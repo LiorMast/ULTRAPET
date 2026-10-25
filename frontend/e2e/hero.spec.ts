@@ -53,14 +53,14 @@ test.describe('layout', () => {
     }
   })
 
-  test('shows the headline and both buttons above the fold (mobile)', async ({ page, isMobile }) => {
+  test('shows the headline and the button above the fold (mobile)', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'mobile layout only')
     for (const path of ['/', '/en']) {
       await page.goto(path)
       await expect(page.getByRole('heading', { level: 1 })).toBeInViewport({ ratio: 1 })
       const buttons = page.locator('#home a.group\\/button')
-      await expect(buttons).toHaveCount(2)
-      for (let i = 0; i < 2; i++) await expect(buttons.nth(i)).toBeInViewport({ ratio: 1 })
+      await expect(buttons).toHaveCount(1)
+      await expect(buttons.first()).toBeInViewport({ ratio: 1 })
     }
   })
 

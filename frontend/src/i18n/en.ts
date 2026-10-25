@@ -27,6 +27,27 @@ export const en: Dictionary = {
     smallAnimals: 'Small Animals',
     birds: 'Birds',
   },
+  brands: {
+    eyebrow: 'Our Brands',
+    title: "Premium brands from the world's leading manufacturers",
+    intro: 'Choose a brand to see its products, categories and full details.',
+    explore: 'Explore brand',
+    taglines: {
+      ultraPet: 'Premium Complete Nutrition',
+      internutri: 'Science-Based Formulas',
+      greenheart: 'Natural & Organic',
+      paw: 'Everyday Excellence',
+      jrFarm: 'Small Animal Specialists',
+      ultraClean: 'Premium Cat Hygiene',
+    },
+  },
+  stats: {
+    title: 'Ultra Pet in numbers',
+    retail: 'Retail locations',
+    partners: 'Manufacturing partners',
+    products: 'Products',
+    years: 'Years of experience',
+  },
   header: {
     home: 'UltraPet – home page',
     mainMenu: 'Main menu',

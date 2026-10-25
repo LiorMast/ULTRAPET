@@ -12,34 +12,17 @@
  * - 0 photos: a plain charcoal gradient. 1 photo: no controls. 2 or more: slideshow with controls.
  * - The scroll-down arrow is a real link to the next home section (#stats).
  */
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, ChevronDown, Pause, Play } from 'lucide-react'
 import { cn } from 'cn'
+import { useReducedMotion } from '@/components/useReducedMotion'
 import { Button } from '@/components/ui/button'
 import { HERO_IMAGES, HERO_LINKS, type HeroImage } from '@/config'
 import { useI18n } from '@/i18n'
 
-const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
-
 /** Same side padding as the navbar, so the hero text lines up with the logo. */
 const PAGE_GUTTER = 'px-6 lg:px-10 xl:px-6 2xl:px-10'
-
-/**
- * Tracks the visitor's "reduce motion" system setting, updating live when it changes.
- * @returns true when the visitor asked for reduced motion.
- */
-function useReducedMotion() {
-  return useSyncExternalStore(
-    (notify) => {
-      const query = window.matchMedia(REDUCED_MOTION_QUERY)
-      query.addEventListener('change', notify)
-      return () => query.removeEventListener('change', notify)
-    },
-    () => window.matchMedia(REDUCED_MOTION_QUERY).matches,
-    () => false,
-  )
-}
 
 /**
  * The home page hero.
@@ -134,9 +117,9 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
                 <ArrowRight size={16} aria-hidden="true" className="rtl:rotate-180" />
               </Link>
             </Button>
-            <Button asChild variant="ghostWhite" className="px-9 py-5 text-sm">
+            {/* <Button asChild variant="ghostWhite" className="px-9 py-5 text-sm">
               <Link {...HERO_LINKS.business.link}>{HERO_LINKS.business.label(t)}</Link>
-            </Button>
+            </Button> */}
           </div>
         </div>
       </div>

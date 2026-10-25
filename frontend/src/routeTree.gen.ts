@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as WhereToBuyRouteImport } from './routes/where-to-buy'
+import { Route as BrandsSlugRouteImport } from './routes/brands.$slug'
 import { Route as CategoriesSlugRouteImport } from './routes/categories.$slug'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const WhereToBuyRoute = WhereToBuyRouteImport.update({
   path: '/where-to-buy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BrandsSlugRoute = BrandsSlugRouteImport.update({
+  id: '/brands/$slug',
+  path: '/brands/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CategoriesSlugRoute = CategoriesSlugRouteImport.update({
   id: '/categories/$slug',
   path: '/categories/$slug',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/where-to-buy': typeof WhereToBuyRoute
+  '/brands/$slug': typeof BrandsSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/where-to-buy': typeof WhereToBuyRoute
+  '/brands/$slug': typeof BrandsSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,29 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/where-to-buy': typeof WhereToBuyRoute
+  '/brands/$slug': typeof BrandsSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/where-to-buy' | '/categories/$slug'
+  fullPaths:
+    '/' | '/login' | '/where-to-buy' | '/brands/$slug' | '/categories/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/where-to-buy' | '/categories/$slug'
-  id: '__root__' | '/' | '/login' | '/where-to-buy' | '/categories/$slug'
+  to: '/' | '/login' | '/where-to-buy' | '/brands/$slug' | '/categories/$slug'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/where-to-buy'
+    | '/brands/$slug'
+    | '/categories/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   WhereToBuyRoute: typeof WhereToBuyRoute
+  BrandsSlugRoute: typeof BrandsSlugRoute
   CategoriesSlugRoute: typeof CategoriesSlugRoute
 }
 
@@ -92,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WhereToBuyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/brands/$slug': {
+      id: '/brands/$slug'
+      path: '/brands/$slug'
+      fullPath: '/brands/$slug'
+      preLoaderRoute: typeof BrandsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/categories/$slug': {
       id: '/categories/$slug'
       path: '/categories/$slug'
@@ -106,6 +130,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   WhereToBuyRoute: WhereToBuyRoute,
+  BrandsSlugRoute: BrandsSlugRoute,
   CategoriesSlugRoute: CategoriesSlugRoute,
 }
 export const routeTree = rootRouteImport

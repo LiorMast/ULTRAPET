@@ -56,7 +56,7 @@ describe('Hero text and buttons', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'אולטרה פט' })).toBeInTheDocument()
     expect(screen.getByText('יבוא והפצה של מזון ומוצרים לחיות מחמד')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'המותגים שלנו' })).toHaveAttribute('href', '/#brands')
-    expect(screen.getByRole('link', { name: 'הפוך ללקוח עסקי' })).toHaveAttribute('href', '/#business')
+    expect(screen.queryByRole('link', { name: 'הפוך ללקוח עסקי' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'המשך למטה' })).toHaveAttribute('href', '/#stats')
   })
 
@@ -64,7 +64,7 @@ describe('Hero text and buttons', () => {
     renderComponent(<Hero images={THREE} />, 'en')
     expect(await screen.findByRole('heading', { level: 1, name: 'Ultra Pet' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Our Brands' })).toHaveAttribute('href', '/en#brands')
-    expect(screen.getByRole('link', { name: 'Become a Business Customer' })).toHaveAttribute('href', '/en#business')
+    expect(screen.queryByRole('link', { name: 'Become a Business Customer' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Scroll down' })).toHaveAttribute('href', '/en#stats')
   })
 })
