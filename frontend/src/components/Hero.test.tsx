@@ -5,7 +5,7 @@
  * home page to prove the photos in src/assets/hero are picked up.
  */
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Hero } from '@/components/Hero'
 import type { HeroImage } from '@/config'
 import { renderComponent, renderPage } from '@/test/utils'
@@ -164,5 +164,28 @@ describe('Hero with reduced motion', () => {
 
     await user.click(screen.getByRole('button', { name: 'Show photo 3 of 3' }))
     expect(photos().map((img) => img.dataset.active)).toEqual(['false', 'false', 'true'])
+  })
+})
+
+describe('Hero scroll-down arrow', () => {
+  it('scrolls to the next section on every click, not only the first one', async () => {
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    const stats = document.createElement('section')
+    stats.id = 'stats'
+    document.body.append(stats)
+    try {
+      const { user } = renderComponent(<Hero images={THREE} />, 'en')
+      const arrow = await screen.findByRole('link', { name: 'Scroll down' })
+      await user.click(arrow)
+      await user.click(arrow)
+      expect(scrollIntoView).toHaveBeenCalledTimes(2)
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth' })
+      expect(arrow).toHaveAttribute('href', '/en#stats')
+    } finally {
+      Element.prototype.scrollIntoView = original
+      stats.remove()
+    }
   })
 })

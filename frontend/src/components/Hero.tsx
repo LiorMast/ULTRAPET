@@ -12,7 +12,7 @@
  * - 0 photos: a plain charcoal gradient. 1 photo: no controls. 2 or more: slideshow with controls.
  * - The scroll-down arrow is a real link to the next home section (#stats).
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, ChevronDown, Pause, Play } from 'lucide-react'
 import { cn } from 'cn'
@@ -66,6 +66,18 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
   /** Shows the next photo (wrapping to the first); called when the active progress dash finishes. */
   const showNext = () => setIndex((current + 1) % count)
 
+  /**
+   * Scrolls to the next home section. The router's Link would navigate to the same URL again on the
+   * second click (no scroll, since the hash is unchanged), so this scrolls by hand and cancels the navigation.
+   * The href stays for crawlers and for clicks with modifier keys.
+   * @param event - The click on the scroll-down arrow.
+   */
+  const scrollDown = (event: MouseEvent<HTMLAnchorElement>) => {
+    const target = document.getElementById(HERO_LINKS.scrollDown.hash)
+    if (!target) return
+    event.preventDefault()
+    target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth' })
+  }
 
   return (
     <section
@@ -177,6 +189,7 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
 
       <Link
         {...HERO_LINKS.scrollDown}
+        onClick={scrollDown}
         aria-label={t.hero.scrollDown}
         className="absolute inset-x-0 bottom-3 z-10 mx-auto w-fit animate-bounce p-2 text-white/60 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white"
       >
