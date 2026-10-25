@@ -1,0 +1,137 @@
+Build a premium corporate website for Ultra Pet Israel, a leading importer and distributor of pet food and pet supplies.
+Company Profile
+Ultra Pet imports and distributes premium pet brands from Europe and supplies pet stores, chains, distributors and retailers throughout Israel.
+The website should look like a large international distributor, similar to Royal Canin, Purina, Hill's or Hamilton, and NOT like a small pet shop or e-commerce store.
+Design Style
+Modern corporate design
+Premium and professional
+Clean white background
+Red and dark charcoal brand colors
+Large typography
+High-end product photography
+Mobile-first responsive design
+Fast loading
+Elegant animations
+Premium user experience
+Homepage Structure
+Hero Section
+Full-width banner with premium pet food brands.
+Headline:
+Ultra Pet
+Subheadline:
+Import and Distribution of Pet Food and Pet Supplies
+Description:
+Supplying premium pet brands to retailers, chains and distributors across Israel.
+Buttons:
+Our Brands
+Become a Business Customer
+Statistics Section
+Display large company statistics:
+150+ Retail Locations
+12+ Years Industry Experience
+6+ Import Countries
+1000+ Products
+Brands Section
+Display brand logos in a premium grid:
+Ultra Pet
+Internutri
+Greenheart Premiums
+Paw
+JR Farm
+Ultra Clean
+Each brand should have a dedicated page.
+Product Categories
+Display modern category cards:
+Dog Food
+Cat Food
+Wet Food & Treats
+Cat Litter
+Small Animals
+Birds
+Private Label Section
+Large premium section explaining private label manufacturing.
+Include:
+Dry Food
+Wet Food
+Treats
+Cat Litter
+Show a professional process timeline:
+Product Selection
+Packaging Design
+Production
+Shipping
+Distribution
+Business Customers Section
+Professional lead generation section.
+Form fields:
+Company Name
+Contact Person
+Phone
+Email
+City
+CTA:
+Open Business Account
+About Section
+Explain Ultra Pet as a national importer and distributor with extensive experience in the pet industry.
+Contact Section
+Include:
+Phone
+Email
+WhatsApp
+Contact Form
+Additional Requirements
+SEO optimized
+Modern navigation
+Sticky header
+Professional footer
+WooCommerce-ready architecture
+Corporate distributor appearance
+Hebrew RTL support
+Future compatibility with product catalog and business customer portal
+The final design should feel like a large international importer and distributor, not an online pet store.
+
+Create a large premium Private Label section.
+This is one of the most important business activities of Ultra Pet.
+Content:
+Ultra Pet develops and manufactures private label products through more than 15 international factories with strict quality control standards.
+Categories:
+
+Dry Food
+Wet Food
+Treats
+Cat Litter Create a professional process timeline:
+Product Selection
+Formula Development
+Packaging Design
+Production
+Quality Control
+International Shipping
+Nationwide Distribution Add professional icons and graphics. Below this section create a Business Customers area. Target audience:
+Pet Stores
+Retail Chains
+Distributors
+Wholesalers Form fields:
+Company Name
+Contact Person
+Phone
+Email
+City Main CTA: Open Business Account Add trust indicators:
+Distribution to 300+ retail locations
+International manufacturing partners
+Premium quality standards
+Nationwide logistics network The section should generate leads and feel like a professional B2B importer website.
+
+Convert the entire website to bilingual support.
+Default language: Hebrew (RTL)
+Secondary language: English (LTR)
+Add a globe language switcher in the header:
+🌐 עברית | English
+All menus, buttons and content must support both languages.
+The layout must automatically switch between RTL and LTR.
+Prepare the system for future Russian and Arabic languages.
+
+For all designs I ask you to make, have them be beautiful, not cookie cutter. Make webpages that are fully featured and worthy for production.
+
+Use icons from lucide-react for logos.
+
+ Run `codegraph sync` after changing files to refresh the codegraph index

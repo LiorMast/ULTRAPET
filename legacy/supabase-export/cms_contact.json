@@ -1,0 +1,32 @@
+[
+  {
+    "id": "7adfda5c-60b3-434c-9684-fafeb3d8cff1",
+    "field_key": "phone",
+    "value": "+972 3 000 0000",
+    "label": "Phone"
+  },
+  {
+    "id": "8e468de8-adc6-4ad9-acde-a0590b1e69b5",
+    "field_key": "email",
+    "value": "office@ultrapet.co.il",
+    "label": "Email"
+  },
+  {
+    "id": "4967f331-032c-472c-8e60-af5235e3308c",
+    "field_key": "whatsapp",
+    "value": "97250000000",
+    "label": "WhatsApp (digits only)"
+  },
+  {
+    "id": "2143492a-a763-42a7-a327-3bfdba9f2891",
+    "field_key": "location",
+    "value": " Israel",
+    "label": "Location"
+  },
+  {
+    "id": "c90dcc1d-1187-4c6f-9233-e51e8732c5fb",
+    "field_key": "hours",
+    "value": "Sun–Thu, 8am–5pm",
+    "label": "Hours"
+  }
+]

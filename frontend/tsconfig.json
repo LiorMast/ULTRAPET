@@ -1,0 +1,12 @@
+// tsconfig.json — TypeScript project root: points to the app (src/) and tooling (configs, e2e/) configs,
+// and declares the "@/..." path alias for editors and the shadcn CLI.
+{
+  "files": [],
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

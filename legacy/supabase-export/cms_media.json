@@ -1,0 +1,132 @@
+[
+  {
+    "id": "5b0ad647-1c68-415d-8522-9deada27f2d2",
+    "filename": "צילום מסך 2026-06-08 003523.png",
+    "storage_path": "brands/1780868163738.png",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/brands/1780868163738.png",
+    "mime_type": "image/png",
+    "size_bytes": 35317,
+    "section": "brands",
+    "uploaded_at": "2026-06-07T21:36:05.617384+00:00"
+  },
+  {
+    "id": "7791f50c-5a6c-450a-b248-8e97231e0d95",
+    "filename": "images.jpg",
+    "storage_path": "brands/1780868369240.jpg",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/brands/1780868369240.jpg",
+    "mime_type": "image/jpeg",
+    "size_bytes": 8415,
+    "section": "brands",
+    "uploaded_at": "2026-06-07T21:39:30.547091+00:00"
+  },
+  {
+    "id": "b379354b-c256-4938-9ab1-7816c0ae2866",
+    "filename": "צילום מסך 2026-06-08 003523.png",
+    "storage_path": "hero/1780869603370.png",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/hero/1780869603370.png",
+    "mime_type": "image/png",
+    "size_bytes": 35317,
+    "section": "hero",
+    "uploaded_at": "2026-06-07T22:00:04.868304+00:00"
+  },
+  {
+    "id": "e0dd51c1-064e-47d4-8cd9-e12fe3971771",
+    "filename": "cc9fca7e-2a68-4355-8ea5-deea30a9b6d2.png",
+    "storage_path": "hero/1780870046016.png",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/hero/1780870046016.png",
+    "mime_type": "image/png",
+    "size_bytes": 910910,
+    "section": "hero",
+    "uploaded_at": "2026-06-07T22:07:28.876901+00:00"
+  },
+  {
+    "id": "34ff11af-5d81-46d4-9967-0c6504ca8029",
+    "filename": "cc9fca7e-2a68-4355-8ea5-deea30a9b6d2.png",
+    "storage_path": "siteIdentity/1780870203025.png",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/siteIdentity/1780870203025.png",
+    "mime_type": "image/png",
+    "size_bytes": 910910,
+    "section": "siteIdentity",
+    "uploaded_at": "2026-06-07T22:10:05.87911+00:00"
+  },
+  {
+    "id": "c404445d-520a-40ae-aea0-331cffad3f75",
+    "filename": "UltraPet_circle_logo.png",
+    "storage_path": "hero/1780870416548.png",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/hero/1780870416548.png",
+    "mime_type": "image/png",
+    "size_bytes": 8902,
+    "section": "hero",
+    "uploaded_at": "2026-06-07T22:13:37.898123+00:00"
+  },
+  {
+    "id": "88b1303d-d3cb-4225-b1c9-62c509e55e4f",
+    "filename": "UltraPet_logo_transparent.png",
+    "storage_path": "brands/1780870567695.png",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/brands/1780870567695.png",
+    "mime_type": "image/png",
+    "size_bytes": 35614,
+    "section": "brands",
+    "uploaded_at": "2026-06-07T22:16:09.201743+00:00"
+  },
+  {
+    "id": "a3e3f5d6-2821-4cef-baca-86551b18aacb",
+    "filename": "banner_Original_desktop_EN.png",
+    "storage_path": "brands/1780929805304.png",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/brands/1780929805304.png",
+    "mime_type": "image/png",
+    "size_bytes": 5029382,
+    "section": "brands",
+    "uploaded_at": "2026-06-08T14:43:33.419018+00:00"
+  },
+  {
+    "id": "eb72da8a-eed0-4c15-badb-60d446afcf0c",
+    "filename": "צילום מסך 2026-06-08 174647.png",
+    "storage_path": "brands/1780930095993.png",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/brands/1780930095993.png",
+    "mime_type": "image/png",
+    "size_bytes": 46951,
+    "section": "brands",
+    "uploaded_at": "2026-06-08T14:48:21.930242+00:00"
+  },
+  {
+    "id": "aa4e9899-a9fa-4263-b527-861cab8b3c5d",
+    "filename": "LOGO_Original_contorno (1).svg",
+    "storage_path": "brands/1780930333301.svg",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/brands/1780930333301.svg",
+    "mime_type": "image/svg+xml",
+    "size_bytes": 14812,
+    "section": "brands",
+    "uploaded_at": "2026-06-08T14:52:14.91993+00:00"
+  },
+  {
+    "id": "692d3bff-652f-4dc0-8699-66b6f918efc4",
+    "filename": "LOGO_Original_contorno (1).svg",
+    "storage_path": "brands/1780930380516.svg",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/brands/1780930380516.svg",
+    "mime_type": "image/svg+xml",
+    "size_bytes": 14812,
+    "section": "brands",
+    "uploaded_at": "2026-06-08T14:53:01.269028+00:00"
+  },
+  {
+    "id": "0dde5e5c-3f26-473b-b451-2641ab42eddb",
+    "filename": "LOGO_Original_contorno (1).svg",
+    "storage_path": "brands/1780930405059.svg",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/brands/1780930405059.svg",
+    "mime_type": "image/svg+xml",
+    "size_bytes": 14812,
+    "section": "brands",
+    "uploaded_at": "2026-06-08T14:53:25.91717+00:00"
+  },
+  {
+    "id": "38de4f19-f0e0-4e04-8500-22c07951443a",
+    "filename": "image.jpg",
+    "storage_path": "products/1780934243286.jpg",
+    "public_url": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/products/1780934243286.jpg",
+    "mime_type": "image/jpeg",
+    "size_bytes": 7592,
+    "section": "products",
+    "uploaded_at": "2026-06-08T15:57:24.647854+00:00"
+  }
+]

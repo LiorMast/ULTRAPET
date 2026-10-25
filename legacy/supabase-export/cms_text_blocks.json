@@ -1,0 +1,1634 @@
+[
+  {
+    "id": "b834775c-848c-4f4b-8137-aa89347f4886",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "tagline",
+    "value": "מוצרי חיות מחמד פרמיום",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "64f03c32-0cd4-4921-b46c-0660a8e19fe1",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "tagline",
+    "value": "Premium Quality Pet Products",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "02bdb6da-12e9-4fa1-944c-89b098622de9",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "description",
+    "value": "יבואן ומפיץ מוביל של מזון ומוצרים לחיות מחמד פרמיום. מוערך על ידי התעשייה מאז 2012.",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "c92679bf-c1ce-41c2-ad50-a6243226faf4",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "description",
+    "value": "Israel's leading national importer and distributor of premium pet food and supplies. Trusted by the industry since 2012.",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "d65b8eaf-2707-4c6e-a336-400b61806c4e",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "ctaTitle",
+    "value": "מוכן לאחסן מותגי חיות מחמד פרמיום?",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "a1b3abd2-8ad9-4b78-8922-783c14476b8f",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "ctaTitle",
+    "value": "Ready to stock premium pet brands?",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "2a187a1d-2c3f-4fd9-b577-d71e91eca9f8",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "ctaSubtitle",
+    "value": "הצטרף ל-300+ שותפים קמעונאים ברחבי ישראל",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "0ac11e76-311b-4d80-b531-fd4a7e7b1460",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "ctaSubtitle",
+    "value": "Join 300+ retail partners across Israel",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "dd42aad7-ddcb-4dfe-b938-207c84314394",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "openAccount",
+    "value": "פתח חשבון עסקי",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "7717492d-c5b7-42a5-bb63-3dd481f549a0",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "openAccount",
+    "value": "Open Business Account",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "cf5c204d-03f1-4b2a-8a1c-60c76930d9c6",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "brandsTitle",
+    "value": "המותגים שלנו",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "09a10cb4-c329-447d-b034-63b8287ca0b3",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "brandsTitle",
+    "value": "Our Brands",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "24a79945-d4d6-4946-9850-46cbf7f0a9d1",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "categoriesTitle",
+    "value": "קטגוריות",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "6d4d7670-1067-41d5-a8ea-fd170bccc1a6",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "categoriesTitle",
+    "value": "Categories",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "1b7fa7c2-24b7-4e2d-9dab-5f3c42100e1d",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "companyTitle",
+    "value": "חברה",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "e31300a0-c2ba-4797-8836-098cf63273cd",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "companyTitle",
+    "value": "Company",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "6c0e9e4d-67c1-4a0c-90fc-0f8b6775caac",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "linkAbout",
+    "value": "אודות",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "0181af58-3f14-4b96-bf8a-38375901fa12",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "linkAbout",
+    "value": "About Us",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "04f7d8ec-5d1b-4fa7-87e5-b36d84710dec",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "linkBrands",
+    "value": "המותגים שלנו",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "ccfe1cb7-62dd-4563-998c-22311ccb22e1",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "linkBrands",
+    "value": "Our Brands",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "ad6a17c3-6cb5-467a-8ee3-f048dedea997",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "linkPrivateLabel",
+    "value": "תווית פרטית",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "4d6c0e47-e340-4506-9cd3-68200a929ecb",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "linkPrivateLabel",
+    "value": "Private Label",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "9588f6d0-b547-4376-b682-aeb65179b387",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "linkBusiness",
+    "value": "חשבונות עסקיים",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "4364ad28-6ba1-4bc2-8d8d-c9c57e4a7ce0",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "linkBusiness",
+    "value": "Business Accounts",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "84aab9f8-ef36-4aab-9439-281a2df908bc",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "linkContact",
+    "value": "צור קשר",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "70aaa0c5-a438-4cfe-b24b-a829b3f07b5d",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "linkContact",
+    "value": "Contact",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "fcecf04e-9071-4819-94ee-ae0cb28978c4",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "privacy",
+    "value": "מדיניות פרטיות",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "ad54c0b8-5799-45d9-b34c-c3d8f65645a8",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "privacy",
+    "value": "Privacy Policy",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "1e27b2ba-d5d9-410f-bceb-c72386b370df",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "terms",
+    "value": "תנאי שימוש",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "6dcb1b76-3427-4966-a6ea-4af5c73e05d7",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "terms",
+    "value": "Terms of Use",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "0ec0371a-c2a0-4679-b3d5-31c4144b0172",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "cookies",
+    "value": "מדיניות עוגיות",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "b73e839b-ad8e-453e-9b5d-b721cc133305",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "cookies",
+    "value": "Cookie Policy",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "103815ae-b6f7-42ba-94db-82ad2c52a98f",
+    "lang": "he",
+    "section": "footer",
+    "field_key": "rights",
+    "value": "כל הזכויות שמורות.",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "ddf101b8-b0bc-451d-b8eb-0a425d2b0d6a",
+    "lang": "en",
+    "section": "footer",
+    "field_key": "rights",
+    "value": "All rights reserved.",
+    "updated_at": "2026-06-07T21:45:56.622063+00:00"
+  },
+  {
+    "id": "c777a74c-787e-4423-81cc-e4660b0b568b",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "eyebrow",
+    "value": "OEM ותווית פרטית",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "bde13b6d-2802-4099-a3e1-33e01a3f1af7",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "eyebrow",
+    "value": "OEM & Private Label",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "3e23b371-22e6-4004-8803-11456f3076d8",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "title1",
+    "value": "ייצור המותג שלך",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "49ecb9e1-4d22-41d3-87aa-e3117eec1844",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "title1",
+    "value": "Manufacture Your",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "c63aa177-5ca3-4192-bd52-61b18d4d28a5",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "title2",
+    "value": "לחיות מחמד",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "8dc929bd-9b86-4b01-8487-1912f90c589c",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "title2",
+    "value": "Own Pet Brand",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "0297ef96-814e-4bb9-b957-ab78edaa9002",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "description1",
+    "value": "אולטרה פט מציעה שירותי ייצור תווית פרטית מלאים — מפיתוח פורמולה ועד הפצה ארצית. אנו מפתחים ומייצרים מוצרים דרך רשת של",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "7451ec80-f03e-4e09-a32a-afe7cdf27a06",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "description1",
+    "value": "UltraPet offers complete private label manufacturing services — from formulation to nationwide distribution. We develop and produce products through a network of",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "723344f8-be4a-44e1-b2d6-d2d124b55be1",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "factories",
+    "value": "15+ מפעלים בינלאומיים מוסמכים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "ab758878-72fd-4b51-aeb2-3f96b4ca2662",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "factories",
+    "value": "15+ international certified factories",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "63645215-7171-42cf-9091-d80a4adc4092",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "description2",
+    "value": "עם בקרת איכות קפדנית בכל שלב.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a76e04d0-eb50-4e42-9003-d426db3a4eae",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "description2",
+    "value": "with strict quality control at every stage.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "4a9c9231-91b4-4307-b1c1-0105c627f525",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "description3",
+    "value": "בין אם אתה קמעונאי המשיק קו מותג עצמי, רשת סופרמרקטים המחפשת מוצרים בלעדיים, או יזם הנכנס לשוק חיות המחמד — אנו מספקים את שרשרת האספקה המלאה תחת קורת גג אחת.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "9e63f86f-8a7f-480b-ac5a-e81cf0738972",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "treatsDesc",
+    "value": "Functional training rewards, dental chews, freeze-dried snacks and natural meat strips. Purpose-built for health benefits and palatability.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "2edd6f62-c645-41ae-9e50-9be7c19b3ac8",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "description3",
+    "value": "Whether you are a retailer launching an own-brand line, a supermarket chain seeking exclusive products, or an entrepreneur entering the pet market — we provide the full supply chain under one roof.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "22b9e30d-1fad-42ac-a393-76ec127c69bb",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "ctaStart",
+    "value": "התחל את התווית הפרטית שלך",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "fba22a5b-1caf-4a9d-a309-8c7fb1b821ec",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "ctaStart",
+    "value": "Start Your Private Label",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "f28deab7-d170-4471-8d83-8b800545e4f2",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "ctaSample",
+    "value": "בקש דוגמה",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "d7d191b1-8567-490d-86fd-92fb48ed757e",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "ctaSample",
+    "value": "Request a Sample",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "77c66fc4-1114-4106-94d6-c365a56229d3",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "capTitle",
+    "value": "יכולות ייצור",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "9f38b9a8-251a-420c-8a55-769cab727ab8",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "capTitle",
+    "value": "Manufacturing Capabilities",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "6e1d4fb8-fc24-4313-abfe-840f86a3ed53",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "capDesc",
+    "value": "רשת הייצור שלנו משתרעת על 6 מדינות באירופה, ומעניקה לך גישה ליצרנים המתמחים הטובים ביותר לכל קטגוריית מוצר.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "b6e05a49-33a0-4fe0-8718-628b78d1f8ba",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "capDesc",
+    "value": "Our production network spans 6 countries across Europe, giving you access to the best specialized manufacturers for each product category.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "2bb2eb6e-d95e-4ac0-a17d-fcb64d16c2de",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "credFactories",
+    "value": "15+",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "61b4f325-ff29-44d0-928b-e189d89fe468",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "credFactories",
+    "value": "15+",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "7352f1bc-ecaa-4826-90f0-1bdf2903bf2b",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "credFactoriesLabel",
+    "value": "מפעלים בינלאומיים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "881cb163-171b-4c28-85d5-c6c10e657e03",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "credFactoriesLabel",
+    "value": "International Factories",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "337ab2e2-43b5-4335-9136-02b6a8ff1d8e",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "credISO",
+    "value": "ISO",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "88d7aa28-1883-4ecb-a4cc-32d8463ed206",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "credISO",
+    "value": "ISO",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "6dfa7de4-c590-48f6-9316-3e2f5de21805",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "credISOLabel",
+    "value": "ייצור מוסמך",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "17336530-648c-4ebe-be7c-d68342593679",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "credISOLabel",
+    "value": "Certified Production",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a6c71d9b-e593-4dd9-8193-2bf58dfcbbd5",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "credFormats",
+    "value": "50+",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "e6974f16-7694-46b9-8c1d-542d581829b7",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "credFormats",
+    "value": "50+",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "dfb07090-8255-4033-8d11-635edf155a9a",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "credFormatsLabel",
+    "value": "פורמטי מוצרים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "b1d56def-9ff1-4ee7-83f7-ac7393677d00",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "credFormatsLabel",
+    "value": "Product Formats",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "15972871-095a-4426-8fb2-2a17379a0cf2",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "credCountries",
+    "value": "12",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "686c2df1-4131-4cd6-b1a7-47c148e67ed9",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "credCountries",
+    "value": "12",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a81f2892-2c48-420e-ad16-451053082512",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "credCountriesLabel",
+    "value": "מדינות יבוא",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "7b64a0ab-9859-42c4-b6e2-e91b299df112",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "credCountriesLabel",
+    "value": "Import Countries",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "afb2bf1b-0e47-4bb9-bb77-5cbb7da48fc1",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "certNote",
+    "value": "כל המפעלים עוברים ביקורת שנתית. תיעוד מלא מסופק לאישור היבוא הישראלי.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "638082ec-c5de-4906-84fe-e3cbbcbdc059",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "certNote",
+    "value": "All factories are subject to annual audits. Full documentation provided for Israeli import approval.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "665acf8d-6a10-4b23-af26-a0c3c632c61e",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "categoriesEyebrow",
+    "value": "קטגוריות מוצרים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "e4bd0d9f-8717-4cba-a1dc-5cff9cccf2d1",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "categoriesEyebrow",
+    "value": "Product Categories",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a2336aa5-f84c-4eec-a678-14b830b4e249",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "categoriesTitle",
+    "value": "מה אנחנו מייצרים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "63192f66-26f6-4d3a-93b0-c2042aaf17ac",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "categoriesTitle",
+    "value": "What We Manufacture",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "ca35552a-4de8-4598-b18b-9577309f357a",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "categoriesSubtitle",
+    "value": "ארבע קטגוריות ליבה, למעלה מ-50 פורמטי מוצרים תחת המותג שלך.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "c23dbdb1-f802-46e5-830f-00c7f72b203f",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "categoriesSubtitle",
+    "value": "Four core categories, 50+ product formats available under your brand.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "87029808-cbd5-42e5-91c3-8a25e1a0dc53",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "dryName",
+    "value": "מזון יבש",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "f2fd476b-32d0-45a1-a57f-1eb916e80df9",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "dryName",
+    "value": "Dry Food",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "75d392bd-eb21-4413-936d-129124780fbc",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "dryTagline",
+    "value": "פורמולות קיבל מותאמות",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "1cac21df-597a-46e3-8224-501584dcadf6",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "dryTagline",
+    "value": "Complete Kibble Formulations",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "d5689bc6-dbf6-49c4-b893-1d84ed4ee4bb",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "dryDesc",
+    "value": "פורמולות מזון יבש מותאמות לכלבים וחתולים בכל שלבי החיים. מדיאטת גורים ועד דיאטות בכירים, נטולות דגנים עד עשירות בחלבון.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "2213c9d7-3bf5-4c7e-8be6-ec8f5ef54b44",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "dryDesc",
+    "value": "Custom dry food formulations for dogs and cats across all life stages. From puppy starter to senior diets, grain-free to high-protein recipes.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "851ea75c-1553-444f-8fbc-4df2c4827003",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "dryFormats",
+    "value": "[\"גור וגורת חתול\",\"בוגר ובכיר\",\"נטול דגנים\",\"שליטה במשקל\",\"דיאטות וטרינריות\"]",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "d1e256cc-fa44-4d8c-a3d4-a95b18d25b2d",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "dryFormats",
+    "value": "[\"Puppy & Kitten\",\"Adult & Senior\",\"Grain-Free\",\"Weight Control\",\"Veterinary Diets\"]",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "fe661289-b849-472c-bb60-a0543176826e",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "drySizes",
+    "value": "1 ק\"ג · 3 ק\"ג · 6 ק\"ג · 10 ק\"ג · 15 ק\"ג · 20 ק\"ג",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a391cb3d-8bf4-4da8-b7c5-d5dd449187bb",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "drySizes",
+    "value": "1kg · 3kg · 6kg · 10kg · 15kg · 20kg",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "2a6d3a91-0b41-4309-a7b7-cb25e49a8cae",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "wetName",
+    "value": "מזון רטוב",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "ddae097f-48de-48bf-9031-8aec8cfdc63e",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "wetName",
+    "value": "Wet Food",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "eb0c957d-d028-4481-ac6e-c60c1f42ef70",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "wetTagline",
+    "value": "פורמולות רטובות גורמה",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "fa4db87c-9ed1-4237-9d5b-46fd164780ad",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "wetTagline",
+    "value": "Gourmet Wet Formulas",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "5d1099e9-acb1-4395-a854-8ce8ff3bacb8",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "wetDesc",
+    "value": "מזון רטוב פרמיום בפורמטי פטה, נתחים ברוטב ומוס. זמין בקופסאות שימורים, שקיות ומגשים לכלבים וחתולים.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "565dbc0e-02a8-4b88-8932-5e0802dcda3a",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "wetDesc",
+    "value": "Premium wet food in pate, chunks-in-gravy, and mousse formats. Available in cans, retort pouches and trays for dogs and cats.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "c98a4150-9453-4ef0-bca1-a86bc85db8a5",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "wetFormats",
+    "value": "[\"פטה / מוס\",\"נתחים ברוטב\",\"מתכוני ג'לי\",\"דיאטות משלימות\",\"מתכונים גורמה\"]",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "bda15365-3e47-473c-8d9e-c2bf8f623a74",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "wetFormats",
+    "value": "[\"Pate / Mousse\",\"Chunks in Gravy\",\"Jelly Recipes\",\"Complementary Diets\",\"Gourmet Recipes\"]",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "3bdc1d8a-90a1-4939-9fef-66f3a02148b2",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "wetSizes",
+    "value": "85 גר' · 100 גר' · 200 גר' · 400 גר' · 800 גר'",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "5dd2631a-736a-49b2-b250-33f504a856d4",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "wetSizes",
+    "value": "85g · 100g · 200g · 400g · 800g",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "3c8ae0e3-8136-4f29-b74d-0ba6bf1b42a5",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "treatsName",
+    "value": "פינוקים וחטיפים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "ebcdee0a-5cc6-47ca-b1dd-2af90a97378d",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "treatsName",
+    "value": "Treats & Snacks",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "9bc57205-30ec-4c40-ad94-2cf685a24261",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "treatsTagline",
+    "value": "פינוקים פונקציונליים ולאימון",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a61102ee-72c6-4bd9-8f8d-718d720e85c9",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "treatsTagline",
+    "value": "Functional & Reward Treats",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "ee530b1d-3df1-46fa-b6ff-72519a9c414a",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "treatsDesc",
+    "value": "פרסים לאימון פונקציונליים, לעיסי שיניים, חטיפים קפואים ופסי בשר טבעיים. בנויים במטרה לתועלות בריאותיות ולטעימות.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "512df463-1e20-4850-acb2-ce4a9f552e78",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "treatsFormats",
+    "value": "[\"פרסי אימון\",\"לעיסי שיניים\",\"קפוא-יבש\",\"פסים טבעיים\",\"פינוקים פונקציונליים\"]",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "41eb6411-edf9-4d32-84a4-d37c102b84dd",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "treatsFormats",
+    "value": "[\"Training Rewards\",\"Dental Chews\",\"Freeze-Dried\",\"Natural Strips\",\"Functional Treats\"]",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "68e148e8-2f3c-4e3d-9812-f39d6a3ebf6d",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "treatsSizes",
+    "value": "50 גר' · 100 גר' · 200 גר' · 400 גר'",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "fe014a17-b65e-49d1-a8a3-e323400a5bc2",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "treatsSizes",
+    "value": "50g · 100g · 200g · 400g",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "c3ed6461-1064-4599-a610-92b8fd0201af",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "litterName",
+    "value": "חול לחתולים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "afdcae4f-d9b0-4adc-9bdc-620127b3857a",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "litterName",
+    "value": "Cat Litter",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "292483b6-08d8-48b5-94a3-2bca49fbf378",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "litterTagline",
+    "value": "פתרונות היגיינה מתקדמים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "5a814892-cea7-4424-a599-1e028f251334",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "litterTagline",
+    "value": "Advanced Hygiene Solutions",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "2f1c3a47-e88d-404f-956a-b5edbfd820ca",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "litterDesc",
+    "value": "חול בנטוניט, ג'ל סיליקה וצמח מתגבש ולא מתגבש. בשמים מותאמים אישית ופורמולות פרמיום נטולות אבק.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "94bcab65-12ae-4eb5-8d0a-aea54637915b",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "litterDesc",
+    "value": "Bentonite, silica gel and plant-based litter in clumping and non-clumping variants. Custom fragrances and premium dust-free formulas.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "94759fe5-2275-4c1e-a1d1-6a052dbef6a4",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "litterFormats",
+    "value": "[\"חימר מתגבש\",\"לא מתגבש\",\"קריסטלי סיליקה\",\"על בסיס צמחי\",\"גרסאות מבושמות\"]",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a2ed372a-bddb-4493-aff6-2e2340e306b7",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "litterFormats",
+    "value": "[\"Clumping Clay\",\"Non-Clumping\",\"Silica Crystals\",\"Plant-Based\",\"Scented Variants\"]",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "56c4f3ed-cd0b-40f2-b782-858416cc58d3",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "litterSizes",
+    "value": "3.6 ק\"ג · 5 ק\"ג · 10 ק\"ג · 20 ק\"ג",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "07aa1027-1eb2-4379-b101-6dc3ac16e927",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "litterSizes",
+    "value": "3.6kg · 5kg · 10kg · 20kg",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "0d4d10f8-474a-4cf4-b3b9-6225a4969b3b",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "packSizes",
+    "value": "גדלי אריזה",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a39d20b7-112c-491c-8a7a-93895846e524",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "packSizes",
+    "value": "Pack Sizes",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "e8e3cfb8-b885-40e0-a91b-6fba0faa2b83",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "processEyebrow",
+    "value": "התהליך שלנו",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "5c17533b-8630-43c6-9f87-78c874d3f11e",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "processEyebrow",
+    "value": "Our Process",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "6d708ea1-cc34-494f-8125-2d1de8bce3b5",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "processTitle1",
+    "value": "מרעיון למדף:",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "5a069e64-f967-45d0-9c6e-6ba559c500cc",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "processTitle1",
+    "value": "From Concept to Shelf:",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "c71210c8-b619-4a0f-9bef-8bb970c492f8",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "processTitle2",
+    "value": "7 שלבים מנוהלים",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a2968aaa-a17d-4b2e-bb0c-537e8e031e86",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "processTitle2",
+    "value": "7 Managed Steps",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "58d0eab8-1184-441d-998d-f62092126c22",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "processDesc",
+    "value": "אנו מנהלים את כל המסלול — מהתדריך הראשוני ועד לרגע שבו המותג שלך מגיע למדף הקמעונאי הישראלי.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "93096af1-a959-4a61-a9f9-fa8d29c92fd0",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "processDesc",
+    "value": "We manage the entire journey — from the first product brief to the moment your brand reaches the Israeli retail shelf.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "b472d212-d93c-4dae-b1a6-b01f5aa1d326",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step1",
+    "value": "בחירת\nמוצר",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "f4fb3e3f-7246-44ae-beec-00f4580059f4",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step1",
+    "value": "Product\nSelection",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "4fd803ee-f033-4fc0-a902-91b166c54833",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step1Desc",
+    "value": "בחר מקטלוג הפורמולות הבסיסי שלנו או תדרך את צוות ה-R&D שלנו על מתכון מותאם אישית לשוק היעד שלך.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "0167519c-48d3-4b72-a0ff-84217ea3d409",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step1Desc",
+    "value": "Choose from our base formulation catalog or brief our R&D team on a custom recipe tailored to your target market.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "7dc6deb5-f0bf-4ab3-9a06-70fc080478dc",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step2",
+    "value": "פיתוח\nפורמולה",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "be7ad866-88a0-453a-bf82-5cc9f6ca2189",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step2",
+    "value": "Formula\nDevelopment",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "014405ab-e576-4458-88cd-d202af4d7bcf",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step2Desc",
+    "value": "התזונאים שלנו מפתחים את הפורמולה בשיתוף עם מעבדות אירופאיות מוסמכות לעמוד בכל דרישות הרגולציה.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "5dcb5f65-5094-45cc-8476-732f6ec0eaa5",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step2Desc",
+    "value": "Our nutritionists develop the formula in collaboration with certified European labs to meet all regulatory requirements.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "f1be5adc-24e7-4557-b26f-a76221e1d235",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step3",
+    "value": "עיצוב\nאריזה",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "3cf60a52-4e4f-4855-9ec5-b68932dbee56",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step3",
+    "value": "Packaging\nDesign",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "2c0e485a-e2f8-48d0-92dc-bfbd6eefc230",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step3Desc",
+    "value": "סטודיו העיצוב הפנימי שלנו יוצר אריזות פרמיום מוכנות למדף המותאמות למותג שלך ולחוקי הסימון הישראלים.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "c70d3f6c-21fb-483b-aedc-f94ab3c5aa32",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step3Desc",
+    "value": "Our in-house design studio creates premium shelf-ready packaging aligned with your brand and Israel's labeling laws.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a8f7724f-1c17-443c-8ea7-fd46111c6a68",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step4",
+    "value": "ייצור",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "145bcabc-27f6-41e0-be7a-ca442a22f056",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step4",
+    "value": "Production",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "9bf01229-c1e4-4a63-a6e1-d13ec72501d5",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step4Desc",
+    "value": "הייצור מתבצע באחד מ-15+ מתקנים אירופאים מוסמכים עם ניתוח מלא ותיעוד ייצור.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "ec5f4302-1ac2-46fa-ac1e-cab44f110bd6",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step4Desc",
+    "value": "Manufacturing takes place in one of 15+ certified European facilities with full traceability and production documentation.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "8754db56-88c9-41f2-b2c5-a85ca19f7d63",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step5",
+    "value": "בקרת\nאיכות",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a2dc0811-7ae0-46ed-9003-95526430479a",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step5",
+    "value": "Quality\nControl",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "e8bb7ba3-f381-412e-a010-40a0c387a6f9",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step5Desc",
+    "value": "כל אצווה עוברת בדיקות QC קפדניות — ניתוח תזונתי, בדיקות מיקרוביולוגיות והערכה חושית.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "900d78a1-6dbe-4eec-bfa5-772505d1ff9f",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step5Desc",
+    "value": "Every batch undergoes rigorous QC testing — nutritional analysis, microbiological checks and sensory evaluation.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "a11a0258-01a7-45d8-90a1-12a89ad26053",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step6",
+    "value": "משלוח\nבינלאומי",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "06ad9b27-36bc-4e7b-b856-f4dc671d70bf",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step6",
+    "value": "International\nShipping",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "3bef6c9a-46c1-406b-bd35-3a36353ed09e",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step6Desc",
+    "value": "אנו מנהלים את תהליך היבוא המלא: משלוח ימי, שחרור מכס, טיפול נמל ואישור וטרינרי ישראלי.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "00dbdda9-881e-4ee0-a5e5-0be522d4c31e",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step6Desc",
+    "value": "We manage the complete import process: ocean freight, customs clearance, port handling and Israeli veterinary approval.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "d9f750c1-8701-469f-a252-1e4e236a8a0f",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step7",
+    "value": "הפצה\nארצית",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "3a4c713b-5aa0-4e23-b100-16aea1e5a5e3",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step7",
+    "value": "Nationwide\nDistribution",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "3b40aa27-6d75-4d2e-85d2-32cd41b567bd",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "step7Desc",
+    "value": "המותג שלך ממוקם ישירות ב-300+ נקודות קמעונאות ברחבי ישראל דרך רשת הלוגיסטיקה המבוססת שלנו.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "80c6c1a9-19e7-4439-9eec-7281ece8538f",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "step7Desc",
+    "value": "Your brand is placed directly into 300+ retail locations across Israel through our established logistics network.",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "60a96831-9361-4eb8-bb11-79f3617902ae",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "timeNote",
+    "value": "זמן ממוצע מתדריך מוצר עד למשלוח ראשון:",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "1328abe2-f6fa-461f-961a-99514eace915",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "timeNote",
+    "value": "Average time from product brief to first delivery:",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "4d909991-1b8d-440b-8c8a-704fd73e9860",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "timeValue",
+    "value": "8–16 שבועות",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "6029aca1-55af-4946-bf81-068dbdd74296",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "timeValue",
+    "value": "8–16 weeks",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "63bdb69b-00cc-40d8-889d-678f67c8fd68",
+    "lang": "he",
+    "section": "privateLabel",
+    "field_key": "startProject",
+    "value": "התחל את הפרויקט שלך",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "265c180f-7fd9-490f-8403-1703354ee116",
+    "lang": "en",
+    "section": "privateLabel",
+    "field_key": "startProject",
+    "value": "Start Your Project",
+    "updated_at": "2026-06-07T21:49:24.998939+00:00"
+  },
+  {
+    "id": "9193290c-432c-47ce-aad8-784b47611c93",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "eyebrow",
+    "value": "יבואן ומפיץ לאומי של מוצרי חיות מחמד בישראל",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "4702ee5f-c53e-4e93-8c17-50128dbe9ad1",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "eyebrow",
+    "value": "Israel's National Pet Import & Distribution Company",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "bf87cb5b-9024-40de-b615-a149327bb6be",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "headline1",
+    "value": "אולטרה ",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "223adc24-24c3-4459-b1c8-961f714d0194",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "headline1",
+    "value": "Ultra",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "ab52e128-d2fa-4d20-b4be-4fff7d6d0511",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "headline2",
+    "value": "פט",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "eae96200-65a7-406f-888b-7da9fe6e8c67",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "headline2",
+    "value": "Pet",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "d1eca9a2-e7e4-4084-979b-65a13b31adb5",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "tagline",
+    "value": "יבוא והפצה של מזון ומוצרים לחיות מחמד",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "5a75753a-3ee6-4e1b-a4f6-79175a34501b",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "tagline",
+    "value": "Import & Distribution of Pet Food and Pet Supplies",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "6306dcd2-5add-4920-b5c5-e10adfd92ee4",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "description",
+    "value": "מספקים מותגי חיות מחמד פרמיום לקמעונאים, רשתות ומפיצים ברחבי ישראל. מוערכים על ידי התעשייה מאז 2012.",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "605b434c-d384-4bae-b433-e6c5d94b9eb2",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "description",
+    "value": "Supplying premium pet brands to retailers, chains and distributors throughout Israel. Trusted by the industry since 2012.",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "af0c6d8f-92a9-48f4-a003-cfe097b79da0",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "cta1",
+    "value": "המותגים שלנו",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "c5015ae4-e531-46f7-8993-4b4b72583475",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "cta1",
+    "value": "Our Brands",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "b4de32d9-0bef-44ed-bb6a-e906b322ba47",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "cta2",
+    "value": "הפוך ללקוח עסקי",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "4eea62a1-9d82-427f-b801-cfd8658a5d1b",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "cta2",
+    "value": "Become a Business Customer",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "1c99cef3-0e9f-4384-8beb-6badef424f18",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "slide1",
+    "value": "תזונת כלבים פרמיום",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "7d6f1d1b-0df5-47b4-832b-cfe44dc9049a",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "slide1",
+    "value": "Premium Dog Nutrition",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "1531f50f-a30f-42c2-8e16-3ed14ff0ca7c",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "slide2",
+    "value": "תזונת חתולים פרמיום",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "7257b528-0857-4a55-bee0-110aef76a510",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "slide2",
+    "value": "Premium Cat Nutrition",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "c99289a9-cc17-4a1a-b06f-7e24f7c70620",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "slide3",
+    "value": "טיפול מקיף בחיות מחמד",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "91f571b2-3691-4b31-8ace-b6707e9bf1f5",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "slide3",
+    "value": "Complete Pet Care",
+    "updated_at": "2026-06-07T21:46:40.753918+00:00"
+  },
+  {
+    "id": "10f52576-00fa-49f6-baa5-4a005c67c8f4",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "logoImageUrl",
+    "value": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/hero/1780870416548.png",
+    "updated_at": "2026-06-07T22:00:14.103417+00:00"
+  },
+  {
+    "id": "ac0d3fc9-d6b9-41a8-ae4c-0b82b79d9cbe",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "logoImageUrl",
+    "value": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/hero/1780870416548.png",
+    "updated_at": "2026-06-07T22:00:14.103417+00:00"
+  },
+  {
+    "id": "9e7230f7-55ff-41bb-8338-3c3b81e2eeae",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "logoWidth",
+    "value": "96",
+    "updated_at": "2026-06-07T22:00:14.103417+00:00"
+  },
+  {
+    "id": "a65226d8-bea4-4e54-994d-94b0ec479799",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "logoWidth",
+    "value": "96",
+    "updated_at": "2026-06-07T22:00:14.103417+00:00"
+  },
+  {
+    "id": "ec94345c-4e17-4988-bb9a-1abcfd84eb9d",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "logoHeight",
+    "value": "96",
+    "updated_at": "2026-06-07T22:00:14.103417+00:00"
+  },
+  {
+    "id": "783c2a88-6dfe-435e-b955-2f9878a69806",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "logoHeight",
+    "value": "96",
+    "updated_at": "2026-06-07T22:00:14.103417+00:00"
+  },
+  {
+    "id": "5eea2b6e-d067-4784-995c-a47abc19c5ba",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "secondaryIconUrl",
+    "value": "",
+    "updated_at": "2026-06-07T22:01:22.465329+00:00"
+  },
+  {
+    "id": "3c1dc013-1b02-4473-9a69-5065f46bfaa3",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "secondaryIconUrl",
+    "value": "",
+    "updated_at": "2026-06-07T22:01:22.465329+00:00"
+  },
+  {
+    "id": "782d4222-9947-4bf0-b83f-f114e8dbd189",
+    "lang": "he",
+    "section": "siteIdentity",
+    "field_key": "headerLogoUrl",
+    "value": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/siteIdentity/1780870203025.png",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "e0cf4185-19c7-4a5a-9754-1d3dc6765c69",
+    "lang": "en",
+    "section": "siteIdentity",
+    "field_key": "headerLogoUrl",
+    "value": "https://svaejohfhrfecfxnwdxu.supabase.co/storage/v1/object/public/cms-media/siteIdentity/1780870203025.png",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "78f10d8d-e4f4-492b-8582-ee849b24628e",
+    "lang": "he",
+    "section": "hero",
+    "field_key": "showSecondaryIcon",
+    "value": "true",
+    "updated_at": "2026-06-07T22:00:14.103417+00:00"
+  },
+  {
+    "id": "eef63766-208e-4e4e-926f-8ea87a2e2252",
+    "lang": "en",
+    "section": "hero",
+    "field_key": "showSecondaryIcon",
+    "value": "true",
+    "updated_at": "2026-06-07T22:00:14.103417+00:00"
+  },
+  {
+    "id": "3af769f6-af7d-4a6a-a9d4-b338624607c1",
+    "lang": "he",
+    "section": "siteIdentity",
+    "field_key": "headerLogoWidth",
+    "value": "",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "241b26cf-191d-48cd-80cb-fc93d0fb370d",
+    "lang": "en",
+    "section": "siteIdentity",
+    "field_key": "headerLogoWidth",
+    "value": "",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "882af936-8156-406f-8c93-024674ac035d",
+    "lang": "he",
+    "section": "siteIdentity",
+    "field_key": "headerLogoHeight",
+    "value": "",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "da8df240-9b74-4797-bf62-363198ac34ac",
+    "lang": "en",
+    "section": "siteIdentity",
+    "field_key": "headerLogoHeight",
+    "value": "",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "9e8bc0e9-b70f-40d7-a87f-928bd2fc5632",
+    "lang": "he",
+    "section": "siteIdentity",
+    "field_key": "mobileLogoUrl",
+    "value": "",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "05027093-8c35-41a4-98c0-fad5b5932ca6",
+    "lang": "en",
+    "section": "siteIdentity",
+    "field_key": "mobileLogoUrl",
+    "value": "",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "64c833f4-c34b-464a-af23-59c765e855d6",
+    "lang": "he",
+    "section": "siteIdentity",
+    "field_key": "faviconUrl",
+    "value": "",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  },
+  {
+    "id": "b7cd5b48-cc13-481e-8d5d-802976c9f84f",
+    "lang": "en",
+    "section": "siteIdentity",
+    "field_key": "faviconUrl",
+    "value": "",
+    "updated_at": "2026-06-07T22:10:09.076917+00:00"
+  }
+]

@@ -1,0 +1,12 @@
+// .oxlintrc.json — Lint rules for the frontend (oxlint; run with `npm run lint`).
+// "only-export-components" is off: TanStack route files must export `Route` next to their page
+// component, and small modules (src/i18n/index.tsx, ui/button.tsx) deliberately export helpers next
+// to components. The only cost is a full reload instead of a hot update when those files change.
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "oxc"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": "off"
+  }
+}

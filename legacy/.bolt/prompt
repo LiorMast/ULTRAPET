@@ -1,0 +1,1 @@
+I have this existing vibe coded website ultrapet and the prompts included in @prompts.txt and  @ULTRAPET.txt . write a claude.md file that integrates all the prompts inside and build a new website that uses react with tanstack router and vite 

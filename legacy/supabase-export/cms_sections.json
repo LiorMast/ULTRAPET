@@ -1,0 +1,58 @@
+[
+  {
+    "id": "f66eb701-6fa1-43e8-806d-b782df338cd2",
+    "slug": "home",
+    "label_en": "Hero Banner",
+    "visible": true,
+    "sort_order": 1
+  },
+  {
+    "id": "186097ca-9fec-4aa2-847f-418b8ed56af6",
+    "slug": "stats",
+    "label_en": "Company Scale",
+    "visible": true,
+    "sort_order": 2
+  },
+  {
+    "id": "ffd636a8-06ae-4c7f-b1c1-ebc62d72ceb2",
+    "slug": "brands",
+    "label_en": "Our Brands",
+    "visible": true,
+    "sort_order": 3
+  },
+  {
+    "id": "90c8e9c9-17ad-4e59-b887-8361e93ed113",
+    "slug": "categories",
+    "label_en": "Product Categories",
+    "visible": true,
+    "sort_order": 4
+  },
+  {
+    "id": "feef6e5d-cfc7-493b-a719-1df704d763ad",
+    "slug": "private-label",
+    "label_en": "Private Label",
+    "visible": true,
+    "sort_order": 5
+  },
+  {
+    "id": "85502f5e-e4d0-4baf-bf69-6a5d79a36cde",
+    "slug": "business",
+    "label_en": "Business Customers",
+    "visible": true,
+    "sort_order": 6
+  },
+  {
+    "id": "a7570d18-6c9b-4da1-a650-d11f58289a06",
+    "slug": "about",
+    "label_en": "About Us",
+    "visible": true,
+    "sort_order": 7
+  },
+  {
+    "id": "81def85b-50f1-4302-9189-0164996d2ddd",
+    "slug": "contact",
+    "label_en": "Contact",
+    "visible": true,
+    "sort_order": 8
+  }
+]

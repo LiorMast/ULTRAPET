@@ -1,0 +1,35 @@
+[
+  {
+    "id": "68c17659-6d78-4103-b2d4-4cbb583f5fbc",
+    "title_he": "פרמיום תזונת כלבים",
+    "title_en": "Premium Dog Nutrition",
+    "subtitle_he": "תזונה מלאה ומאוזנת לכלבים בכל גיל ומין",
+    "subtitle_en": "Complete and balanced nutrition for dogs of all ages",
+    "image_url": "https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg?auto=compress&cs=tinysrgb&w=1920&q=90",
+    "sort_order": 1,
+    "active": true,
+    "created_at": "2026-06-07T19:29:41.353466+00:00"
+  },
+  {
+    "id": "dff3c635-0384-44a2-ac86-d16990c8f2b5",
+    "title_he": "פרמיום תזונת חתולים",
+    "title_en": "Premium Cat Nutrition",
+    "subtitle_he": "תזונה עליונה לחתולים מקורה ומחוץ",
+    "subtitle_en": "Premium feline nutrition for indoor and outdoor cats",
+    "image_url": "https://images.pexels.com/photos/1404819/pexels-photo-1404819.jpeg?auto=compress&cs=tinysrgb&w=1920&q=90",
+    "sort_order": 2,
+    "active": true,
+    "created_at": "2026-06-07T19:29:41.353466+00:00"
+  },
+  {
+    "id": "86212e57-ab9b-40f4-b93e-e631da507720",
+    "title_he": "טיפול מלא בחיות מחמד",
+    "title_en": "Complete Pet Care",
+    "subtitle_he": "כל מה שחיות המחמד שלכם צריכות",
+    "subtitle_en": "Everything your pets need, delivered nationwide",
+    "image_url": "https://images.pexels.com/photos/2607544/pexels-photo-2607544.jpeg?auto=compress&cs=tinysrgb&w=1920&q=90",
+    "sort_order": 3,
+    "active": true,
+    "created_at": "2026-06-07T19:29:41.353466+00:00"
+  }
+]

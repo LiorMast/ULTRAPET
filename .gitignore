@@ -1,0 +1,80 @@
+# Root .gitignore — keeps dependencies, build output, caches, secrets, personal settings and customer
+# data out of git. Patterns without a slash match at any depth. frontend/.gitignore adds Vite-specific rules.
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+legacy/.env
+
+# Credentials and private keys
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials*.json
+service-account*.json
+secrets/
+
+# Playwright artifacts
+playwright-report/
+test-results/
+blob-report/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Local databases, database dumps and runtime uploads (created by the app, not source)
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+pgdata/
+postgres-data/
+backend/instance/
+backend/media/
+
+# Customer personal data: exports of B2B leads and contact-form submissions
+business_leads*
+
+# Logs and build caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Personal Claude Code files (the shared .claude/settings.json and agents stay tracked)
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
+
+# MCP server config: holds a plain-text database password for the local dev container
+.mcp.json
