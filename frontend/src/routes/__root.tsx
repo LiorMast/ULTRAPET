@@ -2,7 +2,7 @@
  * routes/__root.tsx — The layout shared by every page: a "skip to content" link, the Navbar, the
  * current page inside <main>, and the "page not found" screen for unknown URLs.
  */
-import { createRootRoute, Link, Outlet, useMatches } from '@tanstack/react-router'
+import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
 import { Navbar } from '@/components/Navbar'
 import { useI18n } from '@/i18n'
 
@@ -12,14 +12,12 @@ export const Route = createRootRoute({
 })
 
 /**
- * Renders the site chrome around the current page. Pages that open with a dark hero declare
- * `staticData: { headerOverlay: true }`: the header starts transparent over them and the page starts
- * at the very top. Every other page gets top padding so the fixed header doesn't cover it.
+ * Renders the site chrome around the current page. The fixed 88px header is always white, so every
+ * page gets matching top padding and nothing is hidden under it.
  * @returns The page layout.
  */
 function RootLayout() {
   const { t } = useI18n()
-  const overlay = useMatches({ select: (matches) => matches.some((match) => match.staticData.headerOverlay) })
 
   return (
     <>
@@ -29,8 +27,8 @@ function RootLayout() {
       >
         {t.header.skipToContent}
       </a>
-      <Navbar overlay={overlay} />
-      <main id="main" tabIndex={-1} className={overlay ? 'outline-none' : 'pt-20 outline-none'}>
+      <Navbar />
+      <main id="main" tabIndex={-1} className="pt-22 outline-none">
         <Outlet />
       </main>
     </>

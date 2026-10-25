@@ -3,15 +3,13 @@
  *
  * TEMPORARY: until the real sections are built (Hero, Stats, Brands, Categories, Private Label,
  * Business Customers, About, Contact — see the roadmap in CLAUDE.md), this shows a dark hero
- * placeholder and empty sections carrying the anchor ids the navbar links to, so the header's
- * transparent-over-hero behavior and the #section links can be developed and tested.
+ * placeholder and empty sections carrying the anchor ids the navbar links to, so the #section links can be developed and tested.
  */
 import { createFileRoute } from '@tanstack/react-router'
 import type { Dictionary } from '@/i18n/he'
 import { useI18n } from '@/i18n'
 
 export const Route = createFileRoute('/')({
-  staticData: { headerOverlay: true },
   component: HomePage,
 })
 

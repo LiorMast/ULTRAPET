@@ -2,21 +2,10 @@
  * Navbar.test.tsx — Tests for the site header (Navbar), its Products and language dropdowns, and the
  * mobile drawer (MobileMenu), rendered inside the real app with renderPage().
  */
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { screen, waitFor, within } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { CATALOG_PDF_URL } from '@/config'
 import { renderPage } from '@/test/utils'
-
-/**
- * Pretends the window was scrolled and fires the scroll event the header listens to.
- * @param y - The new vertical scroll position in pixels.
- */
-function scrollTo(y: number) {
-  Object.defineProperty(window, 'scrollY', { value: y, configurable: true })
-  fireEvent.scroll(window)
-}
-
-afterEach(() => scrollTo(0))
 
 describe('Navbar links', () => {
   it('shows the Hebrew menu with unprefixed links on Hebrew pages', async () => {
@@ -39,7 +28,6 @@ describe('Navbar links', () => {
     expect(within(nav).getByRole('link', { name: 'Where to Buy' })).toHaveAttribute('href', '/en/where-to-buy')
     expect(screen.getByRole('link', { name: 'UltraPet – home page' })).toHaveAttribute('href', '/en')
     expect(screen.getByRole('link', { name: 'Login' })).toHaveAttribute('href', '/en/login')
-    expect(screen.getByRole('link', { name: 'Business Account' })).toHaveAttribute('href', '/en#business')
   })
 
   it('shows the logo with an accessible name', async () => {
@@ -57,29 +45,9 @@ describe('Navbar links', () => {
 })
 
 describe('Navbar background', () => {
-  it('starts transparent over the home hero and turns solid after scrolling 80px', async () => {
-    await renderPage('/')
-    const header = screen.getByRole('banner')
-    expect(header).toHaveAttribute('data-transparent', 'true')
-    expect(header).toHaveAttribute('data-scrolled', 'false')
-
-    scrollTo(60)
-    expect(header).toHaveAttribute('data-transparent', 'true')
-
-    scrollTo(200)
-    await waitFor(() => expect(header).toHaveAttribute('data-transparent', 'false'))
-    expect(header).toHaveAttribute('data-scrolled', 'true')
-  })
-
-  it('starts in the scrolled state when the page loads already scrolled', async () => {
-    scrollTo(500)
-    await renderPage('/')
-    await waitFor(() => expect(screen.getByRole('banner')).toHaveAttribute('data-scrolled', 'true'))
-  })
-
-  it('is solid from the start on pages without a hero', async () => {
-    await renderPage('/where-to-buy')
-    expect(screen.getByRole('banner')).toHaveAttribute('data-transparent', 'false')
+  it.each(['/', '/where-to-buy'])('is always solid white (%s)', async (url) => {
+    await renderPage(url)
+    expect(screen.getByRole('banner')).toHaveClass('bg-white')
   })
 })
 

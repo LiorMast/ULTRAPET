@@ -40,8 +40,4 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: ReturnType<typeof createAppRouter>
   }
-  interface StaticDataRouteOption {
-    /** true for pages that open with a full-bleed dark hero: the header starts transparent over it. */
-    headerOverlay?: boolean
-  }
 }

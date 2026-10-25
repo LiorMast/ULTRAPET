@@ -125,7 +125,7 @@ html:lang(he) {
     @apply font-sans;
     scroll-behavior: smooth;
     /* Keeps #anchor targets from hiding under the fixed header. */
-    scroll-padding-top: 5rem;
+    scroll-padding-top: 5.5rem;
   }
   body {
     @apply bg-background text-foreground antialiased;

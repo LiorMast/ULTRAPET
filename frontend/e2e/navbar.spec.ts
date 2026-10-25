@@ -26,11 +26,12 @@ async function expectNoHorizontalOverflow(page: Page) {
 async function expectSectionBelowHeader(page: Page, id: string) {
   /** Reads the section's current distance from the top of the window, in px. */
   const sectionTop = () => page.locator(`#${id}`).evaluate((el) => el.getBoundingClientRect().top)
-  await expect.poll(sectionTop, { timeout: 5000 }).toBeLessThan(160)
-  await expect(page.getByRole('banner')).toHaveAttribute('data-scrolled', 'true')
-  await page.waitForTimeout(600) // let the header finish shrinking (500ms transition)
   const headerBottom = await page.getByRole('banner').evaluate((el) => el.getBoundingClientRect().bottom)
-  expect(await sectionTop()).toBeGreaterThanOrEqual(Math.floor(headerBottom))
+  // Smooth scrolling is still running right after the click, so wait until the section has settled
+  // at the header's bottom edge instead of checking once.
+  const settled = async () => Math.round(await sectionTop())
+  await expect.poll(settled, { timeout: 5000 }).toBeGreaterThanOrEqual(Math.floor(headerBottom))
+  await expect.poll(settled, { timeout: 5000 }).toBeLessThanOrEqual(Math.floor(headerBottom) + 8)
 }
 
 /**
@@ -45,17 +46,14 @@ async function expectNoA11yViolations(page: Page) {
 test.describe('desktop', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop layout only')
 
-  test('is transparent over the hero and turns solid after scrolling', async ({ page }) => {
+  test('is always white, over the hero and after scrolling', async ({ page }) => {
     await page.goto('/')
     const header = page.getByRole('banner')
-    await expect(header).toHaveAttribute('data-transparent', 'true')
+    await expect(header).toHaveCSS('background-color', 'rgb(255, 255, 255)')
     await expect(header).toHaveScreenshot('header-he-top.png')
 
     await page.mouse.wheel(0, 600)
-    await expect(header).toHaveAttribute('data-transparent', 'false')
-    await expect
-      .poll(() => header.evaluate((el) => getComputedStyle(el).backgroundColor))
-      .not.toBe('rgba(0, 0, 0, 0)')
+    await expect(header).toHaveCSS('background-color', 'rgb(255, 255, 255)')
     await expect(header).toHaveScreenshot('header-he-scrolled.png')
   })
 
@@ -109,24 +107,29 @@ test.describe('desktop', () => {
         await expectNoHorizontalOverflow(page)
         const header = page.getByRole('banner')
         const height = await header.evaluate((el) => el.getBoundingClientRect().height)
-        expect(height, `header height at ${width}px`).toBeLessThanOrEqual(84)
+        expect(height, `header height at ${width}px`).toBeLessThanOrEqual(96)
 
-        // Every visible entry of the header row stays on a single text line (no wrapped labels),
-        // and nothing spills out of the header row.
+        // Every text label in the header row stays on one line (no wrapped labels), and nothing spills
+        // out of the header row. Icon-only buttons have no text and are skipped.
         const report = await header.evaluate((el) => {
           const row = el.firstElementChild as HTMLElement
-          const entries = [...row.querySelectorAll<HTMLElement>('nav > a, nav > button, :scope > div > *')]
-          const wrapped = entries
-            .filter((e) => e.offsetParent !== null && e.getClientRects().length > 0)
-            .filter((e) => e.getBoundingClientRect().height > 44)
+          const wrapped = [...row.querySelectorAll<HTMLElement>('a, button')]
+            .filter((e) => e.offsetParent !== null && e.textContent?.trim())
+            .filter((e) => {
+              const tops = new Set<number>()
+              const walker = document.createTreeWalker(e, NodeFilter.SHOW_TEXT)
+              for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+                if (node.parentElement?.classList.contains('sr-only')) continue
+                const range = document.createRange()
+                range.selectNodeContents(node)
+                for (const rect of range.getClientRects()) tops.add(Math.round(rect.top))
+              }
+              return tops.size > 1
+            })
             .map((e) => e.textContent)
-          const textLines = [...row.querySelectorAll<HTMLElement>('nav > a, nav > button')]
-            .filter((e) => e.offsetParent !== null)
-            .filter((e) => e.getBoundingClientRect().height > parseFloat(getComputedStyle(e).lineHeight) * 1.5)
-            .map((e) => e.textContent)
-          return { wrapped, textLines, overflow: row.scrollWidth - row.clientWidth }
+          return { wrapped, overflow: row.scrollWidth - row.clientWidth }
         })
-        expect(report, `header row at ${width}px`).toEqual({ wrapped: [], textLines: [], overflow: 0 })
+        expect(report, `header row at ${width}px`).toEqual({ wrapped: [], overflow: 0 })
       }
     })
   }

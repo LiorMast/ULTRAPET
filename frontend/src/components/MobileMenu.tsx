@@ -28,10 +28,9 @@ const SUB_ENTRY_CLASS =
 /**
  * The mobile menu: a hamburger button that opens the navigation drawer.
  * @param props.items - Menu items (the same list the desktop menu shows).
- * @param props.tone - "light" while the header is transparent over the hero (white button), else "dark".
  * @returns The hamburger button together with its drawer.
  */
-export function MobileMenu({ items, tone }: { items: NavItem[]; tone: 'dark' | 'light' }) {
+export function MobileMenu({ items }: { items: NavItem[] }) {
   const { t, isRtl } = useI18n()
   const [open, setOpen] = useState(false)
   /** Closes the drawer; every link calls it, so choosing a destination also closes the menu. */
@@ -42,11 +41,11 @@ export function MobileMenu({ items, tone }: { items: NavItem[]; tone: 'dark' | '
       <SheetTrigger
         aria-label={t.header.openMenu}
         className={cn(
-          'p-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-red',
-          tone === 'light' ? 'text-white' : 'text-brand-charcoal',
+          'p-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-red',
+          'text-brand-charcoal',
         )}
       >
-        <Menu size={22} aria-hidden="true" />
+        <Menu size={32} aria-hidden="true" />
       </SheetTrigger>
 
       <SheetContent

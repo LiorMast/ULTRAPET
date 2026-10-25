@@ -40,17 +40,9 @@ function useLocaleHref() {
 /**
  * The language switcher.
  * @param props.variant - "dropdown" (desktop header), "buttons" (mobile drawer) or "toggle" (mobile bar).
- * @param props.tone - "light" = white text for the transparent header over the dark hero; "dark" otherwise.
- *   Ignored by "buttons".
  * @returns The switcher for the chosen variant.
  */
-export function LanguageSwitcher({
-  variant,
-  tone = 'dark',
-}: {
-  variant: 'dropdown' | 'buttons' | 'toggle'
-  tone?: 'dark' | 'light'
-}) {
+export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' | 'toggle' }) {
   const { t, locale } = useI18n()
   const hrefFor = useLocaleHref()
   const labelId = useId()
@@ -64,11 +56,11 @@ export function LanguageSwitcher({
         lang={other}
         aria-label={`${LOCALES[other].shortName} – ${LOCALES[other].nativeName}`}
         className={cn(
-          'flex items-center gap-1.5 p-2 font-heading text-xs font-semibold transition-colors',
-          tone === 'light' ? 'rounded-sm bg-white/10 text-white/80 hover:text-white' : 'text-neutral-600 hover:text-brand-red',
+          'flex items-center gap-1.5 p-3 font-heading text-base font-semibold transition-colors',
+          'text-neutral-600 hover:text-brand-red',
         )}
       >
-        <Globe size={14} aria-hidden="true" />
+        <Globe size={22} aria-hidden="true" />
         {LOCALES[other].shortName}
       </a>
     )
@@ -111,17 +103,17 @@ export function LanguageSwitcher({
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         className={cn(
-          'group flex items-center gap-1.5 whitespace-nowrap px-3 py-2 font-heading text-xs font-semibold uppercase tracking-widest transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-red',
-          tone === 'light' ? 'text-white/80 hover:text-white' : 'text-neutral-600 hover:text-brand-red',
+          'group flex items-center gap-2.5 whitespace-nowrap px-5 py-3 font-heading text-base font-semibold uppercase tracking-widest transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-red',
+          'text-neutral-600 hover:text-brand-red',
         )}
       >
-        <Globe size={13} aria-hidden="true" />
+        <Globe size={18} aria-hidden="true" />
         {/* Accessible name = "Language: " + whichever label is visible (short below 2xl, full above),
             so it always contains the visible text (WCAG 2.5.3). */}
         <span className="sr-only">{`${t.lang.switchLabel}: `}</span>
         <span className="2xl:hidden">{LOCALES[locale].shortName}</span>
         <span className="hidden 2xl:inline">{LOCALES[locale].nativeName}</span>
-        <ChevronDown size={10} aria-hidden="true" className="transition-transform duration-200 group-data-[state=open]:rotate-180" />
+        <ChevronDown size={15} aria-hidden="true" className="transition-transform duration-200 group-data-[state=open]:rotate-180" />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"

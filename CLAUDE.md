@@ -60,7 +60,7 @@ backend/                (Phase 2)
 - Flat folders, few files, one obvious place for everything (see Layout).
 - Don't add layers until something is genuinely reused by a second caller: no barrel files that only re-export,
   no `hooks/`, `types/`, `services/` or `utils/` folders, no wrapper components.
-- A helper or type used by one file lives in that file (e.g. `useScrolled` lives in `Navbar.tsx`).
+- A helper or type used by one file lives in that file (e.g. `DesktopNavItem` lives in `Navbar.tsx`).
 - Prefer one clear file over several tiny ones; split a file only when it gets hard to read (~250+ lines).
 - The backend follows the same rule: one `backend/app/` package; split modules only when they grow large.
 
@@ -121,7 +121,11 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   screenshots.
 - A step is done only when `npm run check`, `npm run test:e2e` and `npm run build` all pass and changed
   screenshots were reviewed. Never weaken or delete a test to make it pass.
-- Never edit `legacy/` or `requirements/`. Don't commit unless asked.
+- **Test scope during work:** after a small change, run only the tests that cover the changed code (e.g. the
+  matching `*.test.tsx` file and the related e2e spec), not the whole suite every time.
+- **Full gate before committing:** run `npm run check` and `npm run test:e2e` in full before any commit.
+- **Commit only when the user says so.** Never commit on your own initiative.
+- Never edit `legacy/` or `requirements/`.
 
 ## Frontend conventions
 
@@ -170,8 +174,9 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
 - `text-2xs` (0.65rem); shadows `shadow-premium`, `shadow-premium-sm`, `shadow-red`; square corners (`--radius: 0`).
 - **Buttons**: `<Button>` default variant = legacy `.btn-primary` (red, uppercase, lifts with a red glow on hover);
   `size="sm"` for the header.
-- **Logo**: `<Logo tone="dark" | "light">` — horizontal lockup traced from `legacy/public/UltraPet_Logo.pdf`
-  (`light` = white "Ultra" for dark backgrounds).
+- **Logo**: `<Logo className="h-14" />` — horizontal lockup traced from `legacy/public/UltraPet_Logo.pdf`.
+- **Header**: always white, 88px tall (`py-4` + 56px logo); pages use `pt-22` to clear it. No transparent or
+  scroll-driven states.
 - **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,
   short language label "EN"/"עב"); the header container is `max-w-screen-2xl`. Re-run the e2e overflow test
   after adding menu items.
