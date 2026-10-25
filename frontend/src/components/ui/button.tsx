@@ -3,7 +3,8 @@
  *
  * The default variant is the legacy `.btn-primary`: brand red, uppercase Montserrat with wide
  * letter-spacing, lifting slightly with a red glow on hover. Sizes: "default" (legacy px-8 py-4) and
- * "sm" (the header's call to action). The other shadcn variants and icon sizes are kept for
+ * "sm" (the header's call to action). The "ghostWhite" variant is the white-outline button for dark photo
+ * backgrounds (hero), from legacy `.btn-ghost-white`. The other shadcn variants and icon sizes are kept for
  * shadcn components that use them. Use `asChild` to style a <Link> or <a> as a button.
  */
 import * as React from "react"
@@ -18,6 +19,8 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-primary font-heading font-semibold uppercase tracking-widest text-primary-foreground duration-300 hover:-translate-y-0.5 hover:bg-brand-red-dark hover:shadow-red active:translate-y-0",
+        ghostWhite:
+          "border-white/40 font-heading font-semibold uppercase tracking-widest text-white duration-300 hover:-translate-y-0.5 hover:border-white hover:bg-white/10 active:translate-y-0",
         outline:
           "border-border bg-background shadow-xs hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
@@ -48,7 +51,7 @@ const buttonVariants = cva(
 
 /**
  * A button, or — with `asChild` — any single child element (such as a router <Link>) styled as one.
- * @param props.variant - Visual style; "default" is the brand-red primary button.
+ * @param props.variant - Visual style; "default" is the brand-red primary button, "ghostWhite" a white outline for dark backgrounds.
  * @param props.size - "default", "sm" (header), or one of the shadcn icon/compact sizes.
  * @param props.asChild - Render the child element instead of a <button>, merging the button styles into it.
  * @param props.className - Extra classes, merged over the variant classes.

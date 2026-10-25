@@ -29,6 +29,8 @@ secrets/
 playwright-report/
 test-results/
 blob-report/
+# Screenshot baselines of the e2e specs (regenerate with --update-snapshots, never commit)
+*-snapshots/
 
 # Python
 __pycache__/

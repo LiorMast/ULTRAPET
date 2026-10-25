@@ -55,6 +55,19 @@
   --shadow-premium: 0 20px 60px -10px rgb(0 0 0 / 0.15);
   --shadow-premium-sm: 0 8px 30px -5px rgb(0 0 0 / 0.12);
   --shadow-red: 0 8px 30px -5px rgb(190 30 36 / 0.35);
+
+  /* Hero text entrance: fades in while rising 20px. Use as animate-hero-rise with an animation-delay. */
+  --animate-hero-rise: hero-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  @keyframes hero-rise {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
 }
 
 /* shadcn/ui semantic colors -> utilities such as bg-primary, text-muted-foreground, ring-ring. */
@@ -132,13 +145,54 @@ html:lang(he) {
   }
 }
 
+/*
+ * Hero photo slideshow (src/components/Hero.tsx).
+ * --hero-interval is how long each photo stays (default 7s). A photo fades in over 1.6s while very
+ * slowly zooming in (scale 1 -> 1.07) for its whole lifetime, then eases back while it fades out.
+ */
+.hero-slide {
+  opacity: 0;
+  transform: scale(1);
+  transition:
+    opacity 1.6s ease-in-out,
+    transform 1.6s ease-out;
+}
+.hero-slide[data-active='true'] {
+  opacity: 1;
+}
+.hero-slide[data-zoom='true'] {
+  transform: scale(1.07);
+  transition:
+    opacity 1.6s ease-in-out,
+    transform calc(var(--hero-interval, 7s) + 1.6s) linear;
+}
+
+/* The progress bar of the active photo; when it finishes (animationend), the next photo shows. */
+@keyframes hero-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+.hero-progress {
+  animation: hero-progress var(--hero-interval, 7s) linear forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .hero-slide,
+  .hero-slide[data-zoom='true'] {
+    transform: none;
+  }
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
   }
   html {
     scroll-behavior: auto;

@@ -40,7 +40,7 @@ frontend/
     routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, Logo, ...) + their tests
     components/ui/      shadcn primitives (button, dropdown-menu, sheet), restyled for the brand
-    assets/             logo SVGs
+    assets/             logo SVGs; hero/ = the home hero photos (drop images in, no code changes)
     test/               setup.ts (jsdom polyfills), utils.tsx (renderPage)
 backend/                (Phase 2)
 ```
@@ -132,6 +132,12 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Data-driven components**: components take data through props, with defaults from `src/config.ts`; changing the
   menu is a config change. Internal links are built with TanStack `linkOptions(...)`, so a link to a route that
   doesn't exist is a type error.
+- **Modular, reusable components**: build every component to be reused as much as possible. Each component does one
+  job; split out a piece (a card, a heading block, a CTA row, a list item) as soon as it could appear in another place.
+  Vary it through props with sensible defaults and `cva` variants, never by copying it. No page-specific or
+  section-specific logic inside shared components. A component used by one caller may stay in that caller's file (see
+  rule 1), but write it as if it will be reused. When a second caller appears, move it to its own file in
+  `components/` instead of duplicating it.
 - **No hardcoded UI strings**: all text comes from the dictionaries via `useI18n().t` (brand names excepted).
 - **RTL-first**: logical classes only (`ms/me/ps/pe/start/end/text-start/border-s`), never
   `ml/mr/pl/pr/left/right/text-left`. Use `rtl:`/`ltr:` variants for unavoidable direction tweaks (e.g. icon flips).
@@ -273,8 +279,9 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Scaffold: Vite, Tailwind tokens, TanStack Router, i18n, shadcn/ui, Vitest + Playwright
 - [x] Navbar (`Navbar`, `MobileMenu`, `LanguageSwitcher`, `Logo`)
 - [ ] Footer + floating WhatsApp button
-- [ ] Home sections: Hero, Stats, Brands, Categories, Private Label, Business Customers, About, Contact
-      (they replace the placeholder `routes/index.tsx`)
+- [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README)
+- [ ] Home sections: Stats, Brands, Categories, Private Label, Business Customers, About, Contact
+      (each replaces its placeholder block in `routes/index.tsx`)
 - [ ] Pages: brand, category, product, Where to Buy (+ map), articles, legal; per-route SEO head tags
 
 **Phase 2 — Backend**: compose (Postgres + Flask), models + Alembic, seed from the legacy export, public content

@@ -34,6 +34,21 @@ export const he = {
     closeMenu: 'סגירת תפריט',
     skipToContent: 'דילוג לתוכן',
   },
+  hero: {
+    eyebrow: 'יבואן ומפיץ לאומי של מוצרי חיות מחמד בישראל',
+    title: 'אולטרה',
+    titleAccent: 'פט',
+    tagline: 'יבוא והפצה של מזון ומוצרים לחיות מחמד',
+    description:
+      'מספקים מותגי חיות מחמד פרמיום לקמעונאים, רשתות ומפיצים ברחבי ישראל. מוערכים על ידי התעשייה מאז 2012.',
+    ctaBrands: 'המותגים שלנו',
+    ctaBusiness: 'הפוך ללקוח עסקי',
+    scrollDown: 'המשך למטה',
+    slideshowLabel: 'מצגת תמונות',
+    showPhoto: 'הצג תמונה {n} מתוך {total}',
+    pause: 'השהיית המצגת',
+    play: 'הפעלת המצגת',
+  },
   lang: {
     switchLabel: 'שפה',
     comingSoon: 'בקרוב',

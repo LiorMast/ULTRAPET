@@ -35,10 +35,14 @@ async function expectSectionBelowHeader(page: Page, id: string) {
 }
 
 /**
- * Runs axe on the page and fails on any WCAG A/AA violation.
+ * Runs axe on the page and fails on any WCAG A/AA violation. First waits for the hero's text entrance
+ * (`hero-rise`) to finish, because axe reads colours mid-fade and reports false contrast failures.
  * @param page - The Playwright page, in the state to check (e.g. with a menu open).
  */
 async function expectNoA11yViolations(page: Page) {
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => !(a instanceof CSSAnimation && a.animationName === 'hero-rise') || a.playState === 'finished'),
+  )
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
 }

@@ -71,6 +71,30 @@ export const MAIN_NAV: NavItem[] = [
   { id: 'contact', label: (t: Dictionary) => t.nav.contact, link: linkOptions({ to: '/', hash: 'contact' }) },
 ]
 
+/** One hero photo: the default file plus a ready-made `srcset` (WebP at 960w and 1920w). */
+export type HeroImage = { src: string; srcSet: string }
+
+/**
+ * The hero photos: every .jpg/.jpeg/.png/.webp file in src/assets/hero/, in filename order (name them
+ * 01-..., 02-... to control the order). vite-imagetools resizes each one into WebP files at 960w and
+ * 1920w and returns the `srcset` string; the largest file doubles as the plain `src`.
+ */
+const heroFiles = import.meta.glob<string>('/src/assets/hero/*.{jpg,jpeg,png,webp}', {
+  eager: true,
+  import: 'default',
+  query: { w: '960;1920', format: 'webp', as: 'srcset' },
+})
+export const HERO_IMAGES: HeroImage[] = Object.entries(heroFiles)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([, srcSet]) => ({ srcSet, src: srcSet.split(',').pop()!.trim().split(' ')[0] }))
+
+/** Links of the hero: its two call-to-action buttons and the scroll-down arrow (to the next section). */
+export const HERO_LINKS = {
+  brands: { label: (t: Dictionary) => t.hero.ctaBrands, link: linkOptions({ to: '/', hash: 'brands' }) },
+  business: { label: (t: Dictionary) => t.hero.ctaBusiness, link: linkOptions({ to: '/', hash: 'business' }) },
+  scrollDown: linkOptions({ to: '/', hash: 'stats' }),
+}
+
 /** The header's main call to action: "Business Account" → the business-customers section. */
 export const HEADER_CTA = {
   label: (t: Dictionary) => t.nav.businessCta,

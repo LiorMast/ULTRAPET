@@ -34,6 +34,21 @@ export const en: Dictionary = {
     closeMenu: 'Close menu',
     skipToContent: 'Skip to content',
   },
+  hero: {
+    eyebrow: "Israel's National Pet Import & Distribution Company",
+    title: 'Ultra',
+    titleAccent: 'Pet',
+    tagline: 'Import and Distribution of Pet Food and Pet Supplies',
+    description:
+      'Supplying premium pet brands to retailers, chains and distributors across Israel. Trusted by the industry since 2012.',
+    ctaBrands: 'Our Brands',
+    ctaBusiness: 'Become a Business Customer',
+    scrollDown: 'Scroll down',
+    slideshowLabel: 'Photo slideshow',
+    showPhoto: 'Show photo {n} of {total}',
+    pause: 'Pause slideshow',
+    play: 'Play slideshow',
+  },
   lang: {
     switchLabel: 'Language',
     comingSoon: 'Coming Soon',

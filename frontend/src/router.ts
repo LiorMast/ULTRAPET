@@ -23,17 +23,27 @@ export function createAppRouter({ locale, history }: { locale: Locale; history?:
     history,
     scrollRestoration: true,
     defaultPreload: 'intent',
-    rewrite: {
-      input: ({ url }) => {
-        url.pathname = delocalizePath(url.pathname)
-        return url
-      },
-      output: ({ url }) => {
-        url.pathname = localizePath(url.pathname, locale)
-        return url
-      },
-    },
+    rewrite: localeRewrite(locale),
   })
+}
+
+/**
+ * The URL rewrite that maps browser URLs (/en/where-to-buy) to route paths (/where-to-buy) and back.
+ * Shared with the component tests, which build small routers of their own.
+ * @param locale - The language of this page load; every link the router builds gets its prefix.
+ * @returns The `rewrite` option for createRouter.
+ */
+export function localeRewrite(locale: Locale) {
+  return {
+    input: ({ url }: { url: URL }) => {
+      url.pathname = delocalizePath(url.pathname)
+      return url
+    },
+    output: ({ url }: { url: URL }) => {
+      url.pathname = localizePath(url.pathname, locale)
+      return url
+    },
+  }
 }
 
 declare module '@tanstack/react-router' {
