@@ -29,15 +29,30 @@ export type NavItem = { id: string; label: Label } & ({ link: AppLink } | { chil
 /** The PDF catalog without prices (still hosted on the WordPress site until the backend serves it). */
 export const CATALOG_PDF_URL = 'https://www.ultrapet.co.il/wp-content/uploads/2025/03/ultrapetcatalog.pdf'
 
-/** Product categories (from legacy/supabase-export/cms_categories.json), each with a lucide icon. */
-export const CATEGORIES = [
-  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, icon: Dog },
-  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, icon: Cat },
-  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, icon: Bone },
-  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, icon: Sparkles },
-  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, icon: Rabbit },
-  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, icon: Bird },
-]
+/**
+ * Finds the file named after a slug among globbed asset files (e.g. "dog-food" -> .../dog-food.jpg).
+ * @param files - Asset URLs keyed by path, from `import.meta.glob`.
+ * @param slug - The item slug, e.g. "ultra-pet".
+ * @returns The file URL, or undefined when no file is named after the slug.
+ */
+const fileBySlug = (files: Record<string, string>, slug: string) =>
+  Object.entries(files).find(([path]) => /\/([^/]+)\.\w+$/.exec(path)?.[1] === slug)?.[1]
+
+/** Every photo in src/assets/categories/, keyed by path; a category's photo is the file named after its slug. */
+const categoryPhotoFiles = import.meta.glob<string>('/src/assets/categories/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
+
+/** A product category: URL slug, labels, SKU count text, fallback icon and optional photo file. */
+export type Category = { slug: string; label: Label; description: Label; skuCount: string; icon: LucideIcon; image?: string }
+
+/** Product categories (from legacy/supabase-export/cms_categories.json). Backend phase: from the API. */
+export const CATEGORIES: Category[] = [
+  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, description: (t: Dictionary) => t.categories.descriptions.dogFood, skuCount: '300+', icon: Dog },
+  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, description: (t: Dictionary) => t.categories.descriptions.catFood, skuCount: '250+', icon: Cat },
+  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, description: (t: Dictionary) => t.categories.descriptions.wetFood, skuCount: '180+', icon: Bone },
+  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, description: (t: Dictionary) => t.categories.descriptions.litter, skuCount: '40+', icon: Sparkles },
+  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, description: (t: Dictionary) => t.categories.descriptions.smallAnimals, skuCount: '120+', icon: Rabbit },
+  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, description: (t: Dictionary) => t.categories.descriptions.birds, skuCount: '80+', icon: Bird },
+].map((category) => ({ ...category, image: fileBySlug(categoryPhotoFiles, category.slug) }))
 
 /** A company figure shown in the home page Stats band: a number with a suffix ("+") and a short label. */
 export type Stat = { id: string; value: number; suffix: string; label: Label }
@@ -61,7 +76,7 @@ const brandLogoFiles = import.meta.glob<string>('/src/assets/brands/*.{svg,png,j
  * @param slug - The brand slug, e.g. "ultra-pet".
  * @returns The logo URL, or undefined when no file in src/assets/brands/ is named after the slug.
  */
-const brandLogo = (slug: string) => Object.entries(brandLogoFiles).find(([path]) => /\/([^/]+)\.\w+$/.exec(path)?.[1] === slug)?.[1]
+const brandLogo = (slug: string) => fileBySlug(brandLogoFiles, slug)
 
 /** The brands, in display order (from legacy/supabase-export/cms_brands.json). Backend phase: from the API. */
 export const BRANDS: Brand[] = [

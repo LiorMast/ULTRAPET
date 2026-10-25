@@ -1,13 +1,14 @@
 /**
  * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English).
  *
- * The hero, Brands and Stats are real components. The other sections are TEMPORARY placeholders
- * (Categories, Private Label, Business Customers, About, Contact — see the roadmap in CLAUDE.md): each is
+ * The hero, Brands, Stats and Categories are real components. The other sections are TEMPORARY placeholders
+ * (Private Label, Business Customers, About, Contact — see the roadmap in CLAUDE.md): each is
  * an empty block carrying the anchor id that the navbar and the hero link to, until the real section
  * replaces it.
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { Brands } from '@/components/Brands'
+import { Categories } from '@/components/Categories'
 import { Hero } from '@/components/Hero'
 import { Stats } from '@/components/Stats'
 import type { Dictionary } from '@/i18n/he'
@@ -19,7 +20,6 @@ export const Route = createFileRoute('/')({
 
 /** The placeholder section anchors the navbar and the hero link to, in page order. */
 const SECTIONS: { id: string; title: (t: Dictionary) => string }[] = [
-  { id: 'categories', title: (t) => t.nav.products },
   { id: 'private-label', title: (t) => t.nav.privateLabel },
   { id: 'business', title: (t) => t.nav.businessCta },
   { id: 'about', title: (t) => t.nav.about },
@@ -44,7 +44,7 @@ function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
 }
 
 /**
- * The home page: the hero, the Brands and Stats sections, then one empty placeholder per remaining anchor.
+ * The home page: the hero, the Brands, Stats and Categories sections, then one empty placeholder per remaining anchor.
  * @returns The page content.
  */
 function HomePage() {
@@ -53,6 +53,7 @@ function HomePage() {
       <Hero />
       <Brands />
       <Stats />
+      <Categories />
       {SECTIONS.map((section) => (
         <Placeholder key={section.id} section={section} />
       ))}
