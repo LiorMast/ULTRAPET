@@ -7,6 +7,8 @@
  *  - Tailwind CSS v4: compiles the utility classes used in src/.
  *  - vite-imagetools: resizes images imported with a query (e.g. the hero photos in src/assets/hero)
  *    into WebP files at several widths, with a ready-made `srcset`.
+ * `optimizeDeps` pre-bundles the lazily loaded map libraries at server start, so the first visit to
+ * /where-to-buy does not trigger a dependency re-optimisation and page reload.
  * The `test` block configures Vitest (jsdom + Testing Library, see src/test/setup.ts).
  * Playwright end-to-end tests live in e2e/ and have their own playwright.config.ts.
  */
@@ -23,6 +25,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
+  optimizeDeps: { include: ['leaflet', 'react-leaflet'] },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

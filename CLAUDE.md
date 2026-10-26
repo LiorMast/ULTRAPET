@@ -38,8 +38,10 @@ frontend/
     config.ts           menu (MAIN_NAV), categories, header buttons, external links
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
     routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404
-    components/         site components (Navbar, MobileMenu, LanguageSwitcher, Logo, ...) + their tests
-    components/ui/      shadcn primitives (button, dropdown-menu, sheet), restyled for the brand
+    components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
+                        Brands, Stats, Categories, About, Contact, Hero, ...) + their tests
+    components/ui/      shadcn primitives (button, dropdown-menu, popover, sheet), restyled for the brand
+    stubs/              JSON stand-ins for backend data, one file per resource (see Frontend conventions)
     assets/             logo SVGs; hero/ = the home hero photos (drop images in, no code changes)
     test/               setup.ts (jsdom polyfills), utils.tsx (renderPage)
 backend/                (Phase 2)
@@ -132,6 +134,11 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Data-driven components**: components take data through props, with defaults from `src/config.ts`; changing the
   menu is a config change. Internal links are built with TanStack `linkOptions(...)`, so a link to a route that
   doesn't exist is a type error.
+- **JSON stubs stand in for the backend**: until Phase 2 exists, data that will come from the API (lists,
+  records, CMS values, form submissions) is a JSON file in `frontend/src/stubs/` (one file per resource, e.g.
+  `brands.json`), imported and typed at the place that uses it. Keep the stub's shape identical to the planned API
+  response, so replacing it with a `fetch` later touches only the import. Never hardcode such data in components.
+  Static copy stays in the dictionaries (`he.ts` / `en.ts`).
 - **Modular, reusable components**: build every component to be reused as much as possible. Each component does one
   job; split out a piece (a card, a heading block, a CTA row, a list item) as soon as it could appear in another place.
   Vary it through props with sensible defaults and `cva` variants, never by copying it. No page-specific or
@@ -175,7 +182,7 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   (`-2` #2A2A2A, `-3` #3A3A3A, `-muted` #6B6B6B); the legacy neutral scale (`neutral-50` #FAFAFA, `neutral-150`
   #EFEFEF ... `neutral-900` #181818). White backgrounds.
 - **Fonts**: Inter (body), Montserrat (`font-heading`: uppercase labels with `tracking-widest` = 0.25em),
-  Playfair Display (`font-display`, English display headings), Heebo (all Hebrew: `html:lang(he)` swaps every font
+  Inter at bold weights (`font-display`, English display headings and stats numbers; was Playfair Display), Heebo (all Hebrew: `html:lang(he)` swaps every font
   token to Heebo and tightens the tracking to 0.02em).
 - `text-2xs` (0.65rem); shadows `shadow-premium`, `shadow-premium-sm`, `shadow-red`; square corners (`--radius: 0`).
 - **Buttons**: `<Button>` default variant = legacy `.btn-primary` (red, uppercase, lifts with a red glow on hover);
@@ -277,12 +284,15 @@ content exists in each language, and the layout flips direction automatically.
 
 **Phase 1 — Frontend (static data first)**
 - [x] Scaffold: Vite, Tailwind tokens, TanStack Router, i18n, shadcn/ui, Vitest + Playwright
-- [x] Navbar (`Navbar`, `MobileMenu`, `LanguageSwitcher`, `Logo`)
+- [x] Navbar (`Navbar`, `MobileMenu`, `LanguageSwitcher`, `Logo`), with the login popover (`LoginPopover`, `LoginForm`:
+      email, password, remember me; no sign-in until Phase 4) — the mobile drawer links to `/login`, which shows the same form
 - [ ] Footer + floating WhatsApp button
 - [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README)
-- [ ] Home sections: Stats, Brands, Categories, Private Label, Business Customers, About, Contact
-      (each replaces its placeholder block in `routes/index.tsx`)
-- [ ] Pages: brand, category, product, Where to Buy (+ map), articles, legal; per-route SEO head tags
+- [x] Home sections: Stats, Brands, Categories, About, Contact (`Contact` = contact cards + a form that opens a
+      prefilled mailto: until Phase 2 lead endpoints exist)
+- [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)
+- [x] Where to Buy (`WhereToBuy`, `BranchMap`): search, nearest store, Leaflet map, `stubs/branches.json` (124 resellers, geocoded once)
+- [ ] Pages: brand, category, product, articles, legal; per-route SEO head tags
 
 **Phase 2 — Backend**: compose (Postgres + Flask), models + Alembic, seed from the legacy export, public content
 API, lead/contact endpoints; replace static frontend data with API calls; serve the PDF catalog.
