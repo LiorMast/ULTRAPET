@@ -1,12 +1,13 @@
 /**
  * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English).
  *
- * The hero, Brands, Stats and Categories are real components. The other sections are TEMPORARY placeholders
- * (Private Label, Business Customers, About, Contact — see the roadmap in CLAUDE.md): each is
+ * The hero, Brands, Stats, Categories and About are real components. The other sections are TEMPORARY placeholders
+ * (Private Label, Business Customers, Contact — see the roadmap in CLAUDE.md): each is
  * an empty block carrying the anchor id that the navbar and the hero link to, until the real section
  * replaces it.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { About } from '@/components/About'
 import { Brands } from '@/components/Brands'
 import { Categories } from '@/components/Categories'
 import { Hero } from '@/components/Hero'
@@ -22,7 +23,6 @@ export const Route = createFileRoute('/')({
 const SECTIONS: { id: string; title: (t: Dictionary) => string }[] = [
   { id: 'private-label', title: (t) => t.nav.privateLabel },
   { id: 'business', title: (t) => t.nav.businessCta },
-  { id: 'about', title: (t) => t.nav.about },
   { id: 'contact', title: (t) => t.nav.contact },
 ]
 
@@ -44,17 +44,21 @@ function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
 }
 
 /**
- * The home page: the hero, the Brands, Stats and Categories sections, then one empty placeholder per remaining anchor.
+ * The home page: the hero, the Brands, Stats and Categories sections, About, and one empty placeholder per remaining anchor.
  * @returns The page content.
  */
 function HomePage() {
   return (
     <>
       <Hero />
-      <Brands />
       <Stats />
+      <Brands />
       <Categories />
-      {SECTIONS.map((section) => (
+      {SECTIONS.slice(0, 2).map((section) => (
+        <Placeholder key={section.id} section={section} />
+      ))}
+      <About />
+      {SECTIONS.slice(2).map((section) => (
         <Placeholder key={section.id} section={section} />
       ))}
     </>

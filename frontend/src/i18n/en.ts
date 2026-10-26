@@ -66,6 +66,62 @@ export const en: Dictionary = {
     products: 'Products',
     years: 'Years of experience',
   },
+  about: {
+    eyebrow: 'About Ultra Pet',
+    title: "Israel's leading importer and distributor of quality pet products",
+    intro:
+      'Ultra Pet is a leading importer and distributor of quality pet food and supplies in Israel. We serve professional pet stores, retail chains and local suppliers, and provide them with tailored solutions.',
+    visionTitle: 'Vision & mission',
+    pillars: {
+      expertise: {
+        title: 'Professional expertise',
+        text: 'Our team has deep knowledge and wide-ranging relationships with leading manufacturers worldwide, so we can bring you the most innovative, highest-quality brands.',
+      },
+      service: {
+        title: 'Personal, reliable service',
+        text: 'We believe in a personal touch and full transparency: fast response, professional guidance and uncompromising quality control.',
+      },
+      care: {
+        title: 'Committed to pets\' quality of life',
+        text: 'Our goal is to give every dog and cat in Israel optimal nutrition and high-quality accessories that improve their everyday lives.',
+      },
+    },
+    offerTitle: 'What we offer',
+    offers: {
+      food: {
+        title: 'Dry & wet food',
+        text: 'Leading global brands, with a range matched to age, breed and special dietary needs.',
+      },
+      litter: {
+        title: 'Cat litter',
+        text: 'A range of types: tofu, clumping, boxed clumping and crystal litter.',
+      },
+      accessories: {
+        title: 'Accessories & equipment',
+        text: 'Bowls and plastics, cat scratchers, grooming products and dog training pads.',
+      },
+      privateLabel: {
+        title: 'Private label',
+        text: 'Full support in planning, designing and launching a private-label brand for customers.',
+      },
+      logistics: {
+        title: 'Logistics & inventory',
+        text: 'Fast shipping, smart inventory management and stock available at any moment.',
+      },
+    },
+    advantagesTitle: 'The Ultra Pet advantage',
+    advantages: {
+      import: 'Official import and fast supply',
+      prices: 'Competitive prices thanks to large import volumes',
+      support: 'Ongoing support and professional advice on choosing the right products',
+    },
+    joinTitle: 'Join the success',
+    joinText:
+      'Ultra Pet invites you to join the front row of distribution partners in Israel. Together we will build a winning product strategy, maximize customer satisfaction and move your business forward.',
+    cta: 'Get a quote',
+    closing:
+      'We believe in professional, courteous service and take the time to understand our customers\' unique needs. Through our wide distribution network we serve pet stores and pet centers nationwide, with fast and efficient deliveries across the country.',
+  },
   header: {
     home: 'UltraPet – home page',
     mainMenu: 'Main menu',

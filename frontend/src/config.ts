@@ -8,7 +8,7 @@
  * doesn't exist is a type error. (Backend phase: categories will come from the API instead.)
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
-import { Bird, Bone, Cat, Dog, Download, Rabbit, Sparkles, type LucideIcon } from 'lucide-react'
+import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Handshake, Heart, Package, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
 import type { Dictionary } from '@/i18n/he'
 
 /** Picks a translated label from the dictionary of the current language. */
@@ -63,6 +63,32 @@ export const STATS: Stat[] = [
   { id: 'partners', value: 15, suffix: '+', label: (t: Dictionary) => t.stats.partners },
   { id: 'products', value: 1000, suffix: '+', label: (t: Dictionary) => t.stats.products },
   { id: 'years', value: 12, suffix: '+', label: (t: Dictionary) => t.stats.years },
+]
+
+/** An item of the About section (a vision pillar or an offering): icon, title and description. */
+export type AboutItem = { id: string; icon: LucideIcon; title: Label; text: Label }
+
+/** The three vision-and-mission pillars of the About section. */
+export const ABOUT_PILLARS: AboutItem[] = [
+  { id: 'expertise', icon: BadgeCheck, title: (t: Dictionary) => t.about.pillars.expertise.title, text: (t: Dictionary) => t.about.pillars.expertise.text },
+  { id: 'service', icon: Handshake, title: (t: Dictionary) => t.about.pillars.service.title, text: (t: Dictionary) => t.about.pillars.service.text },
+  { id: 'care', icon: Heart, title: (t: Dictionary) => t.about.pillars.care.title, text: (t: Dictionary) => t.about.pillars.care.text },
+]
+
+/** What Ultra Pet offers, shown in the About section. */
+export const ABOUT_OFFERS: AboutItem[] = [
+  { id: 'food', icon: Bone, title: (t: Dictionary) => t.about.offers.food.title, text: (t: Dictionary) => t.about.offers.food.text },
+  { id: 'litter', icon: Sparkles, title: (t: Dictionary) => t.about.offers.litter.title, text: (t: Dictionary) => t.about.offers.litter.text },
+  { id: 'accessories', icon: PawPrint, title: (t: Dictionary) => t.about.offers.accessories.title, text: (t: Dictionary) => t.about.offers.accessories.text },
+  { id: 'private-label', icon: Tag, title: (t: Dictionary) => t.about.offers.privateLabel.title, text: (t: Dictionary) => t.about.offers.privateLabel.text },
+  { id: 'logistics', icon: Boxes, title: (t: Dictionary) => t.about.offers.logistics.title, text: (t: Dictionary) => t.about.offers.logistics.text },
+]
+
+/** The Ultra Pet advantages listed in the About section's dark panel. */
+export const ABOUT_ADVANTAGES: { id: string; icon: LucideIcon; label: Label }[] = [
+  { id: 'import', icon: Truck, label: (t: Dictionary) => t.about.advantages.import },
+  { id: 'prices', icon: Tag, label: (t: Dictionary) => t.about.advantages.prices },
+  { id: 'support', icon: Package, label: (t: Dictionary) => t.about.advantages.support },
 ]
 
 /** A brand shown on the home page: its URL slug, display name, accent color and optional logo file. */
