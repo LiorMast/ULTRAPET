@@ -27,7 +27,7 @@ describe('Navbar links', () => {
     expect(within(nav).getByRole('link', { name: 'Brands' })).toHaveAttribute('href', '/en#brands')
     expect(within(nav).getByRole('link', { name: 'Where to Buy' })).toHaveAttribute('href', '/en/where-to-buy')
     expect(screen.getByRole('link', { name: 'UltraPet – home page' })).toHaveAttribute('href', '/en')
-    expect(screen.getByRole('link', { name: 'Login' })).toHaveAttribute('href', '/en/login')
+    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
   })
 
   it('shows the logo with an accessible name', async () => {

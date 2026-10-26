@@ -8,7 +8,7 @@
  * doesn't exist is a type error. (Backend phase: categories will come from the API instead.)
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
-import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Handshake, Heart, Package, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
+import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Clock, Handshake, Heart, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
 import type { Dictionary } from '@/i18n/he'
 
 /** Picks a translated label from the dictionary of the current language. */
@@ -181,3 +181,22 @@ export const HEADER_LOGIN = {
   label: (t: Dictionary) => t.nav.login,
   link: linkOptions({ to: '/login' }),
 }
+
+/** Real contact facts (from the live site; the email is unconfirmed by the owner). Backend phase: from the CMS. */
+export const CONTACT = {
+  phone: '1700-55-99-92',
+  whatsapp: '972522142410',
+  whatsappDisplay: '+972 52-214-2410',
+  email: 'office@ultrapet.co.il',
+}
+
+/** A contact card: icon, label, value, a sub-line and an optional link (no link = plain text, e.g. hours). */
+export type ContactMethod = { id: string; icon: LucideIcon; label: Label; value: Label; sub: Label; href?: string }
+
+/** The contact cards of the Contact section, in display order. */
+export const CONTACT_METHODS: ContactMethod[] = [
+  { id: 'phone', icon: Phone, label: (t: Dictionary) => t.contact.methods.phone.label, value: () => CONTACT.phone, sub: (t: Dictionary) => t.contact.methods.phone.sub, href: `tel:${CONTACT.phone.replaceAll('-', '')}` },
+  { id: 'whatsapp', icon: MessageCircle, label: (t: Dictionary) => t.contact.methods.whatsapp.label, value: () => CONTACT.whatsappDisplay, sub: (t: Dictionary) => t.contact.methods.whatsapp.sub, href: `https://wa.me/${CONTACT.whatsapp}` },
+  { id: 'email', icon: Mail, label: (t: Dictionary) => t.contact.methods.email.label, value: () => CONTACT.email, sub: (t: Dictionary) => t.contact.methods.email.sub, href: `mailto:${CONTACT.email}` },
+  { id: 'hours', icon: Clock, label: (t: Dictionary) => t.contact.methods.hours.label, value: (t: Dictionary) => t.contact.methods.hours.value, sub: (t: Dictionary) => t.contact.methods.hours.sub },
+]

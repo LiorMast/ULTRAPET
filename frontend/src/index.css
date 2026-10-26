@@ -15,7 +15,6 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/montserrat";
-@import "@fontsource-variable/playfair-display";
 @import "@fontsource-variable/heebo";
 
 /* Brand tokens — each one becomes a utility class (e.g. --color-brand-red -> bg-brand-red). */
@@ -43,7 +42,7 @@
 
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --font-heading: "Montserrat Variable", system-ui, sans-serif;
-  --font-display: "Playfair Display Variable", Georgia, serif;
+  --font-display: "Inter Variable", system-ui, sans-serif;
   --font-hebrew: "Heebo Variable", Arial, sans-serif;
 
   --text-2xs: 0.65rem;

@@ -11,9 +11,10 @@
  */
 import { Fragment } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ChevronDown, UserRound } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { cn } from 'cn'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { LoginPopover } from '@/components/LoginPopover'
 import { Logo } from '@/components/Logo'
 import { MobileMenu } from '@/components/MobileMenu'
 import {
@@ -23,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { HEADER_LOGIN, MAIN_NAV, type NavItem } from '@/config'
+import { MAIN_NAV, type NavItem } from '@/config'
 import { useI18n } from '@/i18n'
 
 /** Text style of the top-level menu entries (legacy look). */
@@ -58,13 +59,7 @@ export function Navbar({ items = MAIN_NAV }: { items?: NavItem[] }) {
 
         <div className="hidden shrink-0 items-center gap-2 xl:flex">
           <LanguageSwitcher variant="dropdown" />
-          <Link
-            {...HEADER_LOGIN.link}
-            className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-neutral-300 px-6 py-3 font-heading text-base font-semibold uppercase tracking-widest text-neutral-700 outline-none transition-colors duration-300 hover:border-brand-red hover:bg-brand-red hover:text-white focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2"
-          >
-            <UserRound size={18} aria-hidden="true" />
-            {HEADER_LOGIN.label(t)}
-          </Link>
+          <LoginPopover />
         </div>
 
         <div className="flex items-center gap-1 xl:hidden">
