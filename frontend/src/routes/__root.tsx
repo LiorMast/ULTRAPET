@@ -1,12 +1,20 @@
 /**
- * routes/__root.tsx — The layout shared by every page: a "skip to content" link, the Navbar, the
- * current page inside <main>, and the "page not found" screen for unknown URLs.
+ * routes/__root.tsx — The layout shared by every page: the route-managed <head> tags, a "skip to
+ * content" link, the Navbar, the current page inside <main>, and the "page not found" screen for
+ * unknown URLs. Its `head` sets the default title and description; pages override them (see seo.ts).
  */
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
+import { createRootRouteWithContext, HeadContent, Link, Outlet } from '@tanstack/react-router'
 import { Navbar } from '@/components/Navbar'
-import { useI18n } from '@/i18n'
+import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 
-export const Route = createRootRoute({
+/** What every route receives from the router (see createAppRouter): the language of this page load. */
+export type RouterContext = { locale: Locale }
+
+export const Route = createRootRouteWithContext<RouterContext>()({
+  head: ({ match }) => {
+    const { seo } = dictionaryFor(match.context.locale)
+    return { meta: [{ title: seo.defaultTitle }, { name: 'description', content: seo.defaultDescription }] }
+  },
   component: RootLayout,
   notFoundComponent: NotFound,
 })
@@ -21,6 +29,7 @@ function RootLayout() {
 
   return (
     <>
+      <HeadContent />
       <a
         href="#main"
         className="sr-only z-[60] bg-brand-red px-4 py-3 font-heading text-xs font-semibold text-white focus:not-sr-only focus:fixed focus:start-4 focus:top-4"

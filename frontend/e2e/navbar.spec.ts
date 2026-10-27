@@ -99,7 +99,7 @@ test.describe('desktop', () => {
     await expect(page).toHaveURL('/en/where-to-buy')
     await expect(page.locator('html')).toHaveAttribute('lang', 'en')
     await expect(page.locator('html')).toHaveAttribute('dir', 'ltr')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Where to Buy')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Find a store')
     await expect(page.getByRole('banner')).toHaveScreenshot('header-en-solid.png')
   })
 

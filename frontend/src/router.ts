@@ -5,6 +5,8 @@
  * - Language prefixes: the browser shows /en/where-to-buy, but the route files only know /where-to-buy.
  *   `rewrite.input` strips the prefix from incoming URLs and `rewrite.output` adds it to every link the
  *   router builds, so <Link to="/where-to-buy"> renders href="/en/where-to-buy" on English pages.
+ * - The router context carries the page language, so route `head` options (titles, meta tags) can be
+ *   translated outside React.
  * - Used by main.tsx (browser history) and by the tests (memory history, see src/test/utils.tsx).
  */
 import { createRouter, type RouterHistory } from '@tanstack/react-router'
@@ -24,6 +26,7 @@ export function createAppRouter({ locale, history }: { locale: Locale; history?:
     scrollRestoration: true,
     defaultPreload: 'intent',
     rewrite: localeRewrite(locale),
+    context: { locale },
   })
 }
 

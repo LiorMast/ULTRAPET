@@ -1,7 +1,8 @@
 /**
  * main.tsx — Browser entry point of the UltraPet site.
  * Reads the page language from the URL (/en/... = English, no prefix = Hebrew), applies it to <html>,
- * and renders the router inside the language provider.
+ * removes the static fallback <head> tags of index.html (the routes manage title and meta tags from now
+ * on), and renders the router inside the language provider.
  */
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -12,6 +13,7 @@ import './index.css'
 
 const locale = detectLocale(window.location.pathname)
 applyDocumentLocale(locale)
+document.head.querySelectorAll('[data-static-head]').forEach((tag) => tag.remove())
 const router = createAppRouter({ locale })
 
 createRoot(document.getElementById('root')!).render(

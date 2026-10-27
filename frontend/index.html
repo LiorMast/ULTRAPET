@@ -2,6 +2,8 @@
 <!--
   index.html — The single HTML page of the UltraPet single-page app.
   Defaults to Hebrew right-to-left; src/main.tsx switches lang/dir for /en/... pages.
+  The data-static-head tags are for crawlers and link previews that do not run JavaScript; main.tsx
+  removes them on start, because the routes then manage the title and meta tags (see src/seo.ts).
 -->
 <html lang="he" dir="rtl">
   <head>
@@ -9,18 +11,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#be1e24" />
-    <title>אולטרה פט ישראל | יבוא והפצה של מזון ומוצרים לחיות מחמד</title>
+    <title data-static-head>אולטרה פט ישראל | יבוא והפצה של מזון ומוצרים לחיות מחמד</title>
     <meta
+      data-static-head
       name="description"
       content="אולטרה פט – יבואן ומפיץ ארצי של מזון ומוצרי פרימיום לחיות מחמד. מספקים מותגים מובילים לחנויות, רשתות ומפיצים בכל הארץ."
     />
-    <meta property="og:title" content="UltraPet Israel | Premium Pet Food Import &amp; Distribution" />
+    <meta data-static-head property="og:title" content="UltraPet Israel | Premium Pet Food Import &amp; Distribution" />
     <meta
+      data-static-head
       property="og:description"
       content="Israel's national importer and distributor of premium pet food and supplies, serving retailers, chains and distributors nationwide."
     />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta data-static-head property="og:type" content="website" />
+    <meta data-static-head name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>

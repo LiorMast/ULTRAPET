@@ -15,8 +15,10 @@ import { Hero } from '@/components/Hero'
 import { Stats } from '@/components/Stats'
 import type { Dictionary } from '@/i18n/he'
 import { useI18n } from '@/i18n'
+import { pageHead } from '@/seo'
 
 export const Route = createFileRoute('/')({
+  head: ({ match }) => pageHead({ locale: match.context.locale, path: '/' }),
   component: HomePage,
 })
 

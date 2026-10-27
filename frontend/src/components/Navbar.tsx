@@ -27,9 +27,13 @@ import {
 import { MAIN_NAV, type NavItem } from '@/config'
 import { useI18n } from '@/i18n'
 
-/** Text style of the top-level menu entries (legacy look). */
+/**
+ * Text style of the top-level menu entries (legacy look). Left-to-right (English) labels use 0.1em
+ * letter-spacing instead of the 0.25em `tracking-widest`, so the seven entries fit on one line at every
+ * desktop width (Hebrew has its own tight tracking).
+ */
 const NAV_TEXT =
-  'group relative whitespace-nowrap font-heading text-xs font-medium uppercase tracking-widest 2xl:text-sm min-[1920px]:text-base text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:text-brand-red data-[status=active]:text-brand-red'
+  'group relative whitespace-nowrap font-heading text-xs font-medium uppercase tracking-widest ltr:tracking-[0.1em] 2xl:text-sm min-[1920px]:text-base text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:text-brand-red data-[status=active]:text-brand-red'
 
 /**
  * The site header.

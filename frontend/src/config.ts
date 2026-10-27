@@ -9,7 +9,9 @@
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
 import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Clock, Handshake, Heart, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
+import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
+import articlesData from '@/stubs/articles.json'
 
 /** Picks a translated label from the dictionary of the current language. */
 export type Label = (t: Dictionary) => string
@@ -142,6 +144,7 @@ export const MAIN_NAV: NavItem[] = [
   },
   { id: 'private-label', label: (t: Dictionary) => t.nav.privateLabel, link: linkOptions({ to: '/', hash: 'private-label' }) },
   { id: 'where-to-buy', label: (t: Dictionary) => t.nav.whereToBuy, link: linkOptions({ to: '/where-to-buy' }) },
+  { id: 'articles', label: (t: Dictionary) => t.nav.articles, link: linkOptions({ to: '/articles' }) },
   { id: 'about', label: (t: Dictionary) => t.nav.about, link: linkOptions({ to: '/', hash: 'about' }) },
   { id: 'contact', label: (t: Dictionary) => t.nav.contact, link: linkOptions({ to: '/', hash: 'contact' }) },
 ]
@@ -159,9 +162,17 @@ const heroFiles = import.meta.glob<string>('/src/assets/hero/*.{jpg,jpeg,png,web
   import: 'default',
   query: { w: '960;1920', format: 'webp', as: 'srcset' },
 })
+
+/**
+ * Turns a vite-imagetools `srcset` string into an image whose plain `src` is the largest file.
+ * @param srcSet - E.g. "/a-960.webp 960w, /a-1920.webp 1920w".
+ * @returns The `src` + `srcSet` pair.
+ */
+const srcSetImage = (srcSet: string): HeroImage => ({ srcSet, src: srcSet.split(',').pop()!.trim().split(' ')[0] })
+
 export const HERO_IMAGES: HeroImage[] = Object.entries(heroFiles)
   .sort(([a], [b]) => a.localeCompare(b))
-  .map(([, srcSet]) => ({ srcSet, src: srcSet.split(',').pop()!.trim().split(' ')[0] }))
+  .map(([, srcSet]) => srcSetImage(srcSet))
 
 /** Links of the hero: its two call-to-action buttons and the scroll-down arrow (to the next section). */
 export const HERO_LINKS = {
@@ -200,3 +211,54 @@ export const CONTACT_METHODS: ContactMethod[] = [
   { id: 'email', icon: Mail, label: (t: Dictionary) => t.contact.methods.email.label, value: () => CONTACT.email, sub: (t: Dictionary) => t.contact.methods.email.sub, href: `mailto:${CONTACT.email}` },
   { id: 'hours', icon: Clock, label: (t: Dictionary) => t.contact.methods.hours.label, value: (t: Dictionary) => t.contact.methods.hours.value, sub: (t: Dictionary) => t.contact.methods.hours.sub },
 ]
+
+/** Text in every language that has it; Hebrew is always present and is the fallback. */
+export type Localized<T> = { he: T } & Partial<Record<Locale, T>>
+
+/**
+ * Picks the text of one language from a localized field (e.g. an article title).
+ * @param field - The localized value.
+ * @param locale - The page language.
+ * @returns The value in that language, or the Hebrew one when it has no translation.
+ */
+export const localized = <T,>(field: Localized<T>, locale: Locale): T => field[locale] ?? field.he
+
+/** One block of article text: a paragraph or a numbered list. */
+export type ArticleBlock = { type: 'p'; text: string } | { type: 'ol'; items: string[] }
+
+/**
+ * An article (מאמר) as the API will return it, plus its photo. `description` doubles as the meta
+ * description; `relatedCategories` are category slugs linked from the article; `legacyPath` is the old
+ * WordPress URL, kept for the 301 redirects.
+ */
+export type Article = {
+  slug: string
+  topic: 'cats' | 'dogs'
+  publishedAt: string
+  updatedAt: string
+  title: Localized<string>
+  description: Localized<string>
+  imageAlt: Localized<string>
+  body: Localized<ArticleBlock[]>
+  relatedCategories: string[]
+  legacyPath: string
+  image?: HeroImage
+}
+
+/** Every photo in src/assets/articles/ (named after the article slug), as WebP at 640w and 1280w. */
+const articleImageFiles = import.meta.glob<string>('/src/assets/articles/*.{jpg,jpeg,png,webp}', {
+  eager: true,
+  import: 'default',
+  query: { w: '640;1280', format: 'webp', as: 'srcset' },
+})
+
+/**
+ * The articles, newest first (from stubs/articles.json, ported from the WordPress blog). Backend phase:
+ * from the API.
+ */
+export const ARTICLES: Article[] = (articlesData as Omit<Article, 'image'>[])
+  .map((article) => {
+    const srcSet = fileBySlug(articleImageFiles, article.slug)
+    return { ...article, image: srcSet ? srcSetImage(srcSet) : undefined }
+  })
+  .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))

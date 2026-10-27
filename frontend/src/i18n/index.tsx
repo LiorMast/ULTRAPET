@@ -22,15 +22,17 @@ interface LocaleInfo {
   /** Short label for the compact mobile switcher. */
   shortName: string
   dir: 'rtl' | 'ltr'
+  /** Open Graph locale (language_TERRITORY) for link previews, e.g. "he_IL". */
+  ogLocale: string
   /** false = shown as "coming soon" in the switcher and its URLs are not served. */
   enabled: boolean
 }
 
 export const LOCALES: Record<Locale, LocaleInfo> = {
-  he: { nativeName: 'עברית', shortName: 'עב', dir: 'rtl', enabled: true },
-  en: { nativeName: 'English', shortName: 'EN', dir: 'ltr', enabled: true },
-  ru: { nativeName: 'Русский', shortName: 'RU', dir: 'ltr', enabled: false },
-  ar: { nativeName: 'العربية', shortName: 'ع', dir: 'rtl', enabled: false },
+  he: { nativeName: 'עברית', shortName: 'עב', dir: 'rtl', ogLocale: 'he_IL', enabled: true },
+  en: { nativeName: 'English', shortName: 'EN', dir: 'ltr', ogLocale: 'en_US', enabled: true },
+  ru: { nativeName: 'Русский', shortName: 'RU', dir: 'ltr', ogLocale: 'ru_RU', enabled: false },
+  ar: { nativeName: 'العربية', shortName: 'ع', dir: 'rtl', ogLocale: 'ar_AR', enabled: false },
 }
 
 export const DEFAULT_LOCALE: Locale = 'he'
@@ -42,6 +44,16 @@ export const ALL_LOCALES = Object.keys(LOCALES) as Locale[]
 export const ENABLED_LOCALES = ALL_LOCALES.filter((locale) => LOCALES[locale].enabled)
 
 const DICTIONARIES: Partial<Record<Locale, Dictionary>> = { he, en }
+
+/**
+ * The translated strings of a language, for code outside components (e.g. a route's `head` option),
+ * where the useI18n hook is not available.
+ * @param locale - The language.
+ * @returns Its dictionary, or the Hebrew one while the language has none yet.
+ */
+export function dictionaryFor(locale: Locale): Dictionary {
+  return DICTIONARIES[locale] ?? he
+}
 
 /**
  * Tells whether a URL path segment is a language prefix that the site serves.
@@ -120,5 +132,5 @@ export function LocaleProvider({ locale, children }: { locale: Locale; children:
 export function useI18n() {
   const locale = useContext(LocaleContext)
   const { dir } = LOCALES[locale]
-  return { locale, dir, isRtl: dir === 'rtl', t: DICTIONARIES[locale] ?? he }
+  return { locale, dir, isRtl: dir === 'rtl', t: dictionaryFor(locale) }
 }

@@ -35,7 +35,8 @@ frontend/
     main.tsx            entry: locale from the URL -> <html lang/dir>, providers, router
     router.ts           createAppRouter(): /en prefix rewrite, route staticData types
     index.css           Tailwind + brand tokens + base styles
-    config.ts           menu (MAIN_NAV), categories, header buttons, external links
+    config.ts           menu (MAIN_NAV), categories, articles (ARTICLES), header buttons, external links
+    seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
     routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
@@ -173,7 +174,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - Dictionaries: `he.ts` defines `Dictionary = typeof he`, and `en.ts` must match it. Port strings from
   `legacy/src/lib/translations/{he,en}.ts` as sections are built; the CMS will later override strings
   (like legacy `cms_text_blocks`).
-- SEO (later): per-route title/description, hreflang alternates, canonical URLs, sitemap.
+- SEO: routes set their head tags with `pageHead()` (`src/seo.ts`) in their `head` option — title, description,
+  canonical, hreflang alternates, Open Graph, JSON-LD; the root route sets the defaults. `sitemap.xml` comes from the
+  plugin in `vite.config.ts` (add new public pages to `SITEMAP_PAGES`). The site is still a client-rendered SPA:
+  prerendering the public pages is the next big SEO step.
 
 ## Design system
 
@@ -191,7 +195,7 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
 - **Header**: always white, 88px tall (`py-4` + 56px logo); pages use `pt-22` to clear it. No transparent or
   scroll-driven states.
 - **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,
-  short language label "EN"/"עב"); the header container is `max-w-screen-2xl`. Re-run the e2e overflow test
+  short language label "EN"/"עב"); English menu labels use 0.1em tracking (not `tracking-widest`) so they fit; the header container is `max-w-screen-2xl`. Re-run the e2e overflow test
   after adding menu items.
 - **Look and feel**: like Royal Canin / Purina / Hill's / Hamilton — a large international distributor, **not a pet
   shop**. Clean, minimal and premium; large typography, high-end photography, elegant animations; beautiful and
@@ -292,7 +296,10 @@ content exists in each language, and the layout flips direction automatically.
       prefilled mailto: until Phase 2 lead endpoints exist)
 - [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)
 - [x] Where to Buy (`WhereToBuy`, `BranchMap`): search, nearest store, Leaflet map, `stubs/branches.json` (124 resellers, geocoded once)
-- [ ] Pages: brand, category, product, articles, legal; per-route SEO head tags
+- [x] Articles (`/articles`, `/articles/$slug`; `ArticleCard`, `Breadcrumbs`): the 4 WordPress posts in `stubs/articles.json`
+      (Hebrew verbatim + English translation), head tags via `seo.ts` + `<HeadContent />`, BlogPosting/Breadcrumb
+      JSON-LD, `sitemap.xml` (Vite plugin) + `robots.txt`; each post keeps its WordPress `legacyPath` for the 301s
+- [ ] Pages: brand, category, product, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
 **Phase 2 — Backend**: compose (Postgres + Flask), models + Alembic, seed from the legacy export, public content
 API, lead/contact endpoints; replace static frontend data with API calls; serve the PDF catalog.
