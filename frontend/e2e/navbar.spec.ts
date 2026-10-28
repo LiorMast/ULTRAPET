@@ -74,7 +74,7 @@ test.describe('desktop', () => {
     const menu = page.getByRole('menu')
 
     await products.click()
-    await expect(menu.getByRole('menuitem')).toHaveCount(8)
+    await expect(menu.getByRole('menuitem')).toHaveCount(9)
     await expect(page.getByRole('banner')).toHaveScreenshot('header-en-products-open.png')
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()

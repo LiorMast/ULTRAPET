@@ -24,7 +24,7 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
 ## Layout
 
 ```
-CLAUDE.md
+README.md  CLAUDE.md
 legacy/                 reference only (old site; supabase-export/ = seed data and media)
 requirements/           original prompts
 frontend/
@@ -37,6 +37,7 @@ frontend/
     index.css           Tailwind + brand tokens + base styles
     config.ts           menu (MAIN_NAV), categories, articles (ARTICLES), header buttons, external links
     seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
+    auth.tsx            AuthProvider/useAuth: the business-customer session (STUB sign-in until Phase 4)
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
     routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
@@ -270,7 +271,14 @@ content exists in each language, and the layout flips direction automatically.
   `config.ts` until the backend serves it).
 - **WordPress product categories (15)**: dry cat food, dry dog food, cat cans & treats, dog cans & treats, cat
   snacks, dog snacks & bones, cat litter, beds & mattresses, grooming & hygiene, cat scratchers, rodents, birds,
-  plastics, collars & leashes, equipment. **Open decision** for the catalog phase: legacy's 6 categories or these 15.
+  plastics, collars & leashes, equipment. **Decided:** the catalog uses these 15 (`stubs/product-categories.json`);
+  legacy's 6 categories stay as the home page's marketing cards.
+- **Products**: the 400 products of the WooCommerce Store API (`/wp-json/wc/store/v1/products`) are in
+  `stubs/products.json` (images still hot-linked from WordPress — move them to the backend in Phase 2). Each product's
+  `name` / `description` holds one translation per language (`{ he, en }`, the DB's product translations; Hebrew from
+  the store, English translated for all 400; add `ru` / `ar` the same way); catalog search matches every language. The store
+  publishes no prices: `stubs/prices.json` holds **placeholder** prices until real ones come from Rivhit/the admin.
+  Only the catalog route component may import the product stub (it is code-split; keeps 450 KB out of the main bundle).
 - **SEO migration**: 301-redirect the old WordPress URLs (Hebrew slugs such as `/אודות/`, `/משווקים/`, `/מאמרים/`,
   `/צור-קשר/`, `/product-category/<slug>/`, `/product/<slug>/`, `/shop/`) to the new routes.
 
@@ -299,6 +307,9 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Articles (`/articles`, `/articles/$slug`; `ArticleCard`, `Breadcrumbs`): the 4 WordPress posts in `stubs/articles.json`
       (Hebrew verbatim + English translation), head tags via `seo.ts` + `<HeadContent />`, BlogPosting/Breadcrumb
       JSON-LD, `sitemap.xml` (Vite plugin) + `robots.txt`; each post keeps its WordPress `legacyPath` for the 301s
+- [x] Catalog (`/catalog`; `Catalog`, `CatalogCard`, `Pagination`, `AccountPanel`, `src/auth.tsx`): 400 store products,
+      category chips, search, 24 per page, all state in the URL; prices only for signed-in customers (stub sign-in,
+      placeholder prices loaded after sign-in), "log in to see the price" for visitors
 - [ ] Pages: brand, category, product, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
 **Phase 2 — Backend**: compose (Postgres + Flask), models + Alembic, seed from the legacy export, public content

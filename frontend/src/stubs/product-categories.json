@@ -1,0 +1,122 @@
+[
+ {
+  "slug": "dry-dog-food",
+  "name": {
+   "he": "מזון יבש לכלבים",
+   "en": "Dry Dog Food"
+  },
+  "legacyPath": "/product-category/כלבים/"
+ },
+ {
+  "slug": "dry-cat-food",
+  "name": {
+   "he": "מזון יבש לחתולים",
+   "en": "Dry Cat Food"
+  },
+  "legacyPath": "/product-category/חתולים/"
+ },
+ {
+  "slug": "dog-wet-food",
+  "name": {
+   "he": "שימורים ומעדנים לכלבים",
+   "en": "Dog Cans & Treats"
+  },
+  "legacyPath": "/product-category/שימורים-ומעדנים-לכלבים/"
+ },
+ {
+  "slug": "cat-wet-food",
+  "name": {
+   "he": "שימורים ומעדנים לחתולים",
+   "en": "Cat Cans & Treats"
+  },
+  "legacyPath": "/product-category/שימורים-ומעדנים-לחתולים/"
+ },
+ {
+  "slug": "dog-treats",
+  "name": {
+   "he": "חטיפים ועצמות לכלבים",
+   "en": "Dog Snacks & Bones"
+  },
+  "legacyPath": "/product-category/חטיפים-ועצמות-לכלבים/"
+ },
+ {
+  "slug": "cat-treats",
+  "name": {
+   "he": "חטיפים לחתולים",
+   "en": "Cat Snacks"
+  },
+  "legacyPath": "/product-category/חטיפים-לחתולים/"
+ },
+ {
+  "slug": "cat-litter",
+  "name": {
+   "he": "חול לחתולים",
+   "en": "Cat Litter"
+  },
+  "legacyPath": "/product-category/חול-לחתולים/"
+ },
+ {
+  "slug": "beds",
+  "name": {
+   "he": "מיטות מזרונים",
+   "en": "Beds & Mattresses"
+  },
+  "legacyPath": "/product-category/מיטות-מזרונים/"
+ },
+ {
+  "slug": "grooming",
+  "name": {
+   "he": "טיפוח והיגיינה",
+   "en": "Grooming & Hygiene"
+  },
+  "legacyPath": "/product-category/טיפוח-והיגיינה/"
+ },
+ {
+  "slug": "cat-scratchers",
+  "name": {
+   "he": "מתקני גירוד לחתולים",
+   "en": "Cat Scratchers"
+  },
+  "legacyPath": "/product-category/גירוד/"
+ },
+ {
+  "slug": "rodents",
+  "name": {
+   "he": "מכרסמים",
+   "en": "Rodents"
+  },
+  "legacyPath": "/product-category/מכרסמים/"
+ },
+ {
+  "slug": "birds",
+  "name": {
+   "he": "ציפורים",
+   "en": "Birds"
+  },
+  "legacyPath": "/product-category/ציפורים/"
+ },
+ {
+  "slug": "plastics",
+  "name": {
+   "he": "פלסטיקה",
+   "en": "Plastics"
+  },
+  "legacyPath": "/product-category/פלסטיקה/"
+ },
+ {
+  "slug": "collars-leashes",
+  "name": {
+   "he": "קולרים ורצועות",
+   "en": "Collars & Leashes"
+  },
+  "legacyPath": "/product-category/קולרים-ורצועות/"
+ },
+ {
+  "slug": "equipment",
+  "name": {
+   "he": "ציוד",
+   "en": "Equipment"
+  },
+  "legacyPath": "/product-category/ציוד-לכלבים/"
+ }
+]

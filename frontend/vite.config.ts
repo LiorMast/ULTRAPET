@@ -10,6 +10,7 @@
  *  - sitemap: writes /sitemap.xml (build output, and served by the dev server) listing the public pages
  *    and every article in each language, with hreflang alternates. public/robots.txt points to it.
  * `define` gives the app the public origin (SITE_URL in src/seo.ts) used for canonical URLs.
+ * `server.allowedHosts` lets the dev server be reached through a Cloudflare quick tunnel.
  * `optimizeDeps` pre-bundles the lazily loaded map libraries at server start, so the first visit to
  * /where-to-buy does not trigger a dependency re-optimisation and page reload.
  * The `test` block configures Vitest (jsdom + Testing Library, see src/test/setup.ts).
@@ -31,7 +32,7 @@ const SITE_URL = 'https://www.ultrapet.co.il'
 const SITEMAP_LOCALES = { he: '', en: '/en' }
 
 /** Internal paths of the public pages that are always in the sitemap (articles are added from the stub). */
-const SITEMAP_PAGES = ['/', '/where-to-buy', '/articles']
+const SITEMAP_PAGES = ['/', '/where-to-buy', '/catalog', '/articles']
 
 /**
  * Builds sitemap.xml: one <url> per page and language, each listing all its language versions.
@@ -87,6 +88,9 @@ export default defineConfig({
     alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
   optimizeDeps: { include: ['leaflet', 'react-leaflet'] },
+  // Dev server: also answer requests through Cloudflare quick tunnels (random *.trycloudflare.com names),
+  // used to preview the local site on another device. The leading dot allows every subdomain.
+  server: { allowedHosts: ['.trycloudflare.com'] },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

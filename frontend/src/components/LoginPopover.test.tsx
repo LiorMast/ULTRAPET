@@ -1,6 +1,7 @@
 /**
  * LoginPopover.test.tsx — Tests for the header login popover and its LoginForm: opening, fields, validation,
- * remember-me, the "coming soon" note, Escape, and the /login page showing the same form.
+ * remember-me, signing in (stub) and out from the header, Escape, and the /login page showing the same form
+ * (and the account panel once signed in).
  */
 import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -49,17 +50,40 @@ describe('Login popover', () => {
     expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.co', password: 'secret', remember: true })
   })
 
-  it('shows the coming-soon note when no onSubmit is given', async () => {
+  it('signs in and confirms it when no onSubmit is given', async () => {
     renderComponent(<LoginForm />, 'en')
     fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'a@b.co' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret' } })
     fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(screen.getByRole('status')).toHaveTextContent('opens soon')
+    expect(await screen.findByRole('status')).toHaveTextContent('You are signed in')
+  })
+
+  it('signs in from the header, then shows the account and signs out', async () => {
+    const { user } = await renderPage('/en')
+    await user.click(screen.getByRole('button', { name: 'Login' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Email'), 'shop@example.com')
+    await user.type(within(dialog).getByLabelText('Password'), 'secret')
+    await user.click(within(dialog).getByRole('button', { name: 'Log in' }))
+
+    const account = await screen.findByRole('dialog', { name: 'My account' })
+    expect(within(account).getByRole('status')).toHaveTextContent('Signed in as shop@example.com')
+    expect(within(account).getByRole('link', { name: 'Go to the product catalog' })).toHaveAttribute('href', '/en/catalog')
+    expect(screen.getByRole('button', { name: 'My account' })).toBeInTheDocument()
+
+    await user.click(within(account).getByRole('button', { name: 'Sign out' }))
+    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
   })
 
   it('shows the same form on the /login page', async () => {
     await renderPage('/en/login')
     expect(screen.getByRole('heading', { level: 1, name: 'Business customer login' })).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
+  })
+
+  it('shows the account panel on the /login page when signed in', async () => {
+    await renderPage('/login', { user: { email: 'shop@example.com' } })
+    expect(screen.getByRole('heading', { level: 1, name: 'החשבון שלי' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'התנתקות' })).toBeInTheDocument()
   })
 })

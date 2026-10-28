@@ -8,7 +8,7 @@
  * doesn't exist is a type error. (Backend phase: categories will come from the API instead.)
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
-import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Clock, Handshake, Heart, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
+import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Clock, Handshake, Heart, LayoutGrid, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
 import articlesData from '@/stubs/articles.json'
@@ -134,9 +134,15 @@ export const MAIN_NAV: NavItem[] = [
         link: linkOptions({ to: '/categories/$slug', params: { slug: category.slug } }),
       })),
       {
+        id: 'full-catalog',
+        label: (t: Dictionary) => t.nav.fullCatalog,
+        icon: LayoutGrid,
+        divider: true,
+        link: linkOptions({ to: '/catalog' }),
+      },
+      {
         id: 'all-categories',
         label: (t: Dictionary) => t.nav.allCategories,
-        divider: true,
         link: linkOptions({ to: '/', hash: 'categories' }),
       },
       { id: 'catalog', label: (t: Dictionary) => t.nav.catalog, icon: Download, href: CATALOG_PDF_URL },
@@ -262,3 +268,26 @@ export const ARTICLES: Article[] = (articlesData as Omit<Article, 'image'>[])
     return { ...article, image: srcSet ? srcSetImage(srcSet) : undefined }
   })
   .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+
+/** A product image from the store: the full file, a 300px square thumbnail and a `srcset` of the sized copies. */
+export type ProductImage = { src: string; thumbnail: string; srcSet: string }
+
+/**
+ * A catalog product as the public API will return it: never a price (prices come only from the signed-in
+ * prices endpoint, see routes/catalog.tsx). `name` and `description` hold one translation per language,
+ * as stored in the database (Hebrew always; English for every product; Russian and Arabic later) — show
+ * them with `localized()`, which falls back to Hebrew. `category` is a ProductCategory slug; `legacyPath`
+ * is the old WooCommerce URL, kept for the 301 redirects.
+ */
+export type Product = {
+  id: string
+  slug: string
+  name: Localized<string>
+  description: Localized<string>
+  category: string
+  image: ProductImage | null
+  legacyPath: string
+}
+
+/** A catalog category (the store's 15 categories), e.g. { slug: 'dry-dog-food', name: { he, en } }. */
+export type ProductCategory = { slug: string; name: Localized<string>; legacyPath: string }

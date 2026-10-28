@@ -52,12 +52,13 @@ describe('Navbar background', () => {
 })
 
 describe('Products dropdown', () => {
-  it('lists the six categories, "all categories" and the PDF catalog', async () => {
+  it('lists the six categories, the product catalog, "all categories" and the PDF catalog', async () => {
     const { user } = await renderPage('/')
     await user.click(screen.getByRole('button', { name: 'מוצרים' }))
     const menu = await screen.findByRole('menu')
 
-    expect(within(menu).getAllByRole('menuitem')).toHaveLength(8)
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(9)
+    expect(within(menu).getByRole('menuitem', { name: 'קטלוג מוצרים' })).toHaveAttribute('href', '/catalog')
     expect(within(menu).getByRole('menuitem', { name: 'מזון לכלבים' })).toHaveAttribute('href', '/categories/dog-food')
     expect(within(menu).getByRole('menuitem', { name: 'בעלי כנף' })).toHaveAttribute('href', '/categories/birds')
     expect(within(menu).getByRole('menuitem', { name: 'כל הקטגוריות' })).toHaveAttribute('href', '/#categories')
