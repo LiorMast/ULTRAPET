@@ -17,8 +17,8 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import scoped_session
 
 from app import create_app
-from app.db import db
-from app.seed import CREATE_TABLES_SQL, DROP_TABLES_SQL, run_sql_file
+from app.database.db import db
+from app.database.seed import CREATE_TABLES_SQL, DROP_TABLES_SQL, run_sql_file
 
 
 def resolve_test_database_url() -> str:

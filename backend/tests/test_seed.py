@@ -5,10 +5,10 @@ import pytest
 from click import ClickException
 from sqlalchemy import func, select
 
-from app.models.catalog import Brand, Category, Product
-from app.models.orders import PaymentMethod
-from app.seed import seed_database
-from app.models.settings import get_setting
+from app.database.models.catalog import Brand, Category, Product
+from app.database.models.orders import PaymentMethod
+from app.database.seed import seed_database
+from app.database.models.settings import get_setting
 
 
 def count(database, model) -> int:

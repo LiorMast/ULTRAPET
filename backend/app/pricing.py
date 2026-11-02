@@ -1,6 +1,6 @@
 """pricing.py — The price a business customer pays, computed from list prices and price rules.
 
-The PriceRule model (table price_rules, app/models/price_rules.py) holds every discount, price increase and special
+The PriceRule model (table price_rules, app/database/models/price_rules.py) holds every discount, price increase and special
 price staff set. The functions below turn a product's list price and those rules into the customer's price:
 
 1. A rule counts only while active: `is_active` and starts_on <= today <= ends_on (a missing date = no limit),
@@ -24,8 +24,8 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_, select
 
-from app.db import db
-from app.models.price_rules import PriceRule
+from app.database.db import db
+from app.database.models.price_rules import PriceRule
 
 ISRAEL = ZoneInfo("Asia/Jerusalem")
 AGORA = Decimal("0.01")
@@ -118,7 +118,7 @@ def customer_prices(business_user_id: int, today: date | None = None) -> dict[in
     Returns:
         Product id -> unit price in shekels before VAT. Products without a price for this customer are left out.
     """
-    from app.models.catalog import Product
+    from app.database.models.catalog import Product
 
     today = today or israel_today()
     products = db.session.execute(

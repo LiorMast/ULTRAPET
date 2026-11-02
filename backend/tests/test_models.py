@@ -10,10 +10,10 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
-from app.models.catalog import Category, Product
-from app.models.orders import Order, PaymentMethod
+from app.database.models.catalog import Category, Product
+from app.database.models.orders import Order, PaymentMethod
 from app.pricing import PriceRule
-from app.models.users import AppUser, BusinessUser, StaffUser
+from app.database.models.users import AppUser, BusinessUser, StaffUser
 
 
 def make_customer(email: str = "shop@example.com") -> BusinessUser:

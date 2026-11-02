@@ -1,6 +1,6 @@
 -- create-tables.sql — Creates every table of the Ultra Pet database (PostgreSQL 17).
 --
--- This file is the source of truth for the schema; the SQLAlchemy models in backend/app/models/ mirror it and
+-- This file is the source of truth for the schema; the SQLAlchemy models in backend/app/database/models/ mirror it and
 -- backend/tests/test_schema.py proves the two match. A fresh Postgres volume runs it automatically (compose mounts
 -- it into /docker-entrypoint-initdb.d); `flask reset-db --yes` runs drop-tables.sql and then this file.
 -- Keep drop-tables.sql in step: every table created here is dropped there, children first.

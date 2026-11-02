@@ -20,16 +20,16 @@ import click
 import psycopg
 from sqlalchemy import func, select, text
 
-from app.models.catalog import Brand, Category, Product, ProductImage
-from app.db import db
-from app.models.orders import PaymentMethod
-from app.models.settings import Setting
-from app.models.users import StaffUser
+from app.database.models.catalog import Brand, Category, Product, ProductImage
+from app.database.db import db
+from app.database.models.orders import PaymentMethod
+from app.database.models.settings import Setting
+from app.database.models.users import StaffUser
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-REPO_DIR = BACKEND_DIR.parent
-CREATE_TABLES_SQL = BACKEND_DIR / "create-tables.sql"
-DROP_TABLES_SQL = BACKEND_DIR / "drop-tables.sql"
+DATABASE_DIR = Path(__file__).resolve().parent
+REPO_DIR = DATABASE_DIR.parents[2]
+CREATE_TABLES_SQL = DATABASE_DIR / "create-tables.sql"
+DROP_TABLES_SQL = DATABASE_DIR / "drop-tables.sql"
 STUBS_DIR = REPO_DIR / "frontend" / "src" / "stubs"
 LEGACY_EXPORT_DIR = REPO_DIR / "legacy" / "supabase-export"
 

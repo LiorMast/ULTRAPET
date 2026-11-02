@@ -9,7 +9,7 @@ from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import TimestampMixin, db
+from app.database.db import TimestampMixin, db
 
 
 class Setting(TimestampMixin, db.Model):

@@ -19,7 +19,7 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
   self-hosted fonts (`@fontsource-variable/*`), oxlint.
 - **Tests**: Vitest 5 + React Testing Library (jsdom); Playwright (Chromium) + `@axe-core/playwright`.
 - **Backend** (`backend/`): Flask 3 (app factory, one monolith), Flask-SQLAlchemy on SQLAlchemy 2.1 (typed models),
-  psycopg 3, PostgreSQL 17, pytest. The schema is `backend/create-tables.sql` (working rule 5): no Alembic migrations
+  psycopg 3, PostgreSQL 17, pytest. The schema is `backend/app/database/create-tables.sql` (working rule 5): no Alembic migrations
   until there is production data (Alembic is only a test library). Docker Compose (`compose.yaml`) runs Postgres +
   Flask; Vite proxies `/api` to Flask in dev.
 
@@ -52,19 +52,20 @@ frontend/
     test/               setup.ts (jsdom polyfills), utils.tsx (renderPage)
 backend/
   Dockerfile  requirements.txt  pyproject.toml (pytest config)
-  create-tables.sql     the schema: every table and column, explained (source of truth, working rule 5)
-  drop-tables.sql       drops every table, children first
   app/
-    __init__.py         create_app(): config from the environment, db, CLI commands, /api/health
-    db.py               `db`, the declarative base (naming convention, column types), TimestampMixin
-    models/             the SQLAlchemy models, one module per area (importing the package registers them all):
-      users.py            AppUser -> StaffUser / BusinessUser (joined-table inheritance), BusinessLead
-      catalog.py          Supplier, Brand, Category, Product, ProductImage, ProductSupplier (junction)
-      price_rules.py      PriceRule
-      orders.py           PaymentMethod, Order, OrderItem
-      settings.py         Setting + get_setting()
+    __init__.py         create_app(): config from the environment, CLI commands, /api/health
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
-    seed.py             `flask reset-db --yes`, `flask seed` (from the frontend stubs)
+    database/           everything about the database
+      create-tables.sql   the schema: every table and column, explained (source of truth, working rule 5)
+      drop-tables.sql     drops every table, children first
+      db.py               `db`, the declarative base (naming convention, column types), TimestampMixin
+      seed.py             `flask reset-db --yes`, `flask seed` (from the frontend stubs)
+      models/             the SQLAlchemy models, one module per area (importing the package registers them all):
+        users.py            AppUser -> StaffUser / BusinessUser (joined-table inheritance), BusinessLead
+        catalog.py          Supplier, Brand, Category, Product, ProductImage, ProductSupplier (junction)
+        price_rules.py      PriceRule
+        orders.py           PaymentMethod, Order, OrderItem
+        settings.py         Setting + get_setting()
   tests/                pytest on the `content_test` database (conftest.py builds it from the SQL files)
 ```
 
@@ -160,19 +161,19 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - Never edit `legacy/` or `requirements/`.
 
 ### 5. Keep the database SQL files in sync with the models
-- `backend/create-tables.sql` and `backend/drop-tables.sql` hold every SQL command needed to drop and recreate the
-  database. `create-tables.sql` is the source of truth; the models in `backend/app/models/` mirror it. A fresh Postgres
+- `backend/app/database/create-tables.sql` and `drop-tables.sql` hold every SQL command needed to drop and recreate the
+  database. `create-tables.sql` is the source of truth; the models in `backend/app/database/models/` mirror it. A fresh Postgres
   volume runs create-tables.sql; `flask reset-db --yes` runs both files.
 - Every table has a comment block above its `CREATE TABLE` that starts `-- <table> — ` (what it stores, who writes
   it), and every column, key and constraint line an inline `--` comment (meaning, units, allowed values, what NULL
   means).
-- A model change (`backend/app/models/*.py`) updates create-tables.sql in the same step (and the other way round). Adding or removing a table or
+- A model change (`backend/app/database/models/*.py`) updates create-tables.sql in the same step (and the other way round). Adding or removing a table or
   a foreign key also updates drop-tables.sql.
 - drop-tables.sql drops children first: a table is dropped before every table it references. Never use CASCADE (it
   hides a wrong order). Each DROP line names the tables that reference it.
 - Constraint and index names are the Postgres defaults (`<table>_pkey`, `<table>_<columns>_fkey` / `_key` / `_idx`,
   `<table>_<column>_check`); multi-column checks are named `<table>_<name>_check` in both places. The models' naming
-  convention (`app/db.py`) produces the same names.
+  convention (`app/database/db.py`) produces the same names.
 - `backend/tests/test_schema.py` proves all of this (models == the database built from the SQL, drop order, every
   table and column commented). Run it after any schema change.
 
@@ -321,7 +322,7 @@ content exists in each language, and the layout flips direction automatically.
 ## Content and data sources
 
 - **Copy**: `legacy/src/lib/translations/{he,en}.ts`, with CMS overrides in `legacy/supabase-export/cms_text_blocks.json`.
-- **Postgres seed** (`backend/app/seed.py`): the catalog from `frontend/src/stubs/` (categories, products with their
+- **Postgres seed** (`backend/app/database/seed.py`): the catalog from `frontend/src/stubs/` (categories, products with their
   WooCommerce ids and images, placeholder prices into `products.list_price`, brands) and the home stats from
   `legacy/supabase-export/cms_settings.json`. The rest of the export (hero banners, contact, sections, text blocks,
   media and `legacy/supabase-export/media/`) waits for the CMS tables (Phase 3); schema hints in

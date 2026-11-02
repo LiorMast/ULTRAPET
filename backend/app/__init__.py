@@ -1,8 +1,8 @@
 """app — The Ultra Pet backend: one Flask application (monolith) over PostgreSQL.
 
-create_app() builds the application: configuration from the environment, the database (app.db), the CLI commands
-(app.seed) and the routes. Modules: db (SQLAlchemy base), models/ (one module per area of the schema), pricing
-(the customer's price), seed (dev database commands). The schema itself lives in backend/create-tables.sql.
+create_app() builds the application: configuration from the environment, the database (app.database.db), the CLI
+commands (app.database.seed) and the routes. Modules: database/ (schema SQL, SQLAlchemy base, models, seed commands)
+and pricing (the customer's price).
 
 Run: `flask --app app run --debug` (DATABASE_URL must point to the database; compose sets it and FLASK_APP).
 """
@@ -13,9 +13,9 @@ from flask import Flask
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app import models  # noqa: F401  (registers every model on db.metadata)
-from app.db import db
-from app.seed import reset_db_command, seed_command
+from app.database import models  # noqa: F401  (registers every model on db.metadata)
+from app.database.db import db
+from app.database.seed import reset_db_command, seed_command
 
 
 def create_app(config: dict[str, Any] | None = None) -> Flask:

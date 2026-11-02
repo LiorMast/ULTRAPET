@@ -4,7 +4,7 @@
 #   docker compose exec backend pytest  run the backend tests
 #   docker compose exec backend flask seed
 #
-# Secrets come from .env (copy .env.example). A fresh `pgdata` volume runs backend/create-tables.sql once; later
+# Secrets come from .env (copy .env.example). A fresh `pgdata` volume runs backend/app/database/create-tables.sql once; later
 # schema changes are applied with `flask reset-db --yes`. Both services are on the network `internal`
 # (= ultrapet_internal), which the postgres MCP server (.mcp.json) joins to reach the database as host `postgres`.
 name: ultrapet
@@ -18,7 +18,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./backend/create-tables.sql:/docker-entrypoint-initdb.d/create-tables.sql:ro
+      - ./backend/app/database/create-tables.sql:/docker-entrypoint-initdb.d/create-tables.sql:ro
     ports:
       - "127.0.0.1:5433:5432"
     healthcheck:

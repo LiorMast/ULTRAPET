@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import CheckConstraint, ForeignKey, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db import Localized, TimestampMixin, db, localized_check
+from app.database.db import Localized, TimestampMixin, db, localized_check
 
 if TYPE_CHECKING:
-    from app.models.catalog import Product
-    from app.models.users import BusinessUser
+    from app.database.models.catalog import Product
+    from app.database.models.users import BusinessUser
 
 PERCENT = Numeric(5, 2)
 TOTAL = Numeric(12, 2)

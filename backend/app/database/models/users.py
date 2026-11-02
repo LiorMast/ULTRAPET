@@ -15,11 +15,11 @@ from sqlalchemy import CheckConstraint, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.db import TimestampMixin, db
+from app.database.db import TimestampMixin, db
 
 if TYPE_CHECKING:
-    from app.models.orders import Order
-    from app.models.price_rules import PriceRule
+    from app.database.models.orders import Order
+    from app.database.models.price_rules import PriceRule
 
 
 class AppUser(TimestampMixin, db.Model):

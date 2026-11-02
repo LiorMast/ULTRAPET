@@ -59,8 +59,8 @@ The Vite dev server forwards `/api` to Flask, so the frontend can call `/api/...
 | `docker compose exec backend flask reset-db --yes` | Drop and recreate every table (all data is lost) |
 
 The database schema is written by hand in two files, both commented table by table and column by column:
-[backend/create-tables.sql](backend/create-tables.sql) creates every table, and
-[backend/drop-tables.sql](backend/drop-tables.sql) drops them in dependency order. The Python models mirror
+[backend/app/database/create-tables.sql](backend/app/database/create-tables.sql) creates every table, and
+[backend/app/database/drop-tables.sql](backend/app/database/drop-tables.sql) drops them in dependency order. The Python models mirror
 create-tables.sql, and a test checks that the two always match.
 
 ## Commands
@@ -90,9 +90,10 @@ The screenshot baselines (`e2e/*-snapshots/`) are git-ignored. Each machine crea
 README.md  CLAUDE.md     this file; the detailed conventions, requirements and roadmap
 compose.yaml             local services: PostgreSQL and the Flask backend (secrets in .env, see .env.example)
 backend/
-  create-tables.sql      the database schema, every table and column explained
-  drop-tables.sql        drops every table, children first
-  app/                   the Flask app: models/ (users, catalog, price rules, orders, settings), pricing, seed commands
+  app/                   the Flask app
+    database/            create-tables.sql (the schema, every table and column explained), drop-tables.sql (drops
+                         every table, children first), models/ (users, catalog, price rules, orders, settings), seed
+    pricing.py           the customer's price from the price rules
   tests/                 pytest
 legacy/                  the old React + Supabase site: reference only, never edited
 requirements/            the original requirement prompts: never edited

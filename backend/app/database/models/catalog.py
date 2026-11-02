@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 from sqlalchemy import CheckConstraint, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db import Localized, TimestampMixin, db, localized_check
+from app.database.db import Localized, TimestampMixin, db, localized_check
 
 if TYPE_CHECKING:
-    from app.models.price_rules import PriceRule
+    from app.database.models.price_rules import PriceRule
 
 # URL slugs of brands and categories: lowercase words joined by single hyphens.
 SLUG_CHECK = "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"

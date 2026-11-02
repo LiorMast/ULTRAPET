@@ -10,8 +10,8 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import CheckConstraint, text
 
-from app.db import db
-from app.seed import CREATE_TABLES_SQL, DROP_TABLES_SQL, run_sql_file
+from app.database.db import db
+from app.database.seed import CREATE_TABLES_SQL, DROP_TABLES_SQL, run_sql_file
 
 
 def public_tables() -> set[str]:

@@ -13,11 +13,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import CheckConstraint, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db import TimestampMixin, db
+from app.database.db import TimestampMixin, db
 
 if TYPE_CHECKING:
-    from app.models.catalog import Category, Product
-    from app.models.users import BusinessUser, StaffUser
+    from app.database.models.catalog import Category, Product
+    from app.database.models.users import BusinessUser, StaffUser
 
 
 class PriceRule(TimestampMixin, db.Model):

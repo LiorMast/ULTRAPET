@@ -7,9 +7,9 @@ from collections.abc import Iterable
 from datetime import date, timedelta
 from decimal import Decimal
 
-from app.models.catalog import Category, Product
+from app.database.models.catalog import Category, Product
 from app.pricing import PriceRule, customer_prices, resolve_price
-from app.models.users import BusinessUser
+from app.database.models.users import BusinessUser
 
 TODAY = date(2026, 11, 15)
 PRODUCT = 1
