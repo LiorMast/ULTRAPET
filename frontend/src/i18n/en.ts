@@ -158,6 +158,7 @@ export const en: Dictionary = {
     openMenu: 'Open menu',
     closeMenu: 'Close menu',
     skipToContent: 'Skip to content',
+    whatsappLabel: 'Customer service',
   },
   hero: {
     eyebrow: "Israel's National Pet Import & Distribution Company",

@@ -158,6 +158,7 @@ export const he = {
     openMenu: 'פתיחת תפריט',
     closeMenu: 'סגירת תפריט',
     skipToContent: 'דילוג לתוכן',
+    whatsappLabel: 'שירות לקוחות',
   },
   hero: {
     eyebrow: 'יבואן ומפיץ לאומי של מוצרי חיות מחמד בישראל',

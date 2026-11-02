@@ -1,10 +1,11 @@
 /**
  * routes/__root.tsx — The layout shared by every page: the route-managed <head> tags, a "skip to
- * content" link, the Navbar, the current page inside <main>, and the "page not found" screen for
+ * content" link, the Navbar, the current page inside <main>, the floating WhatsApp button, and the "page not found" screen for
  * unknown URLs. Its `head` sets the default title and description; pages override them (see seo.ts).
  */
 import { createRootRouteWithContext, HeadContent, Link, Outlet } from '@tanstack/react-router'
 import { Navbar } from '@/components/Navbar'
+import { WhatsAppButton } from '@/components/WhatsAppButton'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 
 /** What every route receives from the router (see createAppRouter): the language of this page load. */
@@ -40,6 +41,7 @@ function RootLayout() {
       <main id="main" tabIndex={-1} className="pt-22 outline-none">
         <Outlet />
       </main>
+      <WhatsAppButton />
     </>
   )
 }
