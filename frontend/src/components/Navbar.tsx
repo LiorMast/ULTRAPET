@@ -9,9 +9,11 @@
  *   offset their content by the same amount.
  * - The menu comes from MAIN_NAV in src/config.ts; an item with `children` opens a dropdown (Products).
  * - From the xl breakpoint the full menu is shown; below it, <MobileMenu> (a drawer) takes over.
+ * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
+ *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
  */
-import { Fragment } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Fragment, useEffect } from 'react'
+import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { ChevronDown } from 'lucide-react'
 import { cn } from 'cn'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -25,7 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MAIN_NAV, type NavItem } from '@/config'
+import { MAIN_NAV, type NavChild, type NavItem } from '@/config'
 import { useI18n } from '@/i18n'
 
 /**
@@ -43,6 +45,7 @@ const NAV_TEXT =
  */
 export function Navbar({ items = MAIN_NAV }: { items?: NavItem[] }) {
   const { t } = useI18n()
+  useScrollSpy()
 
   return (
     <header className="material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]">
@@ -76,6 +79,63 @@ export function Navbar({ items = MAIN_NAV }: { items?: NavItem[] }) {
   )
 }
 
+/** Height of the fixed header in px (py-4 + the 56px logo); a section counts as reached below it. */
+const HEADER_HEIGHT = 88
+
+/**
+ * Makes the menu a scrollspy on the home page: while the visitor scrolls, the URL hash is replaced with
+ * the id of the section being read (the last `<section id>` in <main> whose top has passed the header plus a
+ * third of the window; the last one at the very bottom of the page; no hash on the first one, the hero, or above it).
+ * The router location stays the single source of truth, so the menu's `includeHash` links light up by
+ * themselves. Runs once per animation frame at most, and navigates only when the section changes.
+ */
+function useScrollSpy() {
+  const router = useRouter()
+  const pathname = useLocation({ select: (location) => location.pathname })
+
+  useEffect(() => {
+    if (pathname !== '/') return
+    let frame = 0
+
+    /** Finds the section in view and, when it changed, replaces the URL hash with its id. */
+    const update = () => {
+      frame = 0
+      const line = HEADER_HEIGHT + window.innerHeight / 3
+      const atBottom =
+        window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
+      let current = ''
+      let currentTop = -Infinity
+      document.querySelectorAll<HTMLElement>('#main section[id]').forEach((section, i) => {
+        const top = section.getBoundingClientRect().top
+        if ((atBottom || top <= line) && top > currentTop) {
+          // The first section (the hero) is the top of the page: no hash.
+          current = i === 0 ? '' : section.id
+          currentTop = top
+        }
+      })
+      if (current === router.state.location.hash) return
+      void router.navigate({
+        to: '/',
+        hash: current || undefined,
+        replace: true,
+        resetScroll: false,
+        hashScrollIntoView: false,
+      })
+    }
+
+    /** Schedules one update for the next frame (scroll events can fire many times per frame). */
+    const onScroll = () => {
+      frame ||= requestAnimationFrame(update)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      cancelAnimationFrame(frame)
+    }
+  }, [pathname, router])
+}
+
 /**
  * One top-level menu entry: a link, or — for an item with `children` — a dropdown (Products).
  * @param props.item - The menu item (see MAIN_NAV in src/config.ts).
@@ -83,6 +143,7 @@ export function Navbar({ items = MAIN_NAV }: { items?: NavItem[] }) {
  */
 function DesktopNavItem({ item }: { item: NavItem }) {
   const { t } = useI18n()
+  const location = useLocation({ select: ({ pathname, hash }) => ({ pathname, hash }) })
 
   if (!('children' in item)) {
     return (
@@ -95,7 +156,11 @@ function DesktopNavItem({ item }: { item: NavItem }) {
 
   return (
     <DropdownMenu modal={false}>
-      <DropdownMenuTrigger className={cn(NAV_TEXT, 'flex items-center gap-1.5')}>
+      <DropdownMenuTrigger
+        // Highlighted like an active link while the scrollspy is on one of its #sections (e.g. "All categories").
+        data-status={item.children.some((child) => isCurrentSection(child, location)) ? 'active' : undefined}
+        className={cn(NAV_TEXT, 'flex items-center gap-1.5')}
+      >
         {item.label(t)}
         <ChevronDown size={15} aria-hidden="true" className="transition-transform duration-200 group-data-[state=open]:rotate-180" />
         <Underline />
@@ -131,6 +196,16 @@ function DesktopNavItem({ item }: { item: NavItem }) {
       </DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+/**
+ * Tells whether a dropdown entry links to the home-page section the visitor is on.
+ * @param child - The dropdown entry.
+ * @param location - The current pathname and hash.
+ * @returns True for an internal #section link on the home page whose hash is the current one.
+ */
+function isCurrentSection(child: NavChild, location: { pathname: string; hash: string }) {
+  return 'link' in child && location.pathname === '/' && location.hash !== '' && child.link.hash === location.hash
 }
 
 /**

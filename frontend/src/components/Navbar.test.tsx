@@ -1,9 +1,9 @@
 /**
- * Navbar.test.tsx — Tests for the site header (Navbar), its Products and language dropdowns, and the
- * mobile drawer (MobileMenu), rendered inside the real app with renderPage().
+ * Navbar.test.tsx — Tests for the site header (Navbar), its Products and language dropdowns, the home-page
+ * scrollspy, and the mobile drawer (MobileMenu), rendered inside the real app with renderPage().
  */
-import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CATALOG_PDF_URL } from '@/config'
 import { renderPage } from '@/test/utils'
 
@@ -41,6 +41,59 @@ describe('Navbar links', () => {
     const nav = screen.getByRole('navigation', { name: 'Main menu' })
     expect(within(nav).getByRole('link', { name: 'Where to Buy' })).toHaveAttribute('aria-current', 'page')
     expect(within(nav).getByRole('link', { name: 'Brands' })).not.toHaveAttribute('aria-current')
+  })
+})
+
+/**
+ * Fakes the page layout (jsdom has none): gives the listed sections a distance from the top of the window
+ * (sections not listed sit far below), then fires a scroll event so the scrollspy re-measures.
+ * @param tops - Section id -> its top edge in px relative to the window.
+ */
+function scrollTo(tops: Record<string, number>) {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return { top: tops[this.id] ?? 5000 } as DOMRect
+  })
+  fireEvent.scroll(window)
+}
+
+describe('Scrollspy', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('puts the section being read in the URL and marks its menu link current', async () => {
+    const { router } = await renderPage('/en')
+    const nav = screen.getByRole('navigation', { name: 'Main menu' })
+
+    scrollTo({ stats: -2000, brands: -1500, categories: -900, 'private-label': -400, business: 80, about: 900 })
+    await waitFor(() => expect(router.state.location.hash).toBe('business'))
+    expect(within(nav).getByRole('link', { name: 'Private Label' })).not.toHaveAttribute('aria-current')
+
+    scrollTo({ stats: -2000, brands: -1500, categories: -900, 'private-label': -400, business: -100, about: 88 })
+    await waitFor(() => expect(router.state.location.hash).toBe('about'))
+    expect(router.state.location.pathname).toBe('/')
+    expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('link', { name: 'Brands' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('clears the hash on the hero, above the first section', async () => {
+    const { router } = await renderPage('/#about')
+    scrollTo({ stats: 700 })
+    await waitFor(() => expect(router.state.location.hash).toBe(''))
+    expect(screen.getByRole('navigation', { name: 'תפריט ראשי' }).querySelector('[aria-current]')).toBeNull()
+  })
+
+  it('highlights Products while the categories section is read', async () => {
+    const { router } = await renderPage('/')
+    scrollTo({ stats: -1500, brands: -900, categories: 100 })
+    await waitFor(() => expect(router.state.location.hash).toBe('categories'))
+    expect(screen.getByRole('button', { name: 'מוצרים' })).toHaveAttribute('data-status', 'active')
+  })
+
+  it('does nothing on other pages', async () => {
+    const { router } = await renderPage('/where-to-buy')
+    scrollTo({ about: 0 })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(router.state.location.hash).toBe('')
+    expect(router.state.location.pathname).toBe('/where-to-buy')
   })
 })
 

@@ -5,7 +5,8 @@
  * Built on the shadcn Sheet (a Radix Dialog): it traps keyboard focus inside the drawer, closes on Esc
  * or a click on the backdrop, and stops the page behind it from scrolling. The drawer slides in from
  * the end side — right in English, left in Hebrew — next to the hamburger button in both cases — and can
- * be swiped back towards that edge to close it.
+ * be swiped back towards that edge to close it. Like the desktop menu, the current page or home-page section
+ * (kept in the URL hash by the navbar's scrollspy) is shown in red.
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -20,7 +21,7 @@ import { useI18n } from '@/i18n'
 
 /** Style of the drawer's top-level entries (legacy look). */
 const ENTRY_CLASS =
-  'block w-full py-3.5 text-start font-heading text-xs font-semibold uppercase tracking-widest text-neutral-700 transition-colors hover:text-brand-red'
+  'block w-full py-3.5 text-start font-heading text-xs font-semibold uppercase tracking-widest text-neutral-700 transition-colors hover:text-brand-red data-[status=active]:text-brand-red'
 
 /** Style of the entries inside the Products group. */
 const SUB_ENTRY_CLASS =
@@ -105,7 +106,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
                     </ul>
                   </details>
                 ) : (
-                  <Link {...item.link} onClick={close} className={ENTRY_CLASS}>
+                  <Link {...item.link} activeOptions={{ exact: true, includeHash: true }} onClick={close} className={ENTRY_CLASS}>
                     {item.label(t)}
                   </Link>
                 )}

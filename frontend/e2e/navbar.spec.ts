@@ -1,6 +1,6 @@
 /**
  * navbar.spec.ts — End-to-end checks of the site header in real Chromium: the transparent-to-solid
- * scroll behavior, #section links, the Products menu, language switching, the mobile drawer (including
+ * scroll behavior, #section links, the home-page scrollspy, the Products menu, language switching, the mobile drawer (including
  * swipe-to-close), layout overflow at common widths, accessibility (axe) and screenshots for visual review.
  */
 import AxeBuilder from '@axe-core/playwright'
@@ -100,6 +100,31 @@ test.describe('desktop', () => {
     await expect(page).toHaveURL(/\/#about$/)
     await expectSectionBelowHeader(page, 'about')
   })
+
+  for (const { path, about, prefix } of [
+    { path: '/', about: 'אודות', prefix: '/' },
+    { path: '/en', about: 'About', prefix: '/en' },
+  ]) {
+    test(`the menu follows the section being read, without adding history entries (${path})`, async ({ page }) => {
+      await page.goto(path)
+      const nav = page.getByRole('navigation', { name: path === '/' ? 'תפריט ראשי' : 'Main menu' })
+      const historyLength = await page.evaluate(() => history.length)
+
+      // Scrolled by the visitor (wheel), not by a link: the URL hash and the menu follow.
+      await page.locator('#about').evaluate((el: HTMLElement) => window.scrollTo({ top: el.offsetTop - 88, behavior: 'instant' }))
+      await page.mouse.wheel(0, 1)
+      await expect(page).toHaveURL(new RegExp(`${prefix}#about$`))
+      await expect(nav.getByRole('link', { name: about })).toHaveAttribute('aria-current', 'page')
+
+      await page.mouse.wheel(0, 100_000)
+      await expect(page).toHaveURL(new RegExp(`${prefix}#contact$`))
+
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+      await expect(page).toHaveURL((url) => url.pathname === prefix && url.hash === '')
+      await expect(nav.locator('[aria-current]')).toHaveCount(0)
+      expect(await page.evaluate(() => history.length)).toBe(historyLength)
+    })
+  }
 
   test('the Products menu works with the mouse and the keyboard', async ({ page }) => {
     await page.goto('/en')

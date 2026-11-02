@@ -195,7 +195,8 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
 - **Logo**: `<Logo className="h-14" />` — horizontal lockup traced from `legacy/public/UltraPet_Logo.pdf`.
 - **Header**: a translucent white material (`material-bar` in `index.css`: 85% white + backdrop blur; solid white
   for reduced transparency / more contrast), 88px tall (`py-4` + 56px logo); pages use `pt-22` to clear it. No
-  transparent or scroll-driven states.
+  transparent or scroll-driven states. On the home page the menu is a scrollspy (`useScrollSpy` in `Navbar.tsx`): the URL
+  hash follows the `<section id>` being read (history replace; none on the hero), so `includeHash` links light up.
 - **Motion** (Apple fluid-interface rules): every transition uses `--ease-spring` (a critically damped spring as CSS
   `linear()`, the Tailwind default timing function). Controls react on press (`active:scale-[0.97]
   active:duration-100`); clickable cards lift on hover and settle on press (`transition-[box-shadow,translate,scale]`;
