@@ -20,8 +20,11 @@ Phase 1 (the frontend, on static data) is in progress:
 | Articles: list and article pages, with SEO tags, JSON-LD and a sitemap | |
 | Catalog: 400 products, category filter, search, pagination; prices only after login | Real login and real prices (Phase 4) |
 
-Later phases: a Flask + PostgreSQL backend, an admin CMS, and the B2B portal (price catalog, per-customer discounts,
-checkout, sync with Rivhit). [CLAUDE.md](CLAUDE.md) has the full roadmap and requirements.
+Phase 2 (the backend) has started: a PostgreSQL database and a Flask backend with the full data model (users, catalog,
+suppliers, per-customer pricing, orders), seeded from the frontend's data. The frontend does not call it yet.
+
+Later phases: the API, an admin CMS, and the B2B portal (price catalog, per-customer discounts, checkout, sync with
+Rivhit). [CLAUDE.md](CLAUDE.md) has the full roadmap and requirements.
 
 ## Getting started
 
@@ -35,6 +38,30 @@ npm run dev                                    # http://localhost:5173
 ```
 
 Hebrew pages have no prefix (`/where-to-buy`); English pages are under `/en` (`/en/where-to-buy`).
+
+### Backend
+
+You need Docker with Compose. From the repository root:
+
+```bash
+cp .env.example .env                        # then set POSTGRES_PASSWORD and SECRET_KEY
+docker compose up -d --build                # PostgreSQL on 127.0.0.1:5433, Flask on http://localhost:5000
+docker compose exec backend flask seed      # load the categories, products, prices and brands
+curl localhost:5000/api/health              # {"status": "ok"}
+```
+
+The Vite dev server forwards `/api` to Flask, so the frontend can call `/api/...` on its own origin.
+
+| Command (from the repo root) | What it does |
+|---|---|
+| `docker compose exec backend pytest` | Backend tests, on a separate `content_test` database |
+| `docker compose exec backend flask seed` | Fill an empty database from `frontend/src/stubs/` |
+| `docker compose exec backend flask reset-db --yes` | Drop and recreate every table (all data is lost) |
+
+The database schema is written by hand in two files, both commented table by table and column by column:
+[backend/create-tables.sql](backend/create-tables.sql) creates every table, and
+[backend/drop-tables.sql](backend/drop-tables.sql) drops them in dependency order. The Python models mirror
+create-tables.sql, and a test checks that the two always match.
 
 ## Commands
 
@@ -55,12 +82,18 @@ The screenshot baselines (`e2e/*-snapshots/`) are git-ignored. Each machine crea
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, TanStack Router (file-based routes), shadcn/ui on Radix,
   lucide-react icons, self-hosted fonts.
 - **Tests:** Vitest + React Testing Library; Playwright + axe-core.
-- **Backend (planned):** Flask, SQLAlchemy + Alembic, PostgreSQL, Docker Compose.
+- **Backend:** Flask, Flask-SQLAlchemy (SQLAlchemy 2), psycopg 3, PostgreSQL 17, pytest, Docker Compose.
 
 ## Project layout
 
 ```
 README.md  CLAUDE.md     this file; the detailed conventions, requirements and roadmap
+compose.yaml             local services: PostgreSQL and the Flask backend (secrets in .env, see .env.example)
+backend/
+  create-tables.sql      the database schema, every table and column explained
+  drop-tables.sql        drops every table, children first
+  app/                   the Flask app: models/ (users, catalog, price rules, orders, settings), pricing, seed commands
+  tests/                 pytest
 legacy/                  the old React + Supabase site: reference only, never edited
 requirements/            the original requirement prompts: never edited
 frontend/
@@ -100,6 +133,8 @@ The working rules are in [CLAUDE.md](CLAUDE.md). The main ones:
 - RTL-first styling with logical classes only (`ms`/`me`/`start`/`end`, never `ml`/`mr`/`left`/`right`).
 - No hard-coded interface text: every string comes from the dictionaries.
 - Accessibility to WCAG 2.1 AA (IS 5568, required by Israeli law).
-- Every file has a header comment, and every function has a JSDoc comment.
+- Every file has a header comment, and every function has a JSDoc comment (Python: a docstring).
+- The database SQL files and the backend models always change together.
 - Every component ships with a co-located Vitest test and Playwright coverage.
-- Before committing, `npm run check`, `npm run test:e2e` and `npm run build` must all pass.
+- Before committing, `npm run check`, `npm run test:e2e` and `npm run build` must all pass, and so must the backend's
+  `pytest`.

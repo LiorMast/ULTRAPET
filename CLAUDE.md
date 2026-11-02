@@ -18,13 +18,17 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
   TanStack Router (file-based, `src/routes/`), shadcn/ui on Radix (`radix-ui`), lucide-react icons,
   self-hosted fonts (`@fontsource-variable/*`), oxlint.
 - **Tests**: Vitest 5 + React Testing Library (jsdom); Playwright (Chromium) + `@axe-core/playwright`.
-- **Backend (Phase 2)** (`backend/`): Flask (app factory), SQLAlchemy 2 + Alembic, PostgreSQL 17, pytest;
-  Docker Compose for Postgres + Flask; Vite proxies `/api` to Flask in dev.
+- **Backend** (`backend/`): Flask 3 (app factory, one monolith), Flask-SQLAlchemy on SQLAlchemy 2.1 (typed models),
+  psycopg 3, PostgreSQL 17, pytest. The schema is `backend/create-tables.sql` (working rule 5): no Alembic migrations
+  until there is production data (Alembic is only a test library). Docker Compose (`compose.yaml`) runs Postgres +
+  Flask; Vite proxies `/api` to Flask in dev.
 
 ## Layout
 
 ```
 README.md  CLAUDE.md
+compose.yaml            dev services: postgres + backend (project `ultrapet`)
+.env.example            template of the git-ignored .env (database password, secrets)
 legacy/                 reference only (old site; supabase-export/ = seed data and media)
 requirements/           original prompts
 frontend/
@@ -46,7 +50,22 @@ frontend/
     stubs/              JSON stand-ins for backend data, one file per resource (see Frontend conventions)
     assets/             logo SVGs; hero/ = the home hero photos (drop images in, no code changes)
     test/               setup.ts (jsdom polyfills), utils.tsx (renderPage)
-backend/                (Phase 2)
+backend/
+  Dockerfile  requirements.txt  pyproject.toml (pytest config)
+  create-tables.sql     the schema: every table and column, explained (source of truth, working rule 5)
+  drop-tables.sql       drops every table, children first
+  app/
+    __init__.py         create_app(): config from the environment, db, CLI commands, /api/health
+    db.py               `db`, the declarative base (naming convention, column types), TimestampMixin
+    models/             the SQLAlchemy models, one module per area (importing the package registers them all):
+      users.py            AppUser -> StaffUser / BusinessUser (joined-table inheritance), BusinessLead
+      catalog.py          Supplier, Brand, Category, Product, ProductImage, ProductSupplier (junction)
+      price_rules.py      PriceRule
+      orders.py           PaymentMethod, Order, OrderItem
+      settings.py         Setting + get_setting()
+    pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
+    seed.py             `flask reset-db --yes`, `flask seed` (from the frontend stubs)
+  tests/                pytest on the `content_test` database (conftest.py builds it from the SQL files)
 ```
 
 ## Commands (run in `frontend/`)
@@ -57,6 +76,15 @@ backend/                (Phase 2)
   `npm run test:e2e -- --update-snapshots`, then look at the changed PNGs.
 - `npm run build` — typecheck + production build.
 - From the repo root: `codegraph sync` after changing files.
+
+## Commands (backend, from the repo root)
+
+- `docker compose up -d --build` — Postgres (127.0.0.1:5433) + the Flask dev server (http://localhost:5000, reloads
+  on change). Needs `.env` (copy `.env.example`).
+- `docker compose exec backend pytest` — backend tests (database `content_test`; the dev data is never touched).
+- `docker compose exec backend flask seed` — fill an empty database from the frontend stubs.
+- `docker compose exec backend flask reset-db --yes` — drop and recreate every table (all data is lost); then `seed`.
+- A fresh volume runs `create-tables.sql` by itself; after a schema change run `reset-db` (there are no migrations).
 
 ## Working rules (mandatory)
 
@@ -130,6 +158,23 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Full gate before committing:** run `npm run check` and `npm run test:e2e` in full before any commit.
 - **Commit only when the user says so.** Never commit on your own initiative.
 - Never edit `legacy/` or `requirements/`.
+
+### 5. Keep the database SQL files in sync with the models
+- `backend/create-tables.sql` and `backend/drop-tables.sql` hold every SQL command needed to drop and recreate the
+  database. `create-tables.sql` is the source of truth; the models in `backend/app/models/` mirror it. A fresh Postgres
+  volume runs create-tables.sql; `flask reset-db --yes` runs both files.
+- Every table has a comment block above its `CREATE TABLE` that starts `-- <table> — ` (what it stores, who writes
+  it), and every column, key and constraint line an inline `--` comment (meaning, units, allowed values, what NULL
+  means).
+- A model change (`backend/app/models/*.py`) updates create-tables.sql in the same step (and the other way round). Adding or removing a table or
+  a foreign key also updates drop-tables.sql.
+- drop-tables.sql drops children first: a table is dropped before every table it references. Never use CASCADE (it
+  hides a wrong order). Each DROP line names the tables that reference it.
+- Constraint and index names are the Postgres defaults (`<table>_pkey`, `<table>_<columns>_fkey` / `_key` / `_idx`,
+  `<table>_<column>_check`); multi-column checks are named `<table>_<name>_check` in both places. The models' naming
+  convention (`app/db.py`) produces the same names.
+- `backend/tests/test_schema.py` proves all of this (models == the database built from the SQL, drop order, every
+  table and column commented). Run it after any schema change.
 
 ## Frontend conventions
 
@@ -253,6 +298,11 @@ statement (הצהרת נגישות), refund/returns policy, privacy policy.
 - **Discounts per customer and per category**; an admin customer-edit screen sets all of a customer's discounts.
 - Checkout by **credit card, Bit or bank transfer**, with an optional % discount per payment method (set in the admin).
 - **Minimum order ₪2,000.**
+- **Decided pricing rules** (table `price_rules`, logic in `backend/app/pricing.py`): staff set discounts on a category
+  or a product for all customers, and discounts, price increases or (on a product) a fixed price for one customer,
+  each for a period or open-ended. In each layer (the customer's rules, the general rules) a product rule beats a
+  category rule and the rule that started last wins. The layers **stack**: list price x (1 -/+ customer percent) x
+  (1 - general discount), rounded half-up to agorot; a customer fixed price is final.
 - Submitted orders are written directly to **Rivhit (רווחית)** through its API.
 - A product upload page; an API for pulling product images (later).
 - "WooCommerce-ready architecture" means our own e-commerce-ready data model (products, SKUs, prices, customers,
@@ -271,8 +321,10 @@ content exists in each language, and the layout flips direction automatically.
 ## Content and data sources
 
 - **Copy**: `legacy/src/lib/translations/{he,en}.ts`, with CMS overrides in `legacy/supabase-export/cms_text_blocks.json`.
-- **Postgres seed**: `legacy/supabase-export/*.json` (brands, categories, products, hero banners, contact, sections,
-  settings, text blocks, media) and the files in `legacy/supabase-export/media/`; schema hints in
+- **Postgres seed** (`backend/app/seed.py`): the catalog from `frontend/src/stubs/` (categories, products with their
+  WooCommerce ids and images, placeholder prices into `products.list_price`, brands) and the home stats from
+  `legacy/supabase-export/cms_settings.json`. The rest of the export (hero banners, contact, sections, text blocks,
+  media and `legacy/supabase-export/media/`) waits for the CMS tables (Phase 3); schema hints in
   `legacy/supabase/migrations/`.
 - **Real contact facts** (from the live site; legacy CMS values such as `+972 3 000 0000` are placeholders):
   phone **1700-55-99-92**, WhatsApp **+972 52-214-2410**, hours Sun–Thu 09:00–16:00, closed Fridays and holiday eves.
@@ -322,8 +374,14 @@ content exists in each language, and the layout flips direction automatically.
       placeholder prices loaded after sign-in), "log in to see the price" for visitors
 - [ ] Pages: brand, category, product, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
-**Phase 2 — Backend**: compose (Postgres + Flask), models + Alembic, seed from the legacy export, public content
-API, lead/contact endpoints; replace static frontend data with API calls; serve the PDF catalog.
+**Phase 2 — Backend**
+- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 15 tables: users with staff and
+      business subtypes, leads, suppliers, brands, categories, products, images, product-supplier junction, price
+      rules, settings, payment methods, orders, order items); models; price resolution (`pricing.py`); seed from the
+      stubs; `/api/health`; Vite `/api` proxy
+- [ ] public content API (categories, products, brands, settings); replace the frontend stubs with API calls
+- [ ] auth (sign-in for staff and business users) and the customer price API (`customer_prices`)
+- [ ] lead/contact endpoints (`business_leads`); serve the PDF catalog
 
 **Phase 3 — Admin CMS**: port the legacy admin.
 
@@ -339,6 +397,9 @@ card / Bit / bank transfer), Rivhit sync, generated PDF catalog.
 - `.mcp.json` (git-ignored, because it holds a local dev database password) defines the MCP servers: playwright,
   postgres, shadcn, atlassian. The postgres MCP expects the compose network **`ultrapet_internal`** and database
   **`content`**. Keep passwords out of tracked files: compose should read them from `.env`, which is git-ignored.
-- Two stale containers from an earlier, deleted attempt still run under compose project `ultrapet`:
-  `ultrapet-app-1` (127.0.0.1:8000) and `ultrapet-postgres-1` (host port 5433). A new `compose.yaml` in this folder
-  reuses the project name and would replace them — **ask the user before stopping or removing them.**
+- `compose.yaml` (project `ultrapet`) owns the containers `ultrapet-postgres-1` and `ultrapet-backend-1`, the volume
+  `ultrapet_pgdata` and the network `ultrapet_internal` (the leftovers of an earlier attempt were removed on
+  2026-11-02). Database and user `content`; the password is in `.env` and must match `.mcp.json`.
+  `docker compose down -v` deletes the data volume: ask first.
+- Every Claude Code session starts a `crystaldba/postgres-mcp` container (from `.mcp.json`) that keeps running after
+  the session ends, so they pile up (`docker ps --filter ancestor=crystaldba/postgres-mcp`). Ask before removing them.

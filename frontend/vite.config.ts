@@ -11,6 +11,7 @@
  *    and every article in each language, with hreflang alternates. public/robots.txt points to it.
  * `define` gives the app the public origin (SITE_URL in src/seo.ts) used for canonical URLs.
  * `server.allowedHosts` lets the dev server be reached through a Cloudflare quick tunnel.
+ * `server.proxy` forwards /api to the Flask backend (compose.yaml, port 5000) in dev.
  * `optimizeDeps` pre-bundles the lazily loaded map libraries at server start, so the first visit to
  * /where-to-buy does not trigger a dependency re-optimisation and page reload.
  * The `test` block configures Vitest (jsdom + Testing Library, see src/test/setup.ts).
@@ -90,7 +91,8 @@ export default defineConfig({
   optimizeDeps: { include: ['leaflet', 'react-leaflet'] },
   // Dev server: also answer requests through Cloudflare quick tunnels (random *.trycloudflare.com names),
   // used to preview the local site on another device. The leading dot allows every subdomain.
-  server: { allowedHosts: ['.trycloudflare.com'] },
+  // /api goes to the Flask backend (`docker compose up`), so the app calls the API on its own origin.
+  server: { allowedHosts: ['.trycloudflare.com'], proxy: { '/api': 'http://localhost:5000' } },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

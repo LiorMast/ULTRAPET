@@ -1,0 +1,10 @@
+# requirements.txt — Python dependencies of the backend, pinned (installed by the Dockerfile and the local venv).
+# pytest and alembic are for the tests only: alembic's compare_metadata checks the models against create-tables.sql.
+Flask==3.1.3
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.1.6
+psycopg[binary]==3.3.6
+gunicorn==26.2.0
+tzdata==2026.6
+pytest==9.2.0
+alembic==1.20.1

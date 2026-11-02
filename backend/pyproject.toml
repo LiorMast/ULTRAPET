@@ -1,0 +1,7 @@
+# pyproject.toml — Tool configuration of the backend (pytest only; dependencies are in requirements.txt).
+
+[tool.pytest.ini_options]
+# Import `app` from backend/; no .pytest_cache (the backend folder is bind-mounted into the container).
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
