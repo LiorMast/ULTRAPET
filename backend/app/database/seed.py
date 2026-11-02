@@ -2,7 +2,7 @@
 
 reset-db rebuilds the schema by running drop-tables.sql and then create-tables.sql. seed fills an empty database
 from the data the frontend uses today:
-- categories, products (with their WooCommerce ids and images), placeholder prices and brands from
+- categories, products (with their WooCommerce ids in woocommerce_id, and images), placeholder prices and brands from
   frontend/src/stubs/;
 - the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order and the currency;
 - the three payment methods;
@@ -18,7 +18,7 @@ from typing import Any
 
 import click
 import psycopg
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 
 from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.db import db
@@ -112,7 +112,7 @@ def seed_database() -> dict[str, int]:
         image = item.get("image")
         db.session.add(
             Product(
-                id=int(item["id"]),
+                woocommerce_id=int(item["id"]),
                 slug=item["slug"],
                 name=item["name"],
                 description=item["description"] if item["description"].get("he") else None,
@@ -152,8 +152,6 @@ def seed_database() -> dict[str, int]:
         staff = 1
 
     db.session.flush()
-    # Products were inserted with explicit ids: move the identity sequence past them for new products.
-    db.session.execute(text("SELECT setval(pg_get_serial_sequence('products', 'id'), (SELECT max(id) FROM products))"))
     db.session.commit()
     return {
         "categories": len(categories),

@@ -8,6 +8,7 @@ Column meanings are documented in create-tables.sql.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -15,7 +16,7 @@ from sqlalchemy import CheckConstraint, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.database.db import TimestampMixin, db
+from app.database.db import TimestampMixin, db, uuid_pk
 
 if TYPE_CHECKING:
     from app.database.models.orders import Order
@@ -31,7 +32,7 @@ class AppUser(TimestampMixin, db.Model):
         CheckConstraint("email = lower(email)", name="email"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
     user_type: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
     password_hash: Mapped[str]
@@ -68,7 +69,7 @@ class StaffUser(AppUser):
     __tablename__ = "staff_users"
     __table_args__ = (CheckConstraint("role IN ('admin')", name="role"),)
 
-    id: Mapped[int] = mapped_column(ForeignKey("app_users.id", ondelete="CASCADE"), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(ForeignKey("app_users.id", ondelete="CASCADE"), primary_key=True)
     role: Mapped[str] = mapped_column(default="admin", server_default="admin")
 
     __mapper_args__ = {"polymorphic_identity": "staff"}
@@ -80,7 +81,7 @@ class BusinessUser(AppUser):
     __tablename__ = "business_users"
     __table_args__ = (CheckConstraint("business_number ~ '^[0-9]{9}$'", name="business_number"),)
 
-    id: Mapped[int] = mapped_column(ForeignKey("app_users.id", ondelete="CASCADE"), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(ForeignKey("app_users.id", ondelete="CASCADE"), primary_key=True)
     company_name: Mapped[str]
     business_number: Mapped[str | None] = mapped_column(unique=True)
     city: Mapped[str | None]
@@ -108,7 +109,7 @@ class BusinessLead(TimestampMixin, db.Model):
         CheckConstraint("status IN ('new', 'contacted', 'converted', 'rejected')", name="status"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
     company_name: Mapped[str]
     contact_person: Mapped[str]
     phone: Mapped[str]
@@ -117,7 +118,7 @@ class BusinessLead(TimestampMixin, db.Model):
     message: Mapped[str | None]
     locale: Mapped[str] = mapped_column(default="he", server_default="he")
     status: Mapped[str] = mapped_column(default="new", server_default="new")
-    business_user_id: Mapped[int | None] = mapped_column(
+    business_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("business_users.id", ondelete="SET NULL"), index=True
     )
 

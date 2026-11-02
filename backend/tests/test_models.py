@@ -30,19 +30,18 @@ def make_customer(email: str = "shop@example.com") -> BusinessUser:
     return customer
 
 
-def make_product(category: Category, product_id: int = 1) -> Product:
+def make_product(category: Category, number: int = 1) -> Product:
     """Builds a product in a category.
 
     Args:
         category: Its category.
-        product_id: Its id (also used to make the slug unique).
+        number: A number that makes the slug unique.
 
     Returns:
         The unsaved Product.
     """
     return Product(
-        id=product_id,
-        slug=f"product-{product_id}",
+        slug=f"product-{number}",
         name={"he": "מזון", "en": "Food"},
         category=category,
         list_price=Decimal("100.00"),
@@ -71,13 +70,13 @@ def test_users_are_stored_in_the_base_and_subtype_tables(database):
     database.add_all([staff, make_customer()])
     database.commit()
 
-    rows = database.execute(text("SELECT email, user_type FROM app_users ORDER BY id")).all()
+    rows = database.execute(text("SELECT email, user_type FROM app_users ORDER BY email")).all()
     assert rows == [("admin@ultrapet.co.il", "staff"), ("shop@example.com", "business")]
     assert database.execute(text("SELECT role FROM staff_users")).scalar_one() == "admin"
     assert database.execute(text("SELECT company_name FROM business_users")).scalar_one() == "Pet Shop Ltd"
 
     database.expunge_all()
-    users = database.scalars(select(AppUser).order_by(AppUser.id)).all()
+    users = database.scalars(select(AppUser).order_by(AppUser.email)).all()
     assert [type(user) for user in users] == [StaffUser, BusinessUser]
     assert users[0].check_password("secret-password")
     assert not users[0].check_password("wrong")

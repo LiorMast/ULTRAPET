@@ -6,6 +6,7 @@ documented in create-tables.sql.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -13,7 +14,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import CheckConstraint, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.db import TimestampMixin, db
+from app.database.db import TimestampMixin, db, uuid_pk
 
 if TYPE_CHECKING:
     from app.database.models.catalog import Category, Product
@@ -37,19 +38,19 @@ class PriceRule(TimestampMixin, db.Model):
         CheckConstraint("starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on", name="dates"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    business_user_id: Mapped[int | None] = mapped_column(
+    id: Mapped[uuid.UUID] = uuid_pk()
+    business_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("business_users.id", ondelete="CASCADE"), index=True
     )
-    category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"), index=True)
-    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    category_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str]
     value: Mapped[Decimal]
     starts_on: Mapped[date | None]
     ends_on: Mapped[date | None]
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
     note: Mapped[str | None]
-    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("staff_users.id", ondelete="SET NULL"), index=True)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("staff_users.id", ondelete="SET NULL"), index=True)
 
     business_user: Mapped[BusinessUser | None] = relationship(back_populates="price_rules")
     category: Mapped[Category | None] = relationship(back_populates="price_rules")

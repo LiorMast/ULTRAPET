@@ -7,13 +7,14 @@ create-tables.sql.
 """
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.db import Localized, TimestampMixin, db, localized_check
+from app.database.db import Localized, TimestampMixin, db, localized_check, uuid_pk
 
 if TYPE_CHECKING:
     from app.database.models.price_rules import PriceRule
@@ -28,7 +29,7 @@ class Supplier(TimestampMixin, db.Model):
     __tablename__ = "suppliers"
     __table_args__ = (CheckConstraint("country ~ '^[A-Z]{2}$'", name="country"),)
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
     name: Mapped[str] = mapped_column(unique=True)
     country: Mapped[str | None]
     contact_name: Mapped[str | None]
@@ -54,7 +55,7 @@ class Brand(TimestampMixin, db.Model):
         CheckConstraint("accent_color ~ '^#[0-9A-Fa-f]{6}$'", name="accent_color"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
     slug: Mapped[str] = mapped_column(unique=True)
     name: Mapped[str]
     tagline: Mapped[Localized | None]
@@ -77,7 +78,7 @@ class Category(TimestampMixin, db.Model):
         CheckConstraint(localized_check("name"), name="name"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
     slug: Mapped[str] = mapped_column(unique=True)
     name: Mapped[Localized]
     image_url: Mapped[str | None]
@@ -94,7 +95,7 @@ class Category(TimestampMixin, db.Model):
 
 
 class Product(TimestampMixin, db.Model):
-    """An item Ultra Pet sells. Seeded products keep their WooCommerce id."""
+    """An item Ultra Pet sells. Seeded products keep their old WooCommerce id in `woocommerce_id`."""
 
     __tablename__ = "products"
     __table_args__ = (
@@ -103,14 +104,15 @@ class Product(TimestampMixin, db.Model):
         CheckConstraint("list_price >= 0", name="list_price"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
+    woocommerce_id: Mapped[int | None] = mapped_column(unique=True)
     slug: Mapped[str] = mapped_column(unique=True)
     sku: Mapped[str | None] = mapped_column(unique=True)
     barcode: Mapped[str | None]
     name: Mapped[Localized]
     description: Mapped[Localized | None]
-    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="RESTRICT"), index=True)
-    brand_id: Mapped[int | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"), index=True)
+    category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categories.id", ondelete="RESTRICT"), index=True)
+    brand_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"), index=True)
     list_price: Mapped[Decimal | None]
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
     legacy_path: Mapped[str | None]
@@ -137,8 +139,8 @@ class ProductImage(TimestampMixin, db.Model):
     __tablename__ = "product_images"
     __table_args__ = (CheckConstraint(localized_check("alt", nullable=True), name="alt"),)
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
+    product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     url: Mapped[str]
     thumbnail_url: Mapped[str | None]
     srcset: Mapped[str | None]
@@ -157,8 +159,8 @@ class ProductSupplier(TimestampMixin, db.Model):
         CheckConstraint("cost_currency ~ '^[A-Z]{3}$'", name="cost_currency"),
     )
 
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
-    supplier_id: Mapped[int] = mapped_column(
+    product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
+    supplier_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("suppliers.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     supplier_sku: Mapped[str | None]

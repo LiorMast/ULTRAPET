@@ -4,7 +4,8 @@ Most tests call the pure functions with unsaved PriceRule objects; the last one 
 the database with customer_prices().
 """
 from collections.abc import Iterable
-from datetime import date, timedelta
+import uuid
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from app.database.models.catalog import Category, Product
@@ -12,19 +13,19 @@ from app.pricing import PriceRule, customer_prices, resolve_price
 from app.database.models.users import BusinessUser
 
 TODAY = date(2026, 11, 15)
-PRODUCT = 1
-CATEGORY = 10
+PRODUCT = uuid.UUID(int=1)
+CATEGORY = uuid.UUID(int=10)
 LIST = Decimal("100.00")
 
 
-def rule(kind: str, value: str, *, product: bool = False, rule_id: int = 0, **fields) -> PriceRule:
+def rule(kind: str, value: str, *, product: bool = False, created: int = 0, **fields) -> PriceRule:
     """Builds an unsaved rule on the test product or, by default, its category.
 
     Args:
         kind: 'discount', 'increase' or 'fixed_price'.
         value: Percent, or shekels for a fixed price.
         product: True to target the product instead of the category.
-        rule_id: The rule's id (decides ties between rules with the same start).
+        created: Days after 1 Oct 2026 the rule was created (decides ties between rules with the same start).
         **fields: Other PriceRule fields (starts_on, ends_on, is_active).
 
     Returns:
@@ -32,7 +33,8 @@ def rule(kind: str, value: str, *, product: bool = False, rule_id: int = 0, **fi
     """
     target = {"product_id": PRODUCT} if product else {"category_id": CATEGORY}
     fields.setdefault("is_active", True)
-    return PriceRule(id=rule_id or None, kind=kind, value=Decimal(value), **target, **fields)
+    created_at = datetime(2026, 10, 1, tzinfo=UTC) + timedelta(days=created)
+    return PriceRule(created_at=created_at, kind=kind, value=Decimal(value), **target, **fields)
 
 
 def price(
@@ -102,14 +104,14 @@ def test_a_paused_rule_is_ignored():
 
 
 def test_a_temporary_deal_overrides_permanent_terms_while_it_lasts():
-    permanent = rule("discount", "5", rule_id=1)
-    november = rule("discount", "15", rule_id=2, starts_on=date(2026, 11, 1), ends_on=date(2026, 11, 30))
+    permanent = rule("discount", "5", created=1)
+    november = rule("discount", "15", created=2, starts_on=date(2026, 11, 1), ends_on=date(2026, 11, 30))
     assert price(customer=[permanent, november]) == Decimal("85.00")
     assert price(customer=[permanent, november], today=date(2026, 12, 1)) == Decimal("95.00")
 
 
 def test_between_rules_with_the_same_start_the_newest_wins():
-    assert price(general=[rule("discount", "10", rule_id=7), rule("discount", "20", rule_id=3)]) == Decimal("90.00")
+    assert price(general=[rule("discount", "10", created=7), rule("discount", "20", created=3)]) == Decimal("90.00")
 
 
 def test_prices_round_half_up_to_agorot():
@@ -125,11 +127,11 @@ def test_customer_prices_uses_only_this_customer_and_the_general_rules(database)
         for name in ("me", "other")
     )
 
-    def product(product_id: int, category: Category, list_price: str | None, **fields) -> Product:
+    def product(number: int, category: Category, list_price: str | None, **fields) -> Product:
         """Builds a product.
 
         Args:
-            product_id: Its id.
+            number: A number that makes its slug and name unique.
             category: Its category.
             list_price: Its list price, or None.
             **fields: Other Product fields (is_active).
@@ -138,28 +140,28 @@ def test_customer_prices_uses_only_this_customer_and_the_general_rules(database)
             The Product.
         """
         return Product(
-            id=product_id,
-            slug=f"p{product_id}",
-            name={"he": f"מוצר {product_id}"},
+            slug=f"p{number}",
+            name={"he": f"מוצר {number}"},
             category=category,
             list_price=Decimal(list_price) if list_price else None,
             **fields,
         )
 
+    p1, p2, p3 = product(1, food, "100.00"), product(2, food, "50.00"), product(3, toys, "20.00")
     database.add_all(
         [
-            product(1, food, "100.00"),
-            product(2, food, "50.00"),
-            product(3, toys, "20.00"),
+            p1,
+            p2,
+            p3,
             product(4, toys, None),  # no price: left out
             product(5, toys, "10.00", is_active=False),  # hidden: left out
             PriceRule(business_user=me, category=food, kind="discount", value=Decimal(10)),
-            PriceRule(business_user=me, product_id=2, kind="fixed_price", value=Decimal("30.00")),
+            PriceRule(business_user=me, product=p2, kind="fixed_price", value=Decimal("30.00")),
             PriceRule(business_user=other, category=toys, kind="discount", value=Decimal(50)),  # someone else's
             PriceRule(category=toys, kind="discount", value=Decimal(25), ends_on=TODAY - timedelta(days=1)),  # expired
-            PriceRule(product_id=1, kind="discount", value=Decimal(10)),
+            PriceRule(product=p1, kind="discount", value=Decimal(10)),
         ]
     )
     database.commit()
 
-    assert customer_prices(me.id, TODAY) == {1: Decimal("81.00"), 2: Decimal("30.00"), 3: Decimal("20.00")}
+    assert customer_prices(me.id, TODAY) == {p1.id: Decimal("81.00"), p2.id: Decimal("30.00"), p3.id: Decimal("20.00")}

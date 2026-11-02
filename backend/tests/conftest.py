@@ -78,5 +78,5 @@ def database(app: Flask) -> Iterator[scoped_session]:
         yield db.session
         db.session.rollback()
         tables = ", ".join(table.name for table in db.metadata.sorted_tables)
-        db.session.execute(text(f"TRUNCATE {tables} RESTART IDENTITY"))
+        db.session.execute(text(f"TRUNCATE {tables}"))
         db.session.commit()

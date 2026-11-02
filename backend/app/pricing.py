@@ -16,9 +16,10 @@ the data for the catalog. Column meanings are documented in create-tables.sql.
 """
 from __future__ import annotations
 
+import uuid
 from collections import defaultdict
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
@@ -41,11 +42,24 @@ def israel_today() -> date:
     return datetime.now(ISRAEL).date()
 
 
-def pick_rule(rules: Iterable[PriceRule], product_id: int, category_id: int, today: date) -> PriceRule | None:
+def rule_age(rule: PriceRule) -> tuple[date, datetime, uuid.UUID]:
+    """Sorts rules from oldest to newest: later start first, then later creation, then id as a stable last resort.
+
+    Args:
+        rule: The rule.
+
+    Returns:
+        The sort key; the largest key is the rule that wins.
+    """
+    return (rule.starts_on or date.min, rule.created_at or datetime.min.replace(tzinfo=UTC), rule.id or uuid.UUID(int=0))
+
+
+def pick_rule(rules: Iterable[PriceRule], product_id: uuid.UUID, category_id: uuid.UUID, today: date) -> PriceRule | None:
     """Chooses the one rule of a layer that applies to a product today.
 
     A rule on the product beats a rule on its category. Among rules on the same target, the one with the latest
-    start wins (no start counts as the earliest), then the highest id (the newest rule).
+    start wins (no start counts as the earliest), then the most recently created one (ids are random UUIDs, so they
+    say nothing about age; they only break an exact tie, to keep the choice stable).
 
     Args:
         rules: Rules of one layer (one customer's rules, or the general rules); others are ignored.
@@ -63,7 +77,7 @@ def pick_rule(rules: Iterable[PriceRule], product_id: int, category_id: int, tod
     ):
         candidates = [rule for rule in active if matches(rule)]
         if candidates:
-            return max(candidates, key=lambda rule: (rule.starts_on or date.min, rule.id or 0))
+            return max(candidates, key=rule_age)
     return None
 
 
@@ -71,8 +85,8 @@ def resolve_price(
     list_price: Decimal | None,
     customer_rules: Iterable[PriceRule],
     general_rules: Iterable[PriceRule],
-    product_id: int,
-    category_id: int,
+    product_id: uuid.UUID,
+    category_id: uuid.UUID,
     today: date,
 ) -> Decimal | None:
     """Computes the price one customer pays for one product.
@@ -105,7 +119,7 @@ def resolve_price(
     return price.quantize(AGORA, ROUND_HALF_UP)
 
 
-def customer_prices(business_user_id: int, today: date | None = None) -> dict[int, Decimal]:
+def customer_prices(business_user_id: uuid.UUID, today: date | None = None) -> dict[uuid.UUID, Decimal]:
     """Prices every active product for one customer (the B2B catalog).
 
     Loads the active products and the rules that can apply (the customer's and the general ones, within their
@@ -134,12 +148,12 @@ def customer_prices(business_user_id: int, today: date | None = None) -> dict[in
     ).all()
 
     # Index the rules by target and layer, so each product only looks at the rules that can apply to it.
-    by_target: dict[tuple[bool, str, int], list[PriceRule]] = defaultdict(list)
+    by_target: dict[tuple[bool, str, uuid.UUID], list[PriceRule]] = defaultdict(list)
     for rule in rules:
         target = ("product", rule.product_id) if rule.product_id is not None else ("category", rule.category_id)
         by_target[(rule.business_user_id is not None, *target)].append(rule)
 
-    prices: dict[int, Decimal] = {}
+    prices: dict[uuid.UUID, Decimal] = {}
     for product_id, category_id, list_price in products:
         own = by_target[(True, "product", product_id)] + by_target[(True, "category", category_id)]
         general = by_target[(False, "product", product_id)] + by_target[(False, "category", category_id)]

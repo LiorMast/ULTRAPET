@@ -7,6 +7,7 @@ create-tables.sql.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -14,7 +15,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import CheckConstraint, ForeignKey, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database.db import Localized, TimestampMixin, db, localized_check
+from app.database.db import Localized, TimestampMixin, db, localized_check, uuid_pk
 
 if TYPE_CHECKING:
     from app.database.models.catalog import Product
@@ -60,8 +61,8 @@ class Order(TimestampMixin, db.Model):
         CheckConstraint("total >= 0", name="total"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    business_user_id: Mapped[int] = mapped_column(ForeignKey("business_users.id", ondelete="RESTRICT"), index=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
+    business_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("business_users.id", ondelete="RESTRICT"), index=True)
     status: Mapped[str] = mapped_column(default="submitted", server_default="submitted")
     payment_method_code: Mapped[str] = mapped_column(
         ForeignKey("payment_methods.code", ondelete="RESTRICT"), index=True
@@ -100,9 +101,9 @@ class OrderItem(TimestampMixin, db.Model):
         CheckConstraint("line_total >= 0", name="line_total"),
     )
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
-    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), index=True)
+    id: Mapped[uuid.UUID] = uuid_pk()
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), index=True)
     sku: Mapped[str | None]
     product_name: Mapped[Localized]
     quantity: Mapped[int] = mapped_column(Integer)

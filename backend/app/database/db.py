@@ -3,15 +3,17 @@
 Shared by all model modules (users, catalog, pricing, orders, settings). It fixes three things for the whole schema:
 - the constraint naming convention, which yields Postgres' own default names, so the models and
   create-tables.sql (the source of truth) agree on every constraint and index name;
-- the column types behind Python annotations (int -> BIGINT, str -> TEXT, Localized -> JSONB, ...);
+- the column types behind Python annotations (UUID -> UUID, int -> BIGINT, str -> TEXT, Localized -> JSONB, ...);
+- uuid_pk(), the primary key column of every table with a generated id;
 - TimestampMixin, the created_at / updated_at pair most tables carry.
 """
+import uuid
 from datetime import datetime
 from decimal import Decimal
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import BigInteger, DateTime, MetaData, Numeric, Text, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import BigInteger, DateTime, MetaData, Numeric, Text, func, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, registry
 
 # Text per language, e.g. {"he": "מזון יבש", "en": "Dry food"}; Hebrew is always present (a CHECK in the schema).
@@ -31,7 +33,8 @@ NAMING_CONVENTION = {
 class Base(DeclarativeBase):
     """Declarative base of every model: the naming convention plus the default column type per annotation.
 
-    `int` maps to BIGINT (all ids and foreign keys); counters that are plain INTEGER say so explicitly. Money columns
+    `uuid.UUID` maps to UUID (all ids and foreign keys) and `int` to BIGINT; counters that are plain INTEGER say so
+    explicitly. Money columns
     default to NUMERIC(10,2); totals and percentages give their own precision. Both live on the registry, because
     Flask-SQLAlchemy subclasses this base (SQLAlchemy 2.1 rejects a per-class type_annotation_map there).
     """
@@ -39,6 +42,7 @@ class Base(DeclarativeBase):
     registry = registry(
         metadata=MetaData(naming_convention=NAMING_CONVENTION),
         type_annotation_map={
+            uuid.UUID: UUID(as_uuid=True),
             int: BigInteger,
             str: Text,
             Decimal: Numeric(10, 2),
@@ -71,3 +75,15 @@ def localized_check(column: str, *, nullable: bool = False) -> str:
     """
     check = f"coalesce({column} ->> 'he', '') <> ''"
     return f"{column} IS NULL OR {check}" if nullable else check
+
+
+def uuid_pk() -> Mapped[uuid.UUID]:
+    """Builds the primary key column of a table with a generated id.
+
+    The database fills it with gen_random_uuid() on insert (the same default as create-tables.sql), and SQLAlchemy
+    reads the new id back, so `product.id` is available after the first flush.
+
+    Returns:
+        A mapped_column for `id: Mapped[uuid.UUID]`.
+    """
+    return mapped_column(primary_key=True, server_default=text("gen_random_uuid()"))
