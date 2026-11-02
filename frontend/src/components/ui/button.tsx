@@ -2,7 +2,8 @@
  * ui/button.tsx — The site's button (shadcn/ui, restyled for UltraPet).
  *
  * The default variant is the legacy `.btn-primary`: brand red, uppercase Montserrat with wide
- * letter-spacing, lifting slightly with a red glow on hover. Sizes: "default" (legacy px-8 py-4) and
+ * letter-spacing, lifting slightly with a red glow on hover. Every variant reacts the instant it is pressed
+ * (scales to 97% in 100ms) and springs back on release, so a press never feels dead. Sizes: "default" (legacy px-8 py-4) and
  * "sm" (the header's call to action). The "ghostWhite" variant is the white-outline button for dark photo
  * backgrounds (hero), from legacy `.btn-ghost-white`. The other shadcn variants and icon sizes are kept for
  * shadcn components that use them. Use `asChild` to style a <Link> or <a> as a button.
@@ -13,7 +14,7 @@ import { cn } from "cn"
 import { Slot } from "radix-ui"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:scale-[0.97] active:not-aria-[haspopup]:duration-100 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

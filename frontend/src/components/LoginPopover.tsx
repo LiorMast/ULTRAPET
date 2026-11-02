@@ -25,7 +25,7 @@ export function LoginPopover() {
   const [open, setOpen] = useState(false)
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-neutral-300 px-6 py-3 font-heading text-base font-semibold uppercase tracking-widest text-neutral-700 outline-none transition-colors duration-300 hover:border-brand-red hover:bg-brand-red hover:text-white focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 data-[state=open]:border-brand-red data-[state=open]:bg-brand-red data-[state=open]:text-white">
+      <PopoverTrigger className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-neutral-300 px-6 py-3 font-heading text-base font-semibold uppercase tracking-widest text-neutral-700 outline-none transition-[color,background-color,border-color,scale] duration-300 active:scale-[0.97] active:duration-100 hover:border-brand-red hover:bg-brand-red hover:text-white focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 data-[state=open]:border-brand-red data-[state=open]:bg-brand-red data-[state=open]:text-white">
         <UserRound size={18} aria-hidden="true" />
         {user ? t.login.account : HEADER_LOGIN.label(t)}
       </PopoverTrigger>

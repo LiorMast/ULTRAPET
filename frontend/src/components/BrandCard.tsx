@@ -6,25 +6,26 @@
 import { Link } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
 import { cn } from 'cn'
-import type { Brand } from '@/config'
+import { localized, type Brand } from '@/config'
 import { useI18n } from '@/i18n'
 
 /**
  * One brand card. The card is a real link (crawlable, keyboard-focusable); a thin line in the brand's
- * accent color grows along the bottom edge on hover or focus.
+ * accent color grows along the bottom edge on hover or focus, and the card settles back the instant it is pressed.
  * @param props.brand - The brand to show (see `Brand` in config.ts).
  * @param props.className - Extra classes for the card, e.g. grid placement.
  * @returns The card link element.
  */
 export function BrandCard({ brand, className }: { brand: Brand; className?: string }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   return (
     <Link
       to="/brands/$slug"
       params={{ slug: brand.slug }}
       className={cn(
         'group relative flex flex-col overflow-hidden border border-white/20 bg-transparent p-8 outline-none',
-        'transition-[box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-premium-sm',
+        'transition-[box-shadow,translate,scale] duration-300 hover:-translate-y-1 hover:shadow-premium-sm',
+        'active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100',
         'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
         className,
       )}
@@ -41,7 +42,7 @@ export function BrandCard({ brand, className }: { brand: Brand; className?: stri
       <div className="mt-8 flex items-end justify-between gap-4 border-t border-white/20 pt-5">
         <div className="min-w-0">
           <h3 className="font-heading text-sm font-bold uppercase tracking-widest text-white">{brand.name}</h3>
-          <p className="mt-1 text-sm text-white/75">{brand.tagline(t)}</p>
+          <p className="mt-1 text-sm text-white/75">{localized(brand.tagline, locale)}</p>
         </div>
         <span className="sr-only">{t.brands.explore}</span>
         <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-white transition-transform duration-300 group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />

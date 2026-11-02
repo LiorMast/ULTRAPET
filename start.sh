@@ -1,0 +1,1 @@
+if [ -d "frontend" ]; then cd frontend && npm run dev; else npm run dev; fi

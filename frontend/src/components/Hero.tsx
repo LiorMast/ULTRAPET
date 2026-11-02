@@ -9,8 +9,10 @@
  *   shows. Pausing is just animation-play-state, so there are no JS timers.
  * - The pause button stops the slideshow (WCAG 2.2.2). With prefers-reduced-motion the photos never
  *   advance by themselves and the pause button is hidden.
+ * - The headline starts with the round red logo mark (src/assets/logo-mark.svg), decorative since the text names the brand.
  * - 0 photos: a plain charcoal gradient. 1 photo: no controls. 2 or more: slideshow with controls.
- * - The scroll-down arrow is a real link to the next home section (#stats).
+ * - The scroll-down arrow is a real link to the next home section (#stats); it nudges downwards three
+ *   times after the text has risen, then stays still.
  */
 import { useEffect, useState, type MouseEvent } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -18,6 +20,7 @@ import { ArrowRight, ChevronDown, Pause, Play } from 'lucide-react'
 import { cn } from 'cn'
 import { useReducedMotion } from '@/components/useReducedMotion'
 import { Button } from '@/components/ui/button'
+import logoMarkUrl from '@/assets/logo-mark.svg'
 import { HERO_IMAGES, HERO_LINKS, type HeroImage } from '@/config'
 import { useI18n } from '@/i18n'
 
@@ -113,7 +116,15 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
               {t.hero.eyebrow}
             </span>
           </div>
-          <h1 className="mb-5 animate-hero-rise font-display text-[clamp(3.2rem,7.5vw,6.5rem)] leading-[1.05] font-bold text-white [animation-delay:350ms]">
+          <h1 className="mb-5 animate-hero-rise font-display text-[clamp(3.2rem,7.5vw,6.5rem)] leading-[1.05] font-bold tracking-display text-white [animation-delay:350ms]">
+            <img
+              src={logoMarkUrl}
+              alt=""
+              width={322}
+              height={322}
+              draggable={false}
+              className="me-4 inline-block size-[0.8em] select-none align-[-0.05em] drop-shadow-2xl"
+            />
             {t.hero.title} <span className="text-brand-red ltr:italic">{t.hero.titleAccent}</span>
           </h1>
           <p className="mb-4 max-w-2xl animate-hero-rise font-heading text-lg leading-snug font-medium text-white/90 [animation-delay:500ms] lg:text-xl">
@@ -178,7 +189,7 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
                 type="button"
                 aria-label={userPaused ? t.hero.play : t.hero.pause}
                 onClick={() => setUserPaused(!userPaused)}
-                className="ms-3 flex size-9 items-center justify-center rounded-full border border-white/40 text-white/80 outline-none transition-colors hover:border-white hover:text-white focus-visible:ring-2 focus-visible:ring-white"
+                className="ms-3 flex size-9 items-center justify-center rounded-full border border-white/40 text-white/80 outline-none transition-[color,border-color,scale] hover:border-white hover:text-white focus-visible:ring-2 focus-visible:ring-white active:scale-90 active:duration-100"
               >
                 {userPaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}
               </button>
@@ -191,7 +202,7 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
         {...HERO_LINKS.scrollDown}
         onClick={scrollDown}
         aria-label={t.hero.scrollDown}
-        className="absolute inset-x-0 bottom-3 z-10 mx-auto w-fit animate-bounce p-2 text-white/60 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white"
+        className="absolute inset-x-0 bottom-3 z-10 mx-auto w-fit animate-hint-down p-2 text-white/60 outline-none transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white"
       >
         <ChevronDown size={28} aria-hidden="true" />
       </Link>

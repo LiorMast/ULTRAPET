@@ -6,9 +6,23 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
+test('the carousel pages through the brands with the arrows and the dots', async ({ page }) => {
+  await page.goto('/en')
+  const section = page.locator('#brands')
+  await section.scrollIntoViewIfNeeded()
+  const dots = section.getByRole('navigation', { name: 'Carousel pages' }).getByRole('button')
+  await expect(dots).toHaveCount(2)
+  await expect(dots.first()).toHaveAttribute('aria-current', 'true')
+  await section.getByRole('button', { name: 'Next' }).click()
+  await expect(dots.nth(1)).toHaveAttribute('aria-current', 'true')
+  await expect(section.getByRole('button', { name: 'Next' })).toBeDisabled()
+  await dots.first().click()
+  await expect(dots.first()).toHaveAttribute('aria-current', 'true')
+})
+
 test('the six cards are links and the section does not overflow', async ({ page }) => {
   await page.goto('/')
-  const cards = page.locator('#brands ul a')
+  const cards = page.locator('#brands a')
   await expect(cards).toHaveCount(6)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await cards.first().focus()
@@ -30,6 +44,9 @@ for (const [name, path] of [['he', '/'], ['en', '/en']] as const) {
     const section = page.locator('#brands')
     await section.scrollIntoViewIfNeeded()
     await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('#brands img')].every((i) => i.complete))
+    // The fixed header is translucent and floats over this dark section wherever the scroll stops; hide it
+    // here (it has its own screenshots).
+    await page.getByRole('banner').evaluate((header) => (header.style.visibility = 'hidden'))
     await expect(section).toHaveScreenshot(`brands-${name}.png`)
   })
 }

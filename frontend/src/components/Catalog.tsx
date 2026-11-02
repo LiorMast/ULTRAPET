@@ -67,7 +67,7 @@ function CategoryChip({ label, count, category, active }: { label: string; count
       search={(prev: CatalogSearch) => ({ ...prev, category, page: undefined })}
       activeOptions={{ exact: true }}
       className={cn(
-        'inline-flex shrink-0 items-center gap-2 whitespace-nowrap border px-4 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
+        'inline-flex shrink-0 items-center gap-2 whitespace-nowrap border px-4 py-2 text-sm font-medium outline-none transition-[color,background-color,border-color,scale] active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
         active ? 'border-brand-charcoal bg-brand-charcoal text-white' : 'border-neutral-200 bg-white text-brand-charcoal hover:border-brand-red hover:text-brand-red-dark',
       )}
     >

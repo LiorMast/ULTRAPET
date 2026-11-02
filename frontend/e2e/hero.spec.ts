@@ -15,6 +15,19 @@ async function waitForFirstPhoto(page: Page) {
 }
 
 /**
+ * Waits until the hero text has finished fading in (with reduced motion it still fades, without rising),
+ * so contrast is checked on the text a visitor actually reads.
+ * @param page - The Playwright page, already on the home page.
+ */
+async function waitForHeroText(page: Page) {
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('#home .animate-hero-rise')].every((el) =>
+      el.getAnimations().every((animation) => animation.playState === 'finished'),
+    ),
+  )
+}
+
+/**
  * Makes each photo stay 2.5s instead of 7s, so the slideshow tests don't wait long. It stays longer
  * than the 1.6s crossfade, so a photo can finish fading in before the next one starts.
  * @param page - The Playwright page, already on the home page.
@@ -135,6 +148,7 @@ test.describe('with reduced motion', () => {
     for (const path of ['/', '/en']) {
       await page.goto(path)
       await waitForFirstPhoto(page)
+      await waitForHeroText(page)
       const results = await new AxeBuilder({ page })
         .include('#home')
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

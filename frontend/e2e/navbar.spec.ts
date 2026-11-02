@@ -1,7 +1,7 @@
 /**
  * navbar.spec.ts — End-to-end checks of the site header in real Chromium: the transparent-to-solid
- * scroll behavior, #section links, the Products menu, language switching, the mobile drawer, layout
- * overflow at common widths, accessibility (axe) and screenshots for visual review.
+ * scroll behavior, #section links, the Products menu, language switching, the mobile drawer (including
+ * swipe-to-close), layout overflow at common widths, accessibility (axe) and screenshots for visual review.
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
@@ -10,6 +10,30 @@ import { expect, test, type Page } from '@playwright/test'
  * Fails the test if the page is wider than the window (which would cause horizontal scrolling).
  * @param page - The Playwright page to check.
  */
+/**
+ * Drags one finger horizontally across the page with real touch events (Chromium DevTools protocol), the
+ * way a phone would: press, move in steps, lift. Every event carries an explicit timestamp, so the
+ * gesture's speed is exact however busy the test machine is.
+ * @param page - The Playwright page.
+ * @param from - Start point in CSS px.
+ * @param dx - Horizontal distance to travel (negative = leftwards).
+ * @param steps - Number of moves.
+ * @param stepMs - Time between moves in ms; fewer steps or less time over the same distance = a faster flick.
+ */
+async function swipe(page: Page, from: { x: number; y: number }, dx: number, steps: number, stepMs: number) {
+  const cdp = await page.context().newCDPSession(page)
+  const start = Date.now() / 1000
+  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', i: number) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      timestamp: start + (i * stepMs) / 1000,
+      touchPoints: type === 'touchEnd' ? [] : [{ x: from.x + (dx * i) / steps, y: from.y }],
+    })
+  await touch('touchStart', 0)
+  for (let i = 1; i <= steps; i++) await touch('touchMove', i)
+  await touch('touchEnd', steps)
+}
+
 async function expectNoHorizontalOverflow(page: Page) {
   const { scrollWidth, clientWidth } = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
@@ -50,15 +74,24 @@ async function expectNoA11yViolations(page: Page) {
 test.describe('desktop', () => {
   test.skip(({ isMobile }) => isMobile, 'desktop layout only')
 
-  test('is always white, over the hero and after scrolling', async ({ page }) => {
+  test('is the same translucent white material over the hero and after scrolling', async ({ page }) => {
     await page.goto('/')
     const header = page.getByRole('banner')
-    await expect(header).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await expect(header).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.85)')
+    await expect(header).toHaveCSS('backdrop-filter', /blur\(20px\)/)
     await expect(header).toHaveScreenshot('header-he-top.png')
 
     await page.mouse.wheel(0, 600)
-    await expect(header).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await expect(header).toHaveCSS('background-color', 'rgba(255, 255, 255, 0.85)')
     await expect(header).toHaveScreenshot('header-he-scrolled.png')
+  })
+
+  test('is solid white for visitors who ask for more contrast', async ({ page }) => {
+    await page.emulateMedia({ contrast: 'more' })
+    await page.goto('/')
+    const header = page.getByRole('banner')
+    await expect(header).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await expect(header).toHaveCSS('backdrop-filter', 'none')
   })
 
   test('menu links scroll to their section, below the header', async ({ page }) => {
@@ -177,6 +210,47 @@ test.describe('mobile', () => {
       await page.keyboard.press('Escape')
       await expect(drawer).toBeHidden()
     }
+  })
+
+  test('the drawer follows a swipe: a short drag springs back, a flick towards the edge closes it', async ({ page }) => {
+    for (const [path, open, sign] of [
+      ['/en', 'Open menu', 1],
+      ['/', 'פתיחת תפריט', -1],
+    ] as const) {
+      await page.goto(path)
+      await page.getByRole('button', { name: open }).click()
+      const drawer = page.getByRole('dialog')
+      await expect(drawer).toBeVisible()
+      await page.waitForTimeout(600) // let the slide-in finish
+      const box = (await drawer.boundingBox())!
+      const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+
+      // A slow, short drag towards the edge: the panel moves with the finger, then springs back open.
+      await swipe(page, start, sign * 60, 12, 40)
+      await expect(drawer).toBeVisible()
+      await expect.poll(async () => Math.round((await drawer.boundingBox())!.x)).toBe(Math.round(box.x))
+
+      // A quick flick that travels well under half the panel: only its momentum carries it closed.
+      await swipe(page, start, sign * 130, 3, 16)
+      await expect(drawer).toBeHidden()
+    }
+  })
+
+  test('a vertical swipe in the drawer does not move it sideways', async ({ page }) => {
+    await page.goto('/en')
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    const drawer = page.getByRole('dialog')
+    await page.waitForTimeout(600)
+    const box = (await drawer.boundingBox())!
+    const cdp = await page.context().newCDPSession(page)
+    const x = box.x + box.width / 2
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: 400 }] })
+    for (let i = 1; i <= 8; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + i * 2, y: 400 - i * 15 }] })
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await expect(drawer).toBeVisible()
+    expect(Math.round((await drawer.boundingBox())!.x)).toBe(Math.round(box.x))
   })
 
   test('choosing a section in the drawer closes it and scrolls there', async ({ page }) => {

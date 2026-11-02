@@ -1,6 +1,6 @@
 /**
- * Categories.tsx — The home page "Products" section (anchor #categories): heading, intro and a carousel of
- * category cards. Used by routes/index.tsx; the navbar's "Products" link scrolls here.
+ * Categories.tsx — The home page "Products" section (anchor #categories): heading, intro and a paged carousel of
+ * category cards (3 per page). Used by routes/index.tsx; the navbar's "Products" link scrolls here.
  */
 import { CategoryCard } from '@/components/CategoryCard'
 import { Carousel } from '@/components/Carousel'
@@ -24,7 +24,7 @@ export function Categories({ categories = CATEGORIES }: { categories?: Category[
           </h2>
           <p className="mt-5 text-lg text-brand-charcoal-muted">{t.categories.intro}</p>
         </div>
-        <Carousel label={t.categories.carouselLabel} className="mt-14">
+        <Carousel label={t.categories.carouselLabel} pageSize={3} className="mt-14">
           {categories.map((category) => (
             <CategoryCard key={category.slug} category={category} />
           ))}

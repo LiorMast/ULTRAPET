@@ -193,8 +193,17 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
 - **Buttons**: `<Button>` default variant = legacy `.btn-primary` (red, uppercase, lifts with a red glow on hover);
   `size="sm"` for the header.
 - **Logo**: `<Logo className="h-14" />` — horizontal lockup traced from `legacy/public/UltraPet_Logo.pdf`.
-- **Header**: always white, 88px tall (`py-4` + 56px logo); pages use `pt-22` to clear it. No transparent or
-  scroll-driven states.
+- **Header**: a translucent white material (`material-bar` in `index.css`: 85% white + backdrop blur; solid white
+  for reduced transparency / more contrast), 88px tall (`py-4` + 56px logo); pages use `pt-22` to clear it. No
+  transparent or scroll-driven states.
+- **Motion** (Apple fluid-interface rules): every transition uses `--ease-spring` (a critically damped spring as CSS
+  `linear()`, the Tailwind default timing function). Controls react on press (`active:scale-[0.97]
+  active:duration-100`); clickable cards lift on hover and settle on press (`transition-[box-shadow,translate,scale]`;
+  Tailwind v4 moves with `translate`/`scale`, so `transition-[transform]` would not animate them). The mobile drawer
+  can be swiped closed (`onSwipeClose` on `SheetContent`). Reduced motion keeps fades and drops movement (see the
+  `prefers-reduced-motion` block in `index.css`).
+- **Type**: Inter with optical sizing (`opsz`); sizes from `text-xl` up carry size-specific negative tracking
+  (`--text-*--letter-spacing`, milder in Hebrew); `tracking-display` for the hero headline; headings balance.
 - **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,
   short language label "EN"/"עב"); English menu labels use 0.1em tracking (not `tracking-widest`) so they fit; the header container is `max-w-screen-2xl`. Re-run the e2e overflow test
   after adding menu items.

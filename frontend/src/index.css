@@ -9,13 +9,20 @@
  *   square corners (--radius: 0) like the legacy design.
  * - Hebrew pages (<html lang="he">) switch every font to Heebo and tighten the wide letter-spacing,
  *   just by overriding the token variables.
+ * - Motion and type follow Apple's interface guidelines: one critically damped spring curve for every
+ *   transition (--ease-spring), size-specific letter-spacing on large text, a translucent header
+ *   material (material-bar), and a reduced-motion mode that keeps fades but drops movement.
  */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/inter";
+/* opsz: Inter changes shape with size (optical sizing), like Apple's system fonts. */
+@import "@fontsource-variable/inter/opsz.css";
 @import "@fontsource-variable/montserrat";
 @import "@fontsource-variable/heebo";
+
+/* Visitors who asked the system for less transparency (used by material-bar and the sheet backdrop). */
+@custom-variant reduced-transparency (@media (prefers-reduced-transparency: reduce));
 
 /* Brand tokens — each one becomes a utility class (e.g. --color-brand-red -> bg-brand-red). */
 @theme {
@@ -50,6 +57,28 @@
 
   --tracking-widest: 0.25em;
   --tracking-ultra-wide: 0.35em;
+  /* Display headings (hero): large text reads too loose, so it gets negative tracking. */
+  --tracking-display: -0.02em;
+
+  /*
+   * Size-specific tracking (Apple: never one letter-spacing for all sizes): from text-xl up, every size
+   * tightens a little more. Body sizes stay at 0. An explicit tracking-* class still wins. Mild values,
+   * because Inter's optical sizes already set large text tighter.
+   */
+  --text-xl--letter-spacing: -0.005em;
+  --text-2xl--letter-spacing: -0.01em;
+  --text-3xl--letter-spacing: -0.015em;
+  --text-4xl--letter-spacing: -0.015em;
+  --text-5xl--letter-spacing: -0.02em;
+  --text-6xl--letter-spacing: -0.02em;
+
+  /*
+   * The site's one motion curve: a critically damped spring (Apple's default, damping 1.0: no overshoot),
+   * sampled into linear(). It settles at the end of the transition's duration, so a duration of D behaves
+   * like a spring "response" of about 0.7 × D. Every transition and ease-spring animation uses it.
+   */
+  --ease-spring: linear(0 0%, 0.001 0.6%, 0.013 1.9%, 0.042 3.6%, 0.094 5.7%, 0.167 8.1%, 0.257 10.9%, 0.357 13.9%, 0.459 17.2%, 0.559 20.8%, 0.65 24.6%, 0.729 28.7%, 0.796 33%, 0.85 37.5%, 0.893 42.2%, 0.925 47.1%, 0.948 52.3%, 0.965 57.6%, 0.977 63.1%, 0.985 68.8%, 0.991 74.7%, 0.994 80.8%, 0.996 87%, 0.998 93.4%, 1 100%);
+  --default-transition-timing-function: var(--ease-spring);
 
   --shadow-premium: 0 20px 60px -10px rgb(0 0 0 / 0.15);
   --shadow-premium-sm: 0 8px 30px -5px rgb(0 0 0 / 0.12);
@@ -65,6 +94,19 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+
+  /* Scroll-down hint: a short nudge in the direction of travel, three times, then still (no endless loop). */
+  --animate-hint-down: hint-down 1.6s ease-in-out 1.5s 3 both;
+  @keyframes hint-down {
+    0%,
+    60%,
+    100% {
+      transform: none;
+    }
+    30% {
+      transform: translateY(6px);
     }
   }
 }
@@ -127,6 +169,33 @@ html:lang(he) {
   --font-display: var(--font-hebrew);
   --tracking-widest: 0.02em;
   --tracking-ultra-wide: 0.02em;
+  /* Hebrew letters stand apart, so large Hebrew text is tightened only slightly. */
+  --tracking-display: -0.01em;
+  --text-xl--letter-spacing: 0;
+  --text-2xl--letter-spacing: 0;
+  --text-3xl--letter-spacing: -0.005em;
+  --text-4xl--letter-spacing: -0.01em;
+  --text-5xl--letter-spacing: -0.01em;
+  --text-6xl--letter-spacing: -0.01em;
+}
+
+/*
+ * Translucent bar material (the fixed header): content scrolling underneath shows through, blurred, so the
+ * bar floats above the page instead of cutting a solid strip out of it. Solid white when the browser can't
+ * blur, or when the visitor asked for less transparency or more contrast.
+ */
+@utility material-bar {
+  background-color: rgb(255 255 255 / 0.85);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    background-color: #fff;
+  }
+  @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+    background-color: #fff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 @layer base {
@@ -141,6 +210,31 @@ html:lang(he) {
   }
   body {
     @apply bg-background text-foreground antialiased;
+    /* Every control draws its own pressed state, so the grey tap flash of mobile browsers goes. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Even line lengths: balanced headings, no single-word last line in paragraphs. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  /* <details> (the mobile menu's Products group) opens and closes smoothly where the browser can animate to auto. */
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition:
+      block-size 400ms var(--ease-spring),
+      content-visibility 400ms allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
   }
 }
 
@@ -179,19 +273,46 @@ html:lang(he) {
   animation: hero-progress var(--hero-interval, 7s) linear forwards;
 }
 
+/* The hero text's reduced-motion entrance: the same fade as hero-rise, without the rise. */
+@keyframes hero-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/*
+ * Reduced motion keeps feedback but drops movement (Apple: a gentler, non-vestibular equivalent, not "no
+ * animation"). Colors, shadows and opacity still fade, so photos and panels cross-fade instead of
+ * jumping; anything that moves, zooms or resizes changes at once; looping hints stop.
+ */
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, opacity, box-shadow !important;
+    /* tw-animate-css enter/exit animations (menus, popovers, the drawer) become plain fades. */
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-enter-rotate: 0 !important;
+    --tw-exit-rotate: 0 !important;
+  }
   .hero-slide,
   .hero-slide[data-zoom='true'] {
     transform: none;
   }
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-delay: 0s !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    transition-delay: 0s !important;
+  .animate-hero-rise {
+    animation-name: hero-fade;
+  }
+  .animate-hint-down,
+  .animate-bounce {
+    animation: none;
+  }
+  details::details-content {
+    transition: none;
   }
   html {
     scroll-behavior: auto;

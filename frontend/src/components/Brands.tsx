@@ -1,15 +1,19 @@
 /**
- * Brands.tsx — The home page "Brands" section (anchor #brands): heading, intro and a grid of brand cards.
+ * Brands.tsx — The home page "Brands" section (anchor #brands): heading, intro and a paged carousel of brand cards (3 per page).
  * Used by routes/index.tsx; the navbar's "Brands" link and the hero's "Our Brands" button scroll here.
  */
 import { BrandCard } from '@/components/BrandCard'
+import { Carousel } from '@/components/Carousel'
 import { BRANDS, type Brand } from '@/config'
 import { useI18n } from '@/i18n'
+
+/** How many brand cards one carousel page holds on a wide screen. */
+const BRANDS_PER_PAGE = 3
 
 /**
  * The brands section.
  * @param props.brands - The brands to show, in order; defaults to the brands in config.ts.
- * @returns The <section> with the heading and the card grid.
+ * @returns The <section> with the heading and the carousel.
  */
 export function Brands({ brands = BRANDS }: { brands?: Brand[] }) {
   const { t } = useI18n()
@@ -23,13 +27,11 @@ export function Brands({ brands = BRANDS }: { brands?: Brand[] }) {
           </h2>
           <p className="mt-5 text-lg text-white/75">{t.brands.intro}</p>
         </div>
-        <ul className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <Carousel label={t.brands.carouselLabel} pageSize={BRANDS_PER_PAGE} tone="dark" className="mt-14">
           {brands.map((brand) => (
-            <li key={brand.slug} className="flex">
-              <BrandCard brand={brand} className="w-full" />
-            </li>
+            <BrandCard key={brand.slug} brand={brand} className="w-full" />
           ))}
-        </ul>
+        </Carousel>
       </div>
     </section>
   )

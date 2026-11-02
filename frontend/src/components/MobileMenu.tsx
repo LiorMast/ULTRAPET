@@ -4,7 +4,8 @@
  *
  * Built on the shadcn Sheet (a Radix Dialog): it traps keyboard focus inside the drawer, closes on Esc
  * or a click on the backdrop, and stops the page behind it from scrolling. The drawer slides in from
- * the end side — right in English, left in Hebrew — next to the hamburger button in both cases.
+ * the end side — right in English, left in Hebrew — next to the hamburger button in both cases — and can
+ * be swiped back towards that edge to close it.
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
@@ -51,6 +52,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
       <SheetContent
         side={isRtl ? 'left' : 'right'}
         showCloseButton={false}
+        onSwipeClose={close}
         aria-describedby={undefined}
         className="w-72 gap-0 border-0 bg-white p-0 shadow-2xl sm:max-w-72"
       >

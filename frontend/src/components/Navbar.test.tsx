@@ -45,9 +45,9 @@ describe('Navbar links', () => {
 })
 
 describe('Navbar background', () => {
-  it.each(['/', '/where-to-buy'])('is always solid white (%s)', async (url) => {
+  it.each(['/', '/where-to-buy'])('is the same white bar material on every page (%s)', async (url) => {
     await renderPage(url)
-    expect(screen.getByRole('banner')).toHaveClass('bg-white')
+    expect(screen.getByRole('banner')).toHaveClass('material-bar')
   })
 })
 

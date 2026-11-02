@@ -12,6 +12,8 @@ import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Clock, Handshake, He
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
 import articlesData from '@/stubs/articles.json'
+import brandsData from '@/stubs/brands.json'
+import categoryImages from '@/stubs/category-images.json'
 
 /** Picks a translated label from the dictionary of the current language. */
 export type Label = (t: Dictionary) => string
@@ -43,18 +45,18 @@ const fileBySlug = (files: Record<string, string>, slug: string) =>
 /** Every photo in src/assets/categories/, keyed by path; a category's photo is the file named after its slug. */
 const categoryPhotoFiles = import.meta.glob<string>('/src/assets/categories/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
 
-/** A product category: URL slug, labels, SKU count text, fallback icon and optional photo file. */
-export type Category = { slug: string; label: Label; description: Label; skuCount: string; icon: LucideIcon; image?: string }
+/** A product category: URL slug, label, fallback icon and optional photo (a file in src/assets/categories/, else a placeholder URL). */
+export type Category = { slug: string; label: Label; icon: LucideIcon; image?: string }
 
-/** Product categories (from legacy/supabase-export/cms_categories.json). Backend phase: from the API. */
+/** Product categories (from legacy/supabase-export/cms_categories.json); placeholder photos from stubs/category-images.json (catalog product images). Backend phase: from the API. */
 export const CATEGORIES: Category[] = [
-  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, description: (t: Dictionary) => t.categories.descriptions.dogFood, skuCount: '300+', icon: Dog },
-  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, description: (t: Dictionary) => t.categories.descriptions.catFood, skuCount: '250+', icon: Cat },
-  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, description: (t: Dictionary) => t.categories.descriptions.wetFood, skuCount: '180+', icon: Bone },
-  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, description: (t: Dictionary) => t.categories.descriptions.litter, skuCount: '40+', icon: Sparkles },
-  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, description: (t: Dictionary) => t.categories.descriptions.smallAnimals, skuCount: '120+', icon: Rabbit },
-  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, description: (t: Dictionary) => t.categories.descriptions.birds, skuCount: '80+', icon: Bird },
-].map((category) => ({ ...category, image: fileBySlug(categoryPhotoFiles, category.slug) }))
+  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, icon: Dog },
+  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, icon: Cat },
+  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, icon: Bone },
+  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, icon: Sparkles },
+  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, icon: Rabbit },
+  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, icon: Bird },
+].map((category) => ({ ...category, image: fileBySlug(categoryPhotoFiles, category.slug) ?? (categoryImages as Record<string, string>)[category.slug] }))
 
 /** A company figure shown in the home page Stats band: a number with a suffix ("+") and a short label. */
 export type Stat = { id: string; value: number; suffix: string; label: Label }
@@ -94,7 +96,7 @@ export const ABOUT_ADVANTAGES: { id: string; icon: LucideIcon; label: Label }[] 
 ]
 
 /** A brand shown on the home page: its URL slug, display name, accent color and optional logo file. */
-export type Brand = { slug: string; name: string; accent: string; tagline: Label; logo?: string }
+export type Brand = { slug: string; name: string; accent: string; tagline: Localized<string>; logo?: string }
 
 /** Every logo file in src/assets/brands/, keyed by path; a brand's logo is the file named after its slug. */
 const brandLogoFiles = import.meta.glob<string>('/src/assets/brands/*.{svg,png,jpg,jpeg,webp}', { eager: true, import: 'default' })
@@ -106,15 +108,8 @@ const brandLogoFiles = import.meta.glob<string>('/src/assets/brands/*.{svg,png,j
  */
 const brandLogo = (slug: string) => fileBySlug(brandLogoFiles, slug)
 
-/** The brands, in display order (from legacy/supabase-export/cms_brands.json). Backend phase: from the API. */
-export const BRANDS: Brand[] = [
-  { slug: 'ultra-pet', name: 'Ultra Pet', accent: '#BE1E24', tagline: (t: Dictionary) => t.brands.taglines.ultraPet },
-  { slug: 'internutri', name: 'Internutri', accent: '#1C4E80', tagline: (t: Dictionary) => t.brands.taglines.internutri },
-  { slug: 'greenheart', name: 'Greenheart Premiums', accent: '#2D6A4F', tagline: (t: Dictionary) => t.brands.taglines.greenheart },
-  { slug: 'paw', name: 'Paw', accent: '#C97D30', tagline: (t: Dictionary) => t.brands.taglines.paw },
-  { slug: 'jr-farm', name: 'JR Farm', accent: '#4A7C42', tagline: (t: Dictionary) => t.brands.taglines.jrFarm },
-  { slug: 'ultra-clean', name: 'Ultra Clean', accent: '#4A4A6A', tagline: (t: Dictionary) => t.brands.taglines.ultraClean },
-].map((brand) => ({ ...brand, logo: brandLogo(brand.slug) }))
+/** The brands, in display order (from stubs/brands.json, seeded from legacy/supabase-export/cms_brands.json). Backend phase: from the API. */
+export const BRANDS: Brand[] = (brandsData as Omit<Brand, 'logo'>[]).map((brand) => ({ ...brand, logo: brandLogo(brand.slug) }))
 
 /**
  * The main menu, in display order. An item has either `link` (an internal page or #section),

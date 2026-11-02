@@ -1,6 +1,7 @@
 /**
  * Brands.test.tsx — Tests for the home page Brands section and its BrandCard: six cards in order, each a
- * real link to the brand page, texts in both languages, logo vs. wordmark, and a custom list via props.
+ * real link to the brand page, texts in both languages, logo vs. wordmark, a custom list via props, and the paged
+ * carousel (two pages of three, dots, labelled region).
  */
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
@@ -40,10 +41,18 @@ describe('Brands section', () => {
   })
 
   it('renders any list of brands passed in', () => {
-    const brands: Brand[] = [{ slug: 'ultra-pet', name: 'Only One', accent: '#000000', tagline: () => 'Just me' }]
+    const brands: Brand[] = [{ slug: 'ultra-pet', name: 'Only One', accent: '#000000', tagline: { he: 'Just me' } }]
     renderComponent(<Brands brands={brands} />, 'en')
     return screen.findByRole('heading', { level: 3, name: 'Only One' }).then(() => {
       expect(screen.getAllByRole('link')).toHaveLength(1)
     })
+  })
+
+  it('is a labelled carousel with two pages of three brands', async () => {
+    await renderPage('/en')
+    const section = document.getElementById('brands')!
+    expect(within(section).getByRole('region', { name: 'Brands' })).toHaveAttribute('aria-roledescription', 'carousel')
+    expect(section.querySelectorAll(':scope ul > li > ul')).toHaveLength(2)
+    expect(section.querySelectorAll(':scope ul > li > ul')[1].querySelectorAll('a')).toHaveLength(3)
   })
 })

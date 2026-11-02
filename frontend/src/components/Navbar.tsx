@@ -3,7 +3,8 @@
  * legacy/src/components/Header.tsx (same look and behavior, with real links, RTL-correct styling and
  * accessible menus).
  *
- * - Fixed to the top of the window, always white with a hairline and a soft shadow (both drawn as
+ * - Fixed to the top of the window: a white, translucent material (material-bar in index.css; content
+ *   scrolling underneath shows through blurred) with a hairline and a soft shadow (both drawn as
  *   box-shadows, so they add no height). It is exactly 88px tall so the logo reads clearly; pages
  *   offset their content by the same amount.
  * - The menu comes from MAIN_NAV in src/config.ts; an item with `children` opens a dropdown (Products).
@@ -44,7 +45,7 @@ export function Navbar({ items = MAIN_NAV }: { items?: NavItem[] }) {
   const { t } = useI18n()
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 bg-white py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]">
+    <header className="material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]">
       <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-6 px-6 lg:px-10 xl:px-6 2xl:px-10">
         <Link
           to="/"
@@ -133,7 +134,8 @@ function DesktopNavItem({ item }: { item: NavItem }) {
 }
 
 /**
- * The thin red underline of a menu entry: grows from the start side on hover or keyboard focus, and
+ * The thin red underline of a menu entry: grows from the start side on hover or keyboard focus (a scale,
+ * so it animates on the compositor), and
  * stays visible on the active page and while a dropdown is open.
  * @returns A decorative <span>, hidden from screen readers.
  */
@@ -141,7 +143,7 @@ function Underline() {
   return (
     <span
       aria-hidden="true"
-      className="absolute -bottom-1 start-0 h-px w-0 bg-brand-red transition-all duration-300 group-hover:w-full group-focus-visible:w-full group-data-[state=open]:w-full group-data-[status=active]:w-full"
+      className="absolute -bottom-1 start-0 h-px w-full origin-left scale-x-0 bg-brand-red transition-transform duration-300 group-hover:scale-x-100 group-focus-visible:scale-x-100 group-data-[state=open]:scale-x-100 group-data-[status=active]:scale-x-100 rtl:origin-right"
     />
   )
 }

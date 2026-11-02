@@ -1,7 +1,7 @@
 /**
  * Categories.test.tsx — Tests for the home page Categories section and its CategoryCard: six cards in
- * order, each a real link to its category page, texts in both languages, the icon fallback for a category
- * without a photo, and a custom list via props.
+ * order, each a real link to its category page, titles in both languages, no description/count/explore
+ * text, the icon fallback for a category without a photo, and a custom list via props.
  */
 import { screen, within } from '@testing-library/react'
 import { Bird } from 'lucide-react'
@@ -21,31 +21,37 @@ describe('Categories section', () => {
     expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'מזון לכלבים', 'מזון לחתולים', 'מזון רטוב ומעדנים', 'חול לחתולים', 'בעלי חיים קטנים', 'בעלי כנף',
     ])
-    expect(within(section).getByText('300+ מוצרים')).toBeInTheDocument()
+    expect(within(section).queryByText(/\d+\+ מוצרים/)).not.toBeInTheDocument()
   })
 
   it('uses the /en prefix and English texts in English', async () => {
     await renderPage('/en')
     const section = document.getElementById('categories')!
     expect(within(section).getAllByRole('link')[1]).toHaveAttribute('href', '/en/categories/cat-food')
-    expect(within(section).getByText('250+ products')).toBeInTheDocument()
+    expect(within(section).queryByText(/\d+\+ products|Explore category/)).not.toBeInTheDocument()
     expect(within(section).getByRole('region', { name: 'Product categories' })).toBeInTheDocument()
   })
 
-  it('shows the icon panel for categories without a photo file', async () => {
+  it('covers each card with a placeholder photo from the catalog', async () => {
     await renderPage('/')
     const cards = within(document.getElementById('categories')!).getAllByRole('link')
-    expect(cards.every((a) => a.querySelector('img') === null)).toBe(true)
-    expect(cards.every((a) => a.querySelector('svg') !== null)).toBe(true)
+    expect(cards.every((a) => a.querySelector('img')?.getAttribute('src')?.startsWith('https://'))).toBe(true)
+  })
+
+  it('shows the icon panel for a category without a photo', async () => {
+    const categories: Category[] = [{ slug: 'birds', label: () => 'Plain', icon: Bird }]
+    renderComponent(<Categories categories={categories} />, 'en')
+    const link = await screen.findByRole('link', { name: 'Plain' })
+    expect(link.querySelector('img')).toBeNull()
+    expect(link.querySelector('svg')).not.toBeNull()
   })
 
   it('renders a custom list given by props, with a photo when the category has one', async () => {
     const categories: Category[] = [
-      { slug: 'birds', label: () => 'Custom', description: () => 'Desc', skuCount: '9+', icon: Bird, image: '/photo.jpg' },
+      { slug: 'birds', label: () => 'Custom', icon: Bird, image: '/photo.jpg' },
     ]
     renderComponent(<Categories categories={categories} />, 'en')
     const link = await screen.findByRole('link', { name: /Custom/ })
     expect(link.querySelector('img')).toHaveAttribute('src', '/photo.jpg')
-    expect(screen.getByText('9+ products')).toBeInTheDocument()
   })
 })

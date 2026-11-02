@@ -52,7 +52,8 @@ export function ArticleMeta({ article, className }: { article: Article; classNam
 const cardVariants = cva(
   [
     'group flex flex-col overflow-hidden border border-neutral-200 bg-white outline-none',
-    'transition-[box-shadow,transform] duration-300 hover:-translate-y-1 hover:shadow-premium-sm',
+    'transition-[box-shadow,translate,scale] duration-300 hover:-translate-y-1 hover:shadow-premium-sm',
+    'active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100',
     'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
   ],
   {

@@ -15,7 +15,7 @@ import { useI18n } from '@/i18n'
 /** The price slot: hidden (signed out), loading, or the price in shekels. */
 export type PriceState = { status: 'hidden' } | { status: 'loading' } | { status: 'shown'; price: number }
 
-const cardVariants = cva('group relative flex border border-neutral-200 bg-white transition-[box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:shadow-premium-sm', {
+const cardVariants = cva('group relative flex border border-neutral-200 bg-white transition-[box-shadow,translate,scale] duration-300 hover:-translate-y-0.5 hover:shadow-premium-sm active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100', {
   variants: {
     variant: {
       grid: 'flex-col',

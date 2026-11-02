@@ -1,7 +1,7 @@
 /**
  * Carousel.test.tsx — Tests for the generic Carousel: slides as list items under a labelled region,
  * arrows hidden when everything fits, scroll direction in LTR vs RTL, disabled arrows at the ends and
- * non-smooth scrolling for reduced motion. jsdom has no layout, so the scroll metrics are mocked.
+ * non-smooth scrolling for reduced motion, and paged mode (grouping, dots, one-page arrows). jsdom has no layout, so the scroll metrics are mocked.
  */
 import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -85,5 +85,52 @@ describe('Carousel', () => {
     const { user } = renderComponent(slides, 'en')
     await user.click(await screen.findByRole('button', { name: 'Next' }))
     expect(scrollBy).toHaveBeenCalledWith({ left: 270, behavior: 'auto' })
+  })
+})
+
+describe('Carousel in paged mode', () => {
+  const paged = (
+    <Carousel label="Demo" pageSize={2}>
+      <span>one</span>
+      <span>two</span>
+      <span>three</span>
+    </Carousel>
+  )
+
+  it('groups the children into pages of pageSize', async () => {
+    mockMetrics(600, 300)
+    const { container } = renderComponent(paged, 'en')
+    await screen.findByRole('region')
+    const pages = container.querySelectorAll('ul > li > ul')
+    expect([...pages].map((p) => p.textContent)).toEqual(['onetwo', 'three'])
+  })
+
+  it('shows one dot per page, marks the current one and jumps to a page on click', async () => {
+    mockMetrics(600, 300)
+    Element.prototype.scrollTo = scrollBy as unknown as typeof Element.prototype.scrollTo
+    const { user } = renderComponent(paged, 'en')
+    const dots = await screen.findAllByRole('button', { name: /^Page \d of 2$/ })
+    expect(dots).toHaveLength(2)
+    expect(dots[0]).toHaveAttribute('aria-current', 'true')
+    await user.click(dots[1])
+    expect(scrollBy).toHaveBeenCalledWith({ left: 300, behavior: 'smooth' })
+  })
+
+  it('follows the scroll position and scrolls a whole page per arrow click (RTL flips the sign)', async () => {
+    mockMetrics(600, 300)
+    const { user } = renderComponent(paged, 'he')
+    const list = (await screen.findAllByRole('list'))[0]
+    list.scrollLeft = 300
+    fireEvent.scroll(list)
+    expect(screen.getByRole('button', { name: 'עמוד 2 מתוך 2' })).toHaveAttribute('aria-current', 'true')
+    await user.click(screen.getByRole('button', { name: 'הקודם' }))
+    expect(scrollBy).toHaveBeenCalledWith({ left: 300, behavior: 'smooth' })
+  })
+
+  it('shows no dots when everything fits on one view', async () => {
+    mockMetrics(300, 300)
+    renderComponent(paged, 'en')
+    await screen.findByRole('region')
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
   })
 })

@@ -48,7 +48,7 @@ function endAnimation(element: Element) {
  * Lists the photo <img> elements of the rendered hero.
  * @returns The images, in document order.
  */
-const photos = () => [...document.querySelectorAll<HTMLImageElement>('#home img')]
+const photos = () => [...document.querySelectorAll<HTMLImageElement>('#home img.hero-slide')]
 
 describe('Hero text and buttons', () => {
   it('shows the Hebrew content with unprefixed links', async () => {
@@ -70,6 +70,13 @@ describe('Hero text and buttons', () => {
 })
 
 describe('Hero photos', () => {
+  it('shows the decorative logo mark inside the headline', async () => {
+    renderComponent(<Hero images={THREE} />)
+    const heading = await screen.findByRole('heading', { level: 1 })
+
+    expect(heading.querySelector('img')).toHaveAttribute('alt', '')
+  })
+
   it('renders one decorative image per photo, the first one eager and high priority', async () => {
     renderComponent(<Hero images={THREE} />)
     await screen.findByRole('heading', { level: 1 })

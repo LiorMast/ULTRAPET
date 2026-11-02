@@ -1,0 +1,38 @@
+[
+ {
+  "slug": "ultra-pet",
+  "name": "Ultra Pet",
+  "accent": "#BE1E24",
+  "tagline": { "he": "תזונה פרמיום מלאה", "en": "Premium Complete Nutrition" }
+ },
+ {
+  "slug": "internutri",
+  "name": "Internutri",
+  "accent": "#1C4E80",
+  "tagline": { "he": "פורמולות מדעיות", "en": "Science-Based Formulas" }
+ },
+ {
+  "slug": "greenheart",
+  "name": "Greenheart Premiums",
+  "accent": "#2D6A4F",
+  "tagline": { "he": "טבעי ואורגני", "en": "Natural & Organic" }
+ },
+ {
+  "slug": "paw",
+  "name": "Paw",
+  "accent": "#C97D30",
+  "tagline": { "he": "מצוינות יומיומית", "en": "Everyday Excellence" }
+ },
+ {
+  "slug": "jr-farm",
+  "name": "JR Farm",
+  "accent": "#4A7C42",
+  "tagline": { "he": "מומחי בעלי חיים קטנים", "en": "Small Animal Specialists" }
+ },
+ {
+  "slug": "ultra-clean",
+  "name": "Ultra Clean",
+  "accent": "#4A4A6A",
+  "tagline": { "he": "היגיינת חתולים פרמיום", "en": "Premium Cat Hygiene" }
+ }
+]
