@@ -223,6 +223,11 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   cells, sorting/search and the generated edit form; editing is our Radix dialog (not the paid DataTables Editor);
   omit `onCreate`/`onUpdate`/`onDelete` for read-only. Columns and options are read once at mount (DataTables' rule).
   DataTables' CSS loads with the admin chunk; the brand overrides live in `index.css` under `.data-table`.
+- **Discounts** (`DiscountDialog`): one dialog for every discount (category, product, customer, payment method):
+  percent/amount switch, a signed value (negative = surcharge), start date, end date or "no end date". It returns a
+  `DiscountValue` ({ type, value, startsOn, endsOn: null = open-ended }) and the caller stores it. **Not yet stored:**
+  `price_rules` holds only positive percents (+ `increase` per customer) and `payment_methods.discount_percent` has no
+  dates; amounts, general surcharges and dated payment discounts need a schema change when the pages are built.
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
 - **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
@@ -417,6 +422,7 @@ content exists in each language, and the layout flips direction automatically.
 **Phase 3 — Admin CMS**: port the legacy admin.
 - [x] Reusable admin table (`DataTable`, `RecordDialog`, `ui/dialog`), staff sign-in at `/admin`, `/admin/brands`
 - [ ] Tables for categories, products (+ images), settings, articles, resellers (a column config + route each)
+- [x] `DiscountDialog` (UI only); [ ] schema + staff API for amount/signed/dated discounts, then the discount pages
 
 **Phase 4 — B2B portal**: auth, price catalog, per-customer/category discounts, cart + checkout (minimum ₪2,000;
 card / Bit / bank transfer), Rivhit sync, generated PDF catalog.
