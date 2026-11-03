@@ -1,17 +1,21 @@
 """seed.py — Database commands for development: `flask reset-db --yes` and `flask seed`.
 
 reset-db rebuilds the schema by running drop-tables.sql and then create-tables.sql. seed fills an empty database
-from the data the frontend uses today:
-- categories, products (with their WooCommerce ids in woocommerce_id, and images), placeholder prices and brands from
-  frontend/src/stubs/;
+from the stub files in frontend/src/stubs/ (the data the frontend showed before the API existed; its unit tests
+still use them as fixtures):
+- categories, products (in stub order, with their WooCommerce ids in woocommerce_id, and images), placeholder prices
+  and brands;
+- the articles (with their WordPress dates) and the resellers of the Where to Buy page;
 - the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order and the currency;
 - the three payment methods;
-- a staff admin, when SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are set.
+- a staff admin, when SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are set, and a demo business customer (to see
+  prices in the catalog), when SEED_CUSTOMER_EMAIL and SEED_CUSTOMER_PASSWORD are set.
 Paths are relative to the repository root; compose mounts the same folders at the same relative places, so the
 commands work both locally and in the backend container. Also used by the tests (run_sql_file, seed_database).
 """
 import json
 import os
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -21,10 +25,11 @@ import psycopg
 from sqlalchemy import func, select
 
 from app.database.models.catalog import Brand, Category, Product, ProductImage
+from app.database.models.content import Article, Reseller
 from app.database.db import db
 from app.database.models.orders import PaymentMethod
 from app.database.models.settings import Setting
-from app.database.models.users import StaffUser
+from app.database.models.users import BusinessUser, StaffUser
 
 DATABASE_DIR = Path(__file__).resolve().parent
 REPO_DIR = DATABASE_DIR.parents[2]
@@ -74,7 +79,8 @@ def read_json(path: Path) -> Any:
 
 
 def seed_database() -> dict[str, int]:
-    """Fills an empty database with the stub catalog, settings, payment methods and (optionally) a staff admin.
+    """Fills an empty database with the stub catalog and content, settings, payment methods and (optionally) a staff
+    admin and a demo customer.
 
     Returns:
         How many rows were added per kind, e.g. {"products": 400, ...}.
@@ -108,7 +114,7 @@ def seed_database() -> dict[str, int]:
 
     prices = read_json(STUBS_DIR / "prices.json")["prices"]
     products = read_json(STUBS_DIR / "products.json")
-    for item in products:
+    for order, item in enumerate(products):
         image = item.get("image")
         db.session.add(
             Product(
@@ -118,12 +124,45 @@ def seed_database() -> dict[str, int]:
                 description=item["description"] if item["description"].get("he") else None,
                 category=categories[item["category"]],
                 list_price=Decimal(str(prices[item["id"]])) if item["id"] in prices else None,
+                sort_order=order,
                 legacy_path=item.get("legacyPath"),
                 images=[
                     ProductImage(url=image["src"], thumbnail_url=image.get("thumbnail"), srcset=image.get("srcSet") or None)
                 ]
                 if image
                 else [],
+            )
+        )
+
+    articles = read_json(STUBS_DIR / "articles.json")
+    for item in articles:
+        db.session.add(
+            Article(
+                slug=item["slug"],
+                topic=item["topic"],
+                title=item["title"],
+                description=item["description"],
+                image_alt=item.get("imageAlt"),
+                body=item["body"],
+                related_categories=item.get("relatedCategories", []),
+                legacy_path=item.get("legacyPath"),
+                published_at=datetime.fromisoformat(item["publishedAt"]),
+                updated_at=datetime.fromisoformat(item["updatedAt"]),
+            )
+        )
+
+    resellers = read_json(STUBS_DIR / "branches.json")
+    for item in resellers:
+        db.session.add(
+            Reseller(
+                name=item["name"],
+                address=item["address"],
+                city=item["city"],
+                phone=item.get("phone"),
+                website=item.get("website"),
+                latitude=item["lat"],
+                longitude=item["lng"],
+                approximate_location=item.get("approximate", False),
             )
         )
 
@@ -151,15 +190,26 @@ def seed_database() -> dict[str, int]:
         db.session.add(admin)
         staff = 1
 
+    customers = 0
+    email, password = os.environ.get("SEED_CUSTOMER_EMAIL"), os.environ.get("SEED_CUSTOMER_PASSWORD")
+    if email and password:
+        customer = BusinessUser(email=email.strip().lower(), full_name="Demo Customer", company_name="Demo Pet Shop")
+        customer.set_password(password)
+        db.session.add(customer)
+        customers = 1
+
     db.session.flush()
     db.session.commit()
     return {
         "categories": len(categories),
         "brands": len(brands),
         "products": len(products),
+        "articles": len(articles),
+        "resellers": len(resellers),
         "settings": len(legacy_settings) + len(BASE_SETTINGS),
         "payment_methods": len(PAYMENT_METHODS),
         "staff_users": staff,
+        "business_users": customers,
     }
 
 
@@ -174,6 +224,6 @@ def reset_db_command() -> None:
 
 @click.command("seed")
 def seed_command() -> None:
-    """Fills an empty database with the stub catalog, settings and payment methods (see seed_database)."""
+    """Fills an empty database with the stub catalog and content, settings and payment methods (see seed_database)."""
     counts = seed_database()
     click.echo("Seeded: " + ", ".join(f"{count} {name}" for name, count in counts.items()))

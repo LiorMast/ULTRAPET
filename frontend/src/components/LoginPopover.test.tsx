@@ -1,12 +1,14 @@
 /**
  * LoginPopover.test.tsx — Tests for the header login popover and its LoginForm: opening, fields, validation,
- * remember-me, signing in (stub) and out from the header, Escape, and the /login page showing the same form
- * (and the account panel once signed in).
+ * remember-me, signing in and out from the header through the API (the fake in test/api.ts), the "wrong email
+ * or password" and "try again" alerts, Escape, and the /login page showing the same form (and the account
+ * panel once signed in).
  */
 import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { LoginForm } from '@/components/LoginForm'
+import { TEST_USER, WRONG_PASSWORD } from '@/test/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
 describe('Login popover', () => {
@@ -58,13 +60,33 @@ describe('Login popover', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('You are signed in')
   })
 
+  it('shows "wrong email or password" when the server refuses the sign-in', async () => {
+    renderComponent(<LoginForm />, 'en')
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'a@b.co' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: WRONG_PASSWORD } })
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Wrong email or password.')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('asks to try again when the server cannot be reached (Hebrew)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
+    renderComponent(<LoginForm />)
+    fireEvent.change(await screen.findByLabelText('דוא"ל'), { target: { value: 'a@b.co' } })
+    fireEvent.change(screen.getByLabelText('סיסמה'), { target: { value: 'secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'התחברות' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('ההתחברות נכשלה. נסו שוב בעוד רגע.')
+  })
+
   it('signs in from the header, then shows the account and signs out', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const { user } = await renderPage('/en')
     await user.click(screen.getByRole('button', { name: 'Login' }))
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByLabelText('Email'), 'shop@example.com')
     await user.type(within(dialog).getByLabelText('Password'), 'secret')
     await user.click(within(dialog).getByRole('button', { name: 'Log in' }))
+    expect(fetchSpy).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'shop@example.com', password: 'secret', remember: false }) }))
 
     const account = await screen.findByRole('dialog', { name: 'My account' })
     expect(within(account).getByRole('status')).toHaveTextContent('Signed in as shop@example.com')
@@ -73,6 +95,7 @@ describe('Login popover', () => {
 
     await user.click(within(account).getByRole('button', { name: 'Sign out' }))
     expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
+    expect(fetchSpy).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({ method: 'POST' }))
   })
 
   it('shows the same form on the /login page', async () => {
@@ -82,7 +105,7 @@ describe('Login popover', () => {
   })
 
   it('shows the account panel on the /login page when signed in', async () => {
-    await renderPage('/login', { user: { email: 'shop@example.com' } })
+    await renderPage('/login', { user: TEST_USER })
     expect(screen.getByRole('heading', { level: 1, name: 'החשבון שלי' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'התנתקות' })).toBeInTheDocument()
   })

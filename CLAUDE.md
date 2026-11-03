@@ -18,8 +18,8 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
   TanStack Router (file-based, `src/routes/`), shadcn/ui on Radix (`radix-ui`), lucide-react icons,
   self-hosted fonts (`@fontsource-variable/*`), oxlint.
 - **Tests**: Vitest 5 + React Testing Library (jsdom); Playwright (Chromium) + `@axe-core/playwright`.
-- **Backend** (`backend/`): Flask 3 (app factory, one monolith), Flask-SQLAlchemy on SQLAlchemy 2.1 (typed models),
-  psycopg 3, PostgreSQL 17, pytest. The schema is `backend/app/database/create-tables.sql` (working rule 5): no Alembic migrations
+- **Backend** (`backend/`): Flask 3 (app factory, one monolith, routes in two blueprints), Flask-SQLAlchemy on
+  SQLAlchemy 2.1 (typed models), Flask-JWT-Extended (sign-in), psycopg 3, PostgreSQL 17, pytest. The schema is `backend/app/database/create-tables.sql` (working rule 5): no Alembic migrations
   until there is production data (Alembic is only a test library). Docker Compose (`compose.yaml`) runs Postgres +
   Flask; Vite proxies `/api` to Flask in dev.
 
@@ -34,26 +34,36 @@ requirements/           original prompts
 frontend/
   index.html  vite.config.ts  playwright.config.ts  components.json  .oxlintrc.json
   public/favicon.svg
-  e2e/                  Playwright specs (+ *-snapshots/ screenshot baselines)
+  e2e/                  Playwright specs (+ *-snapshots/ screenshot baselines); utils.ts = shared helpers
   src/
     main.tsx            entry: locale from the URL -> <html lang/dir>, providers, router
     router.ts           createAppRouter(): /en prefix rewrite, route staticData types
     index.css           Tailwind + brand tokens + base styles
-    config.ts           menu (MAIN_NAV), categories, articles (ARTICLES), header buttons, external links
+    api.ts              the one API layer: every backend call (typed), CSRF header, refresh-and-retry on token_expired
+    config.ts           menu (MAIN_NAV), home page category cards, stat labels, header buttons, external links,
+                        bundled photos (brandLogo, articleImage)
     seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
-    auth.tsx            AuthProvider/useAuth: the business-customer session (STUB sign-in until Phase 4)
+    auth.tsx            AuthProvider/useAuth: the business-customer session (sign-in through the API, JWT cookies)
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
-    routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404
+    routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404;
+                        admin.tsx = staff panel layout (staff sign-in gate), admin.<resource>.tsx = one table each
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
                         Brands, Stats, Categories, About, Contact, Hero, ...) + their tests
-    components/ui/      shadcn primitives (button, dropdown-menu, popover, sheet), restyled for the brand
-    stubs/              JSON stand-ins for backend data, one file per resource (see Frontend conventions)
+    components/ui/      shadcn primitives (button, dialog, dropdown-menu, popover, sheet), restyled for the brand
+    stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
+                        imports them (oxlint no-restricted-imports)
     assets/             logo SVGs; hero/ = the home hero photos (drop images in, no code changes)
-    test/               setup.ts (jsdom polyfills), utils.tsx (renderPage)
+    test/               setup.ts (jsdom polyfills, fake fetch), utils.tsx (renderPage), api.ts (fake backend API)
 backend/
   Dockerfile  requirements.txt  pyproject.toml (pytest config)
   app/
-    __init__.py         create_app(): config from the environment, CLI commands, /api/health
+    __init__.py         create_app(): config from the environment, JWT, JSON errors, CLI commands, blueprints, /api/health
+    auth.py             JWT sign-in in HttpOnly cookies (CSRF double-submit, 15 min access + 30 day refresh): authenticate,
+                        issue_tokens, refresh_access, clear_tokens, require_user(kind)
+    customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), brands, stats,
+                        articles, resellers, sitemap.xml, customer auth (login/refresh/logout/me), prices
+    staff/routes.py     blueprint `staff` (/api/staff): staff auth + generic CRUD (RESOURCES: brands, categories,
+                        products+images, settings, articles, resellers); DB constraint errors -> 400/409
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
     database/           everything about the database
       create-tables.sql   the schema: every table and column, explained (source of truth, working rule 5)
@@ -66,6 +76,7 @@ backend/
         price_rules.py      PriceRule
         orders.py           PaymentMethod, Order, OrderItem
         settings.py         Setting + get_setting()
+        content.py          Article, Reseller (the public site's articles and Where to Buy stores)
   tests/                pytest on the `content_test` database (conftest.py builds it from the SQL files)
 ```
 
@@ -73,7 +84,8 @@ backend/
 
 - `npm run dev` — dev server at http://localhost:5173 (`/` = Hebrew, `/en` = English).
 - `npm run check` — lint + typecheck + unit tests.
-- `npm run test:e2e` — Playwright (starts the dev server). After an intended visual change:
+- `npm run test:e2e` — Playwright against the seeded backend (reuses or starts `docker compose up` and the dev server;
+  reads `../.env` for the demo customer `SEED_CUSTOMER_EMAIL`/`PASSWORD`). After an intended visual change:
   `npm run test:e2e -- --update-snapshots`, then look at the changed PNGs.
 - `npm run build` — typecheck + production build.
 - From the repo root: `codegraph sync` after changing files.
@@ -83,7 +95,8 @@ backend/
 - `docker compose up -d --build` — Postgres (127.0.0.1:5433) + the Flask dev server (http://localhost:5000, reloads
   on change). Needs `.env` (copy `.env.example`).
 - `docker compose exec backend pytest` — backend tests (database `content_test`; the dev data is never touched).
-- `docker compose exec backend flask seed` — fill an empty database from the frontend stubs.
+- `docker compose exec backend flask seed` — fill an empty database from the frontend stubs (plus the staff admin and
+  the demo customer when SEED_ADMIN_* / SEED_CUSTOMER_* are set in `.env`).
 - `docker compose exec backend flask reset-db --yes` — drop and recreate every table (all data is lost); then `seed`.
 - A fresh volume runs `create-tables.sql` by itself; after a schema change run `reset-db` (there are no migrations).
 
@@ -182,11 +195,14 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Data-driven components**: components take data through props, with defaults from `src/config.ts`; changing the
   menu is a config change. Internal links are built with TanStack `linkOptions(...)`, so a link to a route that
   doesn't exist is a type error.
-- **JSON stubs stand in for the backend**: until Phase 2 exists, data that will come from the API (lists,
-  records, CMS values, form submissions) is a JSON file in `frontend/src/stubs/` (one file per resource, e.g.
-  `brands.json`), imported and typed at the place that uses it. Keep the stub's shape identical to the planned API
-  response, so replacing it with a `fetch` later touches only the import. Never hardcode such data in components.
-  Static copy stays in the dictionaries (`he.ts` / `en.ts`).
+- **Data comes from the API**: everything stored in the database (catalog, brands, stats, articles, resellers,
+  prices) is fetched through `src/api.ts` (one typed function per call), in **route loaders** (`loader` +
+  `abortController.signal`; `loaderDeps` for URL state; `rethrowNotFound` turns a 404 into the not-found page),
+  and passed to components as props. Components never fetch. A failed load shows `LoadError` (the router's
+  `defaultErrorComponent`). Never hardcode such data in components; static copy stays in the dictionaries
+  (`he.ts` / `en.ts`). `src/stubs/` holds the seed data and test fixtures only: the Vitest fake API
+  (`src/test/api.ts`) answers `/api` from them with the server's semantics, so keep it in step with
+  `backend/app/customers/routes.py`.
 - **Modular, reusable components**: build every component to be reused as much as possible. Each component does one
   job; split out a piece (a card, a heading block, a CTA row, a list item) as soon as it could appear in another place.
   Vary it through props with sensible defaults and `cva` variants, never by copying it. No page-specific or
@@ -201,6 +217,12 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   Home sections are `#id` anchors; `scroll-padding-top` in `index.css` keeps them clear of the fixed header.
 - **Styling**: Tailwind utilities with the brand tokens; variants with `cva`; merge classes with `cn` (from the `cn`
   package). Restyle the shadcn primitives in `components/ui/` instead of wrapping them.
+- **Admin tables** (`DataTable` + `RecordDialog`, on DataTables 3 via `datatables.net-react`, free core only): a staff
+  page = a route `admin.<resource>.tsx` whose loader calls `fetchStaffRows` and a `DataColumn[]` config (key = the
+  staff API's camelCase field, `type`, `required`, `pattern`, `ltr`, `inTable`/`inForm`). The same config drives the
+  cells, sorting/search and the generated edit form; editing is our Radix dialog (not the paid DataTables Editor);
+  omit `onCreate`/`onUpdate`/`onDelete` for read-only. Columns and options are read once at mount (DataTables' rule).
+  DataTables' CSS loads with the admin chunk; the brand overrides live in `index.css` under `.data-table`.
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
 - **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
@@ -221,9 +243,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - Dictionaries: `he.ts` defines `Dictionary = typeof he`, and `en.ts` must match it. Port strings from
   `legacy/src/lib/translations/{he,en}.ts` as sections are built; the CMS will later override strings
   (like legacy `cms_text_blocks`).
-- SEO: routes set their head tags with `pageHead()` (`src/seo.ts`) in their `head` option — title, description,
-  canonical, hreflang alternates, Open Graph, JSON-LD; the root route sets the defaults. `sitemap.xml` comes from the
-  plugin in `vite.config.ts` (add new public pages to `SITEMAP_PAGES`). The site is still a client-rendered SPA:
+- SEO: routes set their head tags with `pageHead()` (`src/seo.ts`) in their `head` option (from `loaderData`) — title,
+  description, canonical, hreflang alternates, Open Graph, JSON-LD; the root route sets the defaults. `sitemap.xml` is
+  built by the backend from the database (`/api/sitemap.xml`; add new public pages to `SITEMAP_PAGES` in
+  `backend/app/customers/routes.py`); Vite proxies `/sitemap.xml` to it, and the production server must too. The site is still a client-rendered SPA:
   prerendering the public pages is the next big SEO step.
 
 ## Design system
@@ -323,8 +346,10 @@ content exists in each language, and the layout flips direction automatically.
 
 - **Copy**: `legacy/src/lib/translations/{he,en}.ts`, with CMS overrides in `legacy/supabase-export/cms_text_blocks.json`.
 - **Postgres seed** (`backend/app/database/seed.py`): the catalog from `frontend/src/stubs/` (categories, products with their
-  WooCommerce id in `products.woocommerce_id` and their images, placeholder prices into `products.list_price`, brands) and the home stats from
-  `legacy/supabase-export/cms_settings.json`. The rest of the export (hero banners, contact, sections, text blocks,
+  WooCommerce id in `products.woocommerce_id`, their stub order in `sort_order` and their images, placeholder prices into
+  `products.list_price`, brands), the articles and resellers, the home stats from
+  `legacy/supabase-export/cms_settings.json`, and optionally a staff admin and a demo customer (`SEED_ADMIN_*`,
+  `SEED_CUSTOMER_*`). The rest of the export (hero banners, contact, sections, text blocks,
   media and `legacy/supabase-export/media/`) waits for the CMS tables (Phase 3); schema hints in
   `legacy/supabase/migrations/`.
 - **Real contact facts** (from the live site; legacy CMS values such as `+972 3 000 0000` are placeholders):
@@ -337,15 +362,13 @@ content exists in each language, and the layout flips direction automatically.
   plastics, collars & leashes, equipment. **Decided:** the catalog uses these 15 (`stubs/product-categories.json`);
   legacy's 6 categories stay as the home page's marketing cards.
 - **Ids**: every table's primary key is a UUID generated by the database (`gen_random_uuid()`, helper `uuid_pk()` in
-  `app/database/db.py`); only `settings` and `payment_methods` use a text key. The stubs' product `id` is the
-  WooCommerce id, which the database keeps in `products.woocommerce_id`; when the API replaces the stubs, the
-  frontend switches to the UUID.
+  `app/database/db.py`); only `settings` and `payment_methods` use a text key. The API returns the UUIDs (prices are
+  keyed by product UUID); the stubs' product `id` is the WooCommerce id, kept in `products.woocommerce_id`.
 - **Products**: the 400 products of the WooCommerce Store API (`/wp-json/wc/store/v1/products`) are in
   `stubs/products.json` (images still hot-linked from WordPress — move them to the backend in Phase 2). Each product's
   `name` / `description` holds one translation per language (`{ he, en }`, the DB's product translations; Hebrew from
   the store, English translated for all 400; add `ru` / `ar` the same way); catalog search matches every language. The store
   publishes no prices: `stubs/prices.json` holds **placeholder** prices until real ones come from Rivhit/the admin.
-  Only the catalog route component may import the product stub (it is code-split; keeps 450 KB out of the main bundle).
 - **SEO migration**: 301-redirect the old WordPress URLs (Hebrew slugs such as `/אודות/`, `/משווקים/`, `/מאמרים/`,
   `/צור-קשר/`, `/product-category/<slug>/`, `/product/<slug>/`, `/shop/`) to the new routes.
 
@@ -364,31 +387,36 @@ content exists in each language, and the layout flips direction automatically.
 **Phase 1 — Frontend (static data first)**
 - [x] Scaffold: Vite, Tailwind tokens, TanStack Router, i18n, shadcn/ui, Vitest + Playwright
 - [x] Navbar (`Navbar`, `MobileMenu`, `LanguageSwitcher`, `Logo`), with the login popover (`LoginPopover`, `LoginForm`:
-      email, password, remember me; no sign-in until Phase 4) — the mobile drawer links to `/login`, which shows the same form
+      email, password, remember me; signs in through the API) — the mobile drawer links to `/login`, which shows the same form
 - [ ] Footer + floating WhatsApp button
 - [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README)
 - [x] Home sections: Stats, Brands, Categories, About, Contact (`Contact` = contact cards + a form that opens a
       prefilled mailto: until Phase 2 lead endpoints exist)
 - [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)
-- [x] Where to Buy (`WhereToBuy`, `BranchMap`): search, nearest store, Leaflet map, `stubs/branches.json` (124 resellers, geocoded once)
-- [x] Articles (`/articles`, `/articles/$slug`; `ArticleCard`, `Breadcrumbs`): the 4 WordPress posts in `stubs/articles.json`
-      (Hebrew verbatim + English translation), head tags via `seo.ts` + `<HeadContent />`, BlogPosting/Breadcrumb
-      JSON-LD, `sitemap.xml` (Vite plugin) + `robots.txt`; each post keeps its WordPress `legacyPath` for the 301s
+- [x] Where to Buy (`WhereToBuy`, `BranchMap`): search, nearest store, Leaflet map, 124 resellers (table `resellers`, geocoded once)
+- [x] Articles (`/articles`, `/articles/$slug`; `ArticleCard`, `Breadcrumbs`): the 4 WordPress posts (table `articles`;
+      Hebrew verbatim + English translation), head tags via `seo.ts` + `<HeadContent />`, BlogPosting/Breadcrumb
+      JSON-LD, `sitemap.xml` (backend) + `robots.txt`; each post keeps its WordPress `legacyPath` for the 301s
 - [x] Catalog (`/catalog`; `Catalog`, `CatalogCard`, `Pagination`, `AccountPanel`, `src/auth.tsx`): 400 store products,
-      category chips, search, 24 per page, all state in the URL; prices only for signed-in customers (stub sign-in,
-      placeholder prices loaded after sign-in), "log in to see the price" for visitors
+      category chips, search (on the server, every language), 24 per page, all state in the URL; prices only for
+      signed-in customers (real sign-in, placeholder prices from the price API), "log in to see the price" for visitors
 - [ ] Pages: brand, category, product, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
 **Phase 2 — Backend**
-- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 15 tables: users with staff and
+- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 17 tables: users with staff and
       business subtypes, leads, suppliers, brands, categories, products, images, product-supplier junction, price
-      rules, settings, payment methods, orders, order items); models; price resolution (`pricing.py`); seed from the
+      rules, settings, payment methods, orders, order items, articles, resellers); models; price resolution (`pricing.py`); seed from the
       stubs; `/api/health`; Vite `/api` proxy
-- [ ] public content API (categories, products, brands, settings); replace the frontend stubs with API calls
-- [ ] auth (sign-in for staff and business users) and the customer price API (`customer_prices`)
+- [x] public content API (blueprint `customers`: categories, products, brands, stats, articles, resellers, sitemap);
+      the frontend loads everything through `src/api.ts` (stubs are seed data + test fixtures)
+- [x] auth (JWT sign-in for staff and business users, `app/auth.py`) and the customer price API (`/api/prices`)
+- [x] staff API (blueprint `staff`): CRUD of brands, categories, products + images, settings, articles, resellers
+- [ ] staff API for customers, price rules, leads, payment methods and orders (with the admin UI, Phase 3)
 - [ ] lead/contact endpoints (`business_leads`); serve the PDF catalog
 
 **Phase 3 — Admin CMS**: port the legacy admin.
+- [x] Reusable admin table (`DataTable`, `RecordDialog`, `ui/dialog`), staff sign-in at `/admin`, `/admin/brands`
+- [ ] Tables for categories, products (+ images), settings, articles, resellers (a column config + route each)
 
 **Phase 4 — B2B portal**: auth, price catalog, per-customer/category discounts, cart + checkout (minimum ₪2,000;
 card / Bit / bank transfer), Rivhit sync, generated PDF catalog.

@@ -1,19 +1,18 @@
 /**
- * config.ts — Site content and settings that are not translations: the main menu, the product
- * categories, the header buttons and external links. Components take their defaults from here,
- * so changing the menu is a data change, not a component change.
+ * config.ts — Site content and settings that are not translations and do not come from the API: the main
+ * menu, the home page category cards, the labels of the stats figures, the header buttons, external links,
+ * contact facts and the photos bundled with the site (hero, brand logos, article photos). Components take
+ * their defaults from here, so changing the menu is a data change, not a component change. Data from the
+ * database (catalog, brands, stats values, articles, resellers) comes from src/api.ts.
  *
  * Labels are functions that pick a string from the current language's dictionary, which keeps this
  * file language-free. Internal links are built with TanStack's `linkOptions`, so a link to a route that
- * doesn't exist is a type error. (Backend phase: categories will come from the API instead.)
+ * doesn't exist is a type error.
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
 import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Clock, Handshake, Heart, LayoutGrid, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
-import articlesData from '@/stubs/articles.json'
-import brandsData from '@/stubs/brands.json'
-import categoryImages from '@/stubs/category-images.json'
 
 /** Picks a translated label from the dictionary of the current language. */
 export type Label = (t: Dictionary) => string
@@ -45,29 +44,30 @@ const fileBySlug = (files: Record<string, string>, slug: string) =>
 /** Every photo in src/assets/categories/, keyed by path; a category's photo is the file named after its slug. */
 const categoryPhotoFiles = import.meta.glob<string>('/src/assets/categories/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
 
-/** A product category: URL slug, label, fallback icon and optional photo (a file in src/assets/categories/, else a placeholder URL). */
+/** A product category card: URL slug, label, fallback icon and optional photo (a file in src/assets/categories/, else a placeholder URL). */
 export type Category = { slug: string; label: Label; icon: LucideIcon; image?: string }
 
-/** Product categories (from legacy/supabase-export/cms_categories.json); placeholder photos from stubs/category-images.json (catalog product images). Backend phase: from the API. */
+/**
+ * The home page's marketing categories (from legacy/supabase-export/cms_categories.json; the catalog's 15
+ * store categories come from the API). Until real photos are dropped into src/assets/categories/, each card
+ * shows a placeholder: a product photo from the WordPress store.
+ */
 export const CATEGORIES: Category[] = [
-  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, icon: Dog },
-  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, icon: Cat },
-  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, icon: Bone },
-  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, icon: Sparkles },
-  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, icon: Rabbit },
-  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, icon: Bird },
-].map((category) => ({ ...category, image: fileBySlug(categoryPhotoFiles, category.slug) ?? (categoryImages as Record<string, string>)[category.slug] }))
+  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, icon: Dog, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2026/05/45f8dcaa-598f-4d57-91c3-e59a834a5d80.png' },
+  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, icon: Cat, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2024/03/easy-cat-3d-sakoyla_-1-463x1024-1.png' },
+  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, icon: Bone, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2025/01/Ultrapet-52.-Web.jpg' },
+  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, icon: Sparkles, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2024/03/71gTdjfLT0L._AC_SL1500_-2.jpg' },
+  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, icon: Rabbit, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2025/10/01850.jpg' },
+  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, icon: Bird, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2025/10/08460.jpg' },
+].map(({ placeholder, ...category }) => ({ ...category, image: fileBySlug(categoryPhotoFiles, category.slug) ?? placeholder }))
 
-/** A company figure shown in the home page Stats band: a number with a suffix ("+") and a short label. */
-export type Stat = { id: string; value: number; suffix: string; label: Label }
-
-/** The company figures, in display order (from legacy/supabase-export/cms_settings.json). Backend phase: from the API. */
-export const STATS: Stat[] = [
-  { id: 'retail', value: 350, suffix: '+', label: (t: Dictionary) => t.stats.retail },
-  { id: 'partners', value: 15, suffix: '+', label: (t: Dictionary) => t.stats.partners },
-  { id: 'products', value: 1000, suffix: '+', label: (t: Dictionary) => t.stats.products },
-  { id: 'years', value: 12, suffix: '+', label: (t: Dictionary) => t.stats.years },
-]
+/** The label of each home page figure, by the figure's id (the values come from the API, see fetchStats). */
+export const STAT_LABELS: Record<string, Label> = {
+  retail: (t: Dictionary) => t.stats.retail,
+  partners: (t: Dictionary) => t.stats.partners,
+  products: (t: Dictionary) => t.stats.products,
+  years: (t: Dictionary) => t.stats.years,
+}
 
 /** An item of the About section (a vision pillar or an offering): icon, title and description. */
 export type AboutItem = { id: string; icon: LucideIcon; title: Label; text: Label }
@@ -95,21 +95,15 @@ export const ABOUT_ADVANTAGES: { id: string; icon: LucideIcon; label: Label }[] 
   { id: 'support', icon: Package, label: (t: Dictionary) => t.about.advantages.support },
 ]
 
-/** A brand shown on the home page: its URL slug, display name, accent color and optional logo file. */
-export type Brand = { slug: string; name: string; accent: string; tagline: Localized<string>; logo?: string }
-
 /** Every logo file in src/assets/brands/, keyed by path; a brand's logo is the file named after its slug. */
 const brandLogoFiles = import.meta.glob<string>('/src/assets/brands/*.{svg,png,jpg,jpeg,webp}', { eager: true, import: 'default' })
 
 /**
- * Finds a brand's logo file.
+ * Finds a brand's bundled logo file (used when the API gives the brand no logoUrl).
  * @param slug - The brand slug, e.g. "ultra-pet".
  * @returns The logo URL, or undefined when no file in src/assets/brands/ is named after the slug.
  */
-const brandLogo = (slug: string) => fileBySlug(brandLogoFiles, slug)
-
-/** The brands, in display order (from stubs/brands.json, seeded from legacy/supabase-export/cms_brands.json). Backend phase: from the API. */
-export const BRANDS: Brand[] = (brandsData as Omit<Brand, 'logo'>[]).map((brand) => ({ ...brand, logo: brandLogo(brand.slug) }))
+export const brandLogo = (slug: string) => fileBySlug(brandLogoFiles, slug)
 
 /**
  * The main menu, in display order. An item has either `link` (an internal page or #section),
@@ -224,28 +218,6 @@ export type Localized<T> = { he: T } & Partial<Record<Locale, T>>
  */
 export const localized = <T,>(field: Localized<T>, locale: Locale): T => field[locale] ?? field.he
 
-/** One block of article text: a paragraph or a numbered list. */
-export type ArticleBlock = { type: 'p'; text: string } | { type: 'ol'; items: string[] }
-
-/**
- * An article (מאמר) as the API will return it, plus its photo. `description` doubles as the meta
- * description; `relatedCategories` are category slugs linked from the article; `legacyPath` is the old
- * WordPress URL, kept for the 301 redirects.
- */
-export type Article = {
-  slug: string
-  topic: 'cats' | 'dogs'
-  publishedAt: string
-  updatedAt: string
-  title: Localized<string>
-  description: Localized<string>
-  imageAlt: Localized<string>
-  body: Localized<ArticleBlock[]>
-  relatedCategories: string[]
-  legacyPath: string
-  image?: HeroImage
-}
-
 /** Every photo in src/assets/articles/ (named after the article slug), as WebP at 640w and 1280w. */
 const articleImageFiles = import.meta.glob<string>('/src/assets/articles/*.{jpg,jpeg,png,webp}', {
   eager: true,
@@ -254,35 +226,11 @@ const articleImageFiles = import.meta.glob<string>('/src/assets/articles/*.{jpg,
 })
 
 /**
- * The articles, newest first (from stubs/articles.json, ported from the WordPress blog). Backend phase:
- * from the API.
+ * Finds an article's bundled photo (src/assets/articles/<slug>.*, resized to WebP at 640w and 1280w).
+ * @param slug - The article slug.
+ * @returns The photo's `src` + `srcSet`, or undefined when the article has no photo file.
  */
-export const ARTICLES: Article[] = (articlesData as Omit<Article, 'image'>[])
-  .map((article) => {
-    const srcSet = fileBySlug(articleImageFiles, article.slug)
-    return { ...article, image: srcSet ? srcSetImage(srcSet) : undefined }
-  })
-  .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-
-/** A product image from the store: the full file, a 300px square thumbnail and a `srcset` of the sized copies. */
-export type ProductImage = { src: string; thumbnail: string; srcSet: string }
-
-/**
- * A catalog product as the public API will return it: never a price (prices come only from the signed-in
- * prices endpoint, see routes/catalog.tsx). `name` and `description` hold one translation per language,
- * as stored in the database (Hebrew always; English for every product; Russian and Arabic later) — show
- * them with `localized()`, which falls back to Hebrew. `category` is a ProductCategory slug; `legacyPath`
- * is the old WooCommerce URL, kept for the 301 redirects.
- */
-export type Product = {
-  id: string
-  slug: string
-  name: Localized<string>
-  description: Localized<string>
-  category: string
-  image: ProductImage | null
-  legacyPath: string
+export function articleImage(slug: string): HeroImage | undefined {
+  const srcSet = fileBySlug(articleImageFiles, slug)
+  return srcSet ? srcSetImage(srcSet) : undefined
 }
-
-/** A catalog category (the store's 15 categories), e.g. { slug: 'dry-dog-food', name: { he, en } }. */
-export type ProductCategory = { slug: string; name: Localized<string>; legacyPath: string }

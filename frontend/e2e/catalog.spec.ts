@@ -1,13 +1,17 @@
 /**
- * catalog.spec.ts — End-to-end checks of the catalog page in real Chromium: paging and category chips,
- * prices hidden from visitors and shown after signing in (and gone again after signing out), no horizontal
- * overflow (phone and desktop), axe, and screenshots (Hebrew and English, signed out and signed in).
+ * catalog.spec.ts — End-to-end checks of the catalog page in real Chromium against the seeded backend: paging,
+ * category chips and search (filtered on the server), prices hidden from visitors and shown after signing in
+ * as the seed's demo customer (and gone again after signing out), no horizontal overflow (phone and desktop),
+ * axe, and screenshots (Hebrew and English, signed out and signed in).
  * Product photos are hosted on the WordPress site, so every request for them is answered with a local
  * image: the tests do not depend on the network and the screenshots stay stable.
  */
 import { readFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+
+/** The demo customer `flask seed` creates from .env (loaded by playwright.config.ts). */
+const CUSTOMER = { email: process.env.SEED_CUSTOMER_EMAIL ?? '', password: process.env.SEED_CUSTOMER_PASSWORD ?? '' }
 
 /** Stand-in for every product photo. */
 const PHOTO = readFileSync(new URL('../src/assets/brands/ultra-pet.png', import.meta.url))
@@ -30,23 +34,28 @@ async function open(page: Page, path: string) {
 }
 
 /**
- * Signs in with the stub login: the header popover on desktop, the /login page on phones.
+ * Signs in as the demo customer: the header popover on desktop, the /login page on phones.
  * @param page - The Playwright page.
  * @param isMobile - Whether the test runs in the phone project.
  */
 async function signIn(page: Page, isMobile: boolean) {
+  if (!CUSTOMER.email || !CUSTOMER.password) {
+    throw new Error('Set SEED_CUSTOMER_EMAIL and SEED_CUSTOMER_PASSWORD in .env, then run `flask reset-db --yes` and `flask seed`.')
+  }
   if (isMobile) {
     await page.goto('/en/login')
-    await page.getByLabel('Email').fill('shop@example.com')
-    await page.getByLabel('Password').fill('secret')
+    await page.getByLabel('Email').fill(CUSTOMER.email)
+    await page.getByLabel('Password').fill(CUSTOMER.password)
     await page.getByRole('button', { name: 'Log in' }).click()
     await page.getByRole('link', { name: 'Go to the product catalog' }).click()
   } else {
     await page.getByRole('button', { name: 'Login' }).click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByLabel('Email').fill('shop@example.com')
-    await dialog.getByLabel('Password').fill('secret')
+    await dialog.getByLabel('Email').fill(CUSTOMER.email)
+    await dialog.getByLabel('Password').fill(CUSTOMER.password)
     await dialog.getByRole('button', { name: 'Log in' }).click()
+    // Wait for the server's answer (it sets the sign-in cookies) before closing or leaving the page.
+    await expect(page.getByRole('dialog', { name: 'My account' })).toBeVisible()
     await page.keyboard.press('Escape')
   }
 }
@@ -66,6 +75,11 @@ test('pages through the catalog and filters by category', async ({ page }) => {
   await page.getByRole('navigation', { name: 'סינון לפי קטגוריה' }).getByRole('link', { name: 'ציפורים' }).click()
   await expect(page).toHaveURL(/\/catalog\?category=birds$/)
   await expect(page.getByRole('status')).toContainText('מתוך 13 מוצרים')
+
+  // The search runs on the server, in every language: an English word finds products on the Hebrew page.
+  await page.getByRole('searchbox', { name: 'חיפוש מוצר' }).fill('blueberry')
+  await expect(page).toHaveURL(/\/catalog\?category=birds&q=blueberry$/)
+  await expect(page.getByRole('status')).toContainText('מתוך 1 מוצרים')
 })
 
 test('hides prices from visitors and shows them after signing in', async ({ page, isMobile }) => {
@@ -79,7 +93,7 @@ test('hides prices from visitors and shows them after signing in', async ({ page
   await expect(firstCard).toContainText('₪')
   await expect(firstCard).toContainText('excl. VAT')
 
-  // The session survives a reload ("remember me" off = this tab's session storage).
+  // The sign-in survives a reload ("remember me" off = cookies that last until the browser closes).
   await page.reload()
   await expect(firstCard).toContainText('₪')
 

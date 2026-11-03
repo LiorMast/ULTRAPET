@@ -9,22 +9,9 @@ import L from 'leaflet'
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import { Maximize2, Minimize2, Phone } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
+import type { Branch } from '@/api'
 import { useReducedMotion } from '@/components/useReducedMotion'
 import { useI18n } from '@/i18n'
-
-/** One reseller store, in the shape of the planned API response (see stubs/branches.json). */
-export type Branch = {
-  id: string
-  name: string
-  address: string
-  city: string
-  phone: string
-  website?: string | null
-  lat: number
-  lng: number
-  /** True when the address could not be located and the pin sits at the city centre. */
-  approximate?: boolean
-}
 
 /** A point on the map, e.g. the visitor's location. */
 export type LatLng = { lat: number; lng: number }

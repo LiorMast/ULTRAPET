@@ -5,6 +5,7 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { scrollIntoViewSettled } from './utils.ts'
 
 const HIDE_HEADER = 'header { visibility: hidden !important; }'
 
@@ -15,7 +16,7 @@ for (const [name, path, next, previous] of [
   test(`arrows scroll the row and disable at the ends (${name})`, async ({ page }) => {
     await page.goto(path)
     const section = page.locator('#categories')
-    await section.scrollIntoViewIfNeeded()
+    await scrollIntoViewSettled(section)
     const track = section.locator('ul').first()
     const offset = () => track.evaluate((el) => Math.abs(el.scrollLeft))
     await expect(section.getByRole('button', { name: previous })).toBeDisabled()
@@ -53,7 +54,7 @@ for (const [name, path] of [['he', '/'], ['en', '/en']] as const) {
     await page.goto(path)
     await page.addStyleTag({ content: HIDE_HEADER })
     const section = page.locator('#categories')
-    await section.scrollIntoViewIfNeeded()
+    await scrollIntoViewSettled(section)
     await expect(section.getByRole('button', { name: /Next|הבא/ })).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
     await expect(section).toHaveScreenshot(`categories-${name}.png`)

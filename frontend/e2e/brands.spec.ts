@@ -5,6 +5,7 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { hideFixedOverlays, scrollIntoViewSettled } from './utils.ts'
 
 test('the carousel pages through the brands with the arrows and the dots', async ({ page }) => {
   await page.goto('/en')
@@ -42,11 +43,9 @@ for (const [name, path] of [['he', '/'], ['en', '/en']] as const) {
   test(`screenshot (${name})`, async ({ page }) => {
     await page.goto(path)
     const section = page.locator('#brands')
-    await section.scrollIntoViewIfNeeded()
+    await scrollIntoViewSettled(section)
     await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('#brands img')].every((i) => i.complete))
-    // The fixed header is translucent and floats over this dark section wherever the scroll stops; hide it
-    // here (it has its own screenshots).
-    await page.getByRole('banner').evaluate((header) => (header.style.visibility = 'hidden'))
+    await hideFixedOverlays(page)
     await expect(section).toHaveScreenshot(`brands-${name}.png`)
   })
 }

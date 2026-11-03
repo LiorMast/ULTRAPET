@@ -5,7 +5,8 @@
  */
 import { Link } from '@tanstack/react-router'
 import { LayoutGrid, LogOut } from 'lucide-react'
-import { useAuth, type User } from '@/auth'
+import type { User } from '@/api'
+import { useAuth } from '@/auth'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 

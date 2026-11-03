@@ -10,7 +10,8 @@ import { Link } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from 'cn'
-import { localized, type Article } from '@/config'
+import type { Article } from '@/api'
+import { articleImage, localized } from '@/config'
 import { useI18n, type Locale } from '@/i18n'
 
 /** Reading speed used for the "N min read" estimate, in words per minute. */
@@ -85,13 +86,14 @@ export function ArticleCard({
 }: { article: Article; headingLevel?: 'h2' | 'h3'; priority?: boolean; className?: string } & VariantProps<typeof cardVariants>) {
   const { t, locale } = useI18n()
   const featured = variant === 'featured'
+  const image = articleImage(article.slug)
   return (
     <Link to="/articles/$slug" params={{ slug: article.slug }} className={cn(cardVariants({ variant }), className)}>
       <div className={cn('relative aspect-[16/10] overflow-hidden bg-neutral-150', featured && 'lg:aspect-auto lg:min-h-96')}>
-        {article.image && (
+        {image && (
           <img
-            src={article.image.src}
-            srcSet={article.image.srcSet}
+            src={image.src}
+            srcSet={image.srcSet}
             sizes={featured ? '(min-width: 1024px) 60vw, 100vw' : '(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw'}
             alt=""
             width={1280}

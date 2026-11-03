@@ -34,9 +34,13 @@ services:
     environment:
       FLASK_APP: app
       DATABASE_URL: postgresql+psycopg://content:${POSTGRES_PASSWORD}@postgres:5432/content
-      SECRET_KEY: ${SECRET_KEY:-dev-only-secret}
+      SECRET_KEY: ${SECRET_KEY:-dev-only-secret-never-use-in-production}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_CUSTOMER_EMAIL: ${SEED_CUSTOMER_EMAIL:-}
+      SEED_CUSTOMER_PASSWORD: ${SEED_CUSTOMER_PASSWORD:-}
+      # Plain http in dev; set to 1 behind https so the sign-in cookies are sent over https only.
+      JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-0}
     volumes:
       # Source code (reloads on change), plus the seed data at the same paths relative to backend/ as in the repo.
       - ./backend:/srv/backend

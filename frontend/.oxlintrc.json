@@ -2,11 +2,21 @@
 // "only-export-components" is off: TanStack route files must export `Route` next to their page
 // component, and small modules (src/i18n/index.tsx, ui/button.tsx) deliberately export helpers next
 // to components. The only cost is a full reload instead of a hot update when those files change.
+// "no-restricted-imports": the files in src/stubs/ are the backend's seed data and the fixtures of the
+// tests' fake API (src/test/api.ts); the site itself loads its data through src/api.ts, so only tests may
+// import them.
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": "off"
-  }
+    "react/only-export-components": "off",
+    "no-restricted-imports": [
+      "error",
+      { "patterns": [{ "group": ["@/stubs/*"], "message": "Stubs are seed data and test fixtures; load data through src/api.ts." }] }
+    ]
+  },
+  "overrides": [
+    { "files": ["src/test/**", "**/*.test.ts", "**/*.test.tsx"], "rules": { "no-restricted-imports": "off" } }
+  ]
 }

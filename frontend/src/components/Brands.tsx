@@ -1,10 +1,11 @@
 /**
  * Brands.tsx — The home page "Brands" section (anchor #brands): heading, intro and a paged carousel of brand cards (3 per page).
- * Used by routes/index.tsx; the navbar's "Brands" link and the hero's "Our Brands" button scroll here.
+ * Used by routes/index.tsx, which loads the brands from the API (fetchBrands); the navbar's "Brands" link and
+ * the hero's "Our Brands" button scroll here.
  */
 import { BrandCard } from '@/components/BrandCard'
 import { Carousel } from '@/components/Carousel'
-import { BRANDS, type Brand } from '@/config'
+import type { Brand } from '@/api'
 import { useI18n } from '@/i18n'
 
 /** How many brand cards one carousel page holds on a wide screen. */
@@ -12,10 +13,10 @@ const BRANDS_PER_PAGE = 3
 
 /**
  * The brands section.
- * @param props.brands - The brands to show, in order; defaults to the brands in config.ts.
+ * @param props.brands - The brands to show, in order.
  * @returns The <section> with the heading and the carousel.
  */
-export function Brands({ brands = BRANDS }: { brands?: Brand[] }) {
+export function Brands({ brands }: { brands: Brand[] }) {
   const { t } = useI18n()
   return (
     <section id="brands" aria-labelledby="brands-title" className="bg-black px-6 py-24 lg:px-10 lg:py-32">

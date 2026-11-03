@@ -1,15 +1,15 @@
 /**
  * WhereToBuy.tsx — The "Where to Buy" page content (משווקים): a store locator with a search box, a
  * "find the nearest store" button, a list of the reseller stores (name, address, phone, distance) and a map.
- * Used by routes/where-to-buy.tsx. The stores come from stubs/branches.json until the backend serves them.
+ * Used by routes/where-to-buy.tsx, which loads the stores from the API (fetchResellers).
  * The map (Leaflet) is loaded lazily, so the rest of the site does not download it.
  */
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import { LocateFixed, MapPin, Navigation, Phone, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { Branch, LatLng } from '@/components/BranchMap'
+import type { Branch } from '@/api'
+import type { LatLng } from '@/components/BranchMap'
 import { useI18n } from '@/i18n'
-import branchesData from '@/stubs/branches.json'
 
 const BranchMap = lazy(() => import('@/components/BranchMap').then((m) => ({ default: m.BranchMap })))
 
@@ -84,10 +84,10 @@ function BranchCard({ branch, distance, selected, onSelect }: { branch: Branch; 
 
 /**
  * The Where to Buy page content.
- * @param props.branches - The stores; defaults to the stub in stubs/branches.json.
+ * @param props.branches - The stores.
  * @returns The page <section> with the heading, filters, list and map.
  */
-export function WhereToBuy({ branches = branchesData as Branch[] }: { branches?: Branch[] }) {
+export function WhereToBuy({ branches }: { branches: Branch[] }) {
   const { t, locale } = useI18n()
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState<LocationState>({ status: 'idle' })

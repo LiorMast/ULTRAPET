@@ -10,9 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CatalogRouteImport } from './routes/catalog'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as WhereToBuyRouteImport } from './routes/where-to-buy'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminBrandsRouteImport } from './routes/admin.brands'
 import { Route as ArticlesIndexRouteImport } from './routes/articles.index'
 import { Route as ArticlesSlugRouteImport } from './routes/articles.$slug'
 import { Route as BrandsSlugRouteImport } from './routes/brands.$slug'
@@ -21,6 +24,11 @@ import { Route as CategoriesSlugRouteImport } from './routes/categories.$slug'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CatalogRoute = CatalogRouteImport.update({
@@ -37,6 +45,16 @@ const WhereToBuyRoute = WhereToBuyRouteImport.update({
   id: '/where-to-buy',
   path: '/where-to-buy',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBrandsRoute = AdminBrandsRouteImport.update({
+  id: '/brands',
+  path: '/brands',
+  getParentRoute: () => AdminRoute,
 } as any)
 const ArticlesIndexRoute = ArticlesIndexRouteImport.update({
   id: '/articles/',
@@ -61,12 +79,15 @@ const CategoriesSlugRoute = CategoriesSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/catalog': typeof CatalogRoute
   '/login': typeof LoginRoute
   '/where-to-buy': typeof WhereToBuyRoute
+  '/admin/brands': typeof AdminBrandsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/brands/$slug': typeof BrandsSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
+  '/admin/': typeof AdminIndexRoute
   '/articles/': typeof ArticlesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -74,32 +95,40 @@ export interface FileRoutesByTo {
   '/catalog': typeof CatalogRoute
   '/login': typeof LoginRoute
   '/where-to-buy': typeof WhereToBuyRoute
+  '/admin/brands': typeof AdminBrandsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/brands/$slug': typeof BrandsSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
+  '/admin': typeof AdminIndexRoute
   '/articles': typeof ArticlesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/catalog': typeof CatalogRoute
   '/login': typeof LoginRoute
   '/where-to-buy': typeof WhereToBuyRoute
+  '/admin/brands': typeof AdminBrandsRoute
   '/articles/$slug': typeof ArticlesSlugRoute
   '/brands/$slug': typeof BrandsSlugRoute
   '/categories/$slug': typeof CategoriesSlugRoute
+  '/admin/': typeof AdminIndexRoute
   '/articles/': typeof ArticlesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/catalog'
     | '/login'
     | '/where-to-buy'
+    | '/admin/brands'
     | '/articles/$slug'
     | '/brands/$slug'
     | '/categories/$slug'
+    | '/admin/'
     | '/articles/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -107,24 +136,30 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/login'
     | '/where-to-buy'
+    | '/admin/brands'
     | '/articles/$slug'
     | '/brands/$slug'
     | '/categories/$slug'
+    | '/admin'
     | '/articles'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/catalog'
     | '/login'
     | '/where-to-buy'
+    | '/admin/brands'
     | '/articles/$slug'
     | '/brands/$slug'
     | '/categories/$slug'
+    | '/admin/'
     | '/articles/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   CatalogRoute: typeof CatalogRoute
   LoginRoute: typeof LoginRoute
   WhereToBuyRoute: typeof WhereToBuyRoute
@@ -141,6 +176,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/catalog': {
@@ -163,6 +205,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/where-to-buy'
       preLoaderRoute: typeof WhereToBuyRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/brands': {
+      id: '/admin/brands'
+      path: '/brands'
+      fullPath: '/admin/brands'
+      preLoaderRoute: typeof AdminBrandsRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/articles/': {
       id: '/articles/'
@@ -195,8 +251,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminBrandsRoute: typeof AdminBrandsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminBrandsRoute: AdminBrandsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   CatalogRoute: CatalogRoute,
   LoginRoute: LoginRoute,
   WhereToBuyRoute: WhereToBuyRoute,

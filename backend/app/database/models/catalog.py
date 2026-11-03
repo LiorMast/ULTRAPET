@@ -11,7 +11,7 @@ import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer
+from sqlalchemy import CheckConstraint, Double, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.db import Localized, TimestampMixin, db, localized_check, uuid_pk
@@ -27,11 +27,18 @@ class Supplier(TimestampMixin, db.Model):
     """A manufacturer or exporter Ultra Pet buys from. Staff only, never shown on the public site."""
 
     __tablename__ = "suppliers"
-    __table_args__ = (CheckConstraint("country ~ '^[A-Z]{2}$'", name="country"),)
+    __table_args__ = (
+        CheckConstraint("country ~ '^[A-Z]{2}$'", name="country"),
+        CheckConstraint("latitude BETWEEN -90 AND 90", name="latitude"),
+        CheckConstraint("longitude BETWEEN -180 AND 180", name="longitude"),
+        CheckConstraint("(latitude IS NULL) = (longitude IS NULL)", name="coordinates"),
+    )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     name: Mapped[str] = mapped_column(unique=True)
     country: Mapped[str | None]
+    latitude: Mapped[float | None] = mapped_column(Double)
+    longitude: Mapped[float | None] = mapped_column(Double)
     contact_name: Mapped[str | None]
     email: Mapped[str | None]
     phone: Mapped[str | None]
@@ -114,6 +121,7 @@ class Product(TimestampMixin, db.Model):
     category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categories.id", ondelete="RESTRICT"), index=True)
     brand_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"), index=True)
     list_price: Mapped[Decimal | None]
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
     legacy_path: Mapped[str | None]
 

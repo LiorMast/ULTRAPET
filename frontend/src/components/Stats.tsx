@@ -1,12 +1,14 @@
 /**
  * Stats.tsx — The home page "Stats" band (anchor #stats): the company's key figures, each a large number
- * with a short label. Used by routes/index.tsx. The numbers count up once when they scroll into view
+ * with a short label. Used by routes/index.tsx, which loads the figures from the API (fetchStats); the labels
+ * come from the dictionaries through STAT_LABELS in config.ts. The numbers count up once when they scroll into view
  * (skipped for visitors who prefer reduced motion); the final value is always in the page for screen readers.
  */
 import { useEffect, useRef, useState } from 'react'
 import { cn } from 'cn'
 import { useReducedMotion } from '@/components/useReducedMotion'
-import { STATS, type Stat } from '@/config'
+import type { Stat } from '@/api'
+import { STAT_LABELS, type Label } from '@/config'
 import { useI18n } from '@/i18n'
 
 const COUNT_UP_MS = 1600
@@ -39,10 +41,11 @@ function useCountUp(target: number, run: boolean, animate: boolean) {
 /**
  * One figure: the number (counting up when first visible) above its label.
  * @param props.stat - The figure to show.
+ * @param props.label - Picks its label from the dictionary.
  * @param props.className - Extra classes for the <li>.
  * @returns The list item.
  */
-function StatFigure({ stat, className }: { stat: Stat; className?: string }) {
+function StatFigure({ stat, label, className }: { stat: Stat; label: Label; className?: string }) {
   const { t, locale } = useI18n()
   const reducedMotion = useReducedMotion()
   const ref = useRef<HTMLLIElement>(null)
@@ -67,26 +70,29 @@ function StatFigure({ stat, className }: { stat: Stat; className?: string }) {
         <span aria-hidden="true" dir="ltr" className="inline-block tabular-nums">{format(shown)}</span>
         <span className="sr-only">{format(stat.value)}</span>
       </p>
-      <p className="mt-4 font-heading text-xs font-bold uppercase tracking-widest text-brand-charcoal">{stat.label(t)}</p>
+      <p className="mt-4 font-heading text-xs font-bold uppercase tracking-widest text-brand-charcoal">{label(t)}</p>
     </li>
   )
 }
 
 /**
  * The stats band.
- * @param props.stats - The figures to show, in order; defaults to STATS in config.ts.
+ * @param props.stats - The figures to show, in order (from the API); a figure without a label is left out.
+ * @param props.labels - The label of each figure id; defaults to STAT_LABELS in config.ts.
  * @returns The <section> with a visually hidden heading and the figure list.
  */
-export function Stats({ stats = STATS }: { stats?: Stat[] }) {
+export function Stats({ stats, labels = STAT_LABELS }: { stats: Stat[]; labels?: Record<string, Label> }) {
   const { t } = useI18n()
+  const shown = stats.filter((stat) => labels[stat.id])
   return (
     <section id="stats" aria-labelledby="stats-title" className="border-b border-neutral-150 bg-white">
       <h2 id="stats-title" className="sr-only">{t.stats.title}</h2>
       <ul className="mx-auto grid max-w-7xl grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, i) => (
+        {shown.map((stat, i) => (
           <StatFigure
             key={stat.id}
             stat={stat}
+            label={labels[stat.id]}
             className={cn(i % 2 === 1 && 'border-s border-neutral-150', i > 1 && 'border-t border-neutral-150 lg:border-t-0', i > 0 && 'lg:border-s lg:border-neutral-150')}
           />
         ))}

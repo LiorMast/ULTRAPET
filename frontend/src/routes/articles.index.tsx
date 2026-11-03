@@ -8,12 +8,14 @@
 import { createFileRoute, linkOptions } from '@tanstack/react-router'
 import { ArticleCard } from '@/components/ArticleCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { ARTICLES, localized } from '@/config'
+import { fetchArticles } from '@/api'
+import { articleImage, localized } from '@/config'
 import { dictionaryFor, localizePath, useI18n } from '@/i18n'
 import { absoluteUrl, breadcrumbJsonLd, organizationJsonLd, pageHead } from '@/seo'
 
 export const Route = createFileRoute('/articles/')({
-  head: ({ match }) => {
+  loader: ({ abortController }) => fetchArticles(abortController.signal),
+  head: ({ match, loaderData: articles = [] }) => {
     const { locale } = match.context
     const t = dictionaryFor(locale)
     return pageHead({
@@ -21,7 +23,7 @@ export const Route = createFileRoute('/articles/')({
       path: '/articles',
       title: t.articles.metaTitle,
       description: t.articles.description,
-      image: ARTICLES[0]?.image?.src,
+      image: articles[0] && articleImage(articles[0].slug)?.src,
       jsonLd: [
         {
           '@context': 'https://schema.org',
@@ -31,7 +33,7 @@ export const Route = createFileRoute('/articles/')({
           url: absoluteUrl(localizePath('/articles', locale)),
           inLanguage: locale,
           publisher: organizationJsonLd(locale),
-          blogPost: ARTICLES.map((article) => ({
+          blogPost: articles.map((article) => ({
             '@type': 'BlogPosting',
             headline: localized(article.title, locale),
             url: absoluteUrl(localizePath(`/articles/${article.slug}`, locale)),
@@ -54,7 +56,7 @@ export const Route = createFileRoute('/articles/')({
  */
 function ArticlesPage() {
   const { t } = useI18n()
-  const [latest, ...others] = ARTICLES
+  const [latest, ...others] = Route.useLoaderData()
   return (
     <section aria-labelledby="articles-title" className="mx-auto max-w-7xl px-6 py-16 lg:px-10 lg:py-20">
       <Breadcrumbs items={[{ label: t.articles.home, link: linkOptions({ to: '/' }) }, { label: t.nav.articles }]} />

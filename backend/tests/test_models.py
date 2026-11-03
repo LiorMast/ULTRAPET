@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
-from app.database.models.catalog import Category, Product
+from app.database.models.catalog import Category, Product, Supplier
 from app.database.models.orders import Order, PaymentMethod
 from app.pricing import PriceRule
 from app.database.models.users import AppUser, BusinessUser, StaffUser
@@ -184,3 +184,26 @@ def test_checks_reject_invalid_rows(database, model, constraint):
     database.add(model())
     with pytest.raises(IntegrityError, match=constraint):
         database.commit()
+
+
+@pytest.mark.parametrize(
+    ("coordinates", "constraint"),
+    [
+        ({"latitude": 91.0, "longitude": 10.0}, "suppliers_latitude_check"),
+        ({"latitude": 10.0, "longitude": -181.0}, "suppliers_longitude_check"),
+        ({"latitude": 10.0}, "suppliers_coordinates_check"),
+        ({"longitude": 10.0}, "suppliers_coordinates_check"),
+    ],
+)
+def test_supplier_coordinates_are_checked(database, coordinates, constraint):
+    database.add(Supplier(name="Bad Location Ltd", **coordinates))
+    with pytest.raises(IntegrityError, match=constraint):
+        database.commit()
+
+
+def test_a_supplier_location_is_stored_with_both_coordinates_or_none(database):
+    database.add_all([Supplier(name="Madrid Feeds", latitude=40.4168, longitude=-3.7038), Supplier(name="No Location")])
+    database.commit()
+    located = database.scalar(select(Supplier).where(Supplier.name == "Madrid Feeds"))
+    assert (located.latitude, located.longitude) == (40.4168, -3.7038)
+    assert database.scalar(select(Supplier.latitude).where(Supplier.name == "No Location")) is None

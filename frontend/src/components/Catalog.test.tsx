@@ -7,6 +7,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { pageWindow } from '@/components/Pagination'
+import { TEST_USER } from '@/test/api'
 import { renderPage } from '@/test/utils'
 import products from '@/stubs/products.json'
 import prices from '@/stubs/prices.json'
@@ -18,7 +19,7 @@ const cards = () => within(screen.getByRole('list', { name: /^(מוצרים|Prod
 const names = () => cards().map((card) => within(card).getByRole('heading').textContent)
 
 /** A signed-in business customer. */
-const customer = { email: 'shop@example.com' }
+const customer = TEST_USER
 
 describe('Catalog page', () => {
   it('shows the first 24 products without any price to visitors (Hebrew)', async () => {

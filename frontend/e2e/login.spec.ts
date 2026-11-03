@@ -1,7 +1,7 @@
 /**
  * login.spec.ts — End-to-end checks of the header login popover in real Chromium (desktop only: below xl the
- * mobile drawer links to /login instead): it opens and stays inside the viewport, validates, has no axe
- * violations, and looks right (Hebrew, English).
+ * mobile drawer links to /login instead): it opens and stays inside the viewport, validates, refuses a wrong
+ * password (checked by the real backend), has no axe violations, and looks right (Hebrew, English).
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
@@ -23,6 +23,17 @@ test('opens, validates and stays inside the viewport', async ({ page }) => {
   await expect(dialog.getByText('שדה חובה')).toHaveCount(2)
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
+})
+
+test('says so when the backend refuses the password', async ({ page }) => {
+  await page.getByRole('button', { name: 'התחברות' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('דוא"ל').fill('nobody@example.com')
+  await dialog.getByLabel('סיסמה').fill('not-the-password')
+  await dialog.getByRole('button', { name: 'התחברות' }).click()
+  await expect(dialog.getByRole('alert')).toHaveText('הדוא"ל או הסיסמה שגויים.')
+  // Still signed out: the header button did not turn into "my account".
+  await expect(page.getByRole('banner').getByRole('button', { name: 'התחברות' })).toBeVisible()
 })
 
 test('has no accessibility violations', async ({ page }) => {

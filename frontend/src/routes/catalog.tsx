@@ -1,44 +1,26 @@
 /**
- * routes/catalog.tsx — The product catalog page (/catalog): all products from the store, filterable by
- * category and search text, 24 per page. The URL holds the state: ?category=dry-dog-food&q=salmon&page=2.
+ * routes/catalog.tsx — The product catalog page (/catalog): the store's products, filterable by category and
+ * search text, 24 per page. The URL holds the state: ?category=dry-dog-food&q=salmon&page=2. The loader
+ * fetches the categories and the matching page from the API (the server filters, searches and pages), and runs
+ * again whenever the URL state changes; the previous results stay on screen until the new ones arrive.
  *
- * Prices: the public product data never contains prices. For a signed-in business customer (useAuth) the
- * route loads the prices separately (stubs/prices.json, standing in for the signed-in-only prices API of
- * Phase 4) and passes them to <Catalog>; signed-out visitors get "log in to see the price" on every card.
- * The stub's prices are PLACEHOLDERS, not real prices.
+ * Prices: the product data never contains prices. For a signed-in business customer (useAuth) the page loads
+ * the customer's prices separately (fetchPrices) and passes them to <Catalog>; signed-out visitors get "log in
+ * to see the price" on every card.
  *
  * SEO: title, description, canonical (keeps category and page, drops the search text), hreflang and
  * CollectionPage + BreadcrumbList JSON-LD. No price ever appears in the head tags.
  */
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { fetchCategories, fetchPrices, fetchProducts, type CatalogSearch } from '@/api'
 import { useAuth } from '@/auth'
-import { Catalog, type CatalogPrices, type CatalogSearch } from '@/components/Catalog'
-import type { Product, ProductCategory } from '@/config'
+import { Catalog, type CatalogPrices } from '@/components/Catalog'
 import { dictionaryFor, localizePath } from '@/i18n'
 import { absoluteUrl, breadcrumbJsonLd, pageHead } from '@/seo'
-import categoriesData from '@/stubs/product-categories.json'
-import productsData from '@/stubs/products.json'
 
-/**
- * The products (from the WooCommerce store export). Backend phase: GET /api/products. Only the page
- * component may use it: the router code-splits the component, so the large product list stays out of the
- * main bundle (validateSearch and head are not split).
- */
-const PRODUCTS = productsData as Product[]
-
-/** The store's 15 categories, in display order. Backend phase: GET /api/product-categories. */
-const CATEGORIES = categoriesData as ProductCategory[]
-
-/**
- * Loads the prices of a signed-in customer. Stub: a dynamic import, so the price file is fetched only after
- * sign-in and is not part of the public page code. Phase 4: an authenticated API call.
- * @returns Product id → price in shekels (before VAT).
- */
-async function fetchPrices(): Promise<Record<string, number>> {
-  const { default: data } = await import('@/stubs/prices.json')
-  return data.prices
-}
+/** What a category slug in the URL may look like (the server ignores slugs it does not know). */
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 /**
  * Turns the URL state into a query string for canonical links: category and page only (search results are
@@ -57,14 +39,22 @@ function canonicalQuery({ category, page }: CatalogSearch) {
 export const Route = createFileRoute('/catalog')({
   validateSearch: (raw: Record<string, unknown>): CatalogSearch => {
     const page = Number(raw.page)
-    const category = typeof raw.category === 'string' && CATEGORIES.some((c) => c.slug === raw.category) ? raw.category : undefined
+    const category = typeof raw.category === 'string' && SLUG.test(raw.category) ? raw.category : undefined
     const q = typeof raw.q === 'string' && raw.q.trim() ? raw.q.trim() : undefined
     return { page: Number.isInteger(page) && page > 1 ? page : undefined, category, q }
   },
-  head: ({ match }) => {
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps, abortController }) => {
+    const { signal } = abortController
+    const [categories, results] = await Promise.all([fetchCategories(signal), fetchProducts(deps, signal)])
+    return { categories, results }
+  },
+  head: ({ match, loaderData }) => {
     const { locale } = match.context
     const t = dictionaryFor(locale)
-    const path = `/catalog${canonicalQuery(match.search)}`
+    // An unknown category is not part of the page's identity: the server ignored it.
+    const category = loaderData ? (loaderData.results.category ?? undefined) : match.search.category
+    const path = `/catalog${canonicalQuery({ ...match.search, category })}`
     return pageHead({
       locale,
       path,
@@ -91,19 +81,24 @@ export const Route = createFileRoute('/catalog')({
 
 /**
  * The catalog page: loads prices when a customer is signed in, then renders the catalog.
- * @returns The Catalog with the products, categories, URL state and (signed in) prices.
+ * @returns The Catalog with the page of products, the categories, the URL state and (signed in) prices.
  */
 function CatalogPage() {
   const search = Route.useSearch()
+  const { categories, results } = Route.useLoaderData()
   const { user } = useAuth()
   const [loaded, setLoaded] = useState<{ email: string; prices: Record<string, number> } | null>(null)
 
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    fetchPrices().then((prices) => {
-      if (!cancelled) setLoaded({ email: user.email, prices })
-    })
+    fetchPrices().then(
+      ({ prices }) => {
+        if (!cancelled) setLoaded({ email: user.email, prices })
+      },
+      // A lost sign-in signs the visitor out (api.ts); other failures leave the prices loading.
+      () => undefined,
+    )
     return () => {
       cancelled = true
     }
@@ -116,5 +111,5 @@ function CatalogPage() {
       ? { status: 'loaded', prices: loaded.prices }
       : { status: 'loading' }
 
-  return <Catalog products={PRODUCTS} categories={CATEGORIES} search={search} prices={prices} />
+  return <Catalog results={results} categories={categories} search={search} prices={prices} />
 }

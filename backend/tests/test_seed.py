@@ -1,4 +1,4 @@
-"""test_seed.py — `flask seed` loads the stub catalog, settings and payment methods into an empty database."""
+"""test_seed.py — `flask seed` loads the stub catalog and content, settings, payment methods and the optional users."""
 import uuid
 from decimal import Decimal
 
@@ -7,9 +7,11 @@ from click import ClickException
 from sqlalchemy import func, select
 
 from app.database.models.catalog import Brand, Category, Product
+from app.database.models.content import Article, Reseller
 from app.database.models.orders import PaymentMethod
 from app.database.seed import seed_database
 from app.database.models.settings import get_setting
+from app.database.models.users import BusinessUser
 
 
 def count(database, model) -> int:
@@ -28,18 +30,24 @@ def count(database, model) -> int:
 def test_seed_loads_the_stub_data(database, monkeypatch):
     monkeypatch.setenv("SEED_ADMIN_EMAIL", "Admin@UltraPet.co.il")
     monkeypatch.setenv("SEED_ADMIN_PASSWORD", "secret-password")
+    monkeypatch.setenv("SEED_CUSTOMER_EMAIL", "Shop@Example.com")
+    monkeypatch.setenv("SEED_CUSTOMER_PASSWORD", "customer-password")
     counts = seed_database()
 
     assert counts == {
         "categories": 15,
         "brands": 6,
         "products": 400,
+        "articles": 4,
+        "resellers": 124,
         "settings": 11,
         "payment_methods": 3,
         "staff_users": 1,
+        "business_users": 1,
     }
     assert (count(database, Category), count(database, Brand), count(database, Product)) == (15, 6, 400)
     assert count(database, PaymentMethod) == 3
+    assert (count(database, Article), count(database, Reseller)) == (4, 124)
 
     product = database.scalar(select(Product).where(Product.woocommerce_id == 1081))
     assert isinstance(product.id, uuid.UUID)
@@ -47,6 +55,18 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
     assert product.list_price == Decimal("303.90")
     assert product.name["en"] == "INTERNUTRI ORIGINAL DOG BEEF Dog Food 14 kg"
     assert product.images[0].thumbnail_url.endswith("-300x300.png")
+    # The catalog keeps the stub order: 1081 is the first product of products.json.
+    assert product.sort_order == 0
+    assert database.scalar(select(func.max(Product.sort_order))) == 399
+
+    article = database.scalar(select(Article).where(Article.slug == "living-with-a-cat"))
+    assert article.published_at.isoformat() == "2024-03-17T10:35:25+00:00"
+    assert article.body["he"][0]["type"] == "p"
+    assert database.scalar(select(Reseller).where(Reseller.name == "Petway")).city == "חיפה"
+    assert database.scalar(select(func.count()).where(Reseller.approximate_location)) == 41
+    customer = database.scalar(select(BusinessUser))
+    assert (customer.email, customer.company_name) == ("shop@example.com", "Demo Pet Shop")
+    assert customer.check_password("customer-password")
     assert get_setting("min_order_amount") == 2000
     assert get_setting("stat_retail_value") == 350
     assert get_setting("missing", "fallback") == "fallback"

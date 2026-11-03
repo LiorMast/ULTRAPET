@@ -1,10 +1,12 @@
 /**
  * routes/__root.tsx — The layout shared by every page: the route-managed <head> tags, a "skip to
- * content" link, the Navbar, the current page inside <main>, the floating WhatsApp button, and the "page not found" screen for
- * unknown URLs. Its `head` sets the default title and description; pages override them (see seo.ts).
+ * content" link, the Navbar, the current page inside <main>, the floating WhatsApp button, the "page not found" screen for
+ * unknown URLs, and the "could not load" screen (LoadError, the router's default error component) for pages
+ * whose API request failed. Its `head` sets the default title and description; pages override them (see seo.ts).
  */
-import { createRootRouteWithContext, HeadContent, Link, Outlet } from '@tanstack/react-router'
+import { createRootRouteWithContext, HeadContent, Link, Outlet, useRouter } from '@tanstack/react-router'
 import { Navbar } from '@/components/Navbar'
+import { Button } from '@/components/ui/button'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 
@@ -60,6 +62,25 @@ function NotFound() {
       <Link to="/" className="mt-8 inline-block font-heading text-xs font-semibold uppercase tracking-widest text-brand-red hover:underline">
         {t.page.backHome}
       </Link>
+    </section>
+  )
+}
+
+/**
+ * The "could not load" screen, shown inside the layout in place of a page whose data request failed (the API
+ * is down or the connection dropped). The router's defaultErrorComponent (router.ts).
+ * @returns The message with a button that runs the page's loaders again.
+ */
+export function LoadError() {
+  const { t } = useI18n()
+  const router = useRouter()
+  return (
+    <section className="mx-auto max-w-3xl px-6 py-32 text-center">
+      <h1 className="font-heading text-3xl font-bold text-brand-charcoal">{t.page.loadErrorTitle}</h1>
+      <p className="mt-4 text-brand-charcoal-muted">{t.page.loadErrorBody}</p>
+      <Button className="mt-8" onClick={() => void router.invalidate()}>
+        {t.page.retry}
+      </Button>
     </section>
   )
 }

@@ -1,0 +1,434 @@
+/**
+ * api.ts — The one API layer: every call the site makes to the Flask backend, and the types of what it
+ * returns. Components never fetch: route loaders (and the auth provider) call these functions and pass the
+ * data down through props. In dev, Vite proxies /api to the backend (vite.config.ts); the Vitest tests answer
+ * these calls with a fake built from the stub fixtures (src/test/api.ts).
+ *
+ * Sign-in (backend/app/auth.py): the server keeps the JWTs in HttpOnly cookies, so this code never sees a token.
+ * - Every POST/PUT/PATCH/DELETE sends the X-CSRF-TOKEN header, copied from the readable `csrf_access_token`
+ *   cookie (the refresh call uses `csrf_refresh_token`), as the server's CSRF double-submit check requires.
+ * - A 401 "token_expired" answer (the 15-minute access token ran out) triggers one refresh, then the request
+ *   is sent again. Calls that fail at the same moment share that one refresh. Staff calls (/api/staff/...)
+ *   refresh at the staff route, every other call at the customer route.
+ * - When the sign-in is gone for good (the refresh failed, or any other 401 except a wrong password), the
+ *   handler registered with setSignedOutHandler (by AuthProvider) is told, so the UI shows the visitor as
+ *   signed out.
+ *
+ * Staff panel (backend/app/staff/routes.py): its own sign-in, and one generic create/read/update/delete API for
+ * every resource (fetchStaffRows, createStaffRow, updateStaffRow, deleteStaffRow), used by the /admin pages.
+ */
+import { notFound } from '@tanstack/react-router'
+import type { Localized } from '@/config'
+
+/** A product photo from the store: the full file, a 300px square thumbnail and a `srcset` of the sized copies. */
+export type ProductImage = { src: string; thumbnail: string; srcSet: string }
+
+/**
+ * A catalog product as the list returns it: never a price (prices come only from fetchPrices, for a signed-in
+ * customer). `name` holds one translation per language (show it with `localized()`); `category` is a
+ * ProductCategory slug.
+ */
+export type Product = { id: string; slug: string; name: Localized<string>; category: string; image: ProductImage | null }
+
+/** A catalog category (the store's 15), e.g. { slug: 'dry-dog-food', name: { he, en } }. */
+export type ProductCategory = { slug: string; name: Localized<string>; legacyPath: string | null }
+
+/**
+ * One page of catalog results. `total` counts every product matching the category and search; `category` is
+ * the filter the server applied (null when the URL's slug is unknown); `categoryCounts` gives, per category
+ * slug, the products matching the search alone (the numbers on the category chips; "All" is their sum).
+ */
+export type ProductPage = {
+  items: Product[]
+  page: number
+  pageSize: number
+  pageCount: number
+  total: number
+  category: string | null
+  categoryCounts: Record<string, number>
+}
+
+/** The URL state of the catalog: absent = page 1, every category, no search. */
+export type CatalogSearch = { page?: number; category?: string; q?: string }
+
+/** A signed-in customer's prices: product id → unit price in shekels before VAT. */
+export type Prices = { currency: string; prices: Record<string, number> }
+
+/**
+ * A brand. `accent` null = the site red; `logoUrl` null = the logo file bundled with the site (see
+ * brandLogo in config.ts), or the name as a wordmark.
+ */
+export type Brand = {
+  slug: string
+  name: string
+  accent: string | null
+  tagline: Localized<string> | null
+  description: Localized<string> | null
+  logoUrl: string | null
+}
+
+/** A company figure of the home page Stats band, e.g. { id: 'retail', value: 350, suffix: '+' }. */
+export type Stat = { id: string; value: number; suffix: string }
+
+/** One block of article text: a paragraph or a numbered list. */
+export type ArticleBlock = { type: 'p'; text: string } | { type: 'ol'; items: string[] }
+
+/**
+ * An article (מאמר). `description` doubles as the meta description; `relatedCategories` are slugs of the home
+ * page category cards (CATEGORIES in config.ts); `legacyPath` is the old WordPress URL, kept for the 301
+ * redirects. Its photo is bundled with the site (see articleImage in config.ts).
+ */
+export type Article = {
+  slug: string
+  topic: 'cats' | 'dogs'
+  publishedAt: string
+  updatedAt: string
+  title: Localized<string>
+  description: Localized<string>
+  imageAlt: Localized<string> | null
+  body: Localized<ArticleBlock[]>
+  relatedCategories: string[]
+  legacyPath: string | null
+}
+
+/** A reseller store of the Where to Buy page, with its map position. */
+export type Branch = {
+  id: string
+  name: string
+  address: string
+  city: string
+  phone: string | null
+  website: string | null
+  lat: number
+  lng: number
+  /** True when the address could not be located and the pin sits at the city centre. */
+  approximate: boolean
+}
+
+/** The signed-in business customer. */
+export type User = { email: string; fullName: string; companyName: string }
+
+/** The fields of a JSON error answer, e.g. { error: 'duplicate', constraint: 'brands_slug_key' }. */
+export type ApiErrorBody = { error?: string; field?: string; constraint?: string }
+
+/**
+ * A failed API call: the HTTP status and the server's error code (e.g. "invalid_credentials"), if any. The
+ * staff API also names the JSON `field` (e.g. "slug") or the database `constraint` that refused the change.
+ */
+export class ApiError extends Error {
+  readonly status: number
+  readonly code?: string
+  readonly field?: string
+  readonly constraint?: string
+
+  /**
+   * @param status - The HTTP status, e.g. 404.
+   * @param body - The JSON answer's `error` (the code), `field` and `constraint`, when it had them.
+   */
+  constructor(status: number, { error, field, constraint }: ApiErrorBody = {}) {
+    super(`API error ${status}${error ? ` (${error})` : ''}`)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = error
+    this.field = field
+    this.constraint = constraint
+  }
+}
+
+/** Options of one API call. `csrf` picks the CSRF cookie to send (only the refresh call uses 'refresh'). */
+type CallOptions = { method?: string; body?: unknown; signal?: AbortSignal; csrf?: 'access' | 'refresh' }
+
+/** Methods the server checks for the CSRF header. */
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
+/**
+ * Reads a cookie the page is allowed to see (the CSRF cookies; the JWT cookies are HttpOnly).
+ * @param name - The cookie name.
+ * @returns Its value, or undefined when it is not set.
+ */
+function readCookie(name: string): string | undefined {
+  const prefix = `${name}=`
+  const cookie = document.cookie.split('; ').find((c) => c.startsWith(prefix))
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : undefined
+}
+
+/**
+ * Sends one request (JSON in and out, same-origin cookies, the CSRF header on unsafe methods).
+ * @param path - The API path, e.g. "/api/brands".
+ * @param options - Method, JSON body, abort signal and which CSRF cookie to send.
+ * @returns The raw response.
+ */
+function send(path: string, { method = 'GET', body, signal, csrf = 'access' }: CallOptions): Promise<Response> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const token = UNSAFE_METHODS.has(method) ? readCookie(csrf === 'refresh' ? 'csrf_refresh_token' : 'csrf_access_token') : undefined
+  if (token) headers['X-CSRF-TOKEN'] = token
+  return fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal, credentials: 'same-origin' })
+}
+
+/**
+ * Reads the string fields of a JSON error answer.
+ * @param response - The response (its body is consumed).
+ * @returns `error`, `field` and `constraint` where present; empty when the body is not a JSON object.
+ */
+async function errorBody(response: Response): Promise<ApiErrorBody> {
+  try {
+    const data: unknown = await response.json()
+    if (typeof data !== 'object' || !data) return {}
+    const body: ApiErrorBody = {}
+    for (const key of ['error', 'field', 'constraint'] as const) {
+      const value = (data as Record<string, unknown>)[key]
+      if (typeof value === 'string') body[key] = value
+    }
+    return body
+  } catch {
+    return {}
+  }
+}
+
+/** The refresh in flight per refresh route, shared by the calls that got "token_expired" at the same time. */
+const refreshing = new Map<string, Promise<boolean>>()
+
+/** Told when the sign-in is gone (see setSignedOutHandler). */
+let signedOutHandler: (() => void) | null = null
+
+/**
+ * Registers who to tell when the sign-in is gone (AuthProvider clears its user).
+ * @param handler - The callback, or null to unregister.
+ */
+export function setSignedOutHandler(handler: (() => void) | null) {
+  signedOutHandler = handler
+}
+
+/**
+ * Gets a new access token with the refresh token (one refresh at a time per route).
+ * @param path - The path of the call that expired: staff calls refresh at /api/staff/auth/refresh.
+ * @returns true when the server issued a new access token.
+ */
+function refreshAccess(path: string): Promise<boolean> {
+  const route = path.startsWith('/api/staff/') ? '/api/staff/auth/refresh' : '/api/auth/refresh'
+  let pending = refreshing.get(route)
+  if (!pending) {
+    pending = send(route, { method: 'POST', csrf: 'refresh' })
+      .then((response) => response.ok, () => false)
+      .finally(() => refreshing.delete(route))
+    refreshing.set(route, pending)
+  }
+  return pending
+}
+
+/**
+ * Calls the API: sends the request, refreshes an expired sign-in once and retries, and parses the JSON answer.
+ * @param path - The API path, e.g. "/api/products?page=2".
+ * @param options - Method, JSON body, abort signal.
+ * @returns The parsed JSON (undefined for a 204 answer).
+ * @throws ApiError for any answer other than 2xx (after telling the signed-out handler on a lost sign-in).
+ */
+export async function apiFetch<T>(path: string, options: CallOptions = {}): Promise<T> {
+  let response = await send(path, options)
+  if (response.status === 401 && (await errorBody(response.clone())).error === 'token_expired' && (await refreshAccess(path))) {
+    response = await send(path, options)
+  }
+  if (!response.ok) {
+    const body = await errorBody(response)
+    if (response.status === 401 && body.error !== 'invalid_credentials') signedOutHandler?.()
+    throw new ApiError(response.status, body)
+  }
+  return (response.status === 204 ? undefined : await response.json()) as T
+}
+
+/**
+ * Route-loader helper: turns an API 404 into the router's "not found" page and rethrows anything else.
+ * @param error - What the API call threw.
+ * @throws The router's notFound() for a 404, else the error itself.
+ */
+export function rethrowNotFound(error: unknown): never {
+  throw error instanceof ApiError && error.status === 404 ? notFound() : error
+}
+
+/**
+ * The catalog categories, in display order.
+ * @param signal - Aborts the request (the router passes its loader's signal).
+ * @returns The categories.
+ */
+export const fetchCategories = (signal?: AbortSignal) => apiFetch<ProductCategory[]>('/api/categories', { signal })
+
+/**
+ * One page of the catalog; filtering, search and paging happen on the server.
+ * @param search - The catalog URL state (category slug, search text, page).
+ * @param signal - Aborts the request (a newer search replaces it).
+ * @returns The page of products with its totals and chip counts.
+ */
+export function fetchProducts({ category, q, page }: CatalogSearch, signal?: AbortSignal) {
+  const params = new URLSearchParams()
+  if (category) params.set('category', category)
+  if (q) params.set('q', q)
+  if (page && page > 1) params.set('page', String(page))
+  const query = params.toString()
+  return apiFetch<ProductPage>(`/api/products${query ? `?${query}` : ''}`, { signal })
+}
+
+/**
+ * The signed-in customer's prices.
+ * @returns The prices by product id; throws ApiError 401/403 when no customer is signed in.
+ */
+export const fetchPrices = () => apiFetch<Prices>('/api/prices')
+
+/**
+ * The brands, in display order.
+ * @param signal - Aborts the request.
+ * @returns The active brands.
+ */
+export const fetchBrands = (signal?: AbortSignal) => apiFetch<Brand[]>('/api/brands', { signal })
+
+/**
+ * One brand.
+ * @param slug - The brand's URL name.
+ * @param signal - Aborts the request.
+ * @returns The brand; throws ApiError 404 when it is unknown.
+ */
+export const fetchBrand = (slug: string, signal?: AbortSignal) => apiFetch<Brand>(`/api/brands/${encodeURIComponent(slug)}`, { signal })
+
+/**
+ * The company figures of the Stats band, in display order.
+ * @param signal - Aborts the request.
+ * @returns The figures.
+ */
+export const fetchStats = (signal?: AbortSignal) => apiFetch<Stat[]>('/api/stats', { signal })
+
+/**
+ * The published articles, newest first.
+ * @param signal - Aborts the request.
+ * @returns The articles.
+ */
+export const fetchArticles = (signal?: AbortSignal) => apiFetch<Article[]>('/api/articles', { signal })
+
+/**
+ * One published article.
+ * @param slug - The article's URL name.
+ * @param signal - Aborts the request.
+ * @returns The article; throws ApiError 404 when it is unknown or not published.
+ */
+export const fetchArticle = (slug: string, signal?: AbortSignal) => apiFetch<Article>(`/api/articles/${encodeURIComponent(slug)}`, { signal })
+
+/**
+ * The reseller stores of the Where to Buy page.
+ * @param signal - Aborts the request.
+ * @returns The active stores.
+ */
+export const fetchResellers = (signal?: AbortSignal) => apiFetch<Branch[]>('/api/resellers', { signal })
+
+/**
+ * Who is signed in, according to the server (the JWT cookies).
+ * @returns The customer, or null when nobody (or a staff user) is signed in.
+ */
+export async function fetchSession(): Promise<User | null> {
+  try {
+    return (await apiFetch<{ user: User }>('/api/auth/me')).user
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return null
+    throw error
+  }
+}
+
+/**
+ * Signs a business customer in; the server sets the JWT cookies.
+ * @param credentials - Email, password and "remember me" (the cookies then last 30 days).
+ * @returns The signed-in customer; throws ApiError 401 "invalid_credentials" for a wrong email or password.
+ */
+export async function postSignIn(credentials: { email: string; password: string; remember: boolean }): Promise<User> {
+  return (await apiFetch<{ user: User }>('/api/auth/login', { method: 'POST', body: credentials })).user
+}
+
+/**
+ * Signs out; the server expires the JWT cookies.
+ * @returns Resolves when the server answered.
+ */
+export const postSignOut = () => apiFetch<void>('/api/auth/logout', { method: 'POST' })
+
+/** The signed-in staff user (the admin panel). `role` is "admin" (the only role so far). */
+export type StaffUser = { email: string; fullName: string; role: string }
+
+/** The tables the staff API edits (RESOURCES in backend/app/staff/routes.py). */
+export type StaffResource = 'brands' | 'categories' | 'products' | 'settings' | 'articles' | 'resellers'
+
+/** What every staff row carries besides its fields: when it was created and last changed (ISO timestamps). */
+type StaffRowBase = { createdAt: string; updatedAt: string }
+
+/** A brand as the staff API returns it (every column, active or not). */
+export type StaffBrand = StaffRowBase & {
+  id: string
+  slug: string
+  name: string
+  tagline: Localized<string> | null
+  description: Localized<string> | null
+  accentColor: string | null
+  logoUrl: string | null
+  sortOrder: number
+  isActive: boolean
+}
+
+/**
+ * Who is signed in to the staff panel, according to the server.
+ * @param signal - Aborts the request.
+ * @returns The staff user, or null when nobody (or a business customer) is signed in.
+ */
+export async function fetchStaffSession(signal?: AbortSignal): Promise<StaffUser | null> {
+  try {
+    return (await apiFetch<{ user: StaffUser }>('/api/staff/auth/me', { signal })).user
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return null
+    throw error
+  }
+}
+
+/**
+ * Signs a staff user in; the server sets the JWT cookies (replacing a customer's sign-in in this browser).
+ * @param credentials - Email, password and "remember me".
+ * @returns The staff user; throws ApiError 401 "invalid_credentials" for a wrong email or password.
+ */
+export async function postStaffSignIn(credentials: { email: string; password: string; remember: boolean }): Promise<StaffUser> {
+  return (await apiFetch<{ user: StaffUser }>('/api/staff/auth/login', { method: 'POST', body: credentials })).user
+}
+
+/**
+ * Signs the staff user out; the server expires the JWT cookies.
+ * @returns Resolves when the server answered.
+ */
+export const postStaffSignOut = () => apiFetch<void>('/api/staff/auth/logout', { method: 'POST' })
+
+/**
+ * Every row of a staff resource, active or not, in display order.
+ * @param resource - The table, e.g. "brands".
+ * @param signal - Aborts the request.
+ * @returns The rows; throws ApiError 401/403 without a staff sign-in.
+ */
+export const fetchStaffRows = <Row,>(resource: StaffResource, signal?: AbortSignal) => apiFetch<Row[]>(`/api/staff/${resource}`, { signal })
+
+/**
+ * Creates a row; fields left out take their database default.
+ * @param resource - The table.
+ * @param values - The fields, with camelCase keys (e.g. { slug, name, sortOrder }).
+ * @returns The saved row; throws ApiError 400 (invalid / required, with `field`) or 409 (duplicate).
+ */
+export const createStaffRow = <Row,>(resource: StaffResource, values: Record<string, unknown>) =>
+  apiFetch<Row>(`/api/staff/${resource}`, { method: 'POST', body: values })
+
+/**
+ * Changes some fields of a row; the others stay as they are.
+ * @param resource - The table.
+ * @param key - The row's id (the key text for settings).
+ * @param changes - The changed fields only.
+ * @returns The saved row; throws ApiError 404, 400 or 409 like createStaffRow.
+ */
+export const updateStaffRow = <Row,>(resource: StaffResource, key: string, changes: Record<string, unknown>) =>
+  apiFetch<Row>(`/api/staff/${resource}/${encodeURIComponent(key)}`, { method: 'PATCH', body: changes })
+
+/**
+ * Deletes a row.
+ * @param resource - The table.
+ * @param key - The row's id (the key text for settings).
+ * @returns Resolves when deleted; throws ApiError 409 "in_use" when other rows still need it.
+ */
+export const deleteStaffRow = (resource: StaffResource, key: string) =>
+  apiFetch<void>(`/api/staff/${resource}/${encodeURIComponent(key)}`, { method: 'DELETE' })

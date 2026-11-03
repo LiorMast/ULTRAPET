@@ -6,7 +6,7 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { Brands } from '@/components/Brands'
-import type { Brand } from '@/config'
+import type { Brand } from '@/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
 const NAMES = ['Ultra Pet', 'Internutri', 'Greenheart Premiums', 'Paw', 'JR Farm', 'Ultra Clean']
@@ -41,7 +41,7 @@ describe('Brands section', () => {
   })
 
   it('renders any list of brands passed in', () => {
-    const brands: Brand[] = [{ slug: 'ultra-pet', name: 'Only One', accent: '#000000', tagline: { he: 'Just me' } }]
+    const brands: Brand[] = [{ slug: 'ultra-pet', name: 'Only One', accent: '#000000', tagline: { he: 'Just me' }, description: null, logoUrl: null }]
     renderComponent(<Brands brands={brands} />, 'en')
     return screen.findByRole('heading', { level: 3, name: 'Only One' }).then(() => {
       expect(screen.getAllByRole('link')).toHaveLength(1)

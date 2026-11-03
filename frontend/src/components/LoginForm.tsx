@@ -2,10 +2,13 @@
  * LoginForm.tsx — The customer login form (email, password, "remember me"). Used by LoginPopover (the
  * header's login popover) and by the /login page, so both stay identical.
  *
- * A valid submit signs the customer in through useAuth() (a stub until the Phase 4 portal: any valid email
- * and password works, see src/auth.tsx) and confirms it; a caller can pass `onSubmit` to handle it instead.
+ * A valid submit signs the customer in on the server through useAuth() (see src/auth.tsx) and confirms it, or
+ * shows "wrong email or password" (or a retry message when the server cannot be reached); a caller can pass
+ * `onSubmit` to handle the values instead, or `signIn` to sign in somewhere else with the same error handling
+ * (the /admin staff sign-in).
  */
 import { useState, type FormEvent } from 'react'
+import { ApiError } from '@/api'
 import { useAuth, type Credentials } from '@/auth'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
@@ -20,18 +23,31 @@ const LABEL_CLASS = 'block font-heading text-2xs font-semibold uppercase trackin
 /**
  * The login form.
  * @param props.onSubmit - Called with the values after they pass validation; defaults to signing in (useAuth).
+ * @param props.signIn - Signs in with the values (rejects with ApiError 401 for wrong credentials); defaults to
+ *   the customer sign-in (useAuth).
  * @param props.idPrefix - Prefix for the field ids, so two forms on one page never clash; defaults to "login".
  * @returns The form element.
  */
-export function LoginForm({ onSubmit, idPrefix = 'login' }: { onSubmit?: (values: LoginValues) => void; idPrefix?: string }) {
+export function LoginForm({
+  onSubmit,
+  signIn: signInProp,
+  idPrefix = 'login',
+}: {
+  onSubmit?: (values: LoginValues) => void
+  signIn?: (values: LoginValues) => Promise<unknown>
+  idPrefix?: string
+}) {
   const { t } = useI18n()
-  const { signIn } = useAuth()
+  const auth = useAuth()
+  const signIn = signInProp ?? auth.signIn
   const [values, setValues] = useState<LoginValues>({ email: '', password: '', remember: false })
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
   const [submitted, setSubmitted] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [pending, setPending] = useState(false)
 
   /**
-   * Submit handler: validates, then calls `onSubmit`, or signs in and shows the confirmation.
+   * Submit handler: validates, then calls `onSubmit`, or signs in and shows the confirmation or the error.
    * @param event - The form submit event.
    */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -42,13 +58,21 @@ export function LoginForm({ onSubmit, idPrefix = 'login' }: { onSubmit?: (values
     if (!values.password) found.password = t.login.errorRequired
     setErrors(found)
     setSubmitted(false)
+    setFormError('')
     if (Object.keys(found).length > 0) return
     if (onSubmit) {
       onSubmit(values)
       return
     }
-    await signIn(values)
-    setSubmitted(true)
+    setPending(true)
+    try {
+      await signIn(values)
+      setSubmitted(true)
+    } catch (error) {
+      setFormError(error instanceof ApiError && error.status === 401 ? t.login.errorCredentials : t.login.errorFailed)
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -94,7 +118,12 @@ export function LoginForm({ onSubmit, idPrefix = 'login' }: { onSubmit?: (values
         />
         {t.login.remember}
       </label>
-      <Button type="submit" className="w-full">{t.login.submit}</Button>
+      {formError && (
+        <p role="alert" className="text-sm font-medium text-brand-red-dark">
+          {formError}
+        </p>
+      )}
+      <Button type="submit" disabled={pending} className="w-full">{t.login.submit}</Button>
       {submitted && <p role="status" className="text-xs text-brand-charcoal-muted">{t.login.signedIn}</p>}
     </form>
   )

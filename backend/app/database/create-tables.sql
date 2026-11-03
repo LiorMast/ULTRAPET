@@ -88,6 +88,8 @@ CREATE TABLE suppliers (
   id           UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- supplier id
   name         TEXT        NOT NULL UNIQUE,               -- company name
   country      TEXT        CHECK (country ~ '^[A-Z]{2}$'), -- ISO 3166 two-letter country code (e.g. 'ES'); NULL = unknown
+  latitude     DOUBLE PRECISION CHECK (latitude BETWEEN -90 AND 90),   -- where the supplier is: degrees north of the equator (negative = south), WGS 84; NULL = location not set
+  longitude    DOUBLE PRECISION CHECK (longitude BETWEEN -180 AND 180), -- degrees east of Greenwich (negative = west), WGS 84; NULL = location not set
   contact_name TEXT,                                      -- person to contact; NULL = not given
   email        TEXT,                                      -- contact email; NULL = not given
   phone        TEXT,                                      -- contact phone, international format; NULL = not given
@@ -95,7 +97,8 @@ CREATE TABLE suppliers (
   notes        TEXT,                                      -- internal notes (terms, lead times, ...)
   is_active    BOOLEAN     NOT NULL DEFAULT true,         -- false = no longer bought from (kept for history)
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),        -- when the supplier was added
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()         -- last change
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),        -- last change
+  CONSTRAINT suppliers_coordinates_check CHECK ((latitude IS NULL) = (longitude IS NULL)) -- a location has both coordinates or neither
 );
 
 -- brands — The brands Ultra Pet distributes (Ultra Pet, Internutri, Greenheart Premiums, ...); each has a page on the
@@ -141,6 +144,7 @@ CREATE TABLE products (
   category_id UUID        NOT NULL REFERENCES categories (id) ON DELETE RESTRICT, -- the product's category; a category with products cannot be deleted
   brand_id    UUID        REFERENCES brands (id) ON DELETE SET NULL, -- the product's brand; NULL = unbranded or not set
   list_price  NUMERIC(10,2) CHECK (list_price >= 0),      -- base wholesale price per unit, shekels before VAT, before any price rule; NULL = no price yet (cannot be ordered)
+  sort_order  INTEGER       NOT NULL DEFAULT 0,           -- position in product lists (the catalog), lowest first
   is_active   BOOLEAN       NOT NULL DEFAULT true,        -- false = hidden from the catalog and cannot be ordered
   legacy_path TEXT,                                       -- the old WooCommerce URL, for 301 redirects; NULL = none
   created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),       -- when the product was added
@@ -228,6 +232,45 @@ CREATE TABLE settings (
   description TEXT,                                       -- what the setting controls, shown in the staff panel
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),         -- when the setting was added
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()          -- last change
+);
+
+
+-- ===================================================================================================================
+-- Public site content. Staff write it in the staff panel; the public site reads it.
+-- ===================================================================================================================
+
+-- articles — The blog posts (מאמרים) of the public site, written by staff; the first ones were ported from the
+-- WordPress blog. Shown from published_at on; a NULL published_at is a draft.
+CREATE TABLE articles (
+  id                 UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- article id
+  slug               TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name, e.g. 'cat-play-and-enrichment' (/articles/<slug>)
+  topic              TEXT        NOT NULL CHECK (topic IN ('cats', 'dogs')), -- which animal the article is about (its label and the "more articles" order)
+  title              JSONB       NOT NULL CHECK (coalesce(title ->> 'he', '') <> ''), -- headline per language
+  description        JSONB       NOT NULL CHECK (coalesce(description ->> 'he', '') <> ''), -- summary per language, also the meta description
+  image_alt          JSONB       CHECK (image_alt IS NULL OR coalesce(image_alt ->> 'he', '') <> ''), -- alternative text of the article photo per language; NULL = none
+  body               JSONB       NOT NULL CHECK (coalesce(jsonb_typeof(body -> 'he'), '') = 'array'), -- the text per language: a list of blocks, {"type": "p", "text"} or {"type": "ol", "items": [...]}
+  related_categories TEXT[]      NOT NULL DEFAULT '{}',   -- slugs of the home page category cards (frontend config.ts) linked below the article; empty = none
+  legacy_path        TEXT,                                -- the old WordPress URL, for 301 redirects; NULL = none
+  published_at       TIMESTAMPTZ,                         -- when the article was (or will be) published; NULL = draft, hidden from the public site
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),  -- when the article was added
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()   -- last change (the article's "modified" date)
+);
+
+-- resellers — The pet stores that sell Ultra Pet products (משווקים), listed on the "Where to Buy" page and its map.
+-- Maintained by staff.
+CREATE TABLE resellers (
+  id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,  -- reseller id
+  name       TEXT             NOT NULL,                   -- store name as shown
+  address    TEXT             NOT NULL,                   -- street address
+  city       TEXT             NOT NULL,                   -- city (the list is sorted by city, then name)
+  phone      TEXT,                                        -- store phone; NULL = not listed
+  website    TEXT,                                        -- store website URL; NULL = none
+  latitude   DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),   -- map position: degrees north of the equator, WGS 84
+  longitude  DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180), -- map position: degrees east of Greenwich, WGS 84
+  approximate_location BOOLEAN NOT NULL DEFAULT false,     -- true = the address could not be located and the pin sits at the city centre (the map says so)
+  is_active  BOOLEAN          NOT NULL DEFAULT true,      -- false = hidden from the public site
+  created_at TIMESTAMPTZ      NOT NULL DEFAULT now(),     -- when the reseller was added
+  updated_at TIMESTAMPTZ      NOT NULL DEFAULT now()      -- last change
 );
 
 

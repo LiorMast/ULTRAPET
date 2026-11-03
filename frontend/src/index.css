@@ -12,6 +12,7 @@
  * - Motion and type follow Apple's interface guidelines: one critically damped spring curve for every
  *   transition (--ease-spring), size-specific letter-spacing on large text, a translucent header
  *   material (material-bar), and a reduced-motion mode that keeps fades but drops movement.
+ * - Restyles the DataTables tables of the admin panel (DataTable.tsx) to the brand, under `.data-table`.
  */
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -278,6 +279,114 @@ html:lang(he) {
   from {
     opacity: 0;
   }
+}
+
+/*
+ * Admin data tables (DataTable.tsx): the DataTables default look (datatables.net-dt, loaded with the admin pages)
+ * restyled to the brand. Every rule starts with the component's `.data-table` wrapper so it outranks the
+ * library's stylesheet, which loads later. Logical properties only, so Hebrew pages mirror.
+ */
+.data-table div.dt-container {
+  font-size: var(--text-sm);
+  color: var(--color-brand-charcoal);
+}
+.data-table div.dt-container div.dt-layout-row {
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+/* The library pins the cells with physical margins, which pull both to the middle in RTL: use logical ones. */
+.data-table div.dt-container div.dt-layout-row div.dt-layout-cell.dt-layout-start {
+  margin: 0;
+  margin-inline-end: auto;
+}
+.data-table div.dt-container div.dt-layout-row div.dt-layout-cell.dt-layout-end {
+  margin: 0;
+  margin-inline-start: auto;
+}
+.data-table div.dt-container .dt-search input,
+.data-table div.dt-container .dt-length select {
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 0;
+  background: var(--color-neutral-50);
+  padding: 0.5rem 0.75rem;
+  margin-inline-start: 0.5rem;
+}
+.data-table div.dt-container .dt-search input:focus-visible,
+.data-table div.dt-container .dt-length select:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: 1px;
+  background: white;
+}
+.data-table div.dt-container .dt-info {
+  color: var(--color-brand-charcoal-muted);
+}
+.data-table table.dataTable {
+  border-collapse: collapse;
+}
+.data-table table.dataTable > thead > tr > th,
+.data-table table.dataTable > thead > tr > td {
+  border-bottom: 1px solid var(--color-brand-charcoal);
+  padding: 0.75rem 1rem;
+  text-align: start;
+  font-family: var(--font-heading);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+  color: var(--color-brand-charcoal-muted);
+  white-space: nowrap;
+}
+/* The sort arrows follow the label (the library pushes them to the far edge, or the near one for numbers). */
+.data-table table.dataTable > thead > tr > th div.dt-column-header {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+.data-table table.dataTable > thead > tr > th div.dt-column-header .dt-column-title {
+  flex-grow: 0;
+}
+.data-table table.dataTable > thead > tr > th:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: -2px;
+}
+.data-table table.dataTable > tbody > tr > td {
+  border-top: 1px solid var(--color-neutral-150);
+  padding: 0.75rem 1rem;
+  text-align: start;
+  vertical-align: middle;
+  /* One line per row: a narrow screen scrolls the table sideways inside its box instead. */
+  white-space: nowrap;
+}
+.data-table table.dataTable > tbody > tr:hover > td {
+  background: var(--color-neutral-50);
+}
+.data-table table.dataTable > tbody > tr > td.dt-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+.data-table div.dt-container .dt-paging .dt-paging-button {
+  border: 1px solid transparent;
+  border-radius: 0;
+  padding: 0.375rem 0.75rem;
+  color: var(--color-brand-charcoal) !important;
+  background: transparent;
+}
+.data-table div.dt-container .dt-paging .dt-paging-button:hover {
+  border-color: var(--color-neutral-300);
+  background: var(--color-neutral-100);
+}
+.data-table div.dt-container .dt-paging .dt-paging-button.current,
+.data-table div.dt-container .dt-paging .dt-paging-button.current:hover {
+  border-color: var(--color-brand-red);
+  background: var(--color-brand-red);
+  color: white !important;
+}
+.data-table div.dt-container .dt-paging .dt-paging-button.disabled {
+  color: var(--color-brand-charcoal-muted) !important;
+}
+.data-table div.dt-container .dt-paging .dt-paging-button:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: 1px;
 }
 
 /*

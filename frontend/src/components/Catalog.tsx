@@ -1,8 +1,9 @@
 /**
  * Catalog.tsx — A product catalog: heading, search box, category chips, result count, a grid of
- * CatalogCards and Pagination. Generic: it shows whatever products, categories and prices it is given, and
- * keeps its state (page, category, search) in the URL of the route that renders it, so every filtered
- * page is a real, shareable, crawlable link. Prices are shown only when the caller passes `prices`
+ * CatalogCards and Pagination. Generic: it shows whatever page of results, categories and prices it is
+ * given (the server filters and pages, see fetchProducts), and keeps its state (page, category, search) in
+ * the URL of the route that renders it, so every filtered page is a real, shareable, crawlable link; the
+ * route reloads the results when the URL changes. Prices are shown only when the caller passes `prices`
  * (routes/catalog.tsx does that for signed-in customers); otherwise every card shows "log in to see the price".
  */
 import { useState } from 'react'
@@ -12,31 +13,12 @@ import { cn } from 'cn'
 import { CatalogCard, type PriceState } from '@/components/CatalogCard'
 import { Pagination } from '@/components/Pagination'
 import { Button } from '@/components/ui/button'
-import { CATALOG_PDF_URL, localized, type Product, type ProductCategory } from '@/config'
+import type { CatalogSearch, ProductCategory, ProductPage } from '@/api'
+import { CATALOG_PDF_URL, localized } from '@/config'
 import { useI18n } from '@/i18n'
-
-/** The catalog's URL state. Absent = default (page 1, all categories, no search). */
-export type CatalogSearch = { page?: number; category?: string; q?: string }
 
 /** Prices for signed-in customers: `loading` while they arrive, then a map of product id → price in shekels. */
 export type CatalogPrices = { status: 'loading' } | { status: 'loaded'; prices: Record<string, number> }
-
-/**
- * Filters products by category and search text (case-insensitive). The text is matched against the name
- * and description in every language the product has, so a search works whichever language it is typed in
- * (brand names are often written in Latin letters on Hebrew pages and the other way round).
- * @param products - All products.
- * @param filters - The category slug and the search text; either may be absent.
- * @returns The matching products, in their original order.
- */
-export function filterProducts(products: Product[], { category, q }: Pick<CatalogSearch, 'category' | 'q'>) {
-  const words = (q ?? '').toLowerCase().split(/\s+/).filter(Boolean)
-  return products.filter((product) => {
-    if (category && product.category !== category) return false
-    const text = [...Object.values(product.name), ...Object.values(product.description)].join(' ').toLowerCase()
-    return words.every((word) => text.includes(word))
-  })
-}
 
 /**
  * The price slot of one product.
@@ -108,25 +90,22 @@ function PricesHiddenBanner() {
 
 /**
  * The catalog.
- * @param props.products - Every product (filtering and paging happen here).
+ * @param props.results - One page of matching products with the totals and chip counts (see ProductPage).
  * @param props.categories - The categories for the chips; products are labelled with their names.
  * @param props.search - The URL state (page, category, search text), as validated by the route.
  * @param props.prices - Prices for a signed-in customer; omit to hide every price.
- * @param props.pageSize - Products per page; default 24.
  * @returns The catalog <section>.
  */
 export function Catalog({
-  products,
+  results,
   categories,
   search,
   prices,
-  pageSize = 24,
 }: {
-  products: Product[]
+  results: ProductPage
   categories: ProductCategory[]
   search: CatalogSearch
   prices?: CatalogPrices
-  pageSize?: number
 }) {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
@@ -138,11 +117,8 @@ export function Catalog({
     if ((search.q ?? '') !== query.trim()) setQuery(search.q ?? '')
   }
 
-  const matchingText = filterProducts(products, { q: search.q })
-  const shown = search.category ? matchingText.filter((p) => p.category === search.category) : matchingText
-  const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
-  const page = Math.min(Math.max(1, search.page ?? 1), pageCount)
-  const pageItems = shown.slice((page - 1) * pageSize, page * pageSize)
+  const { items, page, pageSize, pageCount, total, category: activeCategory, categoryCounts } = results
+  const allCount = Object.values(categoryCounts).reduce((sum, n) => sum + n, 0)
   const categoryName = new Map(categories.map((c) => [c.slug, localized(c.name, locale)]))
 
   /**
@@ -198,15 +174,15 @@ export function Catalog({
         <nav aria-label={t.catalog.categoriesLabel} className="-mx-6 overflow-x-auto px-6 pb-1 md:mx-0 md:overflow-visible md:px-0">
           <ul className="flex gap-2 md:flex-wrap">
             <li>
-              <CategoryChip label={t.catalog.all} count={matchingText.length} active={!search.category} />
+              <CategoryChip label={t.catalog.all} count={allCount} active={!activeCategory} />
             </li>
             {categories.map((category) => (
               <li key={category.slug}>
                 <CategoryChip
                   label={localized(category.name, locale)}
-                  count={matchingText.filter((p) => p.category === category.slug).length}
+                  count={categoryCounts[category.slug] ?? 0}
                   category={category.slug}
-                  active={search.category === category.slug}
+                  active={activeCategory === category.slug}
                 />
               </li>
             ))}
@@ -215,14 +191,14 @@ export function Catalog({
       </div>
 
       <p role="status" className="mt-8 border-b border-neutral-150 pb-4 text-sm text-brand-charcoal-muted">
-        {shown.length > 0 &&
+        {items.length > 0 &&
           t.catalog.results
             .replace('{from}', String((page - 1) * pageSize + 1))
-            .replace('{to}', String((page - 1) * pageSize + pageItems.length))
-            .replace('{n}', String(shown.length))}
+            .replace('{to}', String((page - 1) * pageSize + items.length))
+            .replace('{n}', String(total))}
       </p>
 
-      {pageItems.length === 0 ? (
+      {items.length === 0 ? (
         <div className="py-24 text-center">
           <p className="text-lg text-brand-charcoal-muted">{t.catalog.empty}</p>
           <Link to="." search={{}} className="mt-4 inline-block text-sm font-semibold text-brand-red-dark underline underline-offset-4">
@@ -231,7 +207,7 @@ export function Catalog({
         </div>
       ) : (
         <ul aria-label={t.catalog.listLabel} className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-          {pageItems.map((product) => (
+          {items.map((product) => (
             <li key={product.id} className="flex">
               <CatalogCard product={product} categoryName={categoryName.get(product.category)} price={priceFor(prices, product.id)} className="w-full" />
             </li>

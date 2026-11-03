@@ -1,5 +1,6 @@
 /**
- * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English).
+ * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English). Its loader fetches the brands and the
+ * stats figures from the API.
  *
  * The hero, Brands, Stats, Categories, About and Contact are real components. The other sections are TEMPORARY placeholders
  * (Private Label, Business Customers — see the roadmap in CLAUDE.md): each is
@@ -7,6 +8,7 @@
  * replaces it.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { fetchBrands, fetchStats } from '@/api'
 import { About } from '@/components/About'
 import { Brands } from '@/components/Brands'
 import { Categories } from '@/components/Categories'
@@ -18,6 +20,10 @@ import { useI18n } from '@/i18n'
 import { pageHead } from '@/seo'
 
 export const Route = createFileRoute('/')({
+  loader: async ({ abortController }) => {
+    const [brands, stats] = await Promise.all([fetchBrands(abortController.signal), fetchStats(abortController.signal)])
+    return { brands, stats }
+  },
   head: ({ match }) => pageHead({ locale: match.context.locale, path: '/' }),
   component: HomePage,
 })
@@ -50,11 +56,12 @@ function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
  * @returns The page content.
  */
 function HomePage() {
+  const { brands, stats } = Route.useLoaderData()
   return (
     <>
       <Hero />
-      <Stats />
-      <Brands />
+      <Stats stats={stats} />
+      <Brands brands={brands} />
       <Categories />
       {SECTIONS.slice(0, 2).map((section) => (
         <Placeholder key={section.id} section={section} />

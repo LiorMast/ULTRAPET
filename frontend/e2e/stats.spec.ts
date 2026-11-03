@@ -4,6 +4,7 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { hideFixedOverlays, scrollIntoViewSettled } from './utils.ts'
 
 test('shows four figures and does not overflow', async ({ page }) => {
   await page.goto('/')
@@ -27,7 +28,8 @@ for (const [name, path] of [['he', '/'], ['en', '/en']] as const) {
   test(`screenshot (${name})`, async ({ page }) => {
     await page.goto(path)
     const section = page.locator('#stats')
-    await section.scrollIntoViewIfNeeded()
+    await hideFixedOverlays(page)
+    await scrollIntoViewSettled(section)
     await expect(section.locator('li [aria-hidden]').nth(2)).toHaveText('1,000+')
     await expect(section).toHaveScreenshot(`stats-${name}.png`)
   })

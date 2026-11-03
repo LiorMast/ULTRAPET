@@ -9,7 +9,8 @@ import { Link } from '@tanstack/react-router'
 import { Lock } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from 'cn'
-import { localized, type Product } from '@/config'
+import type { Product } from '@/api'
+import { localized } from '@/config'
 import { useI18n } from '@/i18n'
 
 /** The price slot: hidden (signed out), loading, or the price in shekels. */

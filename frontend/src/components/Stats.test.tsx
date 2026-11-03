@@ -5,7 +5,7 @@
 import { screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { Stats } from '@/components/Stats'
-import type { Stat } from '@/config'
+import type { Stat } from '@/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
 describe('Stats section', () => {
@@ -26,8 +26,8 @@ describe('Stats section', () => {
   })
 
   it('renders a custom list given by props', async () => {
-    const stats: Stat[] = [{ id: 'x', value: 7, suffix: '%', label: () => 'Seven' }]
-    renderComponent(<Stats stats={stats} />)
+    const stats: Stat[] = [{ id: 'x', value: 7, suffix: '%' }]
+    renderComponent(<Stats stats={stats} labels={{ x: () => 'Seven' }} />)
     expect(await screen.findAllByRole('listitem')).toHaveLength(1)
     expect(screen.getByText('Seven')).toBeInTheDocument()
     expect(screen.getByText('7%', { selector: '.sr-only' })).toBeInTheDocument()
