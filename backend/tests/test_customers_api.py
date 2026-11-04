@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.database.models.catalog import Brand, Category, Product, ProductImage
-from app.database.models.content import Article, Reseller
+from app.database.models.content import Article, PageSection, Reseller
 from app.database.models.price_rules import PriceRule
 from app.database.models.settings import Setting
 
@@ -210,6 +210,15 @@ def test_articles_lists_the_published_ones_newest_first(client, articles):
     assert (older["publishedAt"], older["updatedAt"]) == ("2024-03-17T12:40:39+02:00", "2024-03-18T00:30:00+02:00")
     assert older["body"]["en"] == [{"type": "p", "text": "Hello"}]
     assert (older["relatedCategories"], older["imageAlt"], older["legacyPath"]) == ([], None, None)
+
+
+def test_sections_returns_the_saved_content(client, database):
+    assert client.get("/api/sections/hero").status_code == 404
+    database.add(PageSection(key="hero", content={"title": {"text": {"he": "שלום"}}}))
+    database.commit()
+    data = client.get("/api/sections/hero").get_json()
+    assert (data["key"], data["content"]) == ("hero", {"title": {"text": {"he": "שלום"}}})
+    assert data["updatedAt"].endswith(("+02:00", "+03:00"))
 
 
 def test_an_unpublished_article_is_not_found(client, articles):

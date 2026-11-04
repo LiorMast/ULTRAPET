@@ -1,19 +1,22 @@
 /**
- * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English). Its loader fetches the brands and the
- * stats figures from the API.
+ * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English). Its loader fetches the brands, the
+ * stats figures and the hero content staff saved (page_sections "hero") from the API. Signed-in staff get the
+ * hero's Edit button (HeroEditor); saving stores the content through the staff API and reloads the page data.
  *
  * The hero, Brands, Stats, Categories, About and Contact are real components. The other sections are TEMPORARY placeholders
  * (Private Label, Business Customers — see the roadmap in CLAUDE.md): each is
  * an empty block carrying the anchor id that the navbar and the hero link to, until the real section
  * replaces it.
  */
-import { createFileRoute } from '@tanstack/react-router'
-import { fetchBrands, fetchStats } from '@/api'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createStaffRow, fetchBrands, fetchSection, fetchStats, updateStaffRow, type HeroContent } from '@/api'
+import { useAuth } from '@/auth'
 import { About } from '@/components/About'
 import { Brands } from '@/components/Brands'
 import { Categories } from '@/components/Categories'
 import { Contact } from '@/components/Contact'
 import { Hero } from '@/components/Hero'
+import { HeroEditor } from '@/components/HeroEditor'
 import { Stats } from '@/components/Stats'
 import type { Dictionary } from '@/i18n/he'
 import { useI18n } from '@/i18n'
@@ -21,8 +24,9 @@ import { pageHead } from '@/seo'
 
 export const Route = createFileRoute('/')({
   loader: async ({ abortController }) => {
-    const [brands, stats] = await Promise.all([fetchBrands(abortController.signal), fetchStats(abortController.signal)])
-    return { brands, stats }
+    const { signal } = abortController
+    const [brands, stats, hero] = await Promise.all([fetchBrands(signal), fetchStats(signal), fetchSection<HeroContent>('hero', signal)])
+    return { brands, stats, hero }
   },
   head: ({ match }) => pageHead({ locale: match.context.locale, path: '/' }),
   component: HomePage,
@@ -52,14 +56,29 @@ function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
 }
 
 /**
- * The home page: the hero, the Brands, Stats and Categories sections, About, Contact, and one empty placeholder per remaining anchor.
+ * The home page: the hero (with its Edit button for staff), the Brands, Stats and Categories sections, About,
+ * Contact, and one empty placeholder per remaining anchor.
  * @returns The page content.
  */
 function HomePage() {
-  const { brands, stats } = Route.useLoaderData()
+  const { brands, stats, hero } = Route.useLoaderData()
+  const { user } = useAuth()
+  const router = useRouter()
+
+  /**
+   * Stores the hero content staff edited (the row is created on the first save) and reloads the page data.
+   * @param content - The new hero content.
+   * @returns Resolves when saved and reloaded; rejects with the server's ApiError.
+   */
+  const saveHero = async (content: HeroContent) => {
+    if (hero) await updateStaffRow('page-sections', 'hero', { content })
+    else await createStaffRow('page-sections', { key: 'hero', content })
+    await router.invalidate()
+  }
+
   return (
     <>
-      <Hero />
+      <Hero content={hero} editor={user?.kind === 'staff' && <HeroEditor content={hero} onSave={saveHero} />} />
       <Stats stats={stats} />
       <Brands brands={brands} />
       <Categories />

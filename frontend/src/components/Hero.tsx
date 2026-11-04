@@ -13,28 +13,107 @@
  * - 0 photos: a plain charcoal gradient. 1 photo: no controls. 2 or more: slideshow with controls.
  * - The scroll-down arrow is a real link to the next home section (#stats); it nudges downwards three
  *   times after the text has risen, then stays still.
+ * - Staff can change the title, tagline and description, and their font and size per language (`content`, saved in
+ *   page_sections, see resolveHero). An empty or missing part shows the dictionary's text in the site's font at
+ *   size "md", which is the original design. The page puts the staff's Edit button in the `editor` slot.
  */
-import { useEffect, useState, type MouseEvent } from 'react'
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, ChevronDown, Pause, Play } from 'lucide-react'
+import { cva } from 'class-variance-authority'
 import { cn } from 'cn'
+import type { FontKey, HeroContent, SectionText, SizeStep } from '@/api'
 import { useReducedMotion } from '@/components/useReducedMotion'
 import { Button } from '@/components/ui/button'
 import logoMarkUrl from '@/assets/logo-mark.svg'
-import { HERO_IMAGES, HERO_LINKS, type HeroImage } from '@/config'
-import { useI18n } from '@/i18n'
+import { FONTS, HERO_IMAGES, HERO_LINKS, SIZE_STEPS, type HeroImage } from '@/config'
+import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 
 /** Same side padding as the navbar, so the hero text lines up with the logo. */
 const PAGE_GUTTER = 'px-6 lg:px-10 xl:px-6 2xl:px-10'
+
+// The size class goes first in cn(): tailwind-merge drops a `leading-*` that comes before a text size.
+
+/** The title's size steps ("md" = the design); every step scales with the screen, so phones never overflow. */
+const titleSize = cva('', {
+  variants: {
+    size: {
+      sm: 'text-[clamp(2.6rem,5.5vw,4.75rem)]',
+      md: 'text-[clamp(3.2rem,7.5vw,6.5rem)]',
+      lg: 'text-[clamp(3.4rem,8.5vw,7.5rem)]',
+      xl: 'text-[clamp(3.6rem,9.5vw,8.5rem)]',
+    },
+  },
+})
+
+/** The tagline's size steps ("md" = the design). */
+const taglineSize = cva('', {
+  variants: { size: { sm: 'text-base lg:text-lg', md: 'text-lg lg:text-xl', lg: 'text-xl lg:text-2xl', xl: 'text-2xl lg:text-3xl' } },
+})
+
+/** The description's size steps ("md" = the design). */
+const descriptionSize = cva('', {
+  variants: { size: { sm: 'text-sm', md: 'text-base', lg: 'text-lg', xl: 'text-xl lg:text-2xl' } },
+})
+
+/** One hero text as shown in one language: its words, font and size step. */
+export type HeroTextValue = { text: string; font: FontKey; size: SizeStep }
+
+/** The hero's texts as shown in one language (see resolveHero). */
+export type ResolvedHero = { title: HeroTextValue & { accent: string }; tagline: HeroTextValue; description: HeroTextValue }
+
+/**
+ * Works out what one hero text shows in a language: the saved value, else the default.
+ * @param saved - The text's saved content, if any.
+ * @param locale - The language.
+ * @param fallback - The dictionary's words for this text.
+ * @returns The words, font ("default" when unset) and size ("md" when unset).
+ */
+function resolveText(saved: SectionText | undefined, locale: Locale, fallback: string): HeroTextValue {
+  // Unknown keys (e.g. a font removed from FONTS since it was saved) fall back too.
+  const font = saved?.font?.[locale]
+  const size = saved?.size?.[locale]
+  return {
+    text: saved?.text?.[locale]?.trim() || fallback,
+    font: font && font in FONTS ? font : 'default',
+    size: size && SIZE_STEPS.includes(size) ? size : 'md',
+  }
+}
+
+/**
+ * Works out what the hero shows in a language: the staff's saved content, with the dictionary's texts, the site's
+ * fonts and the "md" size for whatever was not saved. Also used by the hero editor to start from what is shown.
+ * @param content - The saved hero content, or null when it was never edited.
+ * @param locale - The language.
+ * @returns The title (with its red accent word), tagline and description.
+ */
+export function resolveHero(content: HeroContent | null | undefined, locale: Locale): ResolvedHero {
+  const { hero } = dictionaryFor(locale)
+  return {
+    title: { ...resolveText(content?.title, locale, hero.title), accent: content?.title?.accent?.[locale]?.trim() || hero.titleAccent },
+    tagline: resolveText(content?.tagline, locale, hero.tagline),
+    description: resolveText(content?.description, locale, hero.description),
+  }
+}
+
+/**
+ * The inline style that applies a picked font (it beats the font tokens, also the Hebrew swap in index.css).
+ * @param font - The font key.
+ * @returns The style, or undefined for the site's own font.
+ */
+const fontStyle = (font: FontKey) => (FONTS[font].family ? { fontFamily: FONTS[font].family } : undefined)
 
 /**
  * The home page hero.
  * @param props.images - The photos to cycle through; defaults to the folder src/assets/hero
  *   (HERO_IMAGES). Pass another list to feed it from elsewhere, e.g. a CMS.
+ * @param props.content - The texts, fonts and sizes staff saved (see resolveHero); null or omitted = the defaults.
+ * @param props.editor - Shown at the top end of the hero, e.g. the staff's Edit button; omitted = nothing.
  * @returns The hero <section>.
  */
-export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
-  const { t } = useI18n()
+export function Hero({ images = HERO_IMAGES, content, editor }: { images?: HeroImage[]; content?: HeroContent | null; editor?: ReactNode }) {
+  const { t, locale } = useI18n()
+  const { title, tagline, description } = resolveHero(content, locale)
   const reducedMotion = useReducedMotion()
   const [index, setIndex] = useState(0)
   const [zoomReady, setZoomReady] = useState(false)
@@ -52,6 +131,11 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
       cancelAnimationFrame(second)
     }
   }, [])
+
+  // Downloads the picked fonts that the page does not load by itself.
+  useEffect(() => {
+    for (const font of new Set([title.font, tagline.font, description.font])) void FONTS[font].load?.()
+  }, [title.font, tagline.font, description.font])
 
   const count = images.length
   const current = count ? index % count : 0
@@ -116,7 +200,13 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
               {t.hero.eyebrow}
             </span>
           </div>
-          <h1 className="mb-5 animate-hero-rise font-display text-[clamp(3.2rem,7.5vw,6.5rem)] leading-[1.05] font-bold tracking-display text-white [animation-delay:350ms]">
+          <h1
+            className={cn(
+              titleSize({ size: title.size }),
+              'mb-5 animate-hero-rise font-display leading-[1.05] font-bold tracking-display text-white [animation-delay:350ms]',
+            )}
+            style={fontStyle(title.font)}
+          >
             <img
               src={logoMarkUrl}
               alt=""
@@ -125,13 +215,22 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
               draggable={false}
               className="me-4 inline-block size-[0.8em] select-none align-[-0.05em] drop-shadow-2xl"
             />
-            {t.hero.title} <span className="text-brand-red ltr:italic">{t.hero.titleAccent}</span>
+            {title.text} <span className="text-brand-red ltr:italic">{title.accent}</span>
           </h1>
-          <p className="mb-4 max-w-2xl animate-hero-rise font-heading text-lg leading-snug font-medium text-white/90 [animation-delay:500ms] lg:text-xl">
-            {t.hero.tagline}
+          <p
+            className={cn(
+              taglineSize({ size: tagline.size }),
+              'mb-4 max-w-2xl animate-hero-rise font-heading leading-snug font-medium text-white/90 [animation-delay:500ms]',
+            )}
+            style={fontStyle(tagline.font)}
+          >
+            {tagline.text}
           </p>
-          <p className="mb-10 max-w-xl animate-hero-rise text-base leading-relaxed text-white/80 [animation-delay:600ms]">
-            {t.hero.description}
+          <p
+            className={cn(descriptionSize({ size: description.size }), 'mb-10 max-w-xl animate-hero-rise leading-relaxed text-white/80 [animation-delay:600ms]')}
+            style={fontStyle(description.font)}
+          >
+            {description.text}
           </p>
           <div className="flex animate-hero-rise flex-col gap-4 [animation-delay:750ms] sm:flex-row sm:flex-wrap">
             <Button asChild className="px-9 py-5 text-sm">
@@ -197,6 +296,8 @@ export function Hero({ images = HERO_IMAGES }: { images?: HeroImage[] }) {
           </div>
         </div>
       )}
+
+      {editor && <div className={cn('absolute inset-x-0 top-6 z-20 mx-auto flex max-w-screen-2xl justify-end', PAGE_GUTTER)}>{editor}</div>}
 
       <Link
         {...HERO_LINKS.scrollDown}

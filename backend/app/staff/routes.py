@@ -11,6 +11,8 @@ resource in RESOURCES:
     PATCH /<resource>/<key>      change the fields in the body; the others stay as they are
     DELETE /<resource>/<key>     delete (204)
 JSON keys are camelCase (column `sort_order` -> `sortOrder`); a row also carries `id`, `createdAt`, `updatedAt`.
+`page-sections` (the editable home page sections, keyed by the section name) also record who made the last change
+(`updatedById`).
 Each field checks its JSON type here; the database's constraints (create-tables.sql) do the rest of the validation,
 and their errors become 400 (a failed check, a missing required field, an unknown reference) or 409 (a duplicate,
 or deleting a row others still use, e.g. a category with products).
@@ -32,7 +34,7 @@ from sqlalchemy.orm import selectinload
 from app.auth import require_user
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
-from app.database.models.content import Article, Reseller
+from app.database.models.content import Article, PageSection, Reseller
 from app.database.models.price_rules import PriceRule
 from app.database.models.settings import Setting
 from app.pricing import ISRAEL
@@ -321,7 +323,7 @@ class Resource:
     """A table staff edit: its model, its editable columns (name -> converter), list order and key column.
 
     `options` are loader options for every query; `stamp_creator` records the signed-in staff member in the new row's
-    `created_by_id`.
+    `created_by_id`; `stamp_editor` records them in `updated_by_id` on every create and update (the last change).
     """
 
     model: type[db.Model]
@@ -330,6 +332,7 @@ class Resource:
     key: str = "id"
     options: tuple[Any, ...] = field(default=())
     stamp_creator: bool = False
+    stamp_editor: bool = False
 
 
 RESOURCES: dict[str, Resource] = {
@@ -373,6 +376,9 @@ RESOURCES: dict[str, Resource] = {
          "longitude": number, "approximate_location": boolean, "is_active": boolean},
         (Reseller.city, Reseller.name),
     ),
+    "page-sections": Resource(
+        PageSection, {"key": text, "content": json_object}, (PageSection.key,), key="key", stamp_editor=True
+    ),
 }
 
 # URL part matching the resource names only, so any other name is a 404 (quoted: "price-rules" has a hyphen).
@@ -399,12 +405,15 @@ def row_json(resource: Resource, row: Any) -> dict[str, Any]:
         row: The model instance.
 
     Returns:
-        `id` (tables with a generated id), every editable field and `createdAt` / `updatedAt`.
+        `id` (tables with a generated id), every editable field, `updatedById` (resources that stamp the editor) and
+        `createdAt` / `updatedAt`.
     """
     data: dict[str, Any] = {"id": row.id} if resource.key == "id" else {}
     for column in resource.fields:
         value = getattr(row, column)
         data[camel(column)] = [image_json(image) for image in value] if column == "images" else value
+    if resource.stamp_editor:
+        data["updatedById"] = row.updated_by_id
     return {**data, "createdAt": row.created_at, "updatedAt": row.updated_at}
 
 
@@ -527,6 +536,8 @@ def create_row(resource: str) -> tuple[dict[str, Any], int]:
     row = spec.model(**read_fields(spec))
     if spec.stamp_creator:
         row.created_by_id = current_user.id
+    if spec.stamp_editor:
+        row.updated_by_id = current_user.id
     db.session.add(row)
     commit()
     return row_json(spec, row), 201
@@ -562,6 +573,8 @@ def update_row(resource: str, key: str) -> dict[str, Any]:
     row = find_row(spec, key)
     for column, value in read_fields(spec).items():
         setattr(row, column, value)
+    if spec.stamp_editor:
+        row.updated_by_id = current_user.id
     commit()
     return row_json(spec, row)
 

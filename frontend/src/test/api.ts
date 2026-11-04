@@ -6,8 +6,8 @@
  * search in every language, category filter, chip counts and paging; brands and articles by slug; sign-in that
  * accepts any credentials except the password WRONG_PASSWORD (the email admin@example.com signs in as the staff
  * user TEST_STAFF, anyone else as the customer TEST_USER). The staff API (backend/app/staff/routes.py) is
- * faked for brands, categories, products and price rules: list/create/update/delete on in-memory copies of the
- * stubs (no price rules at first) with the server's errors (401 signed out, 403 for a customer, 400 required /
+ * faked for brands, categories, products, price rules and page sections: list/create/update/delete on in-memory copies
+ * of the stubs (no price rules or page sections at first; GET /api/sections/<key> reads the latter) with the server's errors (401 signed out, 403 for a customer, 400 required /
  * a failed check / an unknown reference, 409 duplicate or in use, 404) and its cascade (a deleted category's or
  * product's price rules go with it).
  * Unknown paths answer 404. A test can replace one
@@ -93,8 +93,10 @@ function seedId(table: number, index: number): string {
  *   sends text such as "303.90"; the server answers a number). `defaults`: the database defaults.
  * - `seed`: the rows `flask seed` would store. `check`: the table's other constraints (null = valid).
  * - `order`: the list order. `inUse`: the foreign key that keeps a row from being deleted, if any applies.
+ * - `key`: the field that names a row in the URL when it is not a generated `id` (page sections: "key").
  */
 type FakeTable = {
+  key?: string
   fields: string[]
   required: string[]
   numeric?: string[]
@@ -254,6 +256,19 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     },
     order: (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
   },
+  'page-sections': {
+    key: 'key',
+    fields: ['key', 'content'],
+    required: ['key', 'content'],
+    defaults: {},
+    seed: () => [],
+    check: (section, others) => {
+      if (!/^[a-z0-9_]+$/.test(String(section.key))) return invalid('page_sections_key_check')
+      if (typeof section.content !== 'object' || section.content === null || Array.isArray(section.content)) return json({ error: 'invalid', field: 'content' }, 400)
+      return duplicate(section, others, 'key', 'page_sections_pkey')
+    },
+    order: (a, b) => String(a.key).localeCompare(String(b.key)),
+  },
 }
 
 /**
@@ -290,7 +305,8 @@ async function staffAnswer(resource: string, method: string, id: string | null, 
   if (id === null) {
     if (method === 'GET') return json([...rows].sort(table.order))
     if (method !== 'POST') return json({ error: 'not_found' }, 404)
-    const row = { ...table.defaults, ...values, id: crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffRow
+    // A keyed table's rows keep their key as the fake's internal id, so the lookups below work for both kinds.
+    const row = { ...table.defaults, ...values, id: table.key ? String(values[table.key]) : crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffRow
     const refused = await refusal(table, row, rows)
     if (refused) return refused
     rows.push(row)
@@ -393,6 +409,8 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
     if (path === '/api/articles') return json(publishedArticles)
     const article = articles.find((a) => a.slug === slug('/api/articles/'))
     if (article) return json(article)
+    const section = (await staffRows['page-sections'])?.find((row) => row.key === slug('/api/sections/'))
+    if (section) return json({ key: section.key, content: section.content, updatedAt: section.updatedAt })
     if (path === '/api/resellers') return json(branches.map((b) => ({ approximate: false, ...b })) satisfies Branch[])
     if (path === '/api/prices') {
       const { default: prices } = await import('@/stubs/prices.json')

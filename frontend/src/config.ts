@@ -1,7 +1,8 @@
 /**
  * config.ts — Site content and settings that are not translations and do not come from the API: the main
  * menu, the home page category cards, the labels of the stats figures, the header buttons, external links,
- * contact facts and the photos bundled with the site (hero, brand logos, article photos). Components take
+ * contact facts, the photos bundled with the site (hero, brand logos, article photos) and the fonts and size steps
+ * staff can pick for editable texts (FONTS, SIZE_STEPS). Components take
  * their defaults from here, so changing the menu is a data change, not a component change. Data from the
  * database (catalog, brands, stats values, articles, resellers) comes from src/api.ts.
  *
@@ -11,7 +12,7 @@
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
 import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Clock, Handshake, Heart, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
-import type { ProductCategory } from '@/api'
+import type { FontKey, ProductCategory, SizeStep } from '@/api'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
 
@@ -169,6 +170,40 @@ export const HERO_LINKS = {
   business: { label: (t: Dictionary) => t.hero.ctaBusiness, link: linkOptions({ to: '/', hash: 'business' }) },
   scrollDown: linkOptions({ to: '/', hash: 'stats' }),
 }
+
+/**
+ * A font staff can pick for an editable text (the hero editor). `family` is the CSS font-family (undefined for
+ * "default": the text keeps the site's own font token); `hebrew` = it has Hebrew letters, so it is offered on
+ * Hebrew texts too; `load` downloads its self-hosted files (Vite splits each into its own CSS chunk) and is
+ * undefined for the fonts every page already loads (src/index.css).
+ */
+export type FontOption = { name: string; family?: string; hebrew: boolean; load?: () => Promise<unknown> }
+
+/** The fonts of the editable texts, in menu order ("default" is labelled from the dictionary, not `name`). */
+export const FONTS: Record<FontKey, FontOption> = {
+  default: { name: '', hebrew: true },
+  heebo: { name: 'Heebo', family: '"Heebo Variable", Arial, sans-serif', hebrew: true },
+  rubik: { name: 'Rubik', family: '"Rubik Variable", Arial, sans-serif', hebrew: true, load: () => import('@fontsource-variable/rubik/index.css') },
+  assistant: { name: 'Assistant', family: '"Assistant Variable", Arial, sans-serif', hebrew: true, load: () => import('@fontsource-variable/assistant/index.css') },
+  'frank-ruhl-libre': {
+    name: 'Frank Ruhl Libre',
+    family: '"Frank Ruhl Libre Variable", Georgia, serif',
+    hebrew: true,
+    load: () => import('@fontsource-variable/frank-ruhl-libre/index.css'),
+  },
+  inter: { name: 'Inter', family: '"Inter Variable", system-ui, sans-serif', hebrew: false },
+  montserrat: { name: 'Montserrat', family: '"Montserrat Variable", system-ui, sans-serif', hebrew: false },
+}
+
+/** The size steps of the editable texts, smallest first. */
+export const SIZE_STEPS: SizeStep[] = ['sm', 'md', 'lg', 'xl']
+
+/**
+ * The fonts that can be picked for a text in one language: Hebrew texts only get fonts with Hebrew letters.
+ * @param locale - The text's language.
+ * @returns The font keys, in menu order.
+ */
+export const fontsFor = (locale: Locale) => (Object.keys(FONTS) as FontKey[]).filter((key) => locale !== 'he' || FONTS[key].hebrew)
 
 /** The header's main call to action: "Business Account" → the business-customers section. */
 export const HEADER_CTA = {

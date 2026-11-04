@@ -1,8 +1,8 @@
 """routes.py — Blueprint `customers` (prefix /api): everything the public site and the business customers call.
 
 Public, no sign-in:
-    GET /categories, /products, /brands, /brands/<slug>, /stats, /articles, /articles/<slug>, /resellers,
-    /sitemap.xml
+    GET /categories, /products, /brands, /brands/<slug>, /stats, /sections/<key>, /articles, /articles/<slug>,
+    /resellers, /sitemap.xml
 Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
     POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me
 Business customers only:
@@ -24,7 +24,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 from app.auth import authenticate, clear_tokens, issue_tokens, read_credentials, refresh_access, require_user, user_type
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
-from app.database.models.content import Article, Reseller
+from app.database.models.content import Article, PageSection, Reseller
 from app.database.models.settings import Setting, get_setting
 from app.database.models.users import AppUser, BusinessUser
 from app.pricing import ISRAEL, customer_prices
@@ -228,6 +228,22 @@ def list_stats() -> list[dict[str, Any]]:
         for stat_id in STAT_IDS
         if f"stat_{stat_id}_value" in values
     ]
+
+
+@bp.get("/sections/<key>")
+def get_section(key: str) -> dict[str, Any]:
+    """The content staff saved for one home page section (e.g. the hero's texts, fonts and sizes).
+
+    Args:
+        key: The section name, e.g. "hero".
+
+    Returns:
+        {key, content, updatedAt}; 404 when the section was never edited (the site then shows its built-in texts).
+    """
+    section = db.session.get(PageSection, key)
+    if section is None:
+        abort(404)
+    return {"key": section.key, "content": section.content, "updatedAt": section.updated_at.astimezone(ISRAEL).isoformat()}
 
 
 def is_published() -> ColumnElement[bool]:

@@ -189,6 +189,35 @@ def test_settings_are_keyed_by_their_name(api):
     assert api("DELETE", "/settings/min_order_amount").status_code == 204
 
 
+def test_page_sections_record_who_made_the_last_change(api, database, staff, client):
+    hero = {"title": {"text": {"he": "אולטרה", "en": "Ultra"}, "size": {"he": "lg"}}}
+    created = api("POST", "/page-sections", {"key": "hero", "content": hero})
+    assert created.status_code == 201
+    assert created.get_json()["updatedById"] == str(staff.id)
+    changed = api("PATCH", "/page-sections/hero", {"content": {"tagline": {}}}).get_json()
+    assert changed["content"] == {"tagline": {}}  # the content is replaced as a whole
+    assert changed["updatedAt"] >= created.get_json()["updatedAt"]
+    assert client.get("/api/sections/hero").get_json()["content"] == {"tagline": {}}
+
+
+@pytest.mark.parametrize(
+    ("body", "error"),
+    [
+        ({"key": "hero", "content": ["not", "an", "object"]}, {"error": "invalid", "field": "content"}),
+        ({"key": "Hero!", "content": {}}, {"error": "invalid", "constraint": "page_sections_key_check"}),
+        ({"key": "hero"}, {"error": "required", "field": "content"}),
+    ],
+)
+def test_invalid_page_sections_are_refused(api, body, error):
+    response = api("POST", "/page-sections", body)
+    assert (response.status_code, response.get_json()) == (400, error)
+
+
+def test_customers_cannot_edit_page_sections(customer_client, csrf):
+    response = customer_client.post("/api/staff/page-sections", json={"key": "hero", "content": {}}, headers=csrf(customer_client))
+    assert response.status_code == 403
+
+
 def test_articles_are_published_by_setting_published_at(api, client):
     article = {
         "slug": "new-post",

@@ -1,11 +1,13 @@
 /**
  * Hero.test.tsx — Tests for the home page hero: its text and buttons in both languages, the photo
- * slideshow (one image per photo, controls, auto-advance, pausing) and the reduced-motion behavior.
+ * slideshow (one image per photo, controls, auto-advance, pausing), the reduced-motion behavior and the content staff
+ * saved (texts, fonts and sizes per language, with the dictionary as fallback; the editor slot).
  * Small cases render <Hero> alone with fake photos via renderComponent(); one case renders the real
  * home page to prove the photos in src/assets/hero are picked up.
  */
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { HeroContent } from '@/api'
 import { Hero } from '@/components/Hero'
 import type { HeroImage } from '@/config'
 import { renderComponent, renderPage } from '@/test/utils'
@@ -66,6 +68,53 @@ describe('Hero text and buttons', () => {
     expect(screen.getByRole('link', { name: 'Our Brands' })).toHaveAttribute('href', '/en#brands')
     expect(screen.queryByRole('link', { name: 'Become a Business Customer' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Scroll down' })).toHaveAttribute('href', '/en#stats')
+  })
+})
+
+describe('Hero saved content', () => {
+  const CONTENT: HeroContent = {
+    title: { text: { he: 'כותרת', en: 'Headline' }, accent: { en: 'Now' }, font: { he: 'rubik' }, size: { he: 'xl' } },
+    tagline: { text: { en: '  ' }, size: { en: 'sm' } },
+    description: { text: { he: 'תיאור חדש' }, font: { he: 'frank-ruhl-libre' }, size: { he: 'lg' } },
+  }
+
+  it('shows the saved texts, fonts and sizes of the page language', async () => {
+    renderComponent(<Hero images={[]} content={CONTENT} />, 'he')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'כותרת פט' })
+    expect(heading.style.fontFamily).toContain('Rubik Variable')
+    expect(heading).toHaveClass('text-[clamp(3.6rem,9.5vw,8.5rem)]')
+    const description = screen.getByText('תיאור חדש')
+    expect(description.style.fontFamily).toContain('Frank Ruhl Libre Variable')
+    expect(description).toHaveClass('text-lg')
+    // Not saved: the dictionary text, the site's font and the design size.
+    const tagline = screen.getByText('יבוא והפצה של מזון ומוצרים לחיות מחמד')
+    expect(tagline.style.fontFamily).toBe('')
+    expect(tagline).toHaveClass('text-lg', 'lg:text-xl')
+    // A size step keeps each text's own line height.
+    expect(heading).toHaveClass('leading-[1.05]')
+    expect(tagline).toHaveClass('leading-snug')
+    expect(description).toHaveClass('leading-relaxed')
+  })
+
+  it('falls back per language and for blank texts', async () => {
+    renderComponent(<Hero images={[]} content={CONTENT} />, 'en')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Headline Now' })
+    expect(heading.style.fontFamily).toBe('')
+    expect(heading).toHaveClass('text-[clamp(3.2rem,7.5vw,6.5rem)]')
+    expect(screen.getByText('Import and Distribution of Pet Food and Pet Supplies')).toHaveClass('text-base', 'lg:text-lg')
+  })
+
+  it('ignores unknown fonts and sizes', async () => {
+    const odd = { title: { font: { he: 'comic-sans' }, size: { he: 'huge' } } } as unknown as HeroContent
+    renderComponent(<Hero images={[]} content={odd} />, 'he')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'אולטרה פט' })
+    expect(heading.style.fontFamily).toBe('')
+    expect(heading).toHaveClass('text-[clamp(3.2rem,7.5vw,6.5rem)]')
+  })
+
+  it('shows the editor slot only when given', async () => {
+    renderComponent(<Hero images={[]} editor={<button type="button">Edit me</button>} />)
+    expect(await screen.findByRole('button', { name: 'Edit me' })).toBeInTheDocument()
   })
 })
 

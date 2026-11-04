@@ -19,6 +19,7 @@
  */
 import { notFound } from '@tanstack/react-router'
 import type { Localized } from '@/config'
+import type { Locale } from '@/i18n'
 
 /** A product photo from the store: the full file, a 300px square thumbnail and a `srcset` of the sized copies. */
 export type ProductImage = { src: string; thumbnail: string; srcSet: string }
@@ -103,6 +104,32 @@ export type Branch = {
   lng: number
   /** True when the address could not be located and the pin sits at the city centre. */
   approximate: boolean
+}
+
+/** A font a staff member can pick for a text of an editable section (FONTS in config.ts); "default" = the site's own. */
+export type FontKey = 'default' | 'heebo' | 'rubik' | 'assistant' | 'frank-ruhl-libre' | 'inter' | 'montserrat'
+
+/** A text size step of an editable section; "md" is the size the design was made for. */
+export type SizeStep = 'sm' | 'md' | 'lg' | 'xl'
+
+/**
+ * One editable text of a section: its words, font and size per language. Every part is optional: a missing or
+ * empty text shows the dictionary's, a missing font the site's own, a missing size "md".
+ */
+export type SectionText = {
+  text?: Partial<Record<Locale, string>>
+  font?: Partial<Record<Locale, FontKey>>
+  size?: Partial<Record<Locale, SizeStep>>
+}
+
+/**
+ * The hero's saved content (page_sections row "hero"): the title (`text` = the white words, `accent` = the red
+ * word), the tagline and the description.
+ */
+export type HeroContent = {
+  title?: SectionText & { accent?: Partial<Record<Locale, string>> }
+  tagline?: SectionText
+  description?: SectionText
 }
 
 /** The signed-in user: a business customer ("business") or an Ultra Pet staff member ("staff", no company). */
@@ -296,6 +323,21 @@ export const fetchBrand = (slug: string, signal?: AbortSignal) => apiFetch<Brand
 export const fetchStats = (signal?: AbortSignal) => apiFetch<Stat[]>('/api/stats', { signal })
 
 /**
+ * The content staff saved for one editable home page section.
+ * @param key - The section name, e.g. "hero".
+ * @param signal - Aborts the request.
+ * @returns The content, or null when the section was never edited (the page then shows its built-in texts).
+ */
+export async function fetchSection<Content>(key: string, signal?: AbortSignal): Promise<Content | null> {
+  try {
+    return (await apiFetch<{ content: Content }>(`/api/sections/${encodeURIComponent(key)}`, { signal })).content
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null
+    throw error
+  }
+}
+
+/**
  * The published articles, newest first.
  * @param signal - Aborts the request.
  * @returns The articles.
@@ -347,7 +389,7 @@ export async function postSignIn(credentials: { email: string; password: string;
 export const postSignOut = () => apiFetch<void>('/api/auth/logout', { method: 'POST' })
 
 /** The tables the staff API edits (RESOURCES in backend/app/staff/routes.py). */
-export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers'
+export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections'
 
 /** What every staff row carries besides its fields: when it was created and last changed (ISO timestamps). */
 type StaffRowBase = { createdAt: string; updatedAt: string }

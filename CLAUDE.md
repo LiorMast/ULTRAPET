@@ -41,7 +41,7 @@ frontend/
     index.css           Tailwind + brand tokens + base styles
     api.ts              the one API layer: every backend call (typed), CSRF header, refresh-and-retry on token_expired
     config.ts           menu (mainNav: Products dropdown = the API categories), home page category cards, stat labels, header buttons, external links,
-                        bundled photos (brandLogo, articleImage)
+                        bundled photos (brandLogo, articleImage), the fonts and size steps of editable texts (FONTS, SIZE_STEPS)
     seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
     auth.tsx            AuthProvider/useAuth: the session of a business customer or a staff member (one sign-in through the API, JWT cookies)
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
@@ -62,9 +62,10 @@ backend/
     auth.py             JWT sign-in in HttpOnly cookies (CSRF double-submit, 15 min access + 30 day refresh): authenticate,
                         issue_tokens, refresh_access, clear_tokens, require_user(kind)
     customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), brands, stats,
-                        articles, resellers, sitemap.xml, the shared auth (login/refresh/logout/me: customers AND staff), prices
+                        sections/<key> (saved home page section content), articles, resellers, sitemap.xml, the shared auth (login/refresh/logout/me: customers AND staff), prices
     staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
-                        products+images, price-rules, settings, articles, resellers); DB constraint errors -> 400/409
+                        products+images, price-rules, settings, articles, resellers, page-sections (stamps updated_by_id));
+                        DB constraint errors -> 400/409
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
     database/           everything about the database
       create-tables.sql   the schema: every table and column, explained (source of truth, working rule 5)
@@ -266,7 +267,10 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   #EFEFEF ... `neutral-900` #181818). White backgrounds.
 - **Fonts**: Inter (body), Montserrat (`font-heading`: uppercase labels with `tracking-widest` = 0.25em),
   Inter at bold weights (`font-display`, English display headings and stats numbers; was Playfair Display), Heebo (all Hebrew: `html:lang(he)` swaps every font
-  token to Heebo and tightens the tracking to 0.02em).
+  token to Heebo and tightens the tracking to 0.02em). Staff-picked fonts for editable texts (`FONTS` in `config.ts`:
+  Heebo, Rubik, Assistant, Frank Ruhl Libre, and Inter/Montserrat for English only) are applied as inline
+  `font-family` and lazy-loaded (`load()`, a CSS chunk each). In `cn()`, put a text-size class before `leading-*`:
+  tailwind-merge drops a line height that comes before a size.
 - `text-2xs` (0.65rem); shadows `shadow-premium`, `shadow-premium-sm`, `shadow-red`; square corners (`--radius: 0`).
 - **Buttons**: `<Button>` default variant = legacy `.btn-primary` (red, uppercase, lifts with a red glow on hover);
   `size="sm"` for the header.
@@ -399,7 +403,9 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Navbar (`Navbar`, `MobileMenu`, `LanguageSwitcher`, `Logo`), with the login popover (`LoginPopover`, `LoginForm`:
       email, password, remember me; one form for customers and staff, through the API) — the mobile drawer links to `/login`, which shows the same form; signed in, the login button becomes Log out and staff also get an Admin panel button
 - [ ] Footer + floating WhatsApp button
-- [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README)
+- [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README); staff
+      edit its title, tagline and description (text, font, size per language) in place with `HeroEditor` (saved as
+      the `page_sections` row "hero", read through `GET /api/sections/hero`; unsaved parts use the dictionaries)
 - [x] Home sections: Stats, Brands, Categories, About, Contact (`Contact` = contact cards + a form that opens a
       prefilled mailto: until Phase 2 lead endpoints exist)
 - [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)
@@ -420,7 +426,8 @@ content exists in each language, and the layout flips direction automatically.
 - [x] public content API (blueprint `customers`: categories, products, brands, stats, articles, resellers, sitemap);
       the frontend loads everything through `src/api.ts` (stubs are seed data + test fixtures)
 - [x] auth (JWT sign-in for staff and business users, `app/auth.py`) and the customer price API (`/api/prices`)
-- [x] staff API (blueprint `staff`): CRUD of brands, categories, products + images, settings, articles, resellers
+- [x] staff API (blueprint `staff`): CRUD of brands, categories, products + images, settings, articles, resellers,
+      page sections
 - [x] staff API for price rules (`price-rules`: positive percent/amount discounts, dated)
 - [ ] staff API for customers, leads, payment methods and orders (with the admin UI, Phase 3)
 - [ ] lead/contact endpoints (`business_leads`); serve the PDF catalog
