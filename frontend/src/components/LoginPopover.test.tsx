@@ -1,14 +1,14 @@
 /**
  * LoginPopover.test.tsx — Tests for the header login popover and its LoginForm: opening, fields, validation,
- * remember-me, signing in and out from the header through the API (the fake in test/api.ts), the "wrong email
- * or password" and "try again" alerts, Escape, and the /login page showing the same form (and the account
- * panel once signed in).
+ * remember-me, signing in and out from the header through the API (the fake in test/api.ts; the login button
+ * turns into Log out, staff also get an Admin panel button), the "wrong email or password" and "try again"
+ * alerts, Escape, and the /login page showing the same form (and the account panel once signed in).
  */
 import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { LoginForm } from '@/components/LoginForm'
-import { TEST_USER, WRONG_PASSWORD } from '@/test/api'
+import { TEST_STAFF, TEST_USER, WRONG_PASSWORD } from '@/test/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
 describe('Login popover', () => {
@@ -16,7 +16,7 @@ describe('Login popover', () => {
     await renderPage('/en')
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Login' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Business customer login' })
+    const dialog = await screen.findByRole('dialog', { name: 'Sign in to Ultra Pet' })
     expect(within(dialog).getByLabelText('Email')).toHaveAttribute('type', 'email')
     expect(within(dialog).getByLabelText('Password')).toHaveAttribute('type', 'password')
     expect(within(dialog).getByRole('checkbox', { name: 'Remember me' })).not.toBeChecked()
@@ -27,7 +27,7 @@ describe('Login popover', () => {
     await renderPage('/')
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'התחברות' }))
-    const dialog = await screen.findByRole('dialog', { name: 'כניסה ללקוחות עסקיים' })
+    const dialog = await screen.findByRole('dialog', { name: 'כניסה לאולטרה פט' })
     expect(within(dialog).getByLabelText('סיסמה')).toBeInTheDocument()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -57,7 +57,7 @@ describe('Login popover', () => {
     fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'a@b.co' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret' } })
     fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('You are signed in')
+    expect(await screen.findByRole('status')).toHaveTextContent('You are signed in.')
   })
 
   it('shows "wrong email or password" when the server refuses the sign-in', async () => {
@@ -78,7 +78,7 @@ describe('Login popover', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('ההתחברות נכשלה. נסו שוב בעוד רגע.')
   })
 
-  it('signs in from the header, then shows the account and signs out', async () => {
+  it('signs in from the header, then the login button becomes Log out', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const { user } = await renderPage('/en')
     await user.click(screen.getByRole('button', { name: 'Login' }))
@@ -88,25 +88,42 @@ describe('Login popover', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Log in' }))
     expect(fetchSpy).toHaveBeenCalledWith('/api/auth/login', expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'shop@example.com', password: 'secret', remember: false }) }))
 
-    const account = await screen.findByRole('dialog', { name: 'My account' })
-    expect(within(account).getByRole('status')).toHaveTextContent('Signed in as shop@example.com')
-    expect(within(account).getByRole('link', { name: 'Go to the product catalog' })).toHaveAttribute('href', '/en/catalog')
-    expect(screen.getByRole('button', { name: 'My account' })).toBeInTheDocument()
+    const logout = await within(screen.getByRole('banner')).findByRole('button', { name: 'Sign out' })
+    expect(within(screen.getByRole('banner')).queryByRole('button', { name: 'Login' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).queryByRole('link', { name: 'Admin panel' })).not.toBeInTheDocument()
 
-    await user.click(within(account).getByRole('button', { name: 'Sign out' }))
-    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
+    await user.click(logout)
+    expect(await within(screen.getByRole('banner')).findByRole('button', { name: 'Login' })).toBeInTheDocument()
     expect(fetchSpy).toHaveBeenCalledWith('/api/auth/logout', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('shows staff an Admin panel button next to Log out', async () => {
+    const { user } = await renderPage('/en')
+    await user.click(screen.getByRole('button', { name: 'Login' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Email'), TEST_STAFF.email)
+    await user.type(within(dialog).getByLabelText('Password'), 'secret')
+    await user.click(within(dialog).getByRole('button', { name: 'Log in' }))
+    const header = within(screen.getByRole('banner'))
+    expect(await header.findByRole('link', { name: 'Admin panel' })).toHaveAttribute('href', '/en/admin')
+    expect(header.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
   it('shows the same form on the /login page', async () => {
     await renderPage('/en/login')
-    expect(screen.getByRole('heading', { level: 1, name: 'Business customer login' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Sign in to Ultra Pet' })).toBeInTheDocument()
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
   })
 
   it('shows the account panel on the /login page when signed in', async () => {
     await renderPage('/login', { user: TEST_USER })
     expect(screen.getByRole('heading', { level: 1, name: 'החשבון שלי' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'התנתקות' })).toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByRole('button', { name: 'התנתקות' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'לוח ניהול' })).not.toBeInTheDocument()
+  })
+
+  it('offers staff the admin panel on the /login page', async () => {
+    await renderPage('/en/login', { staff: TEST_STAFF })
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'Admin panel' })).toHaveAttribute('href', '/en/admin')
   })
 })

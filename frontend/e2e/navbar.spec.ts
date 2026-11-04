@@ -132,7 +132,7 @@ test.describe('desktop', () => {
     const menu = page.getByRole('menu')
 
     await products.click()
-    await expect(menu.getByRole('menuitem')).toHaveCount(9)
+    await expect(menu.getByRole('menuitem')).toHaveCount(17)
     await expect(page.getByRole('banner')).toHaveScreenshot('header-en-products-open.png')
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
@@ -141,10 +141,11 @@ test.describe('desktop', () => {
     await page.keyboard.press('Enter')
     await expect(menu.getByRole('menuitem').first()).toBeFocused()
     await page.keyboard.press('ArrowDown')
-    await expect(menu.getByRole('menuitem', { name: 'Cat Food' })).toBeFocused()
+    await expect(menu.getByRole('menuitem', { name: 'Dry Cat Food' })).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(menu.getByRole('menuitem', { name: 'Dry Dog Food' })).toBeFocused()
     await page.keyboard.press('Enter')
-    await expect(page).toHaveURL('/en/categories/cat-food')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cat Food')
+    await expect(page).toHaveURL('/en/catalog?category=dry-dog-food')
   })
 
   test('switching language opens the same page in the other language', async ({ page }) => {

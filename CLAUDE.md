@@ -40,13 +40,14 @@ frontend/
     router.ts           createAppRouter(): /en prefix rewrite, route staticData types
     index.css           Tailwind + brand tokens + base styles
     api.ts              the one API layer: every backend call (typed), CSRF header, refresh-and-retry on token_expired
-    config.ts           menu (MAIN_NAV), home page category cards, stat labels, header buttons, external links,
+    config.ts           menu (mainNav: Products dropdown = the API categories), home page category cards, stat labels, header buttons, external links,
                         bundled photos (brandLogo, articleImage)
     seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
-    auth.tsx            AuthProvider/useAuth: the business-customer session (sign-in through the API, JWT cookies)
+    auth.tsx            AuthProvider/useAuth: the session of a business customer or a staff member (one sign-in through the API, JWT cookies)
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
     routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404;
-                        admin.tsx = staff panel layout (staff sign-in gate), admin.<resource>.tsx = one table each
+                        admin.tsx = staff panel layout (shows the shared login form to non-staff), admin.<resource>.tsx = one table each
+                        (admin.products / admin.categories also manage their discounts through DiscountsDialog)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
                         Brands, Stats, Categories, About, Contact, Hero, ...) + their tests
     components/ui/      shadcn primitives (button, dialog, dropdown-menu, popover, sheet), restyled for the brand
@@ -61,9 +62,9 @@ backend/
     auth.py             JWT sign-in in HttpOnly cookies (CSRF double-submit, 15 min access + 30 day refresh): authenticate,
                         issue_tokens, refresh_access, clear_tokens, require_user(kind)
     customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), brands, stats,
-                        articles, resellers, sitemap.xml, customer auth (login/refresh/logout/me), prices
-    staff/routes.py     blueprint `staff` (/api/staff): staff auth + generic CRUD (RESOURCES: brands, categories,
-                        products+images, settings, articles, resellers); DB constraint errors -> 400/409
+                        articles, resellers, sitemap.xml, the shared auth (login/refresh/logout/me: customers AND staff), prices
+    staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
+                        products+images, price-rules, settings, articles, resellers); DB constraint errors -> 400/409
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
     database/           everything about the database
       create-tables.sql   the schema: every table and column, explained (source of truth, working rule 5)
@@ -221,13 +222,16 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   page = a route `admin.<resource>.tsx` whose loader calls `fetchStaffRows` and a `DataColumn[]` config (key = the
   staff API's camelCase field, `type`, `required`, `pattern`, `ltr`, `inTable`/`inForm`). The same config drives the
   cells, sorting/search and the generated edit form; editing is our Radix dialog (not the paid DataTables Editor);
-  omit `onCreate`/`onUpdate`/`onDelete` for read-only. Columns and options are read once at mount (DataTables' rule).
+  omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons that open its dialog
+  (e.g. "Discounts"). Columns and options are read once at mount (DataTables' rule); `deferRender` builds only the
+  shown page's cells.
   DataTables' CSS loads with the admin chunk; the brand overrides live in `index.css` under `.data-table`.
 - **Discounts** (`DiscountDialog`): one dialog for every discount (category, product, customer, payment method):
-  percent/amount switch, a signed value (negative = surcharge), start date, end date or "no end date". It returns a
-  `DiscountValue` ({ type, value, startsOn, endsOn: null = open-ended }) and the caller stores it. **Not yet stored:**
-  `price_rules` holds only positive percents (+ `increase` per customer) and `payment_methods.discount_percent` has no
-  dates; amounts, general surcharges and dated payment discounts need a schema change when the pages are built.
+  percent/amount switch, a positive value (no surcharges), start date, end date or "no end date". It returns a
+  `DiscountValue` ({ type, value, startsOn, endsOn: null = open-ended }) and the caller stores it. `DiscountsDialog`
+  lists one target's discounts (add/edit/delete) and is the "Discounts" row action of the products and categories
+  tables. A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0.
+  **Not yet stored:** `payment_methods.discount_percent` has no amounts or dates (schema change with its page).
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
 - **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
@@ -327,11 +331,12 @@ statement (הצהרת נגישות), refund/returns policy, privacy policy.
 - **Discounts per customer and per category**; an admin customer-edit screen sets all of a customer's discounts.
 - Checkout by **credit card, Bit or bank transfer**, with an optional % discount per payment method (set in the admin).
 - **Minimum order ₪2,000.**
-- **Decided pricing rules** (table `price_rules`, logic in `backend/app/pricing.py`): staff set discounts on a category
-  or a product for all customers, and discounts, price increases or (on a product) a fixed price for one customer,
-  each for a period or open-ended. In each layer (the customer's rules, the general rules) a product rule beats a
-  category rule and the rule that started last wins. The layers **stack**: list price x (1 -/+ customer percent) x
-  (1 - general discount), rounded half-up to agorot; a customer fixed price is final.
+- **Decided pricing rules** (table `price_rules`, logic in `backend/app/pricing.py`): staff set discounts (a percent or
+  a shekel amount, always positive: there are no surcharges) on a category or a product, for all customers or one
+  customer, and (on a product, for one customer) a fixed price, each for a period or open-ended. In each layer (the
+  customer's rules, the general rules) a product rule beats a category rule and the rule that started last wins. The
+  layers **stack**: the customer's discount, then the general discount, taken off the list price (percent:
+  x (1 - v/100); amount: - v), never below 0, rounded half-up to agorot once; a customer fixed price is final.
 - Submitted orders are written directly to **Rivhit (רווחית)** through its API.
 - A product upload page; an API for pulling product images (later).
 - "WooCommerce-ready architecture" means our own e-commerce-ready data model (products, SKUs, prices, customers,
@@ -392,7 +397,7 @@ content exists in each language, and the layout flips direction automatically.
 **Phase 1 — Frontend (static data first)**
 - [x] Scaffold: Vite, Tailwind tokens, TanStack Router, i18n, shadcn/ui, Vitest + Playwright
 - [x] Navbar (`Navbar`, `MobileMenu`, `LanguageSwitcher`, `Logo`), with the login popover (`LoginPopover`, `LoginForm`:
-      email, password, remember me; signs in through the API) — the mobile drawer links to `/login`, which shows the same form
+      email, password, remember me; one form for customers and staff, through the API) — the mobile drawer links to `/login`, which shows the same form; signed in, the login button becomes Log out and staff also get an Admin panel button
 - [ ] Footer + floating WhatsApp button
 - [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README)
 - [x] Home sections: Stats, Brands, Categories, About, Contact (`Contact` = contact cards + a form that opens a
@@ -416,13 +421,16 @@ content exists in each language, and the layout flips direction automatically.
       the frontend loads everything through `src/api.ts` (stubs are seed data + test fixtures)
 - [x] auth (JWT sign-in for staff and business users, `app/auth.py`) and the customer price API (`/api/prices`)
 - [x] staff API (blueprint `staff`): CRUD of brands, categories, products + images, settings, articles, resellers
-- [ ] staff API for customers, price rules, leads, payment methods and orders (with the admin UI, Phase 3)
+- [x] staff API for price rules (`price-rules`: positive percent/amount discounts, dated)
+- [ ] staff API for customers, leads, payment methods and orders (with the admin UI, Phase 3)
 - [ ] lead/contact endpoints (`business_leads`); serve the PDF catalog
 
 **Phase 3 — Admin CMS**: port the legacy admin.
-- [x] Reusable admin table (`DataTable`, `RecordDialog`, `ui/dialog`), staff sign-in at `/admin`, `/admin/brands`
-- [ ] Tables for categories, products (+ images), settings, articles, resellers (a column config + route each)
-- [x] `DiscountDialog` (UI only); [ ] schema + staff API for amount/signed/dated discounts, then the discount pages
+- [x] Reusable admin table (`DataTable`, `RecordDialog`, `ui/dialog`), the shared sign-in form at `/admin`, `/admin/brands`
+- [x] `/admin/products`, `/admin/categories` (+ their general discounts: `DiscountsDialog`, row action "Discounts")
+- [ ] Product images in the admin; tables for settings, articles, resellers (a column config + route each)
+- [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API; [ ] customer and payment-method
+      discount pages
 
 **Phase 4 — B2B portal**: auth, price catalog, per-customer/category discounts, cart + checkout (minimum ₪2,000;
 card / Bit / bank transfer), Rivhit sync, generated PDF catalog.

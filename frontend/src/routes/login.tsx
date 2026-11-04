@@ -1,9 +1,9 @@
 /**
- * routes/login.tsx — Login for registered business customers (the B2B portal: price catalog,
- * personal discounts, orders).
+ * routes/login.tsx — The one login page, for registered business customers (the B2B portal: price catalog,
+ * personal discounts, orders) and for staff (the admin panel).
  *
  * Shows the same LoginForm as the header popover (the AccountPanel once signed in); the mobile menu links
- * here. Sign-in is a stub until the Phase 4 portal (see src/auth.tsx).
+ * here.
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { useAuth } from '@/auth'

@@ -1,9 +1,10 @@
 /**
- * auth.tsx — Who is signed in: the business-customer session for the whole site.
+ * auth.tsx — Who is signed in (a business customer or a staff member): the session for the whole site.
  *
- * AuthProvider holds the session and useAuth() gives components `user`, `signIn` and `signOut`. Used by
- * LoginForm (signs in), LoginPopover and the /login page (show the account, sign out) and the catalog
- * (shows prices only to a signed-in customer).
+ * AuthProvider holds the session and useAuth() gives components `user` (its `kind` tells a customer from a
+ * staff member), `signIn` and `signOut`. Used by LoginForm (signs in), LoginPopover, MobileMenu and the /login
+ * page (log out, the admin link for staff), the catalog (prices only for a signed-in customer) and the /admin
+ * layout (the panel only for staff).
  *
  * The sign-in itself lives on the server: JWTs in HttpOnly cookies that scripts cannot read (see src/api.ts
  * and backend/app/auth.py). signIn posts the credentials, signOut asks the server to expire the cookies, and
@@ -18,7 +19,7 @@ import { fetchSession, postSignIn, postSignOut, setSignedOutHandler, type User }
 /** What signIn receives: the login form's values. */
 export type Credentials = { email: string; password: string; remember: boolean }
 
-type AuthValue = { user: User | null; signIn: (credentials: Credentials) => Promise<User>; signOut: () => void }
+type AuthValue = { user: User | null; signIn: (credentials: Credentials) => Promise<User>; signOut: () => Promise<void> }
 
 /** Browser storage key of the saved copy of the user. */
 const SESSION_KEY = 'ultrapet.session'
@@ -94,7 +95,7 @@ export function AuthProvider({ initialUser, children }: { initialUser?: User | n
   }, [initialUser])
 
   /**
-   * Signs a customer in on the server.
+   * Signs a customer or a staff member in on the server.
    * @param credentials - Email, password and "remember me".
    * @returns The signed-in user; rejects with ApiError 401 "invalid_credentials" for a wrong email or password.
    */
@@ -105,11 +106,14 @@ export function AuthProvider({ initialUser, children }: { initialUser?: User | n
     return signedIn
   }, [])
 
-  /** Signs the customer out: forgets the user at once and asks the server to expire the cookies. */
-  const signOut = useCallback(() => {
+  /**
+   * Signs the user out: forgets the user at once and asks the server to expire the cookies.
+   * @returns Resolves when the server answered (or could not be reached), so callers can reload data after it.
+   */
+  const signOut = useCallback(async () => {
     writeSession(null)
     setUser(null)
-    postSignOut().catch(() => undefined)
+    await postSignOut().catch(() => undefined)
   }, [])
 
   const value = useMemo(() => ({ user, signIn, signOut }), [user, signIn, signOut])

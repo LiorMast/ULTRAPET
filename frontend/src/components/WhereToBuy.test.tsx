@@ -32,7 +32,15 @@ describe('Where to Buy page', () => {
   })
 
   it('offers to try again when the stores cannot be loaded', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const realFetch = globalThis.fetch
+    let failed = false
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      if (!failed && String(input).includes('/api/resellers')) {
+        failed = true
+        return Promise.reject(new TypeError('Failed to fetch'))
+      }
+      return realFetch(input, init)
+    })
     const { user } = await renderPage('/where-to-buy')
     expect(screen.getByRole('heading', { level: 1, name: 'לא הצלחנו לטעון את העמוד' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'נסו שוב' }))

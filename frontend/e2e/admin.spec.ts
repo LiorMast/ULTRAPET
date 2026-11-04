@@ -5,30 +5,11 @@
  * form, table, open dialog), no horizontal page overflow on a phone, and screenshots (Hebrew, English).
  *
  * The signed-in tests use the staff admin that `flask seed` creates from SEED_ADMIN_EMAIL /
- * SEED_ADMIN_PASSWORD in the repo's .env (loaded by playwright.config.ts).
+ * SEED_ADMIN_PASSWORD in the repo's .env (loaded by playwright.config.ts; see signInStaff in utils.ts).
  */
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
-import { hideFixedOverlays } from './utils.ts'
-
-const STAFF = { email: process.env.SEED_ADMIN_EMAIL ?? '', password: process.env.SEED_ADMIN_PASSWORD ?? '' }
-
-/**
- * Opens an admin page and signs in as the seed staff admin.
- * @param page - The Playwright page.
- * @param path - The admin page, e.g. "/en/admin/brands".
- */
-async function signIn(page: Page, path = '/en/admin/brands') {
-  if (!STAFF.email || !STAFF.password) {
-    throw new Error('Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in .env, then run `flask reset-db --yes` and `flask seed`.')
-  }
-  await page.goto(path)
-  const english = path.startsWith('/en')
-  await page.getByLabel(english ? 'Email' : 'דוא"ל').fill(STAFF.email)
-  await page.getByLabel(english ? 'Password' : 'סיסמה').fill(STAFF.password)
-  await page.getByRole('main').getByRole('button', { name: english ? 'Log in' : 'התחברות' }).click()
-  await page.getByRole('table').waitFor()
-}
+import { expect, test } from '@playwright/test'
+import { hideFixedOverlays, signInStaff as signIn } from './utils.ts'
 
 test('signed out, shows the staff sign-in and refuses a wrong password', async ({ page }) => {
   await page.goto('/en/admin')

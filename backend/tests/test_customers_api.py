@@ -256,7 +256,7 @@ def test_prices_need_a_signed_in_customer(client):
 
 
 def test_prices_are_the_customers_own(customer_client, customer, catalog, database):
-    database.add(PriceRule(business_user=customer, category=catalog.dogs, kind="discount", value=Decimal("10")))
+    database.add(PriceRule(business_user=customer, category=catalog.dogs, kind="percent", value=Decimal("10")))
     database.commit()
     data = customer_client.get("/api/prices").get_json()
     # Only the treat has a list price; the customer's 10% dog discount applies to it.

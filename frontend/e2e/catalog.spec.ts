@@ -54,9 +54,8 @@ async function signIn(page: Page, isMobile: boolean) {
     await dialog.getByLabel('Email').fill(CUSTOMER.email)
     await dialog.getByLabel('Password').fill(CUSTOMER.password)
     await dialog.getByRole('button', { name: 'Log in' }).click()
-    // Wait for the server's answer (it sets the sign-in cookies) before closing or leaving the page.
-    await expect(page.getByRole('dialog', { name: 'My account' })).toBeVisible()
-    await page.keyboard.press('Escape')
+    // Wait for the server's answer (it sets the sign-in cookies): the login button turns into Log out.
+    await expect(page.getByRole('banner').getByRole('button', { name: 'Sign out' })).toBeVisible()
   }
 }
 
@@ -98,7 +97,7 @@ test('hides prices from visitors and shows them after signing in', async ({ page
   await expect(firstCard).toContainText('₪')
 
   await page.goto('/en/login')
-  await page.getByRole('button', { name: 'Sign out' }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Sign out' }).click()
   await open(page, '/en/catalog')
   await expect(page.getByRole('main')).not.toContainText('₪')
 })

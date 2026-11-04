@@ -226,22 +226,22 @@ def issue_tokens(response: Response, user: AppUser, remember: bool) -> Response:
     return response
 
 
-def refresh_access(response: Response, kind: str) -> Response:
+def refresh_access(response: Response, kind: str | None = None) -> Response:
     """Issues a new access token from the request's refresh token (and its CSRF header).
 
     Args:
         response: The refresh response.
-        kind: The user type this route serves, "business" or "staff".
+        kind: The only user type this route serves, "business" or "staff"; None serves both.
 
     Returns:
         The same response, with a new access cookie that persists like the original sign-in.
     """
     verify_jwt_in_request(refresh=True)
     claims = get_jwt()
-    if claims.get("user_type") != kind:
+    if kind is not None and claims.get("user_type") != kind:
         abort(403)
     max_age = int(REFRESH_LIFETIME.total_seconds()) if claims.get("remember") else None
-    token = create_access_token(claims["sub"], additional_claims={"user_type": kind})
+    token = create_access_token(claims["sub"], additional_claims={"user_type": claims["user_type"]})
     set_access_cookies(response, token, max_age=max_age)
     return response
 

@@ -5,13 +5,15 @@
  * Built on DataTables (datatables.net-react, the free core: no jQuery in v3). The caller describes the columns
  * once (DataColumn: key, label, type, required, ...); the same config drives the table cells, what search and
  * sorting see, and the edit form (RecordDialog). Editing is our own Radix dialog, not the paid DataTables
- * Editor. Each handler left out hides its action, so a table with none is read-only. Used by the /admin pages
+ * Editor. Each handler left out hides its action, so a table with none is read-only. `rowActions` add buttons of
+ * the caller's own (e.g. "Discounts") that open the caller's dialog for the row. Used by the /admin pages
  * (e.g. routes/admin.brands.tsx), one column config per resource.
  *
  * How it talks to DataTables: the options, columns and cell renderers are read once, when the table mounts
  * (the library's rule), so the renderers read the latest props through a ref; new `rows` redraw the table
  * keeping its search, sort and page. Cells are React (slots rendered through portals) for display, and plain
- * text for DataTables' sorting and search. Changing `columns` after mount needs a remount (a new `key`).
+ * text for DataTables' sorting and search; only the rows of the page shown get their cells built (deferRender),
+ * so a table of hundreds of rows stays fast. Changing `columns` after mount needs a remount (a new `key`).
  */
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import DataTableLib, { type DataTableSlots } from 'datatables.net-react'
@@ -66,6 +68,23 @@ export type DataColumn<Row> = {
 /** A row's values by column key, as the form edits them and the handlers receive them. */
 export type RowValues = Record<string, unknown>
 
+/**
+ * A button of the caller's own on every row, between Edit and Delete, that opens the caller's dialog for the row.
+ * - `name`: tells the buttons apart (their `data-action`), e.g. "discounts". `label`: the visible text.
+ * - `rowLabel`: the button's accessible name for a row name, e.g. "Discounts: Paw" (it must contain `label`).
+ * - `icon`: a lucide icon (aria-hidden).
+ * - `dialog`: renders the open dialog for the row, always its latest version (after the rows reload). The dialog
+ *   calls `onClose` when it closes and passes `onCloseAutoFocus` to its DialogContent, so the focus goes back
+ *   to the row's button.
+ */
+export type RowAction<Row> = {
+  name: string
+  label: string
+  rowLabel: (name: string) => string
+  icon: ReactNode
+  dialog: (row: Row, props: { onClose: () => void; onCloseAutoFocus: (event: Event) => void }) => ReactNode
+}
+
 /** The props of DataTable (see the component). */
 export type DataTableProps<Row> = {
   rows: Row[]
@@ -78,10 +97,19 @@ export type DataTableProps<Row> = {
   onCreate?: (values: RowValues) => Promise<unknown>
   onUpdate?: (key: string, changes: RowValues) => Promise<unknown>
   onDelete?: (key: string) => Promise<unknown>
+  rowActions?: RowAction<Row>[]
 }
 
-/** What is open: the form for a new row, the form for a row, or the delete confirmation for a row. */
-type OpenDialog<Row> = { mode: 'create' } | { mode: 'edit'; row: Row } | { mode: 'delete'; row: Row } | null
+/**
+ * What is open: the form for a new row, the form for a row, the delete confirmation for a row, or the dialog of
+ * one of the caller's row actions (by its name).
+ */
+type OpenDialog<Row> =
+  | { mode: 'create' }
+  | { mode: 'edit'; row: Row }
+  | { mode: 'delete'; row: Row }
+  | { mode: 'action'; name: string; row: Row }
+  | null
 
 /**
  * The text DataTables sorts and searches a cell by (the screen shows the React cell instead).
@@ -174,15 +202,15 @@ function focusSettled(root: HTMLElement | null, selector: string, frames = FOCUS
 }
 
 /**
- * The Edit and Delete buttons of one row (DataTables renders them in the actions column).
+ * The Edit, custom (rowActions) and Delete buttons of one row (DataTables renders them in the actions column).
  * @param props.row - The row.
  * @param props.table - The table's latest props (which actions exist, the row's key and name).
- * @param props.onOpen - Opens the edit form or the delete confirmation for the row.
+ * @param props.onOpen - Opens the edit form, a custom action's dialog or the delete confirmation for the row.
  * @returns The buttons the table's handlers allow.
  */
 function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: DataTableProps<Row> }; onOpen: (dialog: OpenDialog<Row>) => void }) {
   const { t } = useI18n()
-  const { onUpdate, onDelete, rowKey, rowLabel } = table.current
+  const { onUpdate, onDelete, rowKey, rowLabel, rowActions = [] } = table.current
   const name = rowLabel(row)
   const key = rowKey(row)
   return (
@@ -193,6 +221,12 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
           {t.admin.edit}
         </Button>
       )}
+      {rowActions.map((action) => (
+        <Button key={action.name} variant="ghost" size="xs" data-row={key} data-action={action.name} aria-label={action.rowLabel(name)} onClick={() => onOpen({ mode: 'action', name: action.name, row })}>
+          {action.icon}
+          {action.label}
+        </Button>
+      ))}
       {onDelete && (
         <Button variant="ghost" size="xs" data-row={key} data-action="delete" aria-label={t.admin.deleteRow.replace('{name}', name)} onClick={() => onOpen({ mode: 'delete', row })}>
           <Trash2 aria-hidden />
@@ -216,6 +250,7 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
  * @param props.onCreate - Saves a new row (rejects with ApiError to show the server's error); omit to hide "Add".
  * @param props.onUpdate - Saves the changed fields of a row; omit to hide "Edit".
  * @param props.onDelete - Deletes a row; omit to hide "Delete".
+ * @param props.rowActions - Buttons of the caller's own on every row, each opening its dialog (see RowAction).
  * @returns The table section.
  */
 export function DataTable<Row>(props: DataTableProps<Row>) {
@@ -233,7 +268,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   // Built once: DataTables reads its options, columns and renderers only when it mounts.
   const [{ columns, slots, options }] = useState(() => {
     const shown = props.columns.filter((column) => column.inTable !== false)
-    const hasActions = Boolean(props.onUpdate || props.onDelete)
+    const hasActions = Boolean(props.onUpdate || props.onDelete || props.rowActions?.length)
     const columns: ColumnOptions[] = shown.map((column) => ({
       data: column.key,
       name: column.key,
@@ -255,6 +290,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     const options: Options = {
       order: [],
       pageLength: props.pageLength ?? 25,
+      deferRender: true,
       // Search first (the control staff use most), the page length at the far end; count and pages below.
       layout: { topStart: 'search', topEnd: 'pageLength', bottomStart: 'info', bottomEnd: 'paging' },
       autoWidth: false,
@@ -292,7 +328,8 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
    */
   const handleCloseFocus = (event: Event) => {
     event.preventDefault()
-    const target = open && open.mode !== 'create' ? `[data-row="${CSS.escape(props.rowKey(open.row))}"][data-action="${open.mode}"]` : '[data-action="create"]'
+    const action = open?.mode === 'action' ? open.name : open?.mode
+    const target = open && open.mode !== 'create' ? `[data-row="${CSS.escape(props.rowKey(open.row))}"][data-action="${action}"]` : '[data-action="create"]'
     focusSettled(wrapper.current, target)
   }
 
@@ -311,6 +348,10 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     }
     setOpen(null)
   }
+
+  // A custom action's dialog shows the row as it is now: a save inside it reloads the rows.
+  const action = open?.mode === 'action' ? props.rowActions?.find((candidate) => candidate.name === open.name) : undefined
+  const actionRow = open?.mode === 'action' ? (rows.find((row) => props.rowKey(row) === props.rowKey(open.row)) ?? open.row) : undefined
 
   const memoTable = useMemo(
     () => (
@@ -347,6 +388,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
           onCloseAutoFocus={handleCloseFocus}
         />
       )}
+      {action && actionRow !== undefined && <ActionDialog action={action} row={actionRow} onClose={() => setOpen(null)} onCloseAutoFocus={handleCloseFocus} />}
       {open?.mode === 'delete' && onDelete && (
         <DeleteDialog
           name={rowLabel(open.row)}
@@ -364,6 +406,18 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
       )}
     </div>
   )
+}
+
+/**
+ * The open dialog of a caller's row action.
+ * @param props.action - The action.
+ * @param props.row - The row, as it is now.
+ * @param props.onClose - Closes the dialog.
+ * @param props.onCloseAutoFocus - Where the focus goes after closing (the row's button).
+ * @returns What the action's `dialog` renders.
+ */
+function ActionDialog<Row>({ action, row, onClose, onCloseAutoFocus }: { action: RowAction<Row>; row: Row; onClose: () => void; onCloseAutoFocus: (event: Event) => void }) {
+  return action.dialog(row, { onClose, onCloseAutoFocus })
 }
 
 /**

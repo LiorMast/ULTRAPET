@@ -5,6 +5,8 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CATALOG_PDF_URL } from '@/config'
+import categories from '@/stubs/product-categories.json'
+import { TEST_STAFF } from '@/test/api'
 import { renderPage } from '@/test/utils'
 
 describe('Navbar links', () => {
@@ -81,13 +83,6 @@ describe('Scrollspy', () => {
     expect(screen.getByRole('navigation', { name: 'תפריט ראשי' }).querySelector('[aria-current]')).toBeNull()
   })
 
-  it('highlights Products while the categories section is read', async () => {
-    const { router } = await renderPage('/')
-    scrollTo({ stats: -1500, brands: -900, categories: 100 })
-    await waitFor(() => expect(router.state.location.hash).toBe('categories'))
-    expect(screen.getByRole('button', { name: 'מוצרים' })).toHaveAttribute('data-status', 'active')
-  })
-
   it('does nothing on other pages', async () => {
     const { router } = await renderPage('/where-to-buy')
     scrollTo({ about: 0 })
@@ -105,29 +100,31 @@ describe('Navbar background', () => {
 })
 
 describe('Products dropdown', () => {
-  it('lists the six categories, the product catalog, "all categories" and the PDF catalog', async () => {
+  it('lists the database categories, the product catalog and the PDF catalog', async () => {
     const { user } = await renderPage('/')
     await user.click(screen.getByRole('button', { name: 'מוצרים' }))
     const menu = await screen.findByRole('menu')
 
-    expect(within(menu).getAllByRole('menuitem')).toHaveLength(9)
-    expect(within(menu).getByRole('menuitem', { name: 'קטלוג מוצרים' })).toHaveAttribute('href', '/catalog')
-    expect(within(menu).getByRole('menuitem', { name: 'מזון לכלבים' })).toHaveAttribute('href', '/categories/dog-food')
-    expect(within(menu).getByRole('menuitem', { name: 'בעלי כנף' })).toHaveAttribute('href', '/categories/birds')
-    expect(within(menu).getByRole('menuitem', { name: 'כל הקטגוריות' })).toHaveAttribute('href', '/#categories')
+    const items = within(menu).getAllByRole('menuitem')
+    expect(items).toHaveLength(categories.length + 2)
+    expect(items[0]).toHaveTextContent('כל המוצרים')
+    expect(items.slice(1, -1).map((item) => item.textContent)).toEqual(categories.map((c) => c.name.he))
+    expect(items[1]).toHaveAttribute('href', `/catalog?category=${categories[0].slug}`)
+    expect(menu.querySelector('svg')).toBeNull()
+    expect(within(menu).getByRole('menuitem', { name: 'כל המוצרים' })).toHaveAttribute('href', '/catalog')
 
     const catalog = within(menu).getByRole('menuitem', { name: 'הקטלוג המלא להורדה (PDF)' })
     expect(catalog).toHaveAttribute('href', CATALOG_PDF_URL)
     expect(catalog).toHaveAttribute('target', '_blank')
   })
 
-  it('navigates to a category page', async () => {
+  it('opens the catalog filtered by the chosen category', async () => {
     const { user, router } = await renderPage('/en')
     await user.click(screen.getByRole('button', { name: 'Products' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Cat Food' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Cat Litter' }))
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/categories/cat-food'))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Cat Food' })).toBeInTheDocument()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/catalog'))
+    expect(router.state.location.search).toMatchObject({ category: 'cat-litter' })
   })
 })
 
@@ -177,6 +174,18 @@ describe('Mobile menu', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
+  it('turns Login into Log out when signed in, with an Admin panel entry for staff', async () => {
+    const { user } = await renderPage('/en', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const drawer = await screen.findByRole('dialog', { name: 'Main menu' })
+    expect(within(drawer).getByRole('link', { name: 'Admin panel' })).toHaveAttribute('href', '/en/admin')
+    expect(within(drawer).queryByRole('link', { name: 'Login' })).not.toBeInTheDocument()
+    await user.click(within(drawer).getByRole('button', { name: 'Sign out' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    expect(within(await screen.findByRole('dialog')).getByRole('link', { name: 'Login' })).toBeInTheDocument()
+  })
+
   it('expands the Products group to show the categories', async () => {
     const { user } = await renderPage('/')
     await user.click(screen.getByRole('button', { name: 'פתיחת תפריט' }))
@@ -184,7 +193,7 @@ describe('Mobile menu', () => {
 
     await user.click(within(drawer).getByText('מוצרים'))
     expect(within(drawer).getByText('מוצרים').closest('details')).toHaveAttribute('open')
-    expect(within(drawer).getByRole('link', { name: 'חול לחתולים' })).toHaveAttribute('href', '/categories/litter')
+    expect(within(drawer).getByRole('link', { name: 'חול לחתולים' })).toHaveAttribute('href', '/catalog?category=cat-litter')
   })
 
   it('closes after choosing a destination', async () => {

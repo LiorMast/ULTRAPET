@@ -4,13 +4,16 @@
  * It answers every /api call the site makes (src/api.ts) from the stub fixtures in src/stubs/ — the same files
  * `flask seed` loads into the database — with the server's semantics (backend/app/customers/routes.py): catalog
  * search in every language, category filter, chip counts and paging; brands and articles by slug; sign-in that
- * accepts any credentials except the password WRONG_PASSWORD. The staff API (backend/app/staff/routes.py) is
- * faked for brands: staff sign-in, and list/create/update/delete on an in-memory copy of the brand stubs with
- * the server's errors (401 without a staff sign-in, 400 required / invalid, 409 duplicate slug, 404).
+ * accepts any credentials except the password WRONG_PASSWORD (the email admin@example.com signs in as the staff
+ * user TEST_STAFF, anyone else as the customer TEST_USER). The staff API (backend/app/staff/routes.py) is
+ * faked for brands, categories, products and price rules: list/create/update/delete on in-memory copies of the
+ * stubs (no price rules at first) with the server's errors (401 signed out, 403 for a customer, 400 required /
+ * a failed check / an unknown reference, 409 duplicate or in use, 404) and its cascade (a deleted category's or
+ * product's price rules go with it).
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
-import type { Brand, Branch, ProductCategory, ProductImage, ProductPage, StaffBrand, StaffUser, Stat, User } from '@/api'
+import type { Brand, Branch, ProductCategory, ProductImage, ProductPage, Stat, User } from '@/api'
 import type { Localized } from '@/config'
 import articles from '@/stubs/articles.json'
 import branches from '@/stubs/branches.json'
@@ -21,7 +24,7 @@ import categories from '@/stubs/product-categories.json'
 export const WRONG_PASSWORD = 'wrong-password'
 
 /** The customer the fake sign-in returns (with the typed email). */
-export const TEST_USER: User = { email: 'shop@example.com', fullName: 'Demo Customer', companyName: 'Demo Pet Shop' }
+export const TEST_USER: User = { kind: 'business', email: 'shop@example.com', fullName: 'Demo Customer', companyName: 'Demo Pet Shop' }
 
 /** The home page figures the fake serves (the values `flask seed` takes from the legacy CMS). */
 export const STATS: Stat[] = [
@@ -45,109 +48,272 @@ type StubProduct = {
 const PAGE_SIZE = 24
 const MAX_PAGE_SIZE = 100
 
-/** The staff user the fake staff sign-in returns (with the typed email). */
-export const TEST_STAFF: StaffUser = { email: 'admin@example.com', fullName: 'Test Admin', role: 'admin' }
+/** The staff user the fake sign-in returns for the email `admin@example.com`. */
+export const TEST_STAFF: User = { kind: 'staff', email: 'admin@example.com', fullName: 'Test Admin', companyName: null }
 
-/** Who the fake thinks is signed in (by /api/auth/login), for /api/auth/me. */
+/** Who the fake thinks is signed in (customer or staff, by /api/auth/login), for /api/auth/me and /api/staff/. */
 let session: User | null = null
 
-/** The staff user signed in to the fake staff API, for /api/staff/... */
-let staffSession: StaffUser | null = null
+/** A row of a staff table as the staff API returns it: its id, its fields and its timestamps. */
+type StaffRow = { id: string; createdAt: string; updatedAt: string } & Record<string, unknown>
 
-/** The brands as the staff API stores them; rebuilt from the stubs on first use after every reset. */
-let staffBrands: StaffBrand[] | null = null
+/** The staff tables (each a promise, so concurrent first requests share one copy); built from the stubs on first use. */
+let staffRows: Partial<Record<string, Promise<StaffRow[]>>> = {}
 
 /** Signs the fake out and forgets staff edits; setup.ts calls it after every test. */
 export function resetFakeApi() {
   session = null
-  staffSession = null
-  staffBrands = null
+  staffRows = {}
 }
 
 /**
- * Signs a staff user in to the fake (renderPage's `staff` option).
- * @param user - The staff user.
+ * Signs a user in to the fake (renderPage's `staff` option).
+ * @param user - The user, e.g. TEST_STAFF.
  */
-export function signInFakeStaff(user: StaffUser) {
-  staffSession = user
+export function signInFakeUser(user: User) {
+  session = user
+}
+
+/** When the stub rows were "created" (the seed's timestamps). */
+const SEEDED = '2026-11-01T10:00:00+02:00'
+
+/**
+ * A fixed id for a seeded row, so tests can predict it.
+ * @param table - A number per table: brands 0, categories 1, products 2.
+ * @param index - The row's position in its stub file.
+ * @returns A UUID, e.g. "00000000-0000-4000-8001-000000000003".
+ */
+function seedId(table: number, index: number): string {
+  return `00000000-0000-4000-800${table}-${String(index + 1).padStart(12, '0')}`
 }
 
 /**
- * The staff brands, built from stubs/brands.json the way `flask seed` stores them.
+ * One staff table of the fake, mirroring RESOURCES in backend/app/staff/routes.py and the table's constraints.
+ * - `fields`: the JSON keys a request may send. `required`: the NOT NULL ones. `numeric`: money fields (the form
+ *   sends text such as "303.90"; the server answers a number). `defaults`: the database defaults.
+ * - `seed`: the rows `flask seed` would store. `check`: the table's other constraints (null = valid).
+ * - `order`: the list order. `inUse`: the foreign key that keeps a row from being deleted, if any applies.
+ */
+type FakeTable = {
+  fields: string[]
+  required: string[]
+  numeric?: string[]
+  defaults: Record<string, unknown>
+  seed: () => StaffRow[] | Promise<StaffRow[]>
+  check: (row: StaffRow, others: StaffRow[]) => Response | null | Promise<Response | null>
+  order: (a: StaffRow, b: StaffRow) => number
+  inUse?: (row: StaffRow) => Promise<string | null>
+}
+
+/**
+ * The rows of a staff table, seeding it on first use.
+ * @param resource - The table, e.g. "categories".
  * @returns The in-memory rows (changed in place by the fake's create/update/delete).
  */
-function brandRows(): StaffBrand[] {
-  staffBrands ??= brands.map((brand, index) => ({
-    id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
-    slug: brand.slug,
-    name: brand.name,
-    tagline: brand.tagline,
-    description: null,
-    accentColor: brand.accent,
-    logoUrl: null,
-    sortOrder: index + 1,
-    isActive: true,
-    createdAt: '2026-11-01T10:00:00+02:00',
-    updatedAt: '2026-11-01T10:00:00+02:00',
-  }))
-  return staffBrands
+function tableRows(resource: string): Promise<StaffRow[]> {
+  staffRows[resource] ??= Promise.resolve(STAFF_TABLES[resource].seed())
+  return staffRows[resource]
 }
 
-/** The fields a staff brand request may send (the server's RESOURCES["brands"]). */
-const BRAND_FIELDS = ['slug', 'name', 'tagline', 'description', 'accentColor', 'logoUrl', 'sortOrder', 'isActive']
-
 /**
- * Checks a brand the way the database's constraints do (create-tables.sql).
- * @param brand - The brand as it would be saved.
- * @param others - The other brands (for the unique slug).
- * @returns The server's error answer, or null when the brand is valid.
+ * The answer of a failed check constraint.
+ * @param constraint - Its name, e.g. "brands_slug_check".
+ * @returns The 400 answer.
  */
-function brandError(brand: StaffBrand, others: StaffBrand[]): Response | null {
-  for (const field of ['name', 'slug', 'sortOrder', 'isActive'] as const) {
-    if (brand[field] === null || brand[field] === undefined) return json({ error: 'required', field }, 400)
-  }
-  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(brand.slug)) return json({ error: 'invalid', constraint: 'brands_slug_check' }, 400)
-  if (brand.accentColor !== null && !/^#[0-9A-Fa-f]{6}$/.test(brand.accentColor)) return json({ error: 'invalid', constraint: 'brands_accent_color_check' }, 400)
-  if (others.some((other) => other.slug === brand.slug)) return json({ error: 'duplicate', constraint: 'brands_slug_key' }, 409)
-  return null
+const invalid = (constraint: string) => json({ error: 'invalid', constraint }, 400)
+
+/**
+ * The answer when another row already has a unique value.
+ * @param row - The row being saved.
+ * @param others - The other rows.
+ * @param field - The unique field, e.g. "slug".
+ * @param constraint - The unique key's name, e.g. "brands_slug_key".
+ * @returns The 409 answer, or null when the value is free (or empty).
+ */
+function duplicate(row: StaffRow, others: StaffRow[], field: string, constraint: string): Response | null {
+  return row[field] !== null && others.some((other) => other[field] === row[field]) ? json({ error: 'duplicate', constraint }, 409) : null
 }
 
 /**
- * Answers /api/staff/brands[/<id>] like the server's generic staff CRUD.
+ * Whether a translated text lacks its Hebrew (the tables' `coalesce(x ->> 'he', '') <> ''` checks).
+ * @param value - The { he, en } value, or null.
+ * @returns True when given without Hebrew.
+ */
+const noHebrew = (value: unknown) => value !== null && !(value as Partial<Localized<string>>).he
+
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+/** The staff tables the fake serves, by their URL name. */
+const STAFF_TABLES: Record<string, FakeTable> = {
+  brands: {
+    fields: ['slug', 'name', 'tagline', 'description', 'accentColor', 'logoUrl', 'sortOrder', 'isActive'],
+    required: ['name', 'slug', 'sortOrder', 'isActive'],
+    defaults: { tagline: null, description: null, accentColor: null, logoUrl: null, sortOrder: 0, isActive: true },
+    seed: () =>
+      brands.map((brand, index) => ({
+        id: seedId(0, index),
+        slug: brand.slug,
+        name: brand.name,
+        tagline: brand.tagline,
+        description: null,
+        accentColor: brand.accent,
+        logoUrl: null,
+        sortOrder: index + 1,
+        isActive: true,
+        createdAt: SEEDED,
+        updatedAt: SEEDED,
+      })),
+    check: (brand, others) => {
+      if (!SLUG.test(String(brand.slug))) return invalid('brands_slug_check')
+      if (brand.accentColor !== null && !/^#[0-9A-Fa-f]{6}$/.test(String(brand.accentColor))) return invalid('brands_accent_color_check')
+      return duplicate(brand, others, 'slug', 'brands_slug_key')
+    },
+    order: (a, b) => Number(a.sortOrder) - Number(b.sortOrder) || String(a.name).localeCompare(String(b.name)),
+  },
+  categories: {
+    fields: ['slug', 'name', 'imageUrl', 'legacyPath', 'sortOrder', 'isActive'],
+    required: ['slug', 'name', 'sortOrder', 'isActive'],
+    defaults: { imageUrl: null, legacyPath: null, sortOrder: 0, isActive: true },
+    seed: () =>
+      categories.map((category, index) => ({
+        id: seedId(1, index),
+        slug: category.slug,
+        name: category.name,
+        imageUrl: null,
+        legacyPath: category.legacyPath,
+        sortOrder: index,
+        isActive: true,
+        createdAt: SEEDED,
+        updatedAt: SEEDED,
+      })),
+    check: (category, others) => {
+      if (!SLUG.test(String(category.slug))) return invalid('categories_slug_check')
+      if (noHebrew(category.name)) return invalid('categories_name_check')
+      return duplicate(category, others, 'slug', 'categories_slug_key')
+    },
+    order: (a, b) => Number(a.sortOrder) - Number(b.sortOrder) || String(a.slug).localeCompare(String(b.slug)),
+    inUse: async (category) => ((await tableRows('products')).some((product) => product.categoryId === category.id) ? 'products_category_id_fkey' : null),
+  },
+  products: {
+    fields: ['woocommerceId', 'slug', 'sku', 'barcode', 'name', 'description', 'categoryId', 'brandId', 'listPrice', 'sortOrder', 'isActive', 'legacyPath', 'images'],
+    required: ['slug', 'name', 'categoryId', 'sortOrder', 'isActive'],
+    numeric: ['listPrice'],
+    defaults: { woocommerceId: null, sku: null, barcode: null, description: null, brandId: null, listPrice: null, sortOrder: 0, isActive: true, legacyPath: null, images: [] },
+    seed: async () => {
+      const [{ default: products }, { default: prices }, categoryRows] = await Promise.all([
+        import('@/stubs/products.json') as Promise<{ default: StubProduct[] }>,
+        import('@/stubs/prices.json') as Promise<{ default: { prices: Record<string, number> } }>,
+        tableRows('categories'),
+      ])
+      return products.map((product, index) => ({
+        id: seedId(2, index),
+        woocommerceId: Number(product.id),
+        slug: product.slug,
+        sku: null,
+        barcode: null,
+        name: product.name,
+        description: product.description.he ? product.description : null,
+        categoryId: categoryRows.find((category) => category.slug === product.category)?.id,
+        brandId: null,
+        listPrice: prices.prices[product.id] ?? null,
+        sortOrder: index,
+        isActive: true,
+        legacyPath: null,
+        images: product.image ? [{ url: product.image.src, thumbnailUrl: product.image.thumbnail, srcset: product.image.srcSet, alt: null }] : [],
+        createdAt: SEEDED,
+        updatedAt: SEEDED,
+      }))
+    },
+    check: async (product, others) => {
+      if (noHebrew(product.name)) return invalid('products_name_check')
+      if (product.listPrice !== null && Number(product.listPrice) < 0) return invalid('products_list_price_check')
+      if (!(await tableRows('categories')).some((category) => category.id === product.categoryId)) {
+        return json({ error: 'invalid_reference', constraint: 'products_category_id_fkey' }, 400)
+      }
+      if (product.brandId !== null && !(await tableRows('brands')).some((brand) => brand.id === product.brandId)) {
+        return json({ error: 'invalid_reference', constraint: 'products_brand_id_fkey' }, 400)
+      }
+      return duplicate(product, others, 'slug', 'products_slug_key') ?? duplicate(product, others, 'sku', 'products_sku_key')
+    },
+    order: (a, b) => Number(a.sortOrder) - Number(b.sortOrder) || a.id.localeCompare(b.id),
+  },
+  'price-rules': {
+    fields: ['businessUserId', 'categoryId', 'productId', 'kind', 'value', 'startsOn', 'endsOn', 'isActive', 'note'],
+    required: ['kind', 'value', 'isActive'],
+    numeric: ['value'],
+    defaults: { businessUserId: null, categoryId: null, productId: null, startsOn: null, endsOn: null, isActive: true, note: null },
+    seed: () => [],
+    check: (rule) => {
+      if (!['percent', 'amount', 'fixed_price'].includes(String(rule.kind))) return invalid('price_rules_kind_check')
+      if (Number(rule.value) <= 0) return invalid('price_rules_value_check')
+      if ((rule.categoryId === null) === (rule.productId === null)) return invalid('price_rules_one_target_check')
+      if (rule.kind === 'percent' && Number(rule.value) > 100) return invalid('price_rules_percent_max_check')
+      if (rule.kind === 'fixed_price' && (rule.productId === null || rule.businessUserId === null)) return invalid('price_rules_fixed_price_target_check')
+      if (rule.startsOn !== null && rule.endsOn !== null && String(rule.endsOn) < String(rule.startsOn)) return invalid('price_rules_dates_check')
+      return null
+    },
+    order: (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  },
+}
+
+/**
+ * Checks a row the way the database does: its required fields, then its table's constraints.
+ * @param table - The table.
+ * @param row - The row as it would be saved.
+ * @param others - The table's other rows.
+ * @returns The server's error answer, or null when the row is valid.
+ */
+async function refusal(table: FakeTable, row: StaffRow, others: StaffRow[]): Promise<Response | null> {
+  const missing = table.required.find((field) => row[field] === null || row[field] === undefined)
+  if (missing) return json({ error: 'required', field: missing }, 400)
+  return table.check(row, others)
+}
+
+/**
+ * Answers /api/staff/<resource>[/<id>] like the server's generic staff CRUD.
+ * @param resource - The table's URL name, e.g. "price-rules".
  * @param method - The HTTP method.
  * @param id - The row id from the path, or null for the collection.
  * @param body - The request body (create/update).
  * @returns The answer.
  */
-function staffBrandsAnswer(method: string, id: string | null, body: BodyInit | null | undefined): Response {
-  if (!staffSession) return json({ error: 'unauthorized' }, 401)
-  const rows = brandRows()
+async function staffAnswer(resource: string, method: string, id: string | null, body: BodyInit | null | undefined): Promise<Response> {
+  if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  const table = STAFF_TABLES[resource]
+  if (!table) return json({ error: 'not_found' }, 404)
+  const rows = await tableRows(resource)
   const values = body ? (JSON.parse(String(body)) as Record<string, unknown>) : {}
-  const unknown = Object.keys(values).find((key) => !BRAND_FIELDS.includes(key))
+  const unknown = Object.keys(values).find((key) => !table.fields.includes(key))
   if (unknown) return json({ error: 'unknown_field', field: unknown }, 400)
+  for (const key of table.numeric ?? []) if (typeof values[key] === 'string') values[key] = Number(values[key])
   const now = new Date().toISOString()
   if (id === null) {
-    if (method === 'GET') return json([...rows].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)))
+    if (method === 'GET') return json([...rows].sort(table.order))
     if (method !== 'POST') return json({ error: 'not_found' }, 404)
-    const brand = { tagline: null, description: null, accentColor: null, logoUrl: null, sortOrder: 0, isActive: true, ...values, id: crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffBrand
-    const refused = brandError(brand, rows)
+    const row = { ...table.defaults, ...values, id: crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffRow
+    const refused = await refusal(table, row, rows)
     if (refused) return refused
-    rows.push(brand)
-    return json(brand, 201)
+    rows.push(row)
+    return json(row, 201)
   }
   const index = rows.findIndex((row) => row.id === id)
   if (index < 0) return json({ error: 'not_found' }, 404)
   if (method === 'GET') return json(rows[index])
   if (method === 'DELETE') {
+    const constraint = await table.inUse?.(rows[index])
+    if (constraint) return json({ error: 'in_use', constraint }, 409)
     rows.splice(index, 1)
+    // A deleted category's or product's price rules go with it (ON DELETE CASCADE).
+    const rules = await staffRows['price-rules']
+    if (rules) rules.splice(0, rules.length, ...rules.filter((rule) => rule.categoryId !== id && rule.productId !== id))
     return json(undefined, 204)
   }
   if (method !== 'PATCH') return json({ error: 'not_found' }, 404)
-  const brand = { ...rows[index], ...values, updatedAt: now } as StaffBrand
-  const refused = brandError(brand, rows.filter((_, i) => i !== index))
+  const row = { ...rows[index], ...values, updatedAt: now }
+  const refused = await refusal(table, row, rows.filter((_, i) => i !== index))
   if (refused) return refused
-  rows[index] = brand
-  return json(brand)
+  rows[index] = row
+  return json(row)
 }
 
 /**
@@ -214,21 +380,8 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
    */
   const slug = (prefix: string) => (path.startsWith(prefix) ? decodeURIComponent(path.slice(prefix.length)) : null)
 
-  if (path === '/api/staff/auth/me' && method === 'GET') return staffSession ? json({ user: staffSession }) : json({ error: 'unauthorized' }, 401)
-  if (path === '/api/staff/auth/login' && method === 'POST') {
-    const { email, password } = JSON.parse(String(init.body)) as { email: string; password: string }
-    if (password === WRONG_PASSWORD) return json({ error: 'invalid_credentials' }, 401)
-    staffSession = { ...TEST_STAFF, email: email.toLowerCase() }
-    session = null
-    return json({ user: staffSession })
-  }
-  if (path === '/api/staff/auth/logout' && method === 'POST') {
-    staffSession = null
-    return json(undefined, 204)
-  }
-  if (path === '/api/staff/brands') return staffBrandsAnswer(method, null, init.body)
-  const staffBrandId = slug('/api/staff/brands/')
-  if (staffBrandId) return staffBrandsAnswer(method, staffBrandId, init.body)
+  const staff = /^\/api\/staff\/([a-z-]+)(?:\/(.+))?$/.exec(path)
+  if (staff) return staffAnswer(staff[1], method, staff[2] ? decodeURIComponent(staff[2]) : null, init.body)
 
   if (method === 'GET') {
     if (path === '/api/categories') return json(categories satisfies ProductCategory[])
@@ -251,7 +404,7 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
     if (path === '/api/auth/login') {
       const { email, password } = JSON.parse(String(init.body)) as { email: string; password: string }
       if (password === WRONG_PASSWORD) return json({ error: 'invalid_credentials' }, 401)
-      session = { ...TEST_USER, email: email.toLowerCase() }
+      session = { ...(email.toLowerCase() === TEST_STAFF.email ? TEST_STAFF : TEST_USER), email: email.toLowerCase() }
       return json({ user: session })
     }
     if (path === '/api/auth/logout') {

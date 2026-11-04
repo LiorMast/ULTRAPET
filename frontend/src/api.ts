@@ -105,8 +105,8 @@ export type Branch = {
   approximate: boolean
 }
 
-/** The signed-in business customer. */
-export type User = { email: string; fullName: string; companyName: string }
+/** The signed-in user: a business customer ("business") or an Ultra Pet staff member ("staff", no company). */
+export type User = { kind: 'business' | 'staff'; email: string; fullName: string; companyName: string | null }
 
 /** The fields of a JSON error answer, e.g. { error: 'duplicate', constraint: 'brands_slug_key' }. */
 export type ApiErrorBody = { error?: string; field?: string; constraint?: string }
@@ -201,12 +201,11 @@ export function setSignedOutHandler(handler: (() => void) | null) {
 }
 
 /**
- * Gets a new access token with the refresh token (one refresh at a time per route).
- * @param path - The path of the call that expired: staff calls refresh at /api/staff/auth/refresh.
+ * Gets a new access token with the refresh token (one refresh at a time).
  * @returns true when the server issued a new access token.
  */
-function refreshAccess(path: string): Promise<boolean> {
-  const route = path.startsWith('/api/staff/') ? '/api/staff/auth/refresh' : '/api/auth/refresh'
+function refreshAccess(): Promise<boolean> {
+  const route = '/api/auth/refresh'
   let pending = refreshing.get(route)
   if (!pending) {
     pending = send(route, { method: 'POST', csrf: 'refresh' })
@@ -226,7 +225,7 @@ function refreshAccess(path: string): Promise<boolean> {
  */
 export async function apiFetch<T>(path: string, options: CallOptions = {}): Promise<T> {
   let response = await send(path, options)
-  if (response.status === 401 && (await errorBody(response.clone())).error === 'token_expired' && (await refreshAccess(path))) {
+  if (response.status === 401 && (await errorBody(response.clone())).error === 'token_expired' && (await refreshAccess())) {
     response = await send(path, options)
   }
   if (!response.ok) {
@@ -320,11 +319,12 @@ export const fetchResellers = (signal?: AbortSignal) => apiFetch<Branch[]>('/api
 
 /**
  * Who is signed in, according to the server (the JWT cookies).
- * @returns The customer, or null when nobody (or a staff user) is signed in.
+ * @param signal - Aborts the request.
+ * @returns The customer or staff user, or null when nobody is signed in.
  */
-export async function fetchSession(): Promise<User | null> {
+export async function fetchSession(signal?: AbortSignal): Promise<User | null> {
   try {
-    return (await apiFetch<{ user: User }>('/api/auth/me')).user
+    return (await apiFetch<{ user: User }>('/api/auth/me', { signal })).user
   } catch (error) {
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return null
     throw error
@@ -332,9 +332,9 @@ export async function fetchSession(): Promise<User | null> {
 }
 
 /**
- * Signs a business customer in; the server sets the JWT cookies.
+ * Signs a business customer or a staff member in; the server sets the JWT cookies.
  * @param credentials - Email, password and "remember me" (the cookies then last 30 days).
- * @returns The signed-in customer; throws ApiError 401 "invalid_credentials" for a wrong email or password.
+ * @returns The signed-in user; throws ApiError 401 "invalid_credentials" for a wrong email or password.
  */
 export async function postSignIn(credentials: { email: string; password: string; remember: boolean }): Promise<User> {
   return (await apiFetch<{ user: User }>('/api/auth/login', { method: 'POST', body: credentials })).user
@@ -346,11 +346,8 @@ export async function postSignIn(credentials: { email: string; password: string;
  */
 export const postSignOut = () => apiFetch<void>('/api/auth/logout', { method: 'POST' })
 
-/** The signed-in staff user (the admin panel). `role` is "admin" (the only role so far). */
-export type StaffUser = { email: string; fullName: string; role: string }
-
 /** The tables the staff API edits (RESOURCES in backend/app/staff/routes.py). */
-export type StaffResource = 'brands' | 'categories' | 'products' | 'settings' | 'articles' | 'resellers'
+export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers'
 
 /** What every staff row carries besides its fields: when it was created and last changed (ISO timestamps). */
 type StaffRowBase = { createdAt: string; updatedAt: string }
@@ -368,34 +365,56 @@ export type StaffBrand = StaffRowBase & {
   isActive: boolean
 }
 
-/**
- * Who is signed in to the staff panel, according to the server.
- * @param signal - Aborts the request.
- * @returns The staff user, or null when nobody (or a business customer) is signed in.
- */
-export async function fetchStaffSession(signal?: AbortSignal): Promise<StaffUser | null> {
-  try {
-    return (await apiFetch<{ user: StaffUser }>('/api/staff/auth/me', { signal })).user
-  } catch (error) {
-    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return null
-    throw error
-  }
+/** A catalog category as the staff API returns it (every column, active or not). */
+export type StaffCategory = StaffRowBase & {
+  id: string
+  slug: string
+  name: Localized<string>
+  imageUrl: string | null
+  legacyPath: string | null
+  sortOrder: number
+  isActive: boolean
+}
+
+/** A product photo as the staff API stores it; the first of a product's photos is its main photo. */
+export type StaffProductImage = { url: string; thumbnailUrl: string | null; srcset: string | null; alt: Localized<string> | null }
+
+/** A product as the staff API returns it (every column, active or not). `listPrice`: shekels before VAT. */
+export type StaffProduct = StaffRowBase & {
+  id: string
+  woocommerceId: number | null
+  slug: string
+  sku: string | null
+  barcode: string | null
+  name: Localized<string>
+  description: Localized<string> | null
+  categoryId: string
+  brandId: string | null
+  listPrice: number | null
+  sortOrder: number
+  isActive: boolean
+  legacyPath: string | null
+  images: StaffProductImage[]
 }
 
 /**
- * Signs a staff user in; the server sets the JWT cookies (replacing a customer's sign-in in this browser).
- * @param credentials - Email, password and "remember me".
- * @returns The staff user; throws ApiError 401 "invalid_credentials" for a wrong email or password.
+ * A price rule (table price_rules): a discount on one category or one product, for every customer
+ * (`businessUserId` null) or one customer. `kind` "percent" / "amount" (shekels before VAT): `value` (> 0) is
+ * what is taken off; "fixed_price" (one customer, one product): the price itself.
+ * `startsOn` / `endsOn` are Israel dates ("2026-11-03", inclusive); null = no limit.
  */
-export async function postStaffSignIn(credentials: { email: string; password: string; remember: boolean }): Promise<StaffUser> {
-  return (await apiFetch<{ user: StaffUser }>('/api/staff/auth/login', { method: 'POST', body: credentials })).user
+export type StaffPriceRule = StaffRowBase & {
+  id: string
+  businessUserId: string | null
+  categoryId: string | null
+  productId: string | null
+  kind: 'percent' | 'amount' | 'fixed_price'
+  value: number
+  startsOn: string | null
+  endsOn: string | null
+  isActive: boolean
+  note: string | null
 }
-
-/**
- * Signs the staff user out; the server expires the JWT cookies.
- * @returns Resolves when the server answered.
- */
-export const postStaffSignOut = () => apiFetch<void>('/api/staff/auth/logout', { method: 'POST' })
 
 /**
  * Every row of a staff resource, active or not, in display order.

@@ -3,10 +3,10 @@
  * category or a product (for all customers or one customer), or a payment method.
  *
  * It asks for the type (a percentage or an amount in shekels before VAT, as a switch), the value, a start date
- * and an end date or "no end date". A positive value is a discount and a negative one a surcharge, for every
- * target. A live summary reads the result back in words ("10% off, from 3 Nov 2026, with no end date"). The
+ * and an end date or "no end date". The value is always positive: the percent or the shekels taken off. A live summary reads the result back in words ("10% off, from 3 Nov 2026, with no end date"). The
  * dialog knows nothing about storage: it hands the caller a DiscountValue, and the caller saves it for its
- * target (e.g. a price rule); when the save is refused, the dialog shows why and stays open.
+ * target (e.g. a price rule); when the save is refused, the dialog shows why and stays open. describeDiscount
+ * words a discount the same way for lists (DiscountsDialog).
  */
 import { useId, useState, type FormEvent } from 'react'
 import { cn } from 'cn'
@@ -15,9 +15,10 @@ import { errorMessage, INPUT_CLASS, LABEL_CLASS } from '@/components/RecordDialo
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n, type Locale } from '@/i18n'
+import type { Dictionary } from '@/i18n/he'
 
 /**
- * One discount. `value` > 0 is a discount, < 0 a surcharge: percent for "percent", shekels before VAT for
+ * One discount. `value` > 0 is what is taken off: percent for "percent", shekels before VAT for
  * "amount". `startsOn` / `endsOn` are Israel dates ("2026-11-03", inclusive); `endsOn` null = no end date.
  */
 export type DiscountValue = { type: 'percent' | 'amount'; value: number; startsOn: string; endsOn: string | null }
@@ -34,18 +35,17 @@ export function israelToday(): string {
 }
 
 /**
- * Formats a discount value for people, with its unit and without its sign.
+ * Formats a discount value for people, with its unit.
  * @param type - Percent or amount.
- * @param value - The value (the sign is dropped; the summary's wording carries it).
+ * @param value - The value.
  * @param locale - The page language.
  * @returns E.g. "10%" or "₪20.00", isolated from the text around it so Hebrew sentences keep "7.5%" in order.
  */
 function formatValue(type: DiscountValue['type'], value: number, locale: Locale): string {
-  const magnitude = Math.abs(value)
   const text =
     type === 'percent'
-      ? `${magnitude.toLocaleString(locale, { maximumFractionDigits: 2 })}%`
-      : magnitude.toLocaleString(locale, { style: 'currency', currency: 'ILS' })
+      ? `${value.toLocaleString(locale, { maximumFractionDigits: 2 })}%`
+      : value.toLocaleString(locale, { style: 'currency', currency: 'ILS' })
   // U+2066 / U+2069: a left-to-right isolate around the number and its unit.
   return `\u2066${text}\u2069`
 }
@@ -61,14 +61,37 @@ function formatDate(date: string, locale: Locale): string {
 }
 
 /**
+ * Words a discount for people: its value and its period.
+ * @param discount - The discount; an empty `startsOn` leaves the period out.
+ * @param t - The dictionary.
+ * @param locale - The page language.
+ * @returns E.g. "10% off, from 3 Nov 2026, with no end date" or "₪20.00 off, from 1 Nov 2026 to 30 Nov 2026".
+ */
+export function describeDiscount({ type, value, startsOn, endsOn }: DiscountValue, t: Dictionary, locale: Locale): string {
+  const d = t.admin.discount
+  return [
+    d.summaryDiscount.replace('{value}', formatValue(type, value, locale)),
+    startsOn &&
+      (endsOn ? d.summaryPeriod : d.summaryOpen)
+        .replace('{start}', formatDate(startsOn, locale))
+        .replace('{end}', endsOn ? formatDate(endsOn, locale) : ''),
+  ]
+    .filter(Boolean)
+    .join(', ')
+}
+
+/**
  * The create/edit discount dialog.
  * @param props.open - Whether the dialog is open.
  * @param props.onOpenChange - Called to open or close it (Cancel, Escape, the X, a click outside, after saving).
  * @param props.onSave - Saves the discount; rejects with ApiError to show the server's reason and keep the
  *   dialog open.
- * @param props.initial - The discount being edited; omit to create one (a percentage, from today, no end date).
+ * @param props.initial - The discount being edited (an empty start date starts from today); omit to create one (a
+ *   percentage, from today, no end date).
  * @param props.title - The title; defaults to "New discount", or "Edit discount" when `initial` is given.
  * @param props.target - What the discount applies to, shown under the title (e.g. "Dry dog food — Demo Pet Shop").
+ * @param props.onCloseAutoFocus - Where the focus goes after closing (the button that opened it); without it, the
+ *   focus is left on the page.
  * @returns The dialog.
  */
 export function DiscountDialog({
@@ -78,6 +101,7 @@ export function DiscountDialog({
   initial,
   title,
   target,
+  onCloseAutoFocus,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -85,11 +109,12 @@ export function DiscountDialog({
   initial?: DiscountValue
   title?: string
   target?: string
+  onCloseAutoFocus?: (event: Event) => void
 }) {
   const { t } = useI18n()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent closeLabel={t.admin.close}>
+      <DialogContent closeLabel={t.admin.close} onCloseAutoFocus={onCloseAutoFocus}>
         {/* Mounted only while open, so every opening starts from `initial`. */}
         <DiscountForm
           initial={initial}
@@ -133,7 +158,7 @@ function DiscountForm({
   const id = useId()
   const [type, setType] = useState<DiscountValue['type']>(initial?.type ?? 'percent')
   const [value, setValue] = useState(initial ? String(initial.value) : '')
-  const [startsOn, setStartsOn] = useState(initial?.startsOn ?? israelToday())
+  const [startsOn, setStartsOn] = useState(initial?.startsOn || israelToday())
   const [endsOn, setEndsOn] = useState(initial?.endsOn ?? '')
   const [noEnd, setNoEnd] = useState(initial ? initial.endsOn === null : true)
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({})
@@ -141,18 +166,8 @@ function DiscountForm({
   const [pending, setPending] = useState(false)
 
   const number = Number(value.trim())
-  const valid = /^-?\d+(\.\d{1,2})?$/.test(value.trim()) && number !== 0
-  const summary = valid
-    ? [
-        (number > 0 ? d.summaryDiscount : d.summarySurcharge).replace('{value}', formatValue(type, number, locale)),
-        startsOn &&
-          (noEnd || !endsOn ? d.summaryOpen : d.summaryPeriod)
-            .replace('{start}', formatDate(startsOn, locale))
-            .replace('{end}', endsOn ? formatDate(endsOn, locale) : ''),
-      ]
-        .filter(Boolean)
-        .join(', ')
-    : ''
+  const valid = /^-?\d+(\.\d{1,2})?$/.test(value.trim()) && number > 0
+  const summary = valid ? describeDiscount({ type, value: number, startsOn, endsOn: noEnd || !endsOn ? null : endsOn }, t, locale) : ''
 
   /**
    * Checks the fields, then saves; puts each problem (or the server's reason) next to its field.
@@ -163,7 +178,7 @@ function DiscountForm({
     const found: Partial<Record<FieldName, string>> = {}
     if (!value.trim()) found.value = t.admin.errors.required
     else if (!/^-?\d+(\.\d{1,2})?$/.test(value.trim())) found.value = d.errorNumber
-    else if (number === 0) found.value = d.errorZero
+    else if (number <= 0) found.value = d.errorPositive
     else if (type === 'percent' && number > 100) found.value = d.errorPercent
     if (!startsOn) found.startsOn = t.admin.errors.required
     if (!noEnd && !endsOn) found.endsOn = t.admin.errors.required

@@ -1,4 +1,4 @@
-"""price_rules.py — The PriceRule model: every discount, price increase and fixed price staff set.
+"""price_rules.py — The PriceRule model: every discount and fixed price staff set.
 
 One row of `price_rules` is a rule for all customers or one customer, on a category or a product, for a set period
 or open-ended. The logic that turns rules into a customer's price lives in app/pricing.py. Column meanings are
@@ -22,19 +22,18 @@ if TYPE_CHECKING:
 
 
 class PriceRule(TimestampMixin, db.Model):
-    """A discount, price increase or fixed price, for everyone or for one customer, on a category or a product."""
+    """A discount (percent or amount), or a customer's fixed price, on a category or a product."""
 
     __tablename__ = "price_rules"
     __table_args__ = (
-        CheckConstraint("kind IN ('discount', 'increase', 'fixed_price')", name="kind"),
+        CheckConstraint("kind IN ('percent', 'amount', 'fixed_price')", name="kind"),
         CheckConstraint("value > 0", name="value"),
         CheckConstraint("num_nonnulls(category_id, product_id) = 1", name="one_target"),
-        CheckConstraint("kind <> 'discount' OR value <= 100", name="discount_max"),
+        CheckConstraint("kind <> 'percent' OR value <= 100", name="percent_max"),
         CheckConstraint(
             "kind <> 'fixed_price' OR (product_id IS NOT NULL AND business_user_id IS NOT NULL)",
             name="fixed_price_target",
         ),
-        CheckConstraint("business_user_id IS NOT NULL OR kind = 'discount'", name="general_discount_only"),
         CheckConstraint("starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on", name="dates"),
     )
 

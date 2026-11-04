@@ -68,14 +68,14 @@ describe('api', () => {
     expect(signedOut).not.toHaveBeenCalled()
   })
 
-  it('refreshes an expired staff sign-in at the staff route', async () => {
+  it('refreshes an expired staff sign-in at the shared route', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(reply(401, { error: 'token_expired' }))
       .mockResolvedValueOnce(reply(204))
       .mockResolvedValueOnce(reply(200, []))
     await expect(fetchStaffRows('brands')).resolves.toEqual([])
-    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual(['/api/staff/brands', '/api/staff/auth/refresh', '/api/staff/brands'])
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual(['/api/staff/brands', '/api/auth/refresh', '/api/staff/brands'])
   })
 
   it('keeps the field and constraint of a refused change', async () => {

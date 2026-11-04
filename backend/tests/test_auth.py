@@ -1,4 +1,4 @@
-"""test_auth.py — JWT sign-in (app/auth.py) through the customers' and the staff's auth routes.
+"""test_auth.py — JWT sign-in (app/auth.py) through the shared /api/auth routes (customers and staff).
 
 Cookies and their flags, "remember me", wrong credentials, expiry and refresh, the CSRF double-submit check,
 deactivated users, tokens of the wrong user type, tampered tokens and sign-out.
@@ -26,7 +26,9 @@ def set_cookies(response) -> dict[str, str]:
 def test_login_sets_httponly_jwt_cookies_and_readable_csrf_cookies(client, customer):
     response = client.post("/api/auth/login", json=CUSTOMER)
     assert response.status_code == 200
-    assert response.get_json() == {"user": {"email": CUSTOMER["email"], "fullName": "Dana Cohen", "companyName": "Pet Corner"}}
+    assert response.get_json() == {
+        "user": {"kind": "business", "email": CUSTOMER["email"], "fullName": "Dana Cohen", "companyName": "Pet Corner"}
+    }
     cookies = set_cookies(response)
     for name in ("access_token_cookie", "refresh_token_cookie"):
         assert "HttpOnly" in cookies[name] and "Path=/api/" in cookies[name] and "SameSite=Lax" in cookies[name]
@@ -53,20 +55,23 @@ def test_login_records_the_time(client, customer, database):
     [
         {**CUSTOMER, "password": "wrong-password"},
         {**CUSTOMER, "email": "nobody@example.com"},
-        STAFF,  # a staff account cannot sign in to the customer portal
     ],
 )
-def test_wrong_credentials_are_refused(client, customer, staff, credentials):
+def test_wrong_credentials_are_refused(client, customer, credentials):
     response = client.post("/api/auth/login", json=credentials)
     assert (response.status_code, response.get_json()) == (401, {"error": "invalid_credentials"})
     assert "Set-Cookie" not in response.headers
 
 
-def test_staff_login_refuses_a_customer_and_an_inactive_staff_user(client, customer, staff, database):
-    assert client.post("/api/staff/auth/login", json=CUSTOMER).status_code == 401
+def test_staff_sign_in_here_and_an_inactive_staff_user_is_refused(client, staff, database):
+    response = client.post("/api/auth/login", json=STAFF)
+    assert response.status_code == 200
+    assert response.get_json()["user"] == {
+        "kind": "staff", "email": STAFF["email"], "fullName": "Office Admin", "companyName": None
+    }
     staff.is_active = False
     database.commit()
-    assert client.post("/api/staff/auth/login", json=STAFF).status_code == 401
+    assert client.post("/api/auth/login", json=STAFF).status_code == 401
 
 
 def test_login_needs_a_json_body_with_email_and_password(client):
@@ -127,12 +132,16 @@ def test_a_deactivated_user_loses_access_at_once(customer_client, customer, data
 
 def test_a_token_only_opens_its_own_user_type(customer_client, client, staff, csrf):
     assert customer_client.get("/api/staff/brands").status_code == 403
-    assert customer_client.post("/api/staff/auth/refresh", headers=csrf(customer_client, refresh=True)).status_code == 403
-    client.post("/api/staff/auth/login", json=STAFF)  # the same browser signs in as staff instead
+    client.post("/api/auth/login", json=STAFF)  # the same browser signs in as staff instead
     assert client.get("/api/prices").status_code == 403
-    assert client.get("/api/staff/auth/me").get_json()["user"] == {
-        "email": STAFF["email"], "fullName": "Office Admin", "role": "admin"
-    }
+    assert client.get("/api/staff/brands").status_code == 200
+    assert client.get("/api/auth/me").get_json()["user"]["kind"] == "staff"
+
+
+def test_a_staff_session_is_refreshed_too(client, staff, csrf):
+    client.post("/api/auth/login", json=STAFF)
+    assert client.post("/api/auth/refresh", headers=csrf(client, refresh=True)).status_code == 204
+    assert client.get("/api/staff/brands").status_code == 200
 
 
 def test_a_tampered_token_is_invalid(customer_client):

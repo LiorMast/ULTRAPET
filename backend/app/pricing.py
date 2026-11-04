@@ -1,15 +1,16 @@
 """pricing.py — The price a business customer pays, computed from list prices and price rules.
 
-The PriceRule model (table price_rules, app/database/models/price_rules.py) holds every discount, price increase and special
-price staff set. The functions below turn a product's list price and those rules into the customer's price:
+The PriceRule model (table price_rules, app/database/models/price_rules.py) holds every discount and special price staff
+set. The functions below turn a product's list price and those rules into the customer's price:
 
 1. A rule counts only while active: `is_active` and starts_on <= today <= ends_on (a missing date = no limit),
    where today is the date in Israel.
 2. Two layers are picked separately: the customer's own rules and the general rules. In each layer a product rule
    beats a category rule; among rules on the same target the one that started last wins (no start = earliest),
    so a temporary deal overrides permanent terms while it lasts.
-3. A customer fixed price is final. Otherwise the layers stack:
-   list price x (1 - or + the customer's percent) x (1 - the general discount), rounded half-up to agorot once.
+3. A customer fixed price is final. Otherwise the layers stack: the customer's discount, then the general discount, is
+   taken off the list price (a percent rule: x (1 - value / 100); an amount rule: - value), never going below 0, and
+   the result is rounded half-up to agorot once.
 
 `pick_rule` and `resolve_price` are pure (no database), so they are unit-tested directly; `customer_prices` loads
 the data for the catalog. Column meanings are documented in create-tables.sql.
@@ -81,6 +82,20 @@ def pick_rule(rules: Iterable[PriceRule], product_id: uuid.UUID, category_id: uu
     return None
 
 
+def apply_rule(price: Decimal, rule: PriceRule) -> Decimal:
+    """Takes one percent or amount discount off a price.
+
+    Args:
+        price: The price so far, in shekels before VAT.
+        rule: A 'percent' or 'amount' rule (its value is positive).
+
+    Returns:
+        The new price (unrounded), never below 0.
+    """
+    changed = price - rule.value if rule.kind == "amount" else price * (1 - rule.value / HUNDRED)
+    return max(changed, Decimal(0))
+
+
 def resolve_price(
     list_price: Decimal | None,
     customer_rules: Iterable[PriceRule],
@@ -94,7 +109,7 @@ def resolve_price(
     Args:
         list_price: The product's list price, or None when it has none.
         customer_rules: The customer's own rules.
-        general_rules: The rules for all customers (discounts only).
+        general_rules: The rules for all customers (percent and amount rules).
         product_id: The product being priced.
         category_id: The product's category.
         today: The Israel date to price on.
@@ -111,11 +126,10 @@ def resolve_price(
 
     price = list_price
     if customer_rule is not None:
-        sign = -1 if customer_rule.kind == "discount" else 1
-        price *= 1 + sign * customer_rule.value / HUNDRED
+        price = apply_rule(price, customer_rule)
     general_rule = pick_rule(general_rules, product_id, category_id, today)
     if general_rule is not None:
-        price *= 1 - general_rule.value / HUNDRED
+        price = apply_rule(price, general_rule)
     return price.quantize(AGORA, ROUND_HALF_UP)
 
 

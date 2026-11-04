@@ -22,8 +22,8 @@ def rule(kind: str, value: str, *, product: bool = False, created: int = 0, **fi
     """Builds an unsaved rule on the test product or, by default, its category.
 
     Args:
-        kind: 'discount', 'increase' or 'fixed_price'.
-        value: Percent, or shekels for a fixed price.
+        kind: 'percent', 'amount' or 'fixed_price'.
+        value: Percent or shekels.
         product: True to target the product instead of the category.
         created: Days after 1 Oct 2026 the rule was created (decides ties between rules with the same start).
         **fields: Other PriceRule fields (starts_on, ends_on, is_active).
@@ -62,25 +62,32 @@ def test_no_rules_gives_the_list_price():
 
 
 def test_a_general_category_discount():
-    assert price(general=[rule("discount", "10")]) == Decimal("90.00")
+    assert price(general=[rule("percent", "10")]) == Decimal("90.00")
 
 
 def test_a_product_rule_beats_a_category_rule_in_the_same_layer():
-    assert price(general=[rule("discount", "10"), rule("discount", "5", product=True)]) == Decimal("95.00")
-    assert price(customer=[rule("increase", "20"), rule("discount", "5", product=True)]) == Decimal("95.00")
-
-
-def test_a_customer_increase_and_a_general_discount_stack():
-    assert price(customer=[rule("increase", "5")], general=[rule("discount", "10", product=True)]) == Decimal("94.50")
+    assert price(general=[rule("percent", "10"), rule("percent", "5", product=True)]) == Decimal("95.00")
+    assert price(customer=[rule("percent", "20"), rule("percent", "5", product=True)]) == Decimal("95.00")
 
 
 def test_a_customer_discount_and_a_general_discount_multiply():
-    assert price(customer=[rule("discount", "15")], general=[rule("discount", "10")]) == Decimal("76.50")
+    assert price(customer=[rule("percent", "15")], general=[rule("percent", "10")]) == Decimal("76.50")
+
+
+def test_amount_rules_take_shekels_off():
+    assert price(general=[rule("amount", "12.50")]) == Decimal("87.50")
+    # The customer's rule comes first: (100 - 10) x 0.9.
+    assert price(customer=[rule("amount", "10")], general=[rule("percent", "10")]) == Decimal("81.00")
+
+
+def test_a_price_never_goes_below_zero():
+    assert price(general=[rule("amount", "150")]) == Decimal("0.00")
+    assert price(customer=[rule("amount", "60")], general=[rule("amount", "50")]) == Decimal("0.00")
 
 
 def test_a_customer_fixed_price_is_final():
     fixed = rule("fixed_price", "80", product=True)
-    assert price(customer=[fixed, rule("discount", "50")], general=[rule("discount", "10")]) == Decimal("80.00")
+    assert price(customer=[fixed, rule("percent", "50")], general=[rule("percent", "10")]) == Decimal("80.00")
 
 
 def test_a_fixed_price_applies_without_a_list_price():
@@ -88,35 +95,35 @@ def test_a_fixed_price_applies_without_a_list_price():
 
 
 def test_no_list_price_and_no_fixed_price_means_no_price():
-    assert price(customer=[rule("discount", "10")], list_price=None) is None
+    assert price(customer=[rule("percent", "10")], list_price=None) is None
 
 
 def test_rules_apply_only_inside_their_period():
     day = timedelta(days=1)
-    assert price(general=[rule("discount", "10", starts_on=TODAY + day)]) == LIST  # not started
-    assert price(general=[rule("discount", "10", ends_on=TODAY - day)]) == LIST  # expired
-    assert price(general=[rule("discount", "10", starts_on=TODAY, ends_on=TODAY)]) == Decimal("90.00")  # inclusive
-    assert price(general=[rule("discount", "10", starts_on=TODAY - 365 * day)]) == Decimal("90.00")  # open-ended
+    assert price(general=[rule("percent", "10", starts_on=TODAY + day)]) == LIST  # not started
+    assert price(general=[rule("percent", "10", ends_on=TODAY - day)]) == LIST  # expired
+    assert price(general=[rule("percent", "10", starts_on=TODAY, ends_on=TODAY)]) == Decimal("90.00")  # inclusive
+    assert price(general=[rule("percent", "10", starts_on=TODAY - 365 * day)]) == Decimal("90.00")  # open-ended
 
 
 def test_a_paused_rule_is_ignored():
-    assert price(general=[rule("discount", "10", is_active=False)]) == LIST
+    assert price(general=[rule("percent", "10", is_active=False)]) == LIST
 
 
 def test_a_temporary_deal_overrides_permanent_terms_while_it_lasts():
-    permanent = rule("discount", "5", created=1)
-    november = rule("discount", "15", created=2, starts_on=date(2026, 11, 1), ends_on=date(2026, 11, 30))
+    permanent = rule("percent", "5", created=1)
+    november = rule("percent", "15", created=2, starts_on=date(2026, 11, 1), ends_on=date(2026, 11, 30))
     assert price(customer=[permanent, november]) == Decimal("85.00")
     assert price(customer=[permanent, november], today=date(2026, 12, 1)) == Decimal("95.00")
 
 
 def test_between_rules_with_the_same_start_the_newest_wins():
-    assert price(general=[rule("discount", "10", created=7), rule("discount", "20", created=3)]) == Decimal("90.00")
+    assert price(general=[rule("percent", "10", created=7), rule("percent", "20", created=3)]) == Decimal("90.00")
 
 
 def test_prices_round_half_up_to_agorot():
     # 1.65 x 0.9 = 1.485: half-up gives 1.49 (banker's rounding would give 1.48).
-    assert price(general=[rule("discount", "10")], list_price=Decimal("1.65")) == Decimal("1.49")
+    assert price(general=[rule("percent", "10")], list_price=Decimal("1.65")) == Decimal("1.49")
 
 
 def test_customer_prices_uses_only_this_customer_and_the_general_rules(database):
@@ -155,11 +162,11 @@ def test_customer_prices_uses_only_this_customer_and_the_general_rules(database)
             p3,
             product(4, toys, None),  # no price: left out
             product(5, toys, "10.00", is_active=False),  # hidden: left out
-            PriceRule(business_user=me, category=food, kind="discount", value=Decimal(10)),
+            PriceRule(business_user=me, category=food, kind="percent", value=Decimal(10)),
             PriceRule(business_user=me, product=p2, kind="fixed_price", value=Decimal("30.00")),
-            PriceRule(business_user=other, category=toys, kind="discount", value=Decimal(50)),  # someone else's
-            PriceRule(category=toys, kind="discount", value=Decimal(25), ends_on=TODAY - timedelta(days=1)),  # expired
-            PriceRule(product=p1, kind="discount", value=Decimal(10)),
+            PriceRule(business_user=other, category=toys, kind="percent", value=Decimal(50)),  # someone else's
+            PriceRule(category=toys, kind="percent", value=Decimal(25), ends_on=TODAY - timedelta(days=1)),  # expired
+            PriceRule(product=p1, kind="percent", value=Decimal(10)),
         ]
     )
     database.commit()

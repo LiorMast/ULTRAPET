@@ -186,22 +186,23 @@ CREATE INDEX ON product_suppliers (supplier_id);
 -- Pricing.
 -- ===================================================================================================================
 
--- price_rules — Every discount, price increase and special price, general or per customer, for a set period or
--- open-ended. Written by staff. How a customer's price is computed (backend/app/pricing.py):
+-- price_rules — Every discount and special price, general or per customer, for a set period or
+-- open-ended. Written by staff (the staff panel's discount dialogs). How a customer's price is computed
+-- (backend/app/pricing.py):
 --   1. Rules count only while active: is_active and starts_on <= today <= ends_on (a NULL date = no limit), where
 --      today is the date in Israel.
 --   2. Two layers are picked separately: the customer's own rules, and the general rules (business_user_id NULL).
 --      In each layer a product rule beats a category rule, and among rules on the same target the one that started
 --      last wins (NULL start = earliest), so a temporary deal overrides permanent terms while it lasts.
---   3. A customer fixed_price is the final price. Otherwise:
---      price = list_price x (1 -/+ customer discount/increase) x (1 - general discount), rounded to agorot.
+--   3. A customer fixed_price is the final price. Otherwise the customer's discount, then the general discount, is
+--      taken off list_price (a percent: x (1 - value/100); an amount: - value), never below 0, rounded to agorot once.
 CREATE TABLE price_rules (
   id               UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- rule id
   business_user_id UUID        REFERENCES business_users (id) ON DELETE CASCADE, -- the customer the rule is for; NULL = a general rule for all customers
   category_id      UUID        REFERENCES categories (id) ON DELETE CASCADE,     -- target category (every product in it); NULL when the rule targets a product
   product_id       UUID        REFERENCES products (id) ON DELETE CASCADE,       -- target product; NULL when the rule targets a category
-  kind             TEXT          NOT NULL CHECK (kind IN ('discount', 'increase', 'fixed_price')), -- 'discount' = value percent off; 'increase' = value percent on top (price hike); 'fixed_price' = the price is value shekels
-  value            NUMERIC(10,2) NOT NULL CHECK (value > 0), -- percent for discount/increase, shekels before VAT for fixed_price
+  kind             TEXT          NOT NULL CHECK (kind IN ('percent', 'amount', 'fixed_price')), -- 'percent' = value percent off; 'amount' = value shekels before VAT off each unit; 'fixed_price' = the price is value shekels
+  value            NUMERIC(10,2) NOT NULL CHECK (value > 0), -- percent or shekels before VAT (see kind); always positive: what is taken off, or the fixed price
   starts_on        DATE,                                  -- first day the rule applies (Israel date, inclusive); NULL = already in effect
   ends_on          DATE,                                  -- last day the rule applies (inclusive); NULL = no end date
   is_active        BOOLEAN       NOT NULL DEFAULT true,   -- false = paused: ignored without being deleted
@@ -210,9 +211,8 @@ CREATE TABLE price_rules (
   created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),  -- when the rule was created
   updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),  -- last change
   CONSTRAINT price_rules_one_target_check CHECK (num_nonnulls(category_id, product_id) = 1), -- exactly one target: a category or a product
-  CONSTRAINT price_rules_discount_max_check CHECK (kind <> 'discount' OR value <= 100), -- a discount is at most 100 percent
+  CONSTRAINT price_rules_percent_max_check CHECK (kind <> 'percent' OR value <= 100), -- a percent discount is at most 100 percent
   CONSTRAINT price_rules_fixed_price_target_check CHECK (kind <> 'fixed_price' OR (product_id IS NOT NULL AND business_user_id IS NOT NULL)), -- a fixed price is set on one product for one customer
-  CONSTRAINT price_rules_general_discount_only_check CHECK (business_user_id IS NOT NULL OR kind = 'discount'), -- a general rule can only be a discount (a general increase = change list_price)
   CONSTRAINT price_rules_dates_check CHECK (starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on) -- the period does not end before it starts
 );
 CREATE INDEX ON price_rules (business_user_id);

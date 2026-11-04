@@ -117,7 +117,7 @@ describe('Catalog page', () => {
   it('is linked from the Products menu', async () => {
     const { user } = await renderPage('/en')
     await user.click(screen.getByRole('button', { name: 'Products' }))
-    expect(await screen.findByRole('menuitem', { name: 'Product catalog' })).toHaveAttribute('href', '/en/catalog')
+    expect(await screen.findByRole('menuitem', { name: 'All products' })).toHaveAttribute('href', '/en/catalog')
   })
 })
 

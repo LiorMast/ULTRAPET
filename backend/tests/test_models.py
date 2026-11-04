@@ -93,7 +93,7 @@ def test_deleting_an_app_user_deletes_the_subtype_row(database):
 def test_deleting_a_customer_deletes_their_price_rules_and_never_makes_them_general(database, category):
     customer = make_customer()
     database.add(customer)
-    database.add(PriceRule(business_user=customer, category=category, kind="discount", value=Decimal(10)))
+    database.add(PriceRule(business_user=customer, category=category, kind="percent", value=Decimal(10)))
     database.commit()
     assert len(customer.price_rules) == 1  # loaded, so the ORM (not only the database) handles them
 
@@ -132,15 +132,16 @@ def test_a_customer_with_orders_cannot_be_deleted(database):
 @pytest.mark.parametrize(
     ("fields", "constraint"),
     [
-        ({"kind": "discount", "value": 10}, "price_rules_one_target_check"),  # no target
-        ({"kind": "discount", "value": 10, "with_product": True, "with_category": True}, "price_rules_one_target_check"),
-        ({"kind": "discount", "value": 120, "with_category": True}, "price_rules_discount_max_check"),
-        ({"kind": "discount", "value": 0, "with_category": True}, "price_rules_value_check"),
+        ({"kind": "percent", "value": 10}, "price_rules_one_target_check"),  # no target
+        ({"kind": "percent", "value": 10, "with_product": True, "with_category": True}, "price_rules_one_target_check"),
+        ({"kind": "percent", "value": 120, "with_category": True}, "price_rules_percent_max_check"),
+        ({"kind": "amount", "value": 0, "with_category": True}, "price_rules_value_check"),
+        ({"kind": "percent", "value": -5, "with_category": True}, "price_rules_value_check"),  # no surcharges
         ({"kind": "fixed_price", "value": 50, "with_product": True}, "price_rules_fixed_price_target_check"),
-        ({"kind": "increase", "value": 5, "with_category": True}, "price_rules_general_discount_only_check"),
+        ({"kind": "fixed_price", "value": -5, "with_product": True, "with_customer": True}, "price_rules_value_check"),
         ({"kind": "rebate", "value": 5, "with_category": True, "with_customer": True}, "price_rules_kind_check"),
         (
-            {"kind": "discount", "value": 5, "with_category": True, "starts_on": date(2026, 12, 1), "ends_on": date(2026, 11, 1)},
+            {"kind": "percent", "value": 5, "with_category": True, "starts_on": date(2026, 12, 1), "ends_on": date(2026, 11, 1)},
             "price_rules_dates_check",
         ),
     ],
@@ -162,6 +163,16 @@ def test_price_rule_checks_reject_invalid_rules(database, category, fields, cons
     database.add(rule)
     with pytest.raises(IntegrityError, match=constraint):
         database.commit()
+
+
+def test_general_percent_and_amount_discounts_are_valid(database, category):
+    database.add_all(
+        [
+            PriceRule(category=category, kind="percent", value=Decimal("100")),
+            PriceRule(category=category, kind="amount", value=Decimal("12.50")),
+        ]
+    )
+    database.commit()
 
 
 def test_a_customer_fixed_price_on_a_product_is_valid(database, category):

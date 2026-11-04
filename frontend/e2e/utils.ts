@@ -24,3 +24,23 @@ export async function scrollIntoViewSettled(section: Locator) {
 export async function hideFixedOverlays(page: Page) {
   await page.addStyleTag({ content: 'header, a[href^="https://wa.me/"].fixed { visibility: hidden !important; }' })
 }
+
+/** The staff admin that `flask seed` creates from SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in the repo's .env. */
+const STAFF = { email: process.env.SEED_ADMIN_EMAIL ?? '', password: process.env.SEED_ADMIN_PASSWORD ?? '' }
+
+/**
+ * Opens an admin page and signs in as the seed staff admin, then waits for the page's table.
+ * @param page - The Playwright page.
+ * @param path - The admin page, e.g. "/en/admin/brands".
+ */
+export async function signInStaff(page: Page, path = '/en/admin/brands') {
+  if (!STAFF.email || !STAFF.password) {
+    throw new Error('Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in .env, then run `flask reset-db --yes` and `flask seed`.')
+  }
+  await page.goto(path)
+  const english = path.startsWith('/en')
+  await page.getByLabel(english ? 'Email' : 'דוא"ל').fill(STAFF.email)
+  await page.getByLabel(english ? 'Password' : 'סיסמה').fill(STAFF.password)
+  await page.getByRole('main').getByRole('button', { name: english ? 'Log in' : 'התחברות' }).click()
+  await page.getByRole('table').waitFor()
+}

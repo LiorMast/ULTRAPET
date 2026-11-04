@@ -7,7 +7,7 @@
  *   scrolling underneath shows through blurred) with a hairline and a soft shadow (both drawn as
  *   box-shadows, so they add no height). It is exactly 88px tall so the logo reads clearly; pages
  *   offset their content by the same amount.
- * - The menu comes from MAIN_NAV in src/config.ts; an item with `children` opens a dropdown (Products).
+ * - The menu is built by mainNav() in src/config.ts (the Products dropdown lists the categories passed in); an item with `children` opens a dropdown (Products).
  * - From the xl breakpoint the full menu is shown; below it, <MobileMenu> (a drawer) takes over.
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
  *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
@@ -27,7 +27,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MAIN_NAV, type NavChild, type NavItem } from '@/config'
+import { mainNav, type NavItem } from '@/config'
+import type { ProductCategory } from '@/api'
 import { useI18n } from '@/i18n'
 
 /**
@@ -40,11 +41,13 @@ const NAV_TEXT =
 
 /**
  * The site header.
- * @param props.items - Menu items; defaults to MAIN_NAV from src/config.ts.
+ * @param props.categories - The catalog categories for the Products dropdown (loaded by the root route).
+ * @param props.items - Menu items; defaults to mainNav(categories) from src/config.ts.
  * @returns The fixed <header> element.
  */
-export function Navbar({ items = MAIN_NAV }: { items?: NavItem[] }) {
-  const { t } = useI18n()
+export function Navbar({ categories = [], items }: { categories?: ProductCategory[]; items?: NavItem[] }) {
+  const { t, locale } = useI18n()
+  items ??= mainNav(categories, locale)
   useScrollSpy()
 
   return (
@@ -138,12 +141,11 @@ function useScrollSpy() {
 
 /**
  * One top-level menu entry: a link, or — for an item with `children` — a dropdown (Products).
- * @param props.item - The menu item (see MAIN_NAV in src/config.ts).
+ * @param props.item - The menu item (see mainNav in src/config.ts).
  * @returns The menu link or dropdown.
  */
 function DesktopNavItem({ item }: { item: NavItem }) {
   const { t } = useI18n()
-  const location = useLocation({ select: ({ pathname, hash }) => ({ pathname, hash }) })
 
   if (!('children' in item)) {
     return (
@@ -157,8 +159,6 @@ function DesktopNavItem({ item }: { item: NavItem }) {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
-        // Highlighted like an active link while the scrollspy is on one of its #sections (e.g. "All categories").
-        data-status={item.children.some((child) => isCurrentSection(child, location)) ? 'active' : undefined}
         className={cn(NAV_TEXT, 'flex items-center gap-1.5')}
       >
         {item.label(t)}
@@ -171,13 +171,7 @@ function DesktopNavItem({ item }: { item: NavItem }) {
         className="w-auto min-w-64 rounded-none border border-neutral-200 p-0 py-2 shadow-premium-sm ring-0"
       >
         {item.children.map((child) => {
-          const Icon = child.icon
-          const content = (
-            <>
-              {Icon && <Icon size={16} aria-hidden="true" className="text-brand-red" />}
-              {child.label(t)}
-            </>
-          )
+          const content = child.label(t)
           return (
             <Fragment key={child.id}>
               {child.divider && <DropdownMenuSeparator className="mx-0 my-2" />}
@@ -196,16 +190,6 @@ function DesktopNavItem({ item }: { item: NavItem }) {
       </DropdownMenuContent>
     </DropdownMenu>
   )
-}
-
-/**
- * Tells whether a dropdown entry links to the home-page section the visitor is on.
- * @param child - The dropdown entry.
- * @param location - The current pathname and hash.
- * @returns True for an internal #section link on the home page whose hash is the current one.
- */
-function isCurrentSection(child: NavChild, location: { pathname: string; hash: string }) {
-  return 'link' in child && location.pathname === '/' && location.hash !== '' && child.link.hash === location.hash
 }
 
 /**

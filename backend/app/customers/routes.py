@@ -3,8 +3,10 @@
 Public, no sign-in:
     GET /categories, /products, /brands, /brands/<slug>, /stats, /articles, /articles/<slug>, /resellers,
     /sitemap.xml
-Business customers (JWT cookies, see app/auth.py):
-    POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me, /prices
+Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
+    POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me
+Business customers only:
+    GET /prices
 
 JSON keys are camelCase, in the shapes the frontend types in src/api.ts (the same shapes as its stub fixtures).
 Only active rows are shown. The public routes never return a price: prices come only from /prices, computed for
@@ -15,15 +17,16 @@ from typing import Any
 from xml.sax.saxutils import escape
 
 from flask import Blueprint, Response, abort, current_app, jsonify, request
+from flask_jwt_extended import current_user, verify_jwt_in_request
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import contains_eager, selectinload
 
-from app.auth import authenticate, clear_tokens, issue_tokens, read_credentials, refresh_access, require_user
+from app.auth import authenticate, clear_tokens, issue_tokens, read_credentials, refresh_access, require_user, user_type
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.models.content import Article, Reseller
 from app.database.models.settings import Setting, get_setting
-from app.database.models.users import BusinessUser
+from app.database.models.users import AppUser, BusinessUser
 from app.pricing import ISRAEL, customer_prices
 
 bp = Blueprint("customers", __name__, url_prefix="/api")
@@ -366,31 +369,32 @@ def sitemap() -> Response:
     return Response(xml, mimetype="application/xml")
 
 
-def customer_json(user: BusinessUser) -> dict[str, Any]:
-    """Shapes the signed-in customer for the frontend's session.
+def session_json(user: AppUser) -> dict[str, Any]:
+    """Shapes the signed-in user (a customer or a staff member) for the frontend's session.
 
     Args:
-        user: The business user.
+        user: The business or staff user.
 
     Returns:
-        {email, fullName, companyName}.
+        {kind, email, fullName, companyName}; kind is "business" or "staff", companyName is null for staff.
     """
-    return {"email": user.email, "fullName": user.full_name, "companyName": user.company_name}
+    company = user.company_name if isinstance(user, BusinessUser) else None
+    return {"kind": user_type(user), "email": user.email, "fullName": user.full_name, "companyName": company}
 
 
 @bp.post("/auth/login")
 def login() -> Response | tuple[Response, int]:
-    """Signs a business customer in. Body: {email, password, remember}.
+    """Signs a business customer or a staff member in. Body: {email, password, remember}.
 
     Returns:
         {user} with the JWT cookies set; 401 {"error": "invalid_credentials"} when the email, password or account
-        does not match an active business user (staff sign in at /api/staff/auth/login).
+        does not match an active user.
     """
     email, password, remember = read_credentials()
-    user = authenticate(BusinessUser, email, password)
+    user = authenticate(AppUser, email, password)
     if user is None:
         return jsonify(error="invalid_credentials"), 401
-    return issue_tokens(jsonify(user=customer_json(user)), user, remember)
+    return issue_tokens(jsonify(user=session_json(user)), user, remember)
 
 
 @bp.post("/auth/refresh")
@@ -398,10 +402,9 @@ def refresh() -> Response:
     """Issues a new access token from the refresh cookie (the frontend calls it after a "token_expired" answer).
 
     Returns:
-        204 with a new access cookie; 401 when the refresh token is missing, expired or the CSRF header is wrong,
-        403 for a staff token.
+        204 with a new access cookie; 401 when the refresh token is missing, expired or the CSRF header is wrong.
     """
-    return refresh_access(Response(status=204), "business")
+    return refresh_access(Response(status=204))
 
 
 @bp.post("/auth/logout")
@@ -419,9 +422,10 @@ def me() -> dict[str, Any]:
     """Who is signed in; the frontend asks on every page load.
 
     Returns:
-        {user} for a signed-in business customer; 401 when signed out or expired, 403 for a staff token.
+        {user} for a signed-in customer or staff member; 401 when signed out or expired.
     """
-    return {"user": customer_json(require_user("business"))}
+    verify_jwt_in_request()
+    return {"user": session_json(current_user)}
 
 
 @bp.get("/prices")

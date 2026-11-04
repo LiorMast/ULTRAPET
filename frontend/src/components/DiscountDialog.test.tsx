@@ -1,7 +1,7 @@
 /**
  * DiscountDialog.test.tsx — Tests for the discount dialog: the defaults (percentage, from today, no end date),
- * the percent/amount switch, positive discounts and negative surcharges, a dated period, the field checks (empty,
- * zero, not a number, over 100%, end before start, missing end), editing an existing discount, the server's
+ * the percent/amount switch, an amount for a dated period, the field checks (empty, zero, negative, not a number,
+ * over 100%, end before start, missing end), editing an existing discount, the server's
  * refusal keeping the dialog open, and the Hebrew texts.
  */
 import { useState } from 'react'
@@ -57,19 +57,19 @@ describe('DiscountDialog', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('saves a negative amount as a surcharge for a set period', async () => {
+  it('saves an amount for a set period', async () => {
     const onSave = vi.fn(async () => {})
     const { user } = await renderDialog({ onSave })
     await user.click(screen.getByRole('radio', { name: 'Amount (₪)' }))
     expect(valueInput()).toHaveAccessibleDescription(/In shekels before VAT/)
-    await user.type(valueInput(), '-20')
+    await user.type(valueInput(), '20')
     await user.clear(screen.getByLabelText('Start date *'))
     await user.type(screen.getByLabelText('Start date *'), '2026-12-01')
     await user.click(screen.getByRole('checkbox', { name: 'No end date' }))
     await user.type(screen.getByLabelText('End date'), '2026-12-31')
-    expect(screen.getByText(/^\u2066₪20\.00\u2069 surcharge, from Dec 1, 2026 to Dec 31, 2026$/)).toBeInTheDocument()
+    expect(screen.getByText(/^\u2066₪20\.00\u2069 off, from Dec 1, 2026 to Dec 31, 2026$/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(onSave).toHaveBeenCalledWith({ type: 'amount', value: -20, startsOn: '2026-12-01', endsOn: '2026-12-31' })
+    expect(onSave).toHaveBeenCalledWith({ type: 'amount', value: 20, startsOn: '2026-12-01', endsOn: '2026-12-31' })
   })
 
   it('checks the value before saving', async () => {
@@ -81,7 +81,12 @@ describe('DiscountDialog', () => {
     expect(valueInput()).toHaveFocus()
     await user.type(valueInput(), '0')
     await save()
-    expect(valueInput()).toHaveAccessibleDescription(/Enter a value other than zero/)
+    expect(valueInput()).toHaveAccessibleDescription(/Enter a value above zero/)
+    await user.clear(valueInput())
+    await user.type(valueInput(), '-5')
+    await save()
+    expect(valueInput()).toHaveAccessibleDescription(/Enter a value above zero/)
+    expect(screen.queryByText(/ off, from /)).not.toBeInTheDocument()
     await user.clear(valueInput())
     await user.type(valueInput(), '1.234')
     await save()
@@ -90,7 +95,7 @@ describe('DiscountDialog', () => {
     await user.type(valueInput(), '150')
     await save()
     expect(valueInput()).toHaveAccessibleDescription(/at most 100%/)
-    // The same 150 is fine as an amount, and a surcharge has no upper limit.
+    // The same 150 is fine as an amount.
     await user.click(screen.getByRole('radio', { name: 'Amount (₪)' }))
     await save()
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ type: 'amount', value: 150 }))
@@ -99,7 +104,7 @@ describe('DiscountDialog', () => {
   it('checks the end date', async () => {
     const onSave = vi.fn(async () => {})
     const { user } = await renderDialog({ onSave })
-    await user.type(valueInput(), '-5')
+    await user.type(valueInput(), '5')
     await user.click(screen.getByRole('checkbox', { name: 'No end date' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByLabelText('End date')).toHaveAccessibleDescription('Required')

@@ -86,7 +86,8 @@ export const Route = createFileRoute('/catalog')({
 function CatalogPage() {
   const search = Route.useSearch()
   const { categories, results } = Route.useLoaderData()
-  const { user } = useAuth()
+  const { user: signedIn } = useAuth()
+  const user = signedIn?.kind === 'business' ? signedIn : null // staff have no customer prices
   const [loaded, setLoaded] = useState<{ email: string; prices: Record<string, number> } | null>(null)
 
   useEffect(() => {

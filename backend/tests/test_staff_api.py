@@ -1,11 +1,12 @@
 """test_staff_api.py — The staff panel API (app/staff/routes.py): access control and create/read/update/delete of
-every resource, with the field checks and the database constraints turned into 400/409 answers.
+every resource (price rules included), with the field checks and the database constraints turned into 400/409 answers.
 """
 import uuid
 
 import pytest
 
 from app.database.models.catalog import Category, Product
+from app.database.models.price_rules import PriceRule
 
 
 @pytest.fixture
@@ -123,6 +124,50 @@ def test_products_with_images_and_references(api):
     assert malformed.get_json() == {"error": "invalid", "field": "categoryId"}
     negative = api("PATCH", f"/products/{created['id']}", {"listPrice": -1})
     assert negative.get_json() == {"error": "invalid", "constraint": "products_list_price_check"}
+
+
+def test_price_rules_are_discounts_on_a_category_or_product(api, database, staff):
+    category = Category(slug="cats", name={"he": "חתולים"})
+    product = Product(slug="tuna", name={"he": "טונה"}, category=category)
+    database.add(product)
+    database.commit()
+
+    response = api("POST", "/price-rules", {"categoryId": str(category.id), "kind": "percent", "value": 10,
+                                            "startsOn": "2026-11-01", "endsOn": "2026-11-30"})
+    assert response.status_code == 201
+    rule = response.get_json()
+    assert {k: rule[k] for k in ("categoryId", "productId", "businessUserId", "kind", "value", "startsOn", "endsOn", "isActive")} == {
+        "categoryId": str(category.id), "productId": None, "businessUserId": None, "kind": "percent", "value": 10.0,
+        "startsOn": "2026-11-01", "endsOn": "2026-11-30", "isActive": True,
+    }
+    assert database.get(PriceRule, uuid.UUID(rule["id"])).created_by_id == staff.id
+
+    # A general discount by amount, open-ended.
+    amount = api("POST", "/price-rules", {"productId": str(product.id), "kind": "amount", "value": "12.50", "startsOn": "2026-11-03"})
+    assert (amount.status_code, amount.get_json()["value"]) == (201, 12.5)
+    changed = api("PATCH", f"/price-rules/{rule['id']}", {"kind": "amount", "value": 5, "endsOn": None}).get_json()
+    assert (changed["kind"], changed["value"], changed["endsOn"]) == ("amount", 5.0, None)
+    assert [r["id"] for r in api("GET", "/price-rules").get_json()] == [rule["id"], amount.get_json()["id"]]
+    assert api("DELETE", f"/price-rules/{rule['id']}").status_code == 204
+
+
+@pytest.mark.parametrize(
+    ("body", "error"),
+    [
+        ({"kind": "percent", "value": 0}, {"error": "invalid", "constraint": "price_rules_value_check"}),
+        ({"kind": "amount", "value": -5}, {"error": "invalid", "constraint": "price_rules_value_check"}),
+        ({"kind": "percent", "value": 101}, {"error": "invalid", "constraint": "price_rules_percent_max_check"}),
+        ({"kind": "percent", "value": 5, "startsOn": "2026-12-01", "endsOn": "2026-11-01"}, {"error": "invalid", "constraint": "price_rules_dates_check"}),
+        ({"kind": "percent", "value": 5, "startsOn": "1 Nov"}, {"error": "invalid", "field": "startsOn"}),
+        ({"kind": "percent"}, {"error": "required", "field": "value"}),
+    ],
+)
+def test_invalid_price_rules_are_refused(api, database, body, error):
+    category = Category(slug="birds", name={"he": "ציפורים"})
+    database.add(category)
+    database.commit()
+    response = api("POST", "/price-rules", {"categoryId": str(category.id), **body})
+    assert (response.status_code, response.get_json()) == (400, error)
 
 
 def test_a_category_with_products_cannot_be_deleted(api, database):

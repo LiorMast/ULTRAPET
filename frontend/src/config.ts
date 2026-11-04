@@ -10,7 +10,8 @@
  * doesn't exist is a type error.
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
-import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Download, Clock, Handshake, Heart, LayoutGrid, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
+import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Clock, Handshake, Heart, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
+import type { ProductCategory } from '@/api'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
 
@@ -21,7 +22,7 @@ export type Label = (t: Dictionary) => string
 export type AppLink = LinkOptions<RegisteredRouter, string, string>
 
 /** A dropdown entry: an internal link, or an external URL (`href`) that opens in a new tab. */
-export type NavChild = { id: string; label: Label; icon?: LucideIcon; divider?: boolean } & (
+export type NavChild = { id: string; label: Label; divider?: boolean } & (
   | { link: AppLink }
   | { href: string }
 )
@@ -108,33 +109,26 @@ export const brandLogo = (slug: string) => fileBySlug(brandLogoFiles, slug)
 /**
  * The main menu, in display order. An item has either `link` (an internal page or #section),
  * or `children` (a dropdown). A child has `link` or `href` (external URL, opens in a new tab), and
- * `divider: true` draws a separator line above it.
+ * `divider: true` draws a separator line above it. The Products dropdown lists the catalog categories from
+ * the database (same order as the live site), each linking to the catalog filtered by that category.
+ * @param categories - The catalog categories from the API (fetchCategories), in display order.
+ * @param locale - The page language, used to pick each category's name.
+ * @returns The menu items.
  */
-export const MAIN_NAV: NavItem[] = [
+export const mainNav = (categories: ProductCategory[], locale: Locale): NavItem[] => [
   { id: 'brands', label: (t: Dictionary) => t.nav.brands, link: linkOptions({ to: '/', hash: 'brands' }) },
   {
     id: 'products',
     label: (t: Dictionary) => t.nav.products,
     children: [
-      ...CATEGORIES.map((category) => ({
+      { id: 'full-catalog', label: (t: Dictionary) => t.nav.fullCatalog, link: linkOptions({ to: '/catalog' }) },
+      ...categories.map((category, i) => ({
         id: category.slug,
-        label: category.label,
-        icon: category.icon,
-        link: linkOptions({ to: '/categories/$slug', params: { slug: category.slug } }),
+        divider: i === 0,
+        label: () => localized(category.name, locale),
+        link: linkOptions({ to: '/catalog', search: { category: category.slug } }),
       })),
-      {
-        id: 'full-catalog',
-        label: (t: Dictionary) => t.nav.fullCatalog,
-        icon: LayoutGrid,
-        divider: true,
-        link: linkOptions({ to: '/catalog' }),
-      },
-      {
-        id: 'all-categories',
-        label: (t: Dictionary) => t.nav.allCategories,
-        link: linkOptions({ to: '/', hash: 'categories' }),
-      },
-      { id: 'catalog', label: (t: Dictionary) => t.nav.catalog, icon: Download, href: CATALOG_PDF_URL },
+      { id: 'catalog', label: (t: Dictionary) => t.nav.catalog, href: CATALOG_PDF_URL },
     ],
   },
   { id: 'private-label', label: (t: Dictionary) => t.nav.privateLabel, link: linkOptions({ to: '/', hash: 'private-label' }) },

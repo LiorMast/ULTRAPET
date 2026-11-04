@@ -1,9 +1,10 @@
 """routes.py — Blueprint `staff` (prefix /api/staff): the staff panel API.
 
-Sign-in: POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me (staff accounts only; JWT cookies, see
-app/auth.py). Every other route requires a signed-in staff user: 401 without a valid token, 403 with a customer's.
+Staff sign in through the shared /api/auth/* routes (blueprint `customers`; JWT cookies, see app/auth.py). Every
+route here requires a signed-in staff user: 401 without a valid token, 403 with a customer's.
 
-Create/read/update/delete of the catalog and the site content, one route set for every resource in RESOURCES:
+Create/read/update/delete of the catalog, its price rules (discounts) and the site content, one route set for every
+resource in RESOURCES:
     GET /<resource>              every row, in display order
     POST /<resource>             create (201) from a JSON body of the resource's fields
     GET /<resource>/<key>        one row (key = the id; the key text for settings)
@@ -18,27 +19,25 @@ import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, NoReturn
 
 from flask import Blueprint, Response, abort, jsonify, request
+from flask_jwt_extended import current_user
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import selectinload
 
-from app.auth import authenticate, clear_tokens, issue_tokens, read_credentials, refresh_access, require_user
+from app.auth import require_user
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.models.content import Article, Reseller
+from app.database.models.price_rules import PriceRule
 from app.database.models.settings import Setting
-from app.database.models.users import StaffUser
 from app.pricing import ISRAEL
 
 bp = Blueprint("staff", __name__, url_prefix="/api/staff")
-
-# The routes a visitor may call without a staff token (refresh checks its own refresh token).
-OPEN_ENDPOINTS = {"staff.login", "staff.refresh", "staff.logout"}
 
 
 class Invalid(ValueError):
@@ -214,6 +213,26 @@ def timestamp(value: Any) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=ISRAEL)
 
 
+def day(value: Any) -> date | None:
+    """A calendar date in ISO form, e.g. "2026-11-03" (price rule periods, counted in Israel dates).
+
+    Args:
+        value: The JSON value.
+
+    Returns:
+        The date, or None.
+
+    Raises:
+        Invalid: The value has another type or form.
+    """
+    if value is None:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except (TypeError, ValueError) as error:
+        raise Invalid from error
+
+
 def json_value(value: Any) -> Any:
     """Any JSON value (setting values).
 
@@ -299,13 +318,18 @@ def image_json(image: ProductImage) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class Resource:
-    """A table staff edit: its model, its editable columns (name -> converter), list order and key column."""
+    """A table staff edit: its model, its editable columns (name -> converter), list order and key column.
+
+    `options` are loader options for every query; `stamp_creator` records the signed-in staff member in the new row's
+    `created_by_id`.
+    """
 
     model: type[db.Model]
     fields: dict[str, Callable[[Any], Any]]
     order_by: tuple[Any, ...]
     key: str = "id"
     options: tuple[Any, ...] = field(default=())
+    stamp_creator: bool = False
 
 
 RESOURCES: dict[str, Resource] = {
@@ -329,6 +353,13 @@ RESOURCES: dict[str, Resource] = {
         (Product.sort_order, Product.id),
         options=(selectinload(Product.images),),
     ),
+    "price-rules": Resource(
+        PriceRule,
+        {"business_user_id": reference, "category_id": reference, "product_id": reference, "kind": text,
+         "value": money, "starts_on": day, "ends_on": day, "is_active": boolean, "note": text},
+        (PriceRule.created_at, PriceRule.id),
+        stamp_creator=True,
+    ),
     "settings": Resource(Setting, {"key": text, "value": json_value, "description": text}, (Setting.key,), key="key"),
     "articles": Resource(
         Article,
@@ -344,8 +375,8 @@ RESOURCES: dict[str, Resource] = {
     ),
 }
 
-# URL part matching the resource names only, so any other name is a 404.
-RESOURCE_PATH = f"<any({', '.join(RESOURCES)}):resource>"
+# URL part matching the resource names only, so any other name is a 404 (quoted: "price-rules" has a hyphen).
+RESOURCE_PATH = f"<any({', '.join(repr(name) for name in RESOURCES)}):resource>"
 
 
 def camel(name: str) -> str:
@@ -459,70 +490,12 @@ def commit() -> None:
 
 @bp.before_request
 def require_staff() -> None:
-    """Lets only signed-in staff reach the staff API (except the sign-in routes).
+    """Lets only signed-in staff reach the staff API.
 
     Raises:
         401 without a valid access token, 403 with a customer's token (see app.auth.require_user).
     """
-    if request.endpoint not in OPEN_ENDPOINTS:
-        require_user("staff")
-
-
-def staff_json(user: StaffUser) -> dict[str, Any]:
-    """Shapes the signed-in staff user.
-
-    Args:
-        user: The staff user.
-
-    Returns:
-        {email, fullName, role}.
-    """
-    return {"email": user.email, "fullName": user.full_name, "role": user.role}
-
-
-@bp.post("/auth/login")
-def login() -> Response | tuple[Response, int]:
-    """Signs a staff user in. Body: {email, password, remember}.
-
-    Returns:
-        {user} with the JWT cookies set; 401 {"error": "invalid_credentials"} when they do not match an active
-        staff user.
-    """
-    email, password, remember = read_credentials()
-    user = authenticate(StaffUser, email, password)
-    if user is None:
-        return jsonify(error="invalid_credentials"), 401
-    return issue_tokens(jsonify(user=staff_json(user)), user, remember)
-
-
-@bp.post("/auth/refresh")
-def refresh() -> Response:
-    """Issues a new access token from the refresh cookie.
-
-    Returns:
-        204 with a new access cookie; 401 without a valid refresh token and CSRF header, 403 for a customer's.
-    """
-    return refresh_access(Response(status=204), "staff")
-
-
-@bp.post("/auth/logout")
-def logout() -> Response:
-    """Signs out.
-
-    Returns:
-        204 with every JWT cookie expired.
-    """
-    return clear_tokens(Response(status=204))
-
-
-@bp.get("/auth/me")
-def me() -> dict[str, Any]:
-    """Who is signed in (the before_request check already ran).
-
-    Returns:
-        {user}.
-    """
-    return {"user": staff_json(require_user("staff"))}
+    require_user("staff")
 
 
 @bp.get(f"/{RESOURCE_PATH}")
@@ -552,6 +525,8 @@ def create_row(resource: str) -> tuple[dict[str, Any], int]:
     """
     spec = RESOURCES[resource]
     row = spec.model(**read_fields(spec))
+    if spec.stamp_creator:
+        row.created_by_id = current_user.id
     db.session.add(row)
     commit()
     return row_json(spec, row), 201

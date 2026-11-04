@@ -167,7 +167,7 @@ def staff_client(client: FlaskClient, staff: StaffUser) -> FlaskClient:
     Returns:
         The client, holding the staff user's JWT cookies.
     """
-    assert client.post("/api/staff/auth/login", json=STAFF).status_code == 200
+    assert client.post("/api/auth/login", json=STAFF).status_code == 200
     return client
 
 
