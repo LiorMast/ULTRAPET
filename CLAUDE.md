@@ -77,7 +77,7 @@ backend/
         price_rules.py      PriceRule
         orders.py           PaymentMethod, Order, OrderItem
         settings.py         Setting + get_setting()
-        content.py          Article, Reseller (the public site's articles and Where to Buy stores)
+        content.py          Article, Reseller, PageSection (articles, Where to Buy stores, editable home page sections)
   tests/                pytest on the `content_test` database (conftest.py builds it from the SQL files)
 ```
 
@@ -413,9 +413,9 @@ content exists in each language, and the layout flips direction automatically.
 - [ ] Pages: brand, category, product, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
 **Phase 2 — Backend**
-- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 17 tables: users with staff and
+- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 18 tables: users with staff and
       business subtypes, leads, suppliers, brands, categories, products, images, product-supplier junction, price
-      rules, settings, payment methods, orders, order items, articles, resellers); models; price resolution (`pricing.py`); seed from the
+      rules, settings, payment methods, orders, order items, articles, resellers, page sections); models; price resolution (`pricing.py`); seed from the
       stubs; `/api/health`; Vite `/api` proxy
 - [x] public content API (blueprint `customers`: categories, products, brands, stats, articles, resellers, sitemap);
       the frontend loads everything through `src/api.ts` (stubs are seed data + test fixtures)

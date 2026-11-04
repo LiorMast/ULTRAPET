@@ -1,15 +1,16 @@
-"""content.py — Content of the public site that staff maintain: the blog articles and the reseller list.
+"""content.py — Content of the public site that staff maintain: the blog articles, the reseller list and the
+editable home page sections.
 
 Article is a blog post (table articles); the public site shows it from `published_at` on. Reseller is a pet store
 that sells Ultra Pet products (table resellers), listed on the "Where to Buy" page and its map. Staff edit both
-through the staff API (app/staff/routes.py); the public API (app/customers/routes.py) reads them. Column meanings
-are documented in create-tables.sql.
+through the staff API (app/staff/routes.py); the public API (app/customers/routes.py) reads them. PageSection is the
+JSON content of one home page section (table page_sections). Column meanings are documented in create-tables.sql.
 """
 import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ARRAY, CheckConstraint, Double, Text
+from sqlalchemy import ARRAY, CheckConstraint, Double, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -62,3 +63,18 @@ class Reseller(TimestampMixin, db.Model):
     longitude: Mapped[float] = mapped_column(Double)
     approximate_location: Mapped[bool] = mapped_column(default=False, server_default="false")
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
+
+
+class PageSection(TimestampMixin, db.Model):
+    """The editable content of one home page section, plus who made the last change (`updated_at` says when)."""
+
+    __tablename__ = "page_sections"
+    __table_args__ = (
+        CheckConstraint("key ~ '^[a-z0-9_]+$'", name="key"),
+        CheckConstraint("jsonb_typeof(content) = 'object'", name="content"),
+    )
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    # An object whose shape depends on the section; translated texts are {"he": ..., "en": ...}.
+    content: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("staff_users.id", ondelete="SET NULL"), index=True)
