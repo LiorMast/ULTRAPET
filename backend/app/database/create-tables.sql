@@ -251,6 +251,22 @@ CREATE TABLE page_sections (
 );
 CREATE INDEX ON page_sections (updated_by_id);
 
+-- faq_items — The questions and answers of the home page FAQ section, as many as staff want, in display order. Staff
+-- add, edit and delete them on the page itself (the FAQ's inline editor saves the whole list at once through
+-- PUT /api/staff/faq-items); the public site reads them (GET /api/faq). A question may exist in some languages only,
+-- an exception to the Hebrew-required convention: the site shows it in a language when both its question and its
+-- answer have text in that language, and never falls back to another language (a page does not mix languages).
+CREATE TABLE faq_items (
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- question id
+  question      JSONB       NOT NULL CHECK (jsonb_typeof(question) = 'object'), -- the question per language, {"he": ..., "en": ...}; a missing or empty language = not shown in it
+  answer        JSONB       NOT NULL CHECK (jsonb_typeof(answer) = 'object'), -- the answer per language, plain text (line breaks kept)
+  sort_order    INTEGER     NOT NULL DEFAULT 0,             -- position in the section, lowest first (the inline editor numbers the list 0, 1, 2, ...)
+  updated_by_id UUID        REFERENCES staff_users (id) ON DELETE SET NULL, -- staff member who made the last change; NULL = unknown, seeded or since deleted
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),         -- when the question was added
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()          -- when it was last changed
+);
+CREATE INDEX ON faq_items (updated_by_id);
+
 
 -- ===================================================================================================================
 -- Public site content. Staff write it in the staff panel; the public site reads it.

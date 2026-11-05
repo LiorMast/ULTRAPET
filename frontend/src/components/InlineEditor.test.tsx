@@ -3,12 +3,15 @@
  * useInlineDraft) on a small test section with two texts and an accent word that follows the heading's style: read
  * mode, edit mode (labelled boxes, one PropBar that follows the selected box, live font and size), one Save for
  * every text, Cancel and Escape, a refused save, where the keyboard focus goes, and moving the PropBar (drag and
- * arrow keys, kept inside its section).
+ * arrow keys, kept inside its section). A second test section is a list (like the FAQ): adding and removing texts
+ * and where the focus goes then, a refusal by the section itself (InlineEditError), the light bar named after its
+ * section, and the wrapping one-line box.
  */
 import { fireEvent, screen } from '@testing-library/react'
+import { useRef } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api'
-import { EditableText, InlineEditBar, PropBar, useInlineDraft, type TextValue } from '@/components/InlineEditor'
+import { EditableText, InlineEditBar, InlineEditError, PropBar, useInlineDraft, type TextValue } from '@/components/InlineEditor'
 import { renderComponent } from '@/test/utils'
 
 /** The test section's texts as saved. */
@@ -223,5 +226,124 @@ describe('inline editing', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).not.toBeEmptyDOMElement()
     expect(screen.getByRole('textbox', { name: 'Heading' })).toBeInTheDocument()
+  })
+})
+
+/**
+ * A text of the list section.
+ * @param text - The words.
+ * @returns The value, in the site's font at the "md" size.
+ */
+const item = (text: string): TextValue => ({ text, font: 'default', size: 'md' })
+
+/**
+ * A minimal list section (like the FAQ): one wrapping text per entry, a Remove button on each and an Add button,
+ * on a white background with a named edit bar.
+ * @param props.onSave - Receives the draft on Save.
+ * @returns The section.
+ */
+function TestList({ onSave }: { onSave: (draft: Record<string, TextValue>) => Promise<unknown> }) {
+  const inline = useInlineDraft<string>(onSave)
+  const added = useRef(0)
+  const { draft } = inline
+  const keys = draft ? Object.keys(draft) : []
+  return (
+    <section>
+      <InlineEditBar {...inline.bar} label="List" tone="light" onEdit={() => inline.start({ a: item('First') })} />
+      {draft && (
+        <form {...inline.formProps}>
+          {keys.map((key, i) => (
+            <div key={key}>
+              <EditableText
+                wrap
+                editing
+                value={draft[key]}
+                onChange={(change) => inline.change(key, change)}
+                selected={inline.active === key}
+                onSelect={() => inline.select(key)}
+                label={`Item ${i + 1}`}
+                locale="en"
+              />
+              <button type="button" onClick={() => inline.remove([key], keys[i + 1] ?? keys[i - 1])}>
+                Remove item {i + 1}
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              added.current += 1
+              inline.add({ [`new${added.current}`]: item('') })
+            }}
+          >
+            Add
+          </button>
+        </form>
+      )}
+    </section>
+  )
+}
+
+describe('inline editing of a list', () => {
+  it('names the edit button after its section and gives a light section an outlined Cancel', async () => {
+    const { user } = renderComponent(<TestList onSave={vi.fn()} />, 'en')
+    const edit = await screen.findByRole('button', { name: 'Edit on page: List' })
+    expect(edit).toHaveTextContent(/^Edit on page$/)
+    await user.click(edit)
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('data-variant', 'outline')
+  })
+
+  it('adds and removes texts, moving the focus with them, and saves them in list order', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    const { user } = renderComponent(<TestList onSave={onSave} />, 'en')
+    await user.click(await screen.findByRole('button', { name: 'Edit on page: List' }))
+
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByRole('textbox', { name: 'Item 2' })).toHaveFocus()
+    expect(screen.getByRole('textbox', { name: 'Item 2' })).toHaveAttribute('data-selected', 'true')
+    await user.type(screen.getByRole('textbox', { name: 'Item 2' }), 'Second')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.type(screen.getByRole('textbox', { name: 'Item 3' }), 'Third')
+
+    // Removing the first entry focuses the next one, which is now the first.
+    await user.click(screen.getByRole('button', { name: 'Remove item 1' }))
+    expect(screen.getByRole('textbox', { name: 'Item 1' })).toHaveValue('Second')
+    expect(screen.getByRole('textbox', { name: 'Item 1' })).toHaveFocus()
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onSave).toHaveBeenCalledWith({ new1: item('Second'), new2: item('Third') })
+    expect(Object.keys(onSave.mock.calls[0][0])).toEqual(['new1', 'new2'])
+  })
+
+  it('focuses the first control when the last text is removed', async () => {
+    const { user } = renderComponent(<TestList onSave={vi.fn()} />, 'en')
+    await user.click(await screen.findByRole('button', { name: 'Edit on page: List' }))
+    await user.click(screen.getByRole('button', { name: 'Remove item 1' }))
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus()
+  })
+
+  it('shows the message of a refusal by the section and focuses the text it names', async () => {
+    const onSave = vi.fn().mockRejectedValue(new InlineEditError('Fix the first item.', 'a'))
+    const { user } = renderComponent(<TestList onSave={onSave} />, 'en')
+    await user.click(await screen.findByRole('button', { name: 'Edit on page: List' }))
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Fix the first item.')
+    expect(screen.getByRole('textbox', { name: 'Item 1' })).toHaveFocus()
+    expect(screen.getByRole('textbox', { name: 'Item 1' })).toHaveAttribute('data-selected', 'true')
+  })
+
+  it('keeps a wrapping box on one line: pasted line breaks become spaces and Enter saves', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    const { user } = renderComponent(<TestList onSave={onSave} />, 'en')
+    await user.click(await screen.findByRole('button', { name: 'Edit on page: List' }))
+    const box = screen.getByRole('textbox', { name: 'Item 1' })
+    expect(box.tagName).toBe('TEXTAREA')
+    await user.clear(box)
+    await user.paste('two\nlines')
+    expect(box).toHaveValue('two lines')
+    await user.keyboard('{Enter}')
+    expect(onSave).toHaveBeenCalledWith({ a: item('two lines') })
   })
 })

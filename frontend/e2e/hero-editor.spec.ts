@@ -53,10 +53,19 @@ test('staff edit the texts in place and save them at once', async ({ page }) => 
   const sent = await fakeHeroSection(page)
   await signInStaff(page)
   await page.goto('/en')
-  await page.getByRole('button', { name: 'Edit on page' }).click()
+  await page.getByRole('button', { name: 'Edit on page: Hero' }).click()
   const hero = page.locator('#home')
   await expect(hero.getByRole('textbox', { name: 'Tagline' })).toBeVisible()
 
+  // Measure contrast once the buttons have faded in (their entrance, hero-rise, runs on after the click).
+  await hero.evaluate((element) =>
+    Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .filter((animation) => (animation as CSSAnimation).animationName === 'hero-rise')
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  )
   const axe = await new AxeBuilder({ page }).include('#home').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
   expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
@@ -90,7 +99,7 @@ test('staff edit the texts in place and save them at once', async ({ page }) => 
 
   await expect(hero.getByText('Wholesale only')).toHaveCSS('font-family', /Assistant Variable/)
   await expect(hero.getByRole('textbox')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Edit on page' })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Edit on page: Hero' })).toBeFocused()
   expect(sent).toHaveLength(1)
   expect(sent[0].body.content).toMatchObject({ tagline: { text: { en: 'Wholesale only' }, font: { en: 'assistant' } }, title: { size: { en: 'sm' } } })
 })

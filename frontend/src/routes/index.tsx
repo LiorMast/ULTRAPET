@@ -1,9 +1,9 @@
 /**
  * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English). Its loader fetches the brands, the
- * stats figures and the hero content staff saved (page_sections "hero") from the API. Signed-in staff can edit the
- * hero in place ("Edit on page", the page's language) or in the two-language dialog (HeroEditor); saving stores the
- * content through the staff API and reloads the page data. The head carries the FAQ section's questions as
- * schema.org FAQPage data.
+ * stats figures, the hero content staff saved (page_sections "hero") and the FAQ questions (faq_items) from the API.
+ * Signed-in staff can edit the hero in place ("Edit on page", the page's language) or in the two-language dialog
+ * (HeroEditor), and the FAQ's questions in place (add, change, delete); saving stores the content through the staff
+ * API and reloads the page data. The head carries the questions the page language shows as schema.org FAQPage data.
  *
  * The hero, Brands, Stats, Categories, About, FAQ and Contact are real components. The other sections are TEMPORARY placeholders
  * (Private Label, Business Customers — see the roadmap in CLAUDE.md): each is
@@ -11,31 +11,30 @@
  * replaces it.
  */
 import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { createStaffRow, fetchBrands, fetchSection, fetchStats, updateStaffRow, type HeroContent } from '@/api'
+import { createStaffRow, fetchBrands, fetchFaq, fetchSection, fetchStats, replaceStaffRows, updateStaffRow, type FaqItemInput, type HeroContent } from '@/api'
 import { useAuth } from '@/auth'
 import { About } from '@/components/About'
 import { Brands } from '@/components/Brands'
 import { Categories } from '@/components/Categories'
 import { Contact } from '@/components/Contact'
-import { Faq } from '@/components/Faq'
+import { Faq, shownFaq } from '@/components/Faq'
 import { Hero } from '@/components/Hero'
 import { HeroEditor } from '@/components/HeroEditor'
 import { Stats } from '@/components/Stats'
-import { FAQ_ITEMS } from '@/config'
 import type { Dictionary } from '@/i18n/he'
-import { dictionaryFor, useI18n } from '@/i18n'
+import { useI18n } from '@/i18n'
 import { faqJsonLd, pageHead } from '@/seo'
 
 export const Route = createFileRoute('/')({
   loader: async ({ abortController }) => {
     const { signal } = abortController
-    const [brands, stats, hero] = await Promise.all([fetchBrands(signal), fetchStats(signal), fetchSection<HeroContent>('hero', signal)])
-    return { brands, stats, hero }
+    const [brands, stats, hero, faq] = await Promise.all([fetchBrands(signal), fetchStats(signal), fetchSection<HeroContent>('hero', signal), fetchFaq(signal)])
+    return { brands, stats, hero, faq }
   },
-  head: ({ match }) => {
+  head: ({ match, loaderData }) => {
     const { locale } = match.context
-    const t = dictionaryFor(locale)
-    return pageHead({ locale, path: '/', jsonLd: [faqJsonLd(FAQ_ITEMS.map((item) => ({ question: item.question(t), answer: item.answer(t) })))] })
+    const questions = loaderData ? shownFaq(loaderData.faq, locale) : []
+    return pageHead({ locale, path: '/', jsonLd: questions.length ? [faqJsonLd(questions)] : [] })
   },
   component: HomePage,
 })
@@ -65,11 +64,11 @@ function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
 
 /**
  * The home page: the hero (editable by staff), the Brands, Stats and Categories sections, About,
- * the FAQ, Contact, and one empty placeholder per remaining anchor.
+ * the FAQ (editable by staff), Contact, and one empty placeholder per remaining anchor.
  * @returns The page content.
  */
 function HomePage() {
-  const { brands, stats, hero } = Route.useLoaderData()
+  const { brands, stats, hero, faq } = Route.useLoaderData()
   const { user } = useAuth()
   const router = useRouter()
 
@@ -84,6 +83,17 @@ function HomePage() {
     await router.invalidate()
   }
 
+  /**
+   * Stores the FAQ's new list of questions staff edited (one request: kept, new and deleted questions and their
+   * order) and reloads the page data.
+   * @param items - The questions in display order.
+   * @returns Resolves when saved and reloaded; rejects with the server's ApiError (nothing is saved then).
+   */
+  const saveFaq = async (items: FaqItemInput[]) => {
+    await replaceStaffRows('faq-items', items)
+    await router.invalidate()
+  }
+
   return (
     <>
       {user?.kind === 'staff' ? <Hero content={hero} onSave={saveHero} editor={<HeroEditor content={hero} onSave={saveHero} />} /> : <Hero content={hero} />}
@@ -94,7 +104,7 @@ function HomePage() {
         <Placeholder key={section.id} section={section} />
       ))}
       <About />
-      <Faq />
+      {user?.kind === 'staff' ? <Faq items={faq} onSave={saveFaq} /> : <Faq items={faq} />}
       <Contact />
     </>
   )

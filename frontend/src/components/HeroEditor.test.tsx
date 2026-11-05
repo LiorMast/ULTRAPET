@@ -31,13 +31,13 @@ describe('HeroEditor', () => {
   it('is not shown to visitors', async () => {
     await renderPage('/en')
     expect(screen.queryByRole('button', { name: 'Edit both languages' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Edit on page' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Edit on page/ })).not.toBeInTheDocument()
   })
 
   it('is not shown to business customers', async () => {
     await renderPage('/en', { user: TEST_USER })
     expect(screen.queryByRole('button', { name: 'Edit both languages' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Edit on page' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Edit on page/ })).not.toBeInTheDocument()
   })
 
   it('lets staff edit every text in place and save them at once, in the page language only', async () => {
@@ -45,7 +45,7 @@ describe('HeroEditor', () => {
     await createStaffRow('page-sections', { key: 'hero', content: { tagline: { text: { he: 'שורה בעברית' } } } })
     const { user } = await renderPage('/en', { staff: TEST_STAFF })
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
-    await user.click(screen.getByRole('button', { name: 'Edit on page' }))
+    await user.click(screen.getByRole('button', { name: 'Edit on page: Hero' }))
     // The dialog's button steps aside while editing in place.
     expect(screen.queryByRole('button', { name: 'Edit both languages' })).not.toBeInTheDocument()
 
@@ -62,7 +62,7 @@ describe('HeroEditor', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Ultra Group' })).toBeInTheDocument()
     expect(screen.getByText('Wholesale only')).toHaveClass('text-lg')
     expect(screen.getByText(/^Supplying premium pet brands/)).toHaveClass('text-sm')
-    expect(screen.getByRole('button', { name: 'Edit on page' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Edit on page: Hero' })).toHaveFocus()
     const patches = sent(fetchSpy, 'PATCH')
     expect(patches).toHaveLength(1)
     expect(patches[0][1].content.tagline.text).toEqual({ he: 'שורה בעברית', en: 'Wholesale only' })

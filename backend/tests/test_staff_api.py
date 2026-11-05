@@ -6,6 +6,7 @@ import uuid
 import pytest
 
 from app.database.models.catalog import Category, Product
+from app.database.models.content import FaqItem
 from app.database.models.price_rules import PriceRule
 
 
@@ -216,6 +217,108 @@ def test_invalid_page_sections_are_refused(api, body, error):
 def test_customers_cannot_edit_page_sections(customer_client, csrf):
     response = customer_client.post("/api/staff/page-sections", json={"key": "hero", "content": {}}, headers=csrf(customer_client))
     assert response.status_code == 403
+
+
+def test_faq_items_create_read_update_delete(api, staff):
+    created = api("POST", "/faq-items", {"question": {"he": "שאלה"}, "answer": {"he": "תשובה", "en": "Answer"}})
+    assert created.status_code == 201
+    item = created.get_json()
+    assert (item["question"], item["answer"], item["sortOrder"], item["updatedById"]) == (
+        {"he": "שאלה"}, {"he": "תשובה", "en": "Answer"}, 0, str(staff.id),
+    )
+    assert api("PATCH", f"/faq-items/{item['id']}", {"question": {"he": "שאלה", "en": "Question"}}).get_json()["question"]["en"] == "Question"
+    assert [row["id"] for row in api("GET", "/faq-items").get_json()] == [item["id"]]
+    assert api("DELETE", f"/faq-items/{item['id']}").status_code == 204
+
+
+@pytest.mark.parametrize(
+    ("body", "error"),
+    [
+        ({"question": ["no"], "answer": {}}, {"error": "invalid", "field": "question"}),
+        ({"question": {"he": 1}, "answer": {}}, {"error": "invalid", "field": "question"}),
+        ({"question": {"he": "שאלה"}}, {"error": "required", "field": "answer"}),
+    ],
+)
+def test_invalid_faq_items_are_refused(api, body, error):
+    response = api("POST", "/faq-items", body)
+    assert (response.status_code, response.get_json()) == (400, error)
+
+
+def test_the_faq_list_is_replaced_at_once(api, database, staff, client):
+    kept = FaqItem(question={"he": "נשארת"}, answer={"he": "כן"}, sort_order=0)
+    untouched = FaqItem(question={"he": "בלי שינוי"}, answer={"he": "כן"}, sort_order=1)
+    gone = FaqItem(question={"he": "נמחקת"}, answer={"he": "כן"}, sort_order=2)
+    database.add_all([kept, untouched, gone])
+    database.commit()
+    kept_id, untouched_id, gone_id = str(kept.id), str(untouched.id), str(gone.id)
+
+    response = api(
+        "PUT",
+        "/faq-items",
+        [
+            {"id": kept_id, "question": {"he": "נשארת", "en": "Kept"}, "sortOrder": 99},
+            {"id": untouched_id, "question": {"he": "בלי שינוי"}, "answer": {"he": "כן"}},
+            {"question": {"he": "חדשה", "en": "New"}, "answer": {"he": "תשובה", "en": "Answer"}},
+        ],
+    )
+    assert response.status_code == 200
+    rows = response.get_json()
+    # The list order is the body's order; a sortOrder in the body is ignored.
+    assert [row["sortOrder"] for row in rows] == [0, 1, 2]
+    assert [row["id"] for row in rows[:2]] == [kept_id, untouched_id]
+    assert rows[0]["question"] == {"he": "נשארת", "en": "Kept"}
+    assert rows[0]["answer"] == {"he": "כן"}  # fields left out keep their value
+    assert [row["question"]["he"] for row in client.get("/api/faq").get_json()] == ["נשארת", "בלי שינוי", "חדשה"]
+    assert database.get(FaqItem, uuid.UUID(gone_id)) is None
+    # Only the rows that changed record the editor: the untouched one (same texts, same place) keeps none.
+    database.expire_all()
+    assert database.get(FaqItem, uuid.UUID(kept_id)).updated_by_id == staff.id
+    assert database.get(FaqItem, uuid.UUID(rows[2]["id"])).updated_by_id == staff.id
+    assert database.get(FaqItem, uuid.UUID(untouched_id)).updated_by_id is None
+
+    # Moving a row is a change too.
+    moved = api("PUT", "/faq-items", [{"id": untouched_id}, {"id": rows[2]["id"]}]).get_json()
+    assert [(row["id"], row["sortOrder"]) for row in moved] == [(untouched_id, 0), (rows[2]["id"], 1)]
+    database.expire_all()
+    assert database.get(FaqItem, uuid.UUID(untouched_id)).updated_by_id == staff.id
+
+    assert api("PUT", "/faq-items", []).get_json() == []
+    assert client.get("/api/faq").get_json() == []
+
+
+@pytest.mark.parametrize(
+    ("body", "error"),
+    [
+        ({"question": {"he": "x"}}, {"error": "invalid_body"}),
+        (["not an object"], {"error": "invalid_body"}),
+        ([{"id": "not-a-uuid", "question": {"he": "x"}, "answer": {"he": "y"}}], {"error": "invalid", "field": "id"}),
+        ([{"id": str(uuid.uuid4()), "question": {"he": "x"}, "answer": {"he": "y"}}], {"error": "invalid", "field": "id"}),
+        ([{"question": {"he": "x"}, "answer": {"he": "y"}, "colour": "red"}], {"error": "unknown_field", "field": "colour"}),
+        ([{"question": {"he": "x"}}], {"error": "required", "field": "answer"}),
+    ],
+)
+def test_a_refused_faq_list_changes_nothing(api, database, client, body, error):
+    database.add(FaqItem(question={"he": "קיימת"}, answer={"he": "כן"}, sort_order=0))
+    database.commit()
+    response = api("PUT", "/faq-items", body)
+    assert (response.status_code, response.get_json()) == (400, error)
+    assert [row["question"] for row in client.get("/api/faq").get_json()] == [{"he": "קיימת"}]
+
+
+def test_an_id_listed_twice_is_refused(api, database):
+    item = FaqItem(question={"he": "קיימת"}, answer={"he": "כן"}, sort_order=0)
+    database.add(item)
+    database.commit()
+    twice = {"id": str(item.id), "question": {"he": "קיימת"}, "answer": {"he": "כן"}}
+    assert api("PUT", "/faq-items", [twice, twice]).get_json() == {"error": "invalid", "field": "id"}
+
+
+def test_only_list_resources_can_be_replaced(api):
+    assert api("PUT", "/brands", []).status_code == 405
+
+
+def test_customers_cannot_replace_the_faq(customer_client, csrf):
+    assert customer_client.put("/api/staff/faq-items", json=[], headers=csrf(customer_client)).status_code == 403
 
 
 def test_articles_are_published_by_setting_published_at(api, client):

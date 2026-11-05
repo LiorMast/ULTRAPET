@@ -6,10 +6,12 @@
  * search in every language, category filter, chip counts and paging; brands and articles by slug; sign-in that
  * accepts any credentials except the password WRONG_PASSWORD (the email admin@example.com signs in as the staff
  * user TEST_STAFF, anyone else as the customer TEST_USER). The staff API (backend/app/staff/routes.py) is
- * faked for brands, categories, products, price rules and page sections: list/create/update/delete on in-memory copies
- * of the stubs (no price rules or page sections at first; GET /api/sections/<key> reads the latter) with the server's errors (401 signed out, 403 for a customer, 400 required /
- * a failed check / an unknown reference, 409 duplicate or in use, 404) and its cascade (a deleted category's or
- * product's price rules go with it).
+ * faked for brands, categories, products, price rules, page sections and FAQ items: list/create/update/delete on
+ * in-memory copies of the stubs (no price rules or page sections at first; GET /api/sections/<key> reads the latter,
+ * GET /api/faq the FAQ items), the FAQ's PUT that replaces the whole list at once (all or nothing), with the server's
+ * errors (401 signed out, 403 for a customer, 400 required / a failed check / an unknown reference or id, 405 PUT on
+ * another table, 409 duplicate or in use, 404) and its cascade (a deleted category's or product's price rules go with
+ * it).
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
@@ -18,6 +20,7 @@ import type { Localized } from '@/config'
 import articles from '@/stubs/articles.json'
 import branches from '@/stubs/branches.json'
 import brands from '@/stubs/brands.json'
+import faq from '@/stubs/faq.json'
 import categories from '@/stubs/product-categories.json'
 
 /** The password the fake sign-in refuses (401 "invalid_credentials"). */
@@ -79,7 +82,7 @@ const SEEDED = '2026-11-01T10:00:00+02:00'
 
 /**
  * A fixed id for a seeded row, so tests can predict it.
- * @param table - A number per table: brands 0, categories 1, products 2.
+ * @param table - A number per table: brands 0, categories 1, products 2, FAQ items 3.
  * @param index - The row's position in its stub file.
  * @returns A UUID, e.g. "00000000-0000-4000-8001-000000000003".
  */
@@ -94,9 +97,11 @@ function seedId(table: number, index: number): string {
  * - `seed`: the rows `flask seed` would store. `check`: the table's other constraints (null = valid).
  * - `order`: the list order. `inUse`: the foreign key that keeps a row from being deleted, if any applies.
  * - `key`: the field that names a row in the URL when it is not a generated `id` (page sections: "key").
+ * - `replaceable`: PUT replaces the whole list (`replaceable` on the server; the table has a sortOrder field).
  */
 type FakeTable = {
   key?: string
+  replaceable?: boolean
   fields: string[]
   required: string[]
   numeric?: string[]
@@ -269,6 +274,31 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     },
     order: (a, b) => String(a.key).localeCompare(String(b.key)),
   },
+  'faq-items': {
+    replaceable: true,
+    fields: ['question', 'answer', 'sortOrder'],
+    required: ['question', 'answer', 'sortOrder'],
+    defaults: { sortOrder: 0 },
+    seed: () =>
+      faq.map((item, index) => ({
+        id: seedId(3, index),
+        question: item.question,
+        answer: item.answer,
+        sortOrder: index,
+        createdAt: SEEDED,
+        updatedAt: SEEDED,
+      })),
+    check: (item) => {
+      for (const field of ['question', 'answer']) {
+        const value = item[field]
+        if (typeof value !== 'object' || value === null || Array.isArray(value) || !Object.values(value).every((text) => typeof text === 'string')) {
+          return json({ error: 'invalid', field }, 400)
+        }
+      }
+      return null
+    },
+    order: (a, b) => Number(a.sortOrder) - Number(b.sortOrder) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  },
 }
 
 /**
@@ -285,6 +315,41 @@ async function refusal(table: FakeTable, row: StaffRow, others: StaffRow[]): Pro
 }
 
 /**
+ * Answers PUT /api/staff/<resource> like the server's replace_rows: the body is the new list in display order (an
+ * item with an `id` keeps and changes that row, one without is new, rows left out are deleted, sortOrder = the
+ * position); any refusal leaves the table as it was.
+ * @param table - The table (must be replaceable).
+ * @param rows - Its rows, replaced in place on success.
+ * @param body - The parsed request body.
+ * @returns The saved list, or the server's error answer.
+ */
+async function replaceAnswer(table: FakeTable, rows: StaffRow[], body: unknown): Promise<Response> {
+  if (!Array.isArray(body) || !body.every((item) => typeof item === 'object' && item !== null && !Array.isArray(item))) return json({ error: 'invalid_body' }, 400)
+  const now = new Date().toISOString()
+  const remaining = new Map(rows.map((row) => [row.id, row]))
+  const next: StaffRow[] = []
+  for (const [position, item] of (body as Record<string, unknown>[]).entries()) {
+    const { id, ...values } = item
+    const unknown = Object.keys(values).find((key) => !table.fields.includes(key))
+    if (unknown) return json({ error: 'unknown_field', field: unknown }, 400)
+    let row: StaffRow
+    if (id === undefined || id === null) {
+      row = { ...table.defaults, ...values, sortOrder: position, id: crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffRow
+    } else {
+      const saved = remaining.get(String(id))
+      if (!saved) return json({ error: 'invalid', field: 'id' }, 400)
+      remaining.delete(String(id))
+      row = { ...saved, ...values, sortOrder: position, updatedAt: now }
+    }
+    const refused = await refusal(table, row, next)
+    if (refused) return refused
+    next.push(row)
+  }
+  rows.splice(0, rows.length, ...next)
+  return json(next)
+}
+
+/**
  * Answers /api/staff/<resource>[/<id>] like the server's generic staff CRUD.
  * @param resource - The table's URL name, e.g. "price-rules".
  * @param method - The HTTP method.
@@ -297,13 +362,14 @@ async function staffAnswer(resource: string, method: string, id: string | null, 
   const table = STAFF_TABLES[resource]
   if (!table) return json({ error: 'not_found' }, 404)
   const rows = await tableRows(resource)
-  const values = body ? (JSON.parse(String(body)) as Record<string, unknown>) : {}
+  const values = body && method !== 'PUT' ? (JSON.parse(String(body)) as Record<string, unknown>) : {}
   const unknown = Object.keys(values).find((key) => !table.fields.includes(key))
   if (unknown) return json({ error: 'unknown_field', field: unknown }, 400)
   for (const key of table.numeric ?? []) if (typeof values[key] === 'string') values[key] = Number(values[key])
   const now = new Date().toISOString()
   if (id === null) {
     if (method === 'GET') return json([...rows].sort(table.order))
+    if (method === 'PUT') return table.replaceable ? replaceAnswer(table, rows, body ? JSON.parse(String(body)) : null) : json({ error: 'method_not_allowed' }, 405)
     if (method !== 'POST') return json({ error: 'not_found' }, 404)
     // A keyed table's rows keep their key as the fake's internal id, so the lookups below work for both kinds.
     const row = { ...table.defaults, ...values, id: table.key ? String(values[table.key]) : crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffRow
@@ -409,6 +475,10 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
     if (path === '/api/articles') return json(publishedArticles)
     const article = articles.find((a) => a.slug === slug('/api/articles/'))
     if (article) return json(article)
+    if (path === '/api/faq') {
+      const items = [...(await tableRows('faq-items'))].sort(STAFF_TABLES['faq-items'].order)
+      return json(items.map(({ id, question, answer }) => ({ id, question, answer })))
+    }
     const section = (await staffRows['page-sections'])?.find((row) => row.key === slug('/api/sections/'))
     if (section) return json({ key: section.key, content: section.content, updatedAt: section.updatedAt })
     if (path === '/api/resellers') return json(branches.map((b) => ({ approximate: false, ...b })) satisfies Branch[])

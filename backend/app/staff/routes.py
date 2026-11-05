@@ -10,9 +10,11 @@ resource in RESOURCES:
     GET /<resource>/<key>        one row (key = the id; the key text for settings)
     PATCH /<resource>/<key>      change the fields in the body; the others stay as they are
     DELETE /<resource>/<key>     delete (204)
+    PUT /<resource>              replace the whole list in one transaction (only resources edited as one ordered
+                                 list: `faq-items`, see replace_rows)
 JSON keys are camelCase (column `sort_order` -> `sortOrder`); a row also carries `id`, `createdAt`, `updatedAt`.
-`page-sections` (the editable home page sections, keyed by the section name) also record who made the last change
-(`updatedById`).
+`page-sections` (the editable home page sections, keyed by the section name) and `faq-items` (the questions of the
+home page FAQ) also record who made the last change (`updatedById`).
 Each field checks its JSON type here; the database's constraints (create-tables.sql) do the rest of the validation,
 and their errors become 400 (a failed check, a missing required field, an unknown reference) or 409 (a duplicate,
 or deleting a row others still use, e.g. a category with products).
@@ -34,7 +36,7 @@ from sqlalchemy.orm import selectinload
 from app.auth import require_user
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
-from app.database.models.content import Article, PageSection, Reseller
+from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.price_rules import PriceRule
 from app.database.models.settings import Setting
 from app.pricing import ISRAEL
@@ -324,6 +326,8 @@ class Resource:
 
     `options` are loader options for every query; `stamp_creator` records the signed-in staff member in the new row's
     `created_by_id`; `stamp_editor` records them in `updated_by_id` on every create and update (the last change).
+    `replaceable` allows PUT of the whole list (replace_rows): for a resource staff edit as one ordered list, keyed by
+    a generated id and ordered by a `sort_order` column.
     """
 
     model: type[db.Model]
@@ -333,6 +337,7 @@ class Resource:
     options: tuple[Any, ...] = field(default=())
     stamp_creator: bool = False
     stamp_editor: bool = False
+    replaceable: bool = False
 
 
 RESOURCES: dict[str, Resource] = {
@@ -378,6 +383,13 @@ RESOURCES: dict[str, Resource] = {
     ),
     "page-sections": Resource(
         PageSection, {"key": text, "content": json_object}, (PageSection.key,), key="key", stamp_editor=True
+    ),
+    "faq-items": Resource(
+        FaqItem,
+        {"question": localized, "answer": localized, "sort_order": integer},
+        (FaqItem.sort_order, FaqItem.created_at, FaqItem.id),
+        stamp_editor=True,
+        replaceable=True,
     ),
 }
 
@@ -427,12 +439,28 @@ def read_fields(resource: Resource) -> dict[str, Any]:
         Column name -> converted value, for the fields present in the body.
 
     Raises:
-        400 {"error": "unknown_field" | "invalid", "field"} for a key that is not a field or a value of the wrong
-        type; 415 for a non-JSON body.
+        400 {"error": "invalid_body"} for a body that is not an object; 415 for a non-JSON body; see convert_fields.
     """
     data = request.get_json()
     if not isinstance(data, dict):
         fail(400, error="invalid_body")
+    return convert_fields(resource, data)
+
+
+def convert_fields(resource: Resource, data: dict[str, Any]) -> dict[str, Any]:
+    """Converts the fields of one JSON row (a request body, or one item of a replaced list).
+
+    Args:
+        resource: The resource being created or changed.
+        data: The row's JSON object, camelCase keys.
+
+    Returns:
+        Column name -> converted value, for the fields present in the object.
+
+    Raises:
+        400 {"error": "unknown_field" | "invalid", "field"} for a key that is not a field or a value of the wrong
+        type.
+    """
     columns = {camel(column): column for column in resource.fields}
     values = {}
     for key, value in data.items():
@@ -594,3 +622,59 @@ def delete_row(resource: str, key: str) -> Response:
     db.session.delete(find_row(spec, key))
     commit()
     return Response(status=204)
+
+
+@bp.put(f"/{RESOURCE_PATH}")
+def replace_rows(resource: str) -> list[dict[str, Any]]:
+    """Replaces the whole list of a resource staff edit as one ordered list (the FAQ), in one transaction, so a refused
+    item saves nothing.
+
+    The JSON body is the new list in display order. An item with an `id` keeps that row and changes the fields it
+    gives; an item without one is a new row. Rows left out are deleted. Every row's `sort_order` becomes its position
+    (0, 1, 2, ...; a `sortOrder` in an item is ignored). Only rows that really changed (or moved) record the signed-in
+    staff member as their last editor.
+
+    Args:
+        resource: The resource name, e.g. "faq-items".
+
+    Returns:
+        The rows in their new order (see row_json). Errors: 405 for a resource that is not replaceable; 400
+        {"error": "invalid_body"} for a body that is not a list of objects; 400 {"error": "invalid", "field": "id"}
+        for an id that is not in the table (e.g. deleted meanwhile) or appears twice; the field errors of
+        convert_fields and the database errors of commit.
+    """
+    spec = RESOURCES[resource]
+    if not spec.replaceable:
+        abort(405)
+    data = request.get_json()
+    if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
+        fail(400, error="invalid_body")
+    remaining = {row.id: row for row in db.session.scalars(select(spec.model))}
+    rows, changed = [], []
+    for position, item in enumerate(data):
+        fields = dict(item)
+        key = fields.pop("id", None)
+        values = convert_fields(spec, fields) | {"sort_order": position}
+        if key is None:
+            row = spec.model(**values)
+            db.session.add(row)
+            changed.append(row)
+        else:
+            try:
+                row = remaining.pop(reference(key), None)
+            except Invalid:
+                row = None
+            if row is None:
+                fail(400, error="invalid", field="id")
+            for column, value in values.items():
+                setattr(row, column, value)
+            if db.session.is_modified(row):
+                changed.append(row)
+        rows.append(row)
+    for row in remaining.values():
+        db.session.delete(row)
+    if spec.stamp_editor:
+        for row in changed:
+            row.updated_by_id = current_user.id
+    commit()
+    return [row_json(spec, row) for row in rows]

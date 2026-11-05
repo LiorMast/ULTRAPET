@@ -3,18 +3,30 @@
  *
  * - useInlineDraft(onSave): the section's edit state (on/off, the draft of every text, the selected text, saving,
  *   the error) and the props for its <form>, its InlineEditBar and its PropBar. Escape cancels; Enter in a one-line
- *   box saves.
+ *   box saves. Two kinds of sections use it:
+ *   - a fixed set of texts (the hero: title, tagline, ...): start(values) with one key per text;
+ *   - a list that grows and shrinks (the FAQ's questions): every entry owns a few keys (e.g. "<id>:question",
+ *     "<id>:answer"); add(values) appends an entry's texts and focuses its first box, remove(keys, next) drops
+ *     them and moves the focus to `next`. The draft keeps its keys in the order they were added, so the section
+ *     can read its entries' order from Object.keys(draft).
+ *   A section may refuse a save itself before storing anything by throwing InlineEditError from onSave: the bar
+ *   shows its message and the box it names gets the focus.
  * - InlineEditBar: "Edit on page", then Save (all the section's texts at once) and Cancel, the refusal message and
- *   a status line that announces the save. The keyboard focus returns to "Edit on page" afterwards.
+ *   a status line that announces the save. The keyboard focus returns to "Edit on page" afterwards. `tone` matches
+ *   the section's background (dark photo or white); `label` names the section in the button's accessible name
+ *   ("Edit on page: FAQ"), since a page may have several editable sections.
  * - PropBar: the section's one font + size bar. It controls the selected text: the box that last had the focus
  *   (the first text when editing starts), and says which one ("Editing: Tagline"). Staff can move it out of the way
- *   by its grip (drag with a mouse, finger or pen, or the arrow keys); it stays inside the window.
+ *   by its grip (drag with a mouse, finger or pen, or the arrow keys); it stays inside the window. Optional: a
+ *   section whose texts keep the site's typography (the FAQ) has none.
  * - EditableText: one text of the section. Read mode renders the plain element (exactly what visitors get); edit
- *   mode renders a text box with the text's own classes, size and font, so the box looks like the result. Its
- *   focus selects it for the PropBar; the selected box has a solid frame, the others a dashed one.
+ *   mode renders a text box with the text's own classes, size and font, so the box looks like the result: one line
+ *   (growing sideways), one line that wraps (`wrap`, e.g. a question) or several lines (`multiline`). Its focus
+ *   selects it for the PropBar; the selected box has a solid frame, the others a dashed one.
  *
  * Fonts and sizes come from FONTS / SIZE_STEPS in src/config.ts; the section supplies its size classes. The
- * section decides what saving means (the hero merges the draft into its page_sections content).
+ * section decides what saving means (the hero merges the draft into its page_sections content, the FAQ turns it
+ * into its new list of questions).
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { GripVertical, Pencil } from 'lucide-react'
@@ -36,11 +48,31 @@ export type TextValue = { text: string; font: FontKey; size: SizeStep }
 export const fontStyle = (font: FontKey) => (FONTS[font].family ? { fontFamily: FONTS[font].family } : undefined)
 
 /**
+ * A save the section refuses by itself, before storing anything (e.g. a question without its answer). Thrown from
+ * useInlineDraft's onSave: the bar shows the message as it is (so it must already be translated) and, when `key`
+ * names a text, that text is selected and its box focused, so staff land on what to fix.
+ */
+export class InlineEditError extends Error {
+  readonly key?: string
+
+  /**
+   * @param message - The translated reason, shown to staff.
+   * @param key - The draft key of the text to fix, if any.
+   */
+  constructor(message: string, key?: string) {
+    super(message)
+    this.name = 'InlineEditError'
+    this.key = key
+  }
+}
+
+/**
  * The edit state of one section (see the file header).
- * @param onSave - Stores the draft; rejects with an ApiError when the server refuses it.
- * @returns `editing`, `draft`, `active` (the selected text), `start(values, first?)`, `select(key)`,
- *   `change(key, partial)`, `cancel()`, `formProps` for the section's <form>, `bar` for its InlineEditBar and
- *   `propBar(labels)` for its PropBar.
+ * @param onSave - Stores the draft; rejects with an ApiError when the server refuses it, or with an InlineEditError
+ *   when the section refuses it itself.
+ * @returns `editing`, `draft`, `active` (the selected text), `start(values, first?)`, `add(values, first?)`,
+ *   `remove(keys, next?)`, `select(key)`, `change(key, partial)`, `cancel()`, `formProps` for the section's <form>,
+ *   `bar` for its InlineEditBar and `propBar(labels)` for its PropBar.
  */
 export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, TextValue>) => Promise<unknown>) {
   const { t } = useI18n()
@@ -53,8 +85,10 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
   const [status, setStatus] = useState('')
   /** Set when edit mode ends, so the effect below focuses the Edit button once it is back. */
   const returnFocus = useRef(false)
-  /** Set when edit mode starts, so the effect below focuses the selected box once it is rendered. */
+  /** Set by requestFocus, so the effect below focuses the selected box once it is rendered. */
   const focusSelected = useRef(false)
+  /** Bumped by requestFocus, so the effect runs even when neither the draft nor the selection changed. */
+  const [focusRequest, setFocusRequest] = useState(0)
 
   useEffect(() => {
     if (returnFocus.current && !draft) {
@@ -63,21 +97,55 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
     }
     if (focusSelected.current && draft) {
       focusSelected.current = false
-      document.getElementById(formId)?.querySelector<HTMLElement>('[data-selected="true"]')?.focus()
+      const form = document.getElementById(formId)
+      // No text selected (e.g. the last entry of a list was removed): the form's first control, such as "Add".
+      const target = form?.querySelector<HTMLElement>('[data-selected="true"]') ?? form?.querySelector<HTMLElement>('input, textarea, select, button')
+      target?.focus()
     }
-  }, [draft, formId])
+  }, [draft, focusRequest, formId])
+
+  /** Focuses the selected box (or the form's first control) after the next render. */
+  const requestFocus = () => {
+    focusSelected.current = true
+    setFocusRequest((count) => count + 1)
+  }
 
   /**
    * Turns edit mode on and puts the focus in the first selected box.
-   * @param values - Every text's starting values.
+   * @param values - Every text's starting values (may be empty: a list with no entries yet).
    * @param first - The text selected first; default the first key of `values`.
    */
   const start = (values: Record<Key, TextValue>, first?: Key) => {
-    focusSelected.current = true
     setDraft(values)
-    setActive(first ?? (Object.keys(values)[0] as Key))
+    setActive(first ?? (Object.keys(values)[0] as Key | undefined) ?? null)
     setError('')
     setStatus('')
+    requestFocus()
+  }
+
+  /**
+   * Adds texts to the draft, after the others (a new entry of a list), selects one and focuses its box.
+   * @param values - The new texts' starting values, by their new keys.
+   * @param first - The text to select; default the first key of `values`.
+   */
+  const add = (values: Partial<Record<Key, TextValue>>, first?: Key) => {
+    setDraft((current) => current && ({ ...current, ...values } as Record<Key, TextValue>))
+    setActive(first ?? (Object.keys(values)[0] as Key | undefined) ?? null)
+    requestFocus()
+  }
+
+  /**
+   * Removes texts from the draft (an entry of a list) and moves the focus, since the button that removed them goes
+   * away with them.
+   * @param keys - The texts to remove.
+   * @param next - The text to select and focus next (e.g. the next entry's first text). Omitted: the selected text
+   *   keeps the selection and gets the focus, or, when it was among the removed ones, the selection is cleared and the
+   *   focus goes to the form's first control.
+   */
+  const remove = (keys: Key[], next?: Key) => {
+    setDraft((current) => current && (Object.fromEntries(Object.entries(current).filter(([key]) => !keys.includes(key as Key))) as Record<Key, TextValue>))
+    setActive((current) => next ?? (current !== null && keys.includes(current) ? null : current))
+    requestFocus()
   }
 
   /**
@@ -111,23 +179,34 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
       setActive(null)
       setStatus(t.admin.saved)
     } catch (caught) {
-      setError(errorMessage(caught instanceof ApiError ? caught.code : undefined, t))
+      if (caught instanceof InlineEditError) {
+        setError(caught.message)
+        if (caught.key !== undefined) {
+          setActive(caught.key as Key)
+          requestFocus()
+        }
+      } else {
+        setError(errorMessage(caught instanceof ApiError ? caught.code : undefined, t))
+      }
     } finally {
       setPending(false)
     }
   }
 
   /**
-   * Cancels on Escape anywhere inside the section's form or its PropBar; Enter in a one-line box saves (done here,
-   * not left to the browser's implicit submission, which depends on how many boxes and buttons the form has).
+   * Cancels on Escape anywhere inside the section's form or its PropBar; Enter in a one-line box (also one that
+   * wraps) saves (done here, not left to the browser's implicit submission, which depends on how many boxes and
+   * buttons the form has).
    * @param event - The key press.
    */
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (!draft) return
+    const { target } = event
+    const oneLine = (target instanceof HTMLInputElement && target.type === 'text') || (target instanceof HTMLTextAreaElement && target.dataset.oneLine === 'true')
     if (event.key === 'Escape') {
       event.preventDefault()
       cancel()
-    } else if (event.key === 'Enter' && event.target instanceof HTMLInputElement && event.target.type === 'text') {
+    } else if (event.key === 'Enter' && oneLine) {
       event.preventDefault()
       ;(document.getElementById(formId) as HTMLFormElement | null)?.requestSubmit()
     }
@@ -148,6 +227,8 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
     draft,
     active,
     start,
+    add,
+    remove,
     select: setActive,
     change,
     cancel,
@@ -158,7 +239,7 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
 }
 
 /** What InlineEditBar needs: the `bar` returned by useInlineDraft, plus what "Edit on page" does. */
-type InlineEditBarProps = ReturnType<typeof useInlineDraft>['bar'] & { onEdit: () => void; className?: string }
+type InlineEditBarProps = ReturnType<typeof useInlineDraft>['bar'] & { onEdit: () => void; label?: string; tone?: 'dark' | 'light'; className?: string }
 
 /**
  * The section's edit controls: "Edit on page", or Save and Cancel while editing.
@@ -170,10 +251,14 @@ type InlineEditBarProps = ReturnType<typeof useInlineDraft>['bar'] & { onEdit: (
  * @param props.editButton - Ref of "Edit on page", focused again after saving or cancelling.
  * @param props.onEdit - Starts editing (the section calls start() with its current values).
  * @param props.onCancel - Leaves edit mode without saving.
+ * @param props.label - The section's name, e.g. "FAQ": "Edit on page" is then announced as "Edit on page: FAQ", so the
+ *   edit buttons of a page with several editable sections are told apart (the visible text stays "Edit on page").
+ * @param props.tone - The section's background: "dark" (default, a photo such as the hero: white-outline Cancel) or
+ *   "light" (a white section: the outlined Cancel of the site's dialogs).
  * @param props.className - Extra classes of the bar.
  * @returns The bar.
  */
-export function InlineEditBar({ editing, formId, pending, error, status, editButton, onEdit, onCancel, className }: InlineEditBarProps) {
+export function InlineEditBar({ editing, formId, pending, error, status, editButton, onEdit, onCancel, label, tone = 'dark', className }: InlineEditBarProps) {
   const { t } = useI18n()
   return (
     <div className={cn('flex flex-wrap items-center justify-end gap-3', className)}>
@@ -184,7 +269,7 @@ export function InlineEditBar({ editing, formId, pending, error, status, editBut
       )}
       {editing ? (
         <>
-          <Button type="button" variant="ghostWhite" size="sm" onClick={onCancel}>
+          <Button type="button" variant={tone === 'dark' ? 'ghostWhite' : 'outline'} size="sm" onClick={onCancel}>
             {t.admin.cancel}
           </Button>
           <Button type="submit" form={formId} size="sm" disabled={pending}>
@@ -192,7 +277,7 @@ export function InlineEditBar({ editing, formId, pending, error, status, editBut
           </Button>
         </>
       ) : (
-        <Button ref={editButton} type="button" size="sm" onClick={onEdit}>
+        <Button ref={editButton} type="button" size="sm" aria-label={label ? t.inlineEdit.editSection.replace('{section}', label) : undefined} onClick={onEdit}>
           <Pencil size={14} aria-hidden="true" />
           {t.inlineEdit.edit}
         </Button>
@@ -398,7 +483,9 @@ const BOX_CLASS =
  * @param props.className - The text's classes (colour, weight, line height, margins, ...), in both modes.
  * @param props.sizeClass - The text's size classes per step; omitted = no size of its own (inherits).
  * @param props.controls - false = no font/size of its own: it follows its parent's (e.g. an accent word).
- * @param props.multiline - A growing multi-line box instead of a one-line one.
+ * @param props.multiline - A growing multi-line box (Enter starts a new line) instead of a one-line one.
+ * @param props.wrap - A one-line text that wraps onto more lines as it grows, at the full width (e.g. a question):
+ *   Enter saves and typed or pasted line breaks become spaces. Ignored with `multiline`.
  * @param props.placeholder - Shown in an empty box (e.g. the built-in text an empty value falls back to).
  * @param props.before - Shown before the words in both modes (e.g. a decorative logo).
  * @param props.after - Shown after the words in both modes (e.g. an accent word, itself an EditableText).
@@ -417,6 +504,7 @@ export function EditableText({
   sizeClass,
   controls = true,
   multiline = false,
+  wrap = false,
   placeholder,
   before,
   after,
@@ -433,6 +521,7 @@ export function EditableText({
   sizeClass?: (size: SizeStep) => string
   controls?: boolean
   multiline?: boolean
+  wrap?: boolean
   placeholder?: string
   before?: ReactNode
   after?: ReactNode
@@ -455,6 +544,7 @@ export function EditableText({
     )
   }
 
+  const oneLineWrap = wrap && !multiline
   const box = {
     value: value.text,
     placeholder,
@@ -462,14 +552,16 @@ export function EditableText({
     lang: locale,
     'data-selected': selected,
     onFocus: onSelect,
-    onChange: (event: { target: { value: string } }) => onChange({ text: event.target.value }),
+    onChange: (event: { target: { value: string } }) => onChange({ text: oneLineWrap ? event.target.value.replace(/\s*[\r\n]+\s*/g, ' ') : event.target.value }),
   }
-  const field = multiline ? (
-    <textarea rows={3} className={cn(BOX_CLASS, 'field-sizing-content resize-none')} {...box} />
-  ) : (
-    // One line that grows with its words (field-sizing), so a short word stays inline next to the next box.
-    <input type="text" size={Math.max((value.text || placeholder || '').length, 2)} className={cn(BOX_CLASS, 'inline-block w-auto max-w-full field-sizing-content')} {...box} />
-  )
+  const field =
+    multiline || oneLineWrap ? (
+      // data-one-line tells useInlineDraft's key handler that Enter saves here instead of breaking the line.
+      <textarea rows={multiline ? 3 : 1} data-one-line={oneLineWrap || undefined} className={cn(BOX_CLASS, 'field-sizing-content resize-none')} {...box} />
+    ) : (
+      // One line that grows with its words (field-sizing), so a short word stays inline next to the next box.
+      <input type="text" size={Math.max((value.text || placeholder || '').length, 2)} className={cn(BOX_CLASS, 'inline-block w-auto max-w-full field-sizing-content')} {...box} />
+    )
 
   if (!controls) return <span className={look}>{field}</span>
 

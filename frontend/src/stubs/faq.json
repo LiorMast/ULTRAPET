@@ -1,0 +1,72 @@
+[
+  {
+    "question": {
+      "he": "האם אתם מוכרים ללקוחות פרטיים?",
+      "en": "Do you sell to private customers?"
+    },
+    "answer": {
+      "he": "לא. אולטרה פט עוסקת במכירה סיטונאית בלבד: לחנויות חיות מחמד, לרשתות קמעונאיות, למפיצים ולסיטונאים. לקוחות פרטיים מוזמנים למצוא חנות קרובה בעמוד \"משווקים\".",
+      "en": "No. Ultra Pet sells wholesale only: to pet stores, retail chains, distributors and wholesalers. Private customers are welcome to find a store near them on the Where to Buy page."
+    }
+  },
+  {
+    "question": {
+      "he": "איך פותחים חשבון לקוח עסקי?",
+      "en": "How do I open a business account?"
+    },
+    "answer": {
+      "he": "השאירו פרטים בטופס יצירת הקשר או התקשרו אלינו, ונציג מכירות יחזור אליכם כדי להכיר את העסק, להכין הצעת מחיר מותאמת ולפתוח עבורכם חשבון.",
+      "en": "Leave your details in the contact form or call us, and a sales representative will get back to you to learn about your business, prepare a tailored quote and open your account."
+    }
+  },
+  {
+    "question": {
+      "he": "איפה אפשר לראות את המחירים?",
+      "en": "Where can I see the prices?"
+    },
+    "answer": {
+      "he": "המחירים מוצגים בקטלוג רק ללקוחות עסקיים מחוברים. גם בלי להתחבר אפשר לעיין בקטלוג המוצרים המלא ולהוריד את קטלוג ה-PDF, ללא מחירים.",
+      "en": "Prices are shown in the catalog to signed-in business customers only. Without signing in you can still browse the full product catalog and download the PDF catalog, without prices."
+    }
+  },
+  {
+    "question": {
+      "he": "האם יש מינימום הזמנה?",
+      "en": "Is there a minimum order?"
+    },
+    "answer": {
+      "he": "כן, סכום ההזמנה המינימלי הוא \u20662,000 ₪\u2069.",
+      "en": "Yes, the minimum order is ₪2,000."
+    }
+  },
+  {
+    "question": {
+      "he": "אילו אמצעי תשלום אתם מקבלים?",
+      "en": "Which payment methods do you accept?"
+    },
+    "answer": {
+      "he": "כרטיס אשראי, ביט והעברה בנקאית.",
+      "en": "Credit card, Bit and bank transfer."
+    }
+  },
+  {
+    "question": {
+      "he": "לאן אתם מפיצים?",
+      "en": "Where do you deliver?"
+    },
+    "answer": {
+      "he": "לכל רחבי הארץ. רשת ההפצה שלנו מספקת לחנויות ולמרכזי חיות מחמד בכל הארץ, עם משלוחים מהירים ויעילים.",
+      "en": "Nationwide. Our distribution network supplies pet stores and pet centers across Israel, with fast and efficient deliveries."
+    }
+  },
+  {
+    "question": {
+      "he": "האם אתם מייצרים מוצרים במותג פרטי?",
+      "en": "Do you make private label products?"
+    },
+    "answer": {
+      "he": "כן. אולטרה פט מפתחת ומייצרת מוצרי מותג פרטי (Private Label) במפעלים בינלאומיים, בבקרת איכות קפדנית: מזון יבש, מזון רטוב, חטיפים וחול לחתולים, מבחירת המוצר ופיתוח הפורמולה ועד עיצוב האריזה וההפצה.",
+      "en": "Yes. Ultra Pet develops and manufactures private label products in international factories under strict quality control: dry food, wet food, treats and cat litter, from product selection and formula development to packaging design and distribution."
+    }
+  }
+]

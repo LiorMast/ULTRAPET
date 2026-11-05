@@ -117,37 +117,15 @@ export const en: Dictionary = {
     moreTitle: 'Still have a question?',
     moreText: 'Our customer service team is happy to help, Sunday to Thursday, 09:00–16:00.',
     cta: 'Talk to us',
-    items: {
-      wholesale: {
-        question: 'Do you sell to private customers?',
-        answer:
-          'No. Ultra Pet sells wholesale only: to pet stores, retail chains, distributors and wholesalers. Private customers are welcome to find a store near them on the Where to Buy page.',
-      },
-      account: {
-        question: 'How do I open a business account?',
-        answer: 'Leave your details in the contact form or call us, and a sales representative will get back to you to learn about your business, prepare a tailored quote and open your account.',
-      },
-      prices: {
-        question: 'Where can I see the prices?',
-        answer: 'Prices are shown in the catalog to signed-in business customers only. Without signing in you can still browse the full product catalog and download the PDF catalog, without prices.',
-      },
-      minimum: {
-        question: 'Is there a minimum order?',
-        answer: 'Yes, the minimum order is ₪2,000.',
-      },
-      payment: {
-        question: 'Which payment methods do you accept?',
-        answer: 'Credit card, Bit and bank transfer.',
-      },
-      delivery: {
-        question: 'Where do you deliver?',
-        answer: 'Nationwide. Our distribution network supplies pet stores and pet centers across Israel, with fast and efficient deliveries.',
-      },
-      privateLabel: {
-        question: 'Do you make private label products?',
-        answer:
-          'Yes. Ultra Pet develops and manufactures private label products in international factories under strict quality control: dry food, wet food, treats and cat litter, from product selection and formula development to packaging design and distribution.',
-      },
+    // The in-place editor of the questions (staff): {n} = the question's number in the list.
+    edit: {
+      question: 'Question {n}',
+      answer: 'Answer {n}',
+      questionPlaceholder: 'Type the question',
+      answerPlaceholder: 'Type the answer',
+      add: 'Add a question',
+      incomplete: 'Every question needs an answer, and every answer a question.',
+      empty: 'No questions in English yet. Use "Edit on page" to add some.',
     },
   },
   contact: {
@@ -219,6 +197,7 @@ export const en: Dictionary = {
     play: 'Play slideshow',
     edit: {
       button: 'Edit both languages',
+      section: 'Hero',
       title: 'Edit the hero',
       description: 'The headline and the texts under it, in Hebrew and English. An empty text shows the built-in one.',
       titleText: 'Title',
@@ -233,6 +212,8 @@ export const en: Dictionary = {
   },
   inlineEdit: {
     edit: 'Edit on page',
+    // The accessible name of a section's edit button when a page has several, e.g. 'Edit on page: FAQ'.
+    editSection: 'Edit on page: {section}',
     toolbar: 'Text style',
     move: 'Move the style bar',
     editing: 'Editing: {label}',

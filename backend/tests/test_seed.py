@@ -1,4 +1,5 @@
-"""test_seed.py — `flask seed` loads the stub catalog and content, settings, payment methods and the optional users."""
+"""test_seed.py — `flask seed` loads the stub catalog and content (articles, resellers, FAQ), settings, payment methods
+and the optional users."""
 import uuid
 from decimal import Decimal
 
@@ -7,7 +8,7 @@ from click import ClickException
 from sqlalchemy import func, select
 
 from app.database.models.catalog import Brand, Category, Product
-from app.database.models.content import Article, Reseller
+from app.database.models.content import Article, FaqItem, Reseller
 from app.database.models.orders import PaymentMethod
 from app.database.seed import seed_database
 from app.database.models.settings import get_setting
@@ -40,6 +41,7 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
         "products": 400,
         "articles": 4,
         "resellers": 124,
+        "faq_items": 7,
         "settings": 11,
         "payment_methods": 3,
         "staff_users": 1,
@@ -64,6 +66,10 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
     assert article.body["he"][0]["type"] == "p"
     assert database.scalar(select(Reseller).where(Reseller.name == "Petway")).city == "חיפה"
     assert database.scalar(select(func.count()).where(Reseller.approximate_location)) == 41
+    faq = database.scalars(select(FaqItem).order_by(FaqItem.sort_order)).all()
+    assert [item.sort_order for item in faq] == list(range(7))
+    assert faq[0].question == {"he": "האם אתם מוכרים ללקוחות פרטיים?", "en": "Do you sell to private customers?"}
+    assert faq[3].answer["en"] == "Yes, the minimum order is ₪2,000."
     customer = database.scalar(select(BusinessUser))
     assert (customer.email, customer.company_name) == ("shop@example.com", "Demo Pet Shop")
     assert customer.check_password("customer-password")

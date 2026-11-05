@@ -15,7 +15,8 @@
  *   signed out.
  *
  * Staff panel (backend/app/staff/routes.py): its own sign-in, and one generic create/read/update/delete API for
- * every resource (fetchStaffRows, createStaffRow, updateStaffRow, deleteStaffRow), used by the /admin pages.
+ * every resource (fetchStaffRows, createStaffRow, updateStaffRow, deleteStaffRow), used by the /admin pages and the
+ * in-place editors; a resource edited as one ordered list (the FAQ) is saved whole with replaceStaffRows.
  */
 import { notFound } from '@tanstack/react-router'
 import type { Localized } from '@/config'
@@ -131,6 +132,15 @@ export type HeroContent = {
   tagline?: SectionText
   description?: SectionText
 }
+
+/**
+ * A question of the home page FAQ section (table faq_items) and its answer, per language. A language may be missing:
+ * the site shows the question only in the languages where both texts are there (see shownFaq in Faq.tsx).
+ */
+export type FaqItem = { id: string; question: Partial<Record<Locale, string>>; answer: Partial<Record<Locale, string>> }
+
+/** A question as the FAQ editor saves it: with the `id` of the row it keeps, or without one for a new question. */
+export type FaqItemInput = Omit<FaqItem, 'id'> & { id?: string }
 
 /** The signed-in user: a business customer ("business") or an Ultra Pet staff member ("staff", no company). */
 export type User = { kind: 'business' | 'staff'; email: string; fullName: string; companyName: string | null }
@@ -338,6 +348,13 @@ export async function fetchSection<Content>(key: string, signal?: AbortSignal): 
 }
 
 /**
+ * The questions of the home page FAQ section.
+ * @param signal - Aborts the request.
+ * @returns The questions in display order, every language of each.
+ */
+export const fetchFaq = (signal?: AbortSignal) => apiFetch<FaqItem[]>('/api/faq', { signal })
+
+/**
  * The published articles, newest first.
  * @param signal - Aborts the request.
  * @returns The articles.
@@ -389,7 +406,10 @@ export async function postSignIn(credentials: { email: string; password: string;
 export const postSignOut = () => apiFetch<void>('/api/auth/logout', { method: 'POST' })
 
 /** The tables the staff API edits (RESOURCES in backend/app/staff/routes.py). */
-export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections'
+export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections' | 'faq-items'
+
+/** The staff resources edited as one ordered list, which replaceStaffRows saves whole (`replaceable` on the server). */
+export type StaffListResource = 'faq-items'
 
 /** What every staff row carries besides its fields: when it was created and last changed (ISO timestamps). */
 type StaffRowBase = { createdAt: string; updatedAt: string }
@@ -493,3 +513,14 @@ export const updateStaffRow = <Row,>(resource: StaffResource, key: string, chang
  */
 export const deleteStaffRow = (resource: StaffResource, key: string) =>
   apiFetch<void>(`/api/staff/${resource}/${encodeURIComponent(key)}`, { method: 'DELETE' })
+
+/**
+ * Replaces the whole list of a list resource in one transaction: rows with an `id` are kept and changed, rows without
+ * one are created, rows left out are deleted, and the order of `rows` becomes the display order (sortOrder).
+ * @param resource - The list, e.g. "faq-items".
+ * @param rows - The new list, in display order.
+ * @returns The saved rows in order; throws ApiError 400 (an invalid field, or an `id` no longer in the table) and
+ *   nothing is changed.
+ */
+export const replaceStaffRows = <Row,>(resource: StaffListResource, rows: Record<string, unknown>[]) =>
+  apiFetch<Row[]>(`/api/staff/${resource}`, { method: 'PUT', body: rows })

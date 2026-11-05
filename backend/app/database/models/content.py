@@ -4,13 +4,14 @@ editable home page sections.
 Article is a blog post (table articles); the public site shows it from `published_at` on. Reseller is a pet store
 that sells Ultra Pet products (table resellers), listed on the "Where to Buy" page and its map. Staff edit both
 through the staff API (app/staff/routes.py); the public API (app/customers/routes.py) reads them. PageSection is the
-JSON content of one home page section (table page_sections). Column meanings are documented in create-tables.sql.
+JSON content of one home page section (table page_sections). FaqItem is one question of the home page FAQ section
+(table faq_items), as many as staff add. Column meanings are documented in create-tables.sql.
 """
 import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ARRAY, CheckConstraint, Double, ForeignKey, Text
+from sqlalchemy import ARRAY, CheckConstraint, Double, ForeignKey, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -77,4 +78,21 @@ class PageSection(TimestampMixin, db.Model):
     key: Mapped[str] = mapped_column(primary_key=True)
     # An object whose shape depends on the section; translated texts are {"he": ..., "en": ...}.
     content: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("staff_users.id", ondelete="SET NULL"), index=True)
+
+
+class FaqItem(TimestampMixin, db.Model):
+    """One question of the home page FAQ section and its answer, per language (a language may be missing: the site
+    then leaves the question out of that language), plus who made the last change."""
+
+    __tablename__ = "faq_items"
+    __table_args__ = (
+        CheckConstraint("jsonb_typeof(question) = 'object'", name="question"),
+        CheckConstraint("jsonb_typeof(answer) = 'object'", name="answer"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    question: Mapped[Localized]
+    answer: Mapped[Localized]
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     updated_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("staff_users.id", ondelete="SET NULL"), index=True)

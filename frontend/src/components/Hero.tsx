@@ -424,6 +424,7 @@ export function Hero({
           {onSave && (
             <InlineEditBar
               {...inline.bar}
+              label={e.section}
               onEdit={() => {
                 setSettled(true)
                 inline.start(heroDraft(content, locale), 'title')

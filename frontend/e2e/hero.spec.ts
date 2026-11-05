@@ -80,10 +80,13 @@ test.describe('layout', () => {
   for (const path of ['/', '/en']) {
     test(`fits every screen width without horizontal scrolling (${path})`, async ({ page, isMobile }) => {
       test.skip(isMobile, 'resizes the window itself')
+      test.slow() // six page loads, each waiting for its fonts
       for (const width of [360, 390, 768, 1024, 1440, 1920]) {
         await page.setViewportSize({ width, height: 900 })
         await page.goto(path)
         await page.getByRole('heading', { level: 1 }).waitFor()
+        // Measure the final layout: until the web fonts swap in, the fallback font can stick out by a pixel.
+        await page.evaluate(() => document.fonts.ready)
         const report = await page.evaluate(() => {
           const h1 = document.querySelector('#home h1')!.getBoundingClientRect()
           return {

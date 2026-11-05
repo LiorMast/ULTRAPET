@@ -139,7 +139,7 @@ describe('Hero saved content', () => {
   it('has no inline editing without onSave', async () => {
     renderComponent(<Hero images={[]} content={CONTENT} />, 'en')
     await screen.findByRole('heading', { level: 1 })
-    expect(screen.queryByRole('button', { name: 'Edit on page' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Edit on page/ })).not.toBeInTheDocument()
   })
 
   it('shows the editor slot only when given', async () => {

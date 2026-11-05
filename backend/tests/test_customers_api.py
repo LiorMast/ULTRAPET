@@ -1,7 +1,7 @@
 """test_customers_api.py — The public and customer routes of the `customers` blueprint (app/customers/routes.py).
 
 Catalog categories and products (search in any language, category filter, chip counts, paging), brands, stats,
-articles, resellers, the sitemap, and the signed-in customer's prices. Sign-in itself is in test_auth.py.
+the saved home page sections and FAQ, articles, resellers, the sitemap, and the signed-in customer's prices. Sign-in itself is in test_auth.py.
 """
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.database.models.catalog import Brand, Category, Product, ProductImage
-from app.database.models.content import Article, PageSection, Reseller
+from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.price_rules import PriceRule
 from app.database.models.settings import Setting
 
@@ -219,6 +219,18 @@ def test_sections_returns_the_saved_content(client, database):
     data = client.get("/api/sections/hero").get_json()
     assert (data["key"], data["content"]) == ("hero", {"title": {"text": {"he": "שלום"}}})
     assert data["updatedAt"].endswith(("+02:00", "+03:00"))
+
+
+def test_faq_lists_the_questions_in_display_order(client, database):
+    assert client.get("/api/faq").get_json() == []
+    second = FaqItem(question={"he": "שאלה ב"}, answer={"he": "תשובה ב"}, sort_order=1)
+    first = FaqItem(question={"he": "שאלה א", "en": "Question A"}, answer={"he": "תשובה א", "en": "Answer A"}, sort_order=0)
+    database.add_all([second, first])
+    database.commit()
+    assert client.get("/api/faq").get_json() == [
+        {"id": str(first.id), "question": {"he": "שאלה א", "en": "Question A"}, "answer": {"he": "תשובה א", "en": "Answer A"}},
+        {"id": str(second.id), "question": {"he": "שאלה ב"}, "answer": {"he": "תשובה ב"}},
+    ]
 
 
 def test_an_unpublished_article_is_not_found(client, articles):

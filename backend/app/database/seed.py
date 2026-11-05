@@ -6,6 +6,7 @@ still use them as fixtures):
 - categories, products (in stub order, with their WooCommerce ids in woocommerce_id, and images), placeholder prices
   and brands;
 - the articles (with their WordPress dates) and the resellers of the Where to Buy page;
+- the questions of the home page FAQ section (stubs/faq.json, in file order);
 - the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order and the currency;
 - the three payment methods;
 - a staff admin, when SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are set, and a demo business customer (to see
@@ -25,7 +26,7 @@ import psycopg
 from sqlalchemy import func, select
 
 from app.database.models.catalog import Brand, Category, Product, ProductImage
-from app.database.models.content import Article, Reseller
+from app.database.models.content import Article, FaqItem, Reseller
 from app.database.db import db
 from app.database.models.orders import PaymentMethod
 from app.database.models.settings import Setting
@@ -79,8 +80,8 @@ def read_json(path: Path) -> Any:
 
 
 def seed_database() -> dict[str, int]:
-    """Fills an empty database with the stub catalog and content, settings, payment methods and (optionally) a staff
-    admin and a demo customer.
+    """Fills an empty database with the stub catalog and content (articles, resellers, FAQ), settings, payment methods
+    and (optionally) a staff admin and a demo customer.
 
     Returns:
         How many rows were added per kind, e.g. {"products": 400, ...}.
@@ -166,6 +167,10 @@ def seed_database() -> dict[str, int]:
             )
         )
 
+    faq = read_json(STUBS_DIR / "faq.json")
+    for order, item in enumerate(faq):
+        db.session.add(FaqItem(question=item["question"], answer=item["answer"], sort_order=order))
+
     legacy_settings = read_json(LEGACY_EXPORT_DIR / "cms_settings.json")
     for item in legacy_settings:
         value = item["value"]
@@ -206,6 +211,7 @@ def seed_database() -> dict[str, int]:
         "products": len(products),
         "articles": len(articles),
         "resellers": len(resellers),
+        "faq_items": len(faq),
         "settings": len(legacy_settings) + len(BASE_SETTINGS),
         "payment_methods": len(PAYMENT_METHODS),
         "staff_users": staff,

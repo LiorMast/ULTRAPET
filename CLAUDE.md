@@ -62,10 +62,11 @@ backend/
     auth.py             JWT sign-in in HttpOnly cookies (CSRF double-submit, 15 min access + 30 day refresh): authenticate,
                         issue_tokens, refresh_access, clear_tokens, require_user(kind)
     customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), brands, stats,
-                        sections/<key> (saved home page section content), articles, resellers, sitemap.xml, the shared auth (login/refresh/logout/me: customers AND staff), prices
+                        sections/<key> (saved home page section content), faq, articles, resellers, sitemap.xml, the shared auth (login/refresh/logout/me: customers AND staff), prices
     staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
-                        products+images, price-rules, settings, articles, resellers, page-sections (stamps updated_by_id));
-                        DB constraint errors -> 400/409
+                        products+images, price-rules, settings, articles, resellers, page-sections, faq-items (these two
+                        stamp updated_by_id)); PUT /<resource> replaces a whole ordered list in one transaction (only
+                        `replaceable` resources: faq-items); DB constraint errors -> 400/409
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
     database/           everything about the database
       create-tables.sql   the schema: every table and column, explained (source of truth, working rule 5)
@@ -78,7 +79,8 @@ backend/
         price_rules.py      PriceRule
         orders.py           PaymentMethod, Order, OrderItem
         settings.py         Setting + get_setting()
-        content.py          Article, Reseller, PageSection (articles, Where to Buy stores, editable home page sections)
+        content.py          Article, Reseller, PageSection, FaqItem (articles, Where to Buy stores, editable home page
+                            sections, the FAQ's questions)
   tests/                pytest on the `content_test` database (conftest.py builds it from the SQL files)
 ```
 
@@ -256,13 +258,23 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   the window, and keeps its spot until edit mode ends.
   The section supplies its cva size steps and decides how the draft is saved (the hero: `mergeHero` into its
   `page_sections` content).
+  **Lists** (a section whose entries staff add and delete, e.g. the FAQ): each entry owns a few draft keys
+  (`"<id>:question"`, `"<id>:answer"`; new entries a `new-<n>` id); `add(values)` appends an entry and focuses its first
+  box (the plus button), `remove(keys, next)` drops one and focuses `next` (or the form's first control, e.g. "Add",
+  when none is left); the draft keeps insertion order, so the section reads its order from `Object.keys(draft)`. A
+  section without per-text styling omits the PropBar. `onSave` may throw `InlineEditError(message, key)` to refuse a
+  save itself (the bar shows the translated message, the named box gets the focus). Give `InlineEditBar` a `label`
+  (accessible name "Edit on page: FAQ"; a page can have several editable sections) and `tone="light"` on a white
+  section (outlined Cancel). `EditableText wrap` = a one-line text that wraps (Enter saves, line breaks become
+  spaces), `multiline` = a paragraph box. Save the list whole with `replaceStaffRows` (PUT, one transaction).
 - **Section headings**: a section opens with `<SectionHeading id eyebrow title intro />` (red eyebrow, display
   title, muted intro; `as="h1"` for a page heading), never with copied heading markup.
 - **Accordion** (`ui/accordion.tsx`, Radix): `<Accordion type="single" collapsible variant="line|card">` +
   `AccordionItem` / `AccordionTrigger` / `AccordionContent`; the variant reaches the parts through context. Panels
   grow to Radix's measured height on `--ease-spring` while the text fades in; reduced motion opens without resizing
-  (rules in `index.css`). The FAQ (`Faq.tsx`, questions in `FAQ_ITEMS` + `t.faq`) uses it, and the home head carries
-  the same questions as FAQPage JSON-LD (`faqJsonLd` in `seo.ts`), since closed answers are not in the DOM.
+  (rules in `index.css`). The FAQ (`Faq.tsx`, questions from the table `faq_items` via `GET /api/faq`, heading from
+  `t.faq`) uses it, and the home head carries the shown questions as FAQPage JSON-LD (`shownFaq` + `faqJsonLd` in
+  `seo.ts`), since closed answers are not in the DOM.
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
 - **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
@@ -391,7 +403,7 @@ content exists in each language, and the layout flips direction automatically.
 - **Copy**: `legacy/src/lib/translations/{he,en}.ts`, with CMS overrides in `legacy/supabase-export/cms_text_blocks.json`.
 - **Postgres seed** (`backend/app/database/seed.py`): the catalog from `frontend/src/stubs/` (categories, products with their
   WooCommerce id in `products.woocommerce_id`, their stub order in `sort_order` and their images, placeholder prices into
-  `products.list_price`, brands), the articles and resellers, the home stats from
+  `products.list_price`, brands), the articles, resellers and FAQ questions (`faq.json`), the home stats from
   `legacy/supabase-export/cms_settings.json`, and optionally a staff admin and a demo customer (`SEED_ADMIN_*`,
   `SEED_CUSTOMER_*`). The rest of the export (hero banners, contact, sections, text blocks,
   media and `legacy/supabase-export/media/`) waits for the CMS tables (Phase 3); schema hints in
@@ -441,7 +453,10 @@ content exists in each language, and the layout flips direction automatically.
       prefilled mailto: until Phase 2 lead endpoints exist)
 - [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)
 - [x] Home FAQ (`Faq`, `#faq`, between About and Contact) on the reusable `ui/accordion` (spring animation), with
-      FAQPage JSON-LD; the copy (minimum order, payment methods) awaits the owner's review
+      FAQPage JSON-LD; the questions are rows of `faq_items` (seeded from `stubs/faq.json`), shown in a language only
+      when both texts exist in it; staff edit them in place in the page's language ("Edit on page": change, "Add a
+      question", Delete, one Save = `PUT /api/staff/faq-items`); the copy (minimum order, payment methods) awaits the
+      owner's review; [ ] reorder questions, edit the heading texts
 - [x] Where to Buy (`WhereToBuy`, `BranchMap`): search, nearest store, Leaflet map, 124 resellers (table `resellers`, geocoded once)
 - [x] Articles (`/articles`, `/articles/$slug`; `ArticleCard`, `Breadcrumbs`): the 4 WordPress posts (table `articles`;
       Hebrew verbatim + English translation), head tags via `seo.ts` + `<HeadContent />`, BlogPosting/Breadcrumb
@@ -452,15 +467,16 @@ content exists in each language, and the layout flips direction automatically.
 - [ ] Pages: brand, category, product, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
 **Phase 2 — Backend**
-- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 18 tables: users with staff and
+- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 19 tables: users with staff and
       business subtypes, leads, suppliers, brands, categories, products, images, product-supplier junction, price
-      rules, settings, payment methods, orders, order items, articles, resellers, page sections); models; price resolution (`pricing.py`); seed from the
+      rules, settings, payment methods, orders, order items, articles, resellers, page sections, FAQ items); models; price resolution (`pricing.py`); seed from the
       stubs; `/api/health`; Vite `/api` proxy
-- [x] public content API (blueprint `customers`: categories, products, brands, stats, articles, resellers, sitemap);
+- [x] public content API (blueprint `customers`: categories, products, brands, stats, sections, FAQ, articles,
+      resellers, sitemap);
       the frontend loads everything through `src/api.ts` (stubs are seed data + test fixtures)
 - [x] auth (JWT sign-in for staff and business users, `app/auth.py`) and the customer price API (`/api/prices`)
 - [x] staff API (blueprint `staff`): CRUD of brands, categories, products + images, settings, articles, resellers,
-      page sections
+      page sections, FAQ items (+ PUT that replaces the FAQ list at once)
 - [x] staff API for price rules (`price-rules`: positive percent/amount discounts, dated)
 - [ ] staff API for customers, leads, payment methods and orders (with the admin UI, Phase 3)
 - [ ] lead/contact endpoints (`business_leads`); serve the PDF catalog

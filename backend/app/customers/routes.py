@@ -1,8 +1,8 @@
 """routes.py — Blueprint `customers` (prefix /api): everything the public site and the business customers call.
 
 Public, no sign-in:
-    GET /categories, /products, /brands, /brands/<slug>, /stats, /sections/<key>, /articles, /articles/<slug>,
-    /resellers, /sitemap.xml
+    GET /categories, /products, /brands, /brands/<slug>, /stats, /sections/<key>, /faq, /articles,
+    /articles/<slug>, /resellers, /sitemap.xml
 Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
     POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me
 Business customers only:
@@ -24,7 +24,7 @@ from sqlalchemy.orm import contains_eager, selectinload
 from app.auth import authenticate, clear_tokens, issue_tokens, read_credentials, refresh_access, require_user, user_type
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
-from app.database.models.content import Article, PageSection, Reseller
+from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.settings import Setting, get_setting
 from app.database.models.users import AppUser, BusinessUser
 from app.pricing import ISRAEL, customer_prices
@@ -244,6 +244,18 @@ def get_section(key: str) -> dict[str, Any]:
     if section is None:
         abort(404)
     return {"key": section.key, "content": section.content, "updatedAt": section.updated_at.astimezone(ISRAEL).isoformat()}
+
+
+@bp.get("/faq")
+def list_faq() -> list[dict[str, Any]]:
+    """The questions of the home page FAQ section, in display order.
+
+    Returns:
+        [{id, question, answer}], each text per language ({"he": ..., "en": ...}); the site shows a question in a
+        language only when both its texts have that language.
+    """
+    items = db.session.scalars(select(FaqItem).order_by(FaqItem.sort_order, FaqItem.created_at, FaqItem.id))
+    return [{"id": item.id, "question": item.question, "answer": item.answer} for item in items]
 
 
 def is_published() -> ColumnElement[bool]:
