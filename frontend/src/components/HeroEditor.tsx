@@ -1,5 +1,5 @@
 /**
- * HeroEditor.tsx — The staff's "Edit hero" button and its dialog: the hero's title (white words + red word),
+ * HeroEditor.tsx — The staff's "Edit both languages" button and its dialog: the hero's title (white words + red word),
  * tagline and description, each with its font and size, side by side in Hebrew and English.
  *
  * The home page shows it in the hero's `editor` slot to signed-in staff only. A text left empty shows the
@@ -240,7 +240,7 @@ function LanguageFields({ block, locale, value, onChange }: { block: Block; loca
             <select id={`${id}-font`} value={value.font} onChange={(event) => onChange({ font: event.target.value as FontKey })} className={INPUT_CLASS}>
               {fontsFor(locale).map((font) => (
                 <option key={font} value={font}>
-                  {font === 'default' ? e.siteFont : FONTS[font].name}
+                  {font === 'default' ? t.inlineEdit.siteFont : FONTS[font].name}
                 </option>
               ))}
             </select>
@@ -252,7 +252,7 @@ function LanguageFields({ block, locale, value, onChange }: { block: Block; loca
             <select id={`${id}-size`} value={value.size} onChange={(event) => onChange({ size: event.target.value as SizeStep })} className={INPUT_CLASS}>
               {SIZE_STEPS.map((size) => (
                 <option key={size} value={size}>
-                  {e.sizes[size]}
+                  {t.inlineEdit.sizes[size]}
                 </option>
               ))}
             </select>

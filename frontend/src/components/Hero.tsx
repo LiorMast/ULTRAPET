@@ -15,14 +15,18 @@
  *   times after the text has risen, then stays still.
  * - Staff can change the title, tagline and description, and their font and size per language (`content`, saved in
  *   page_sections, see resolveHero). An empty or missing part shows the dictionary's text in the site's font at
- *   size "md", which is the original design. The page puts the staff's Edit button in the `editor` slot.
+ *   size "md", which is the original design. With `onSave`, staff edit the texts in place (InlineEditor: "Edit on
+ *   page", one PropBar in the top corner for the font and size of the selected text, one Save for all of them, the
+ *   page's language only, see mergeHero); the page can also put another
+ *   control (the two-language dialog) in the `editor` slot.
  */
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, ChevronDown, Pause, Play } from 'lucide-react'
 import { cva } from 'class-variance-authority'
 import { cn } from 'cn'
-import type { FontKey, HeroContent, SectionText, SizeStep } from '@/api'
+import type { HeroContent, SectionText } from '@/api'
+import { EditableText, InlineEditBar, PropBar, useInlineDraft, type TextValue } from '@/components/InlineEditor'
 import { useReducedMotion } from '@/components/useReducedMotion'
 import { Button } from '@/components/ui/button'
 import logoMarkUrl from '@/assets/logo-mark.svg'
@@ -56,11 +60,11 @@ const descriptionSize = cva('', {
   variants: { size: { sm: 'text-sm', md: 'text-base', lg: 'text-lg', xl: 'text-xl lg:text-2xl' } },
 })
 
-/** One hero text as shown in one language: its words, font and size step. */
-export type HeroTextValue = { text: string; font: FontKey; size: SizeStep }
-
 /** The hero's texts as shown in one language (see resolveHero). */
-export type ResolvedHero = { title: HeroTextValue & { accent: string }; tagline: HeroTextValue; description: HeroTextValue }
+export type ResolvedHero = { title: TextValue & { accent: string }; tagline: TextValue; description: TextValue }
+
+/** The texts of the hero's inline editor (the red accent word is a text of its own, styled like the title). */
+type HeroDraft = Record<'title' | 'accent' | 'tagline' | 'description', TextValue>
 
 /**
  * Works out what one hero text shows in a language: the saved value, else the default.
@@ -69,7 +73,7 @@ export type ResolvedHero = { title: HeroTextValue & { accent: string }; tagline:
  * @param fallback - The dictionary's words for this text.
  * @returns The words, font ("default" when unset) and size ("md" when unset).
  */
-function resolveText(saved: SectionText | undefined, locale: Locale, fallback: string): HeroTextValue {
+function resolveText(saved: SectionText | undefined, locale: Locale, fallback: string): TextValue {
   // Unknown keys (e.g. a font removed from FONTS since it was saved) fall back too.
   const font = saved?.font?.[locale]
   const size = saved?.size?.[locale]
@@ -97,23 +101,109 @@ export function resolveHero(content: HeroContent | null | undefined, locale: Loc
 }
 
 /**
- * The inline style that applies a picked font (it beats the font tokens, also the Hebrew swap in index.css).
- * @param font - The font key.
- * @returns The style, or undefined for the site's own font.
+ * The inline editor's starting values in a language: the saved words ('' when not saved, so the box shows the
+ * built-in text as its placeholder) with the font and size shown now.
+ * @param content - The saved hero content, or null.
+ * @param locale - The page language.
+ * @returns The draft.
  */
-const fontStyle = (font: FontKey) => (FONTS[font].family ? { fontFamily: FONTS[font].family } : undefined)
+function heroDraft(content: HeroContent | null | undefined, locale: Locale): HeroDraft {
+  const shown = resolveHero(content, locale)
+  /**
+   * One text's starting values.
+   * @param words - The saved words in this language, if any.
+   * @param style - The font and size shown now.
+   * @returns The text's draft.
+   */
+  const draftOf = (words: string | undefined, style: TextValue): TextValue => ({ text: words ?? '', font: style.font, size: style.size })
+  return {
+    title: draftOf(content?.title?.text?.[locale], shown.title),
+    accent: draftOf(content?.title?.accent?.[locale], shown.title),
+    tagline: draftOf(content?.tagline?.text?.[locale], shown.tagline),
+    description: draftOf(content?.description?.text?.[locale], shown.description),
+  }
+}
+
+/**
+ * Writes one language's inline edit into the saved hero content; the other languages keep their values.
+ * @param content - The saved hero content, or null.
+ * @param locale - The edited language.
+ * @param draft - The edited texts (an empty text is removed, so the built-in one shows).
+ * @returns The new content to save.
+ */
+export function mergeHero(content: HeroContent | null | undefined, locale: Locale, draft: HeroDraft): HeroContent {
+  /**
+   * Sets or removes one language's value of a per-language map.
+   * @param values - The saved map, e.g. { he: "...", en: "..." }.
+   * @param value - The new value; '' removes it.
+   * @returns The new map.
+   */
+  const put = <T,>(values: Partial<Record<Locale, T>> | undefined, value: T | '') => {
+    const next = { ...values }
+    if (value === '') delete next[locale]
+    else next[locale] = value
+    return next
+  }
+  /**
+   * Merges one text.
+   * @param saved - Its saved content.
+   * @param value - Its edited value.
+   * @returns Its new content.
+   */
+  const text = (saved: SectionText | undefined, value: TextValue): SectionText => ({
+    ...saved,
+    text: put(saved?.text, value.text.trim()),
+    font: put(saved?.font, value.font),
+    size: put(saved?.size, value.size),
+  })
+  return {
+    ...content,
+    title: { ...text(content?.title, draft.title), accent: put(content?.title?.accent, draft.accent.text.trim()) },
+    tagline: text(content?.tagline, draft.tagline),
+    description: text(content?.description, draft.description),
+  }
+}
 
 /**
  * The home page hero.
  * @param props.images - The photos to cycle through; defaults to the folder src/assets/hero
  *   (HERO_IMAGES). Pass another list to feed it from elsewhere, e.g. a CMS.
  * @param props.content - The texts, fonts and sizes staff saved (see resolveHero); null or omitted = the defaults.
- * @param props.editor - Shown at the top end of the hero, e.g. the staff's Edit button; omitted = nothing.
+ * @param props.onSave - Stores new content (rejects with an ApiError on refusal); given = staff can edit in place.
+ * @param props.editor - Shown at the top end of the hero (hidden while editing in place), e.g. the dialog's
+ *   button; omitted = nothing.
  * @returns The hero <section>.
  */
-export function Hero({ images = HERO_IMAGES, content, editor }: { images?: HeroImage[]; content?: HeroContent | null; editor?: ReactNode }) {
+export function Hero({
+  images = HERO_IMAGES,
+  content,
+  onSave,
+  editor,
+}: {
+  images?: HeroImage[]
+  content?: HeroContent | null
+  onSave?: (content: HeroContent) => Promise<unknown>
+  editor?: ReactNode
+}) {
   const { t, locale } = useI18n()
-  const { title, tagline, description } = resolveHero(content, locale)
+  const shown = resolveHero(content, locale)
+  const inline = useInlineDraft<keyof HeroDraft>(async (draft) => onSave?.(mergeHero(content, locale, draft)))
+  const { editing } = inline
+  // Once edited, the texts stop rising in: they would replay the entrance on every switch between the modes.
+  const [settled, setSettled] = useState(false)
+  const rise = settled ? '' : 'animate-hero-rise'
+  /**
+   * What one text shows: its draft while editing, else the resolved value.
+   * @param key - The text.
+   * @param resolved - Its value in read mode.
+   * @returns The value for EditableText.
+   */
+  const valueOf = (key: keyof HeroDraft, resolved: TextValue) => (inline.draft ? inline.draft[key] : resolved)
+  const builtIn = t.hero
+  const e = t.hero.edit
+  /** The texts' names, for their boxes and the PropBar ("Editing: Tagline"). */
+  const labels: Record<keyof HeroDraft, string> = { title: e.titleMain, accent: e.titleAccent, tagline: e.tagline, description: e.descriptionText }
+  const propBar = inline.propBar(labels)
   const reducedMotion = useReducedMotion()
   const [index, setIndex] = useState(0)
   const [zoomReady, setZoomReady] = useState(false)
@@ -131,11 +221,6 @@ export function Hero({ images = HERO_IMAGES, content, editor }: { images?: HeroI
       cancelAnimationFrame(second)
     }
   }, [])
-
-  // Downloads the picked fonts that the page does not load by itself.
-  useEffect(() => {
-    for (const font of new Set([title.font, tagline.font, description.font])) void FONTS[font].load?.()
-  }, [title.font, tagline.font, description.font])
 
   const count = images.length
   const current = count ? index % count : 0
@@ -169,7 +254,11 @@ export function Hero({ images = HERO_IMAGES, content, editor }: { images?: HeroI
   return (
     <section
       id="home"
-      className="relative isolate h-[calc(100svh-5.5rem)] max-h-[960px] min-h-[600px] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3"
+      className={cn(
+        'relative isolate h-[calc(100svh-5.5rem)] max-h-[960px] min-h-[600px] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3',
+        // While editing, the boxes' frames and a wrapped bar can add height: the hero grows instead of cutting off.
+        editing && 'h-auto max-h-none py-28',
+      )}
     >
       {images.map((image, i) => (
         <img
@@ -193,45 +282,78 @@ export function Hero({ images = HERO_IMAGES, content, editor }: { images?: HeroI
       <div className="absolute inset-y-0 start-0 z-10 w-1 bg-brand-red" aria-hidden="true" />
 
       <div className={cn('relative z-10 mx-auto flex h-full max-w-screen-2xl flex-col justify-center', PAGE_GUTTER)}>
-        <div className="max-w-3xl">
+        <form {...inline.formProps} className="max-w-3xl">
           <div className="mb-5 flex animate-hero-rise items-center gap-3 [animation-delay:200ms]">
             <span aria-hidden="true" className="h-px w-8 bg-brand-red" />
             <span className="font-heading text-2xs font-semibold uppercase tracking-ultra-wide text-white/90">
               {t.hero.eyebrow}
             </span>
           </div>
-          <h1
-            className={cn(
-              titleSize({ size: title.size }),
-              'mb-5 animate-hero-rise font-display leading-[1.05] font-bold tracking-display text-white [animation-delay:350ms]',
-            )}
-            style={fontStyle(title.font)}
-          >
-            <img
-              src={logoMarkUrl}
-              alt=""
-              width={322}
-              height={322}
-              draggable={false}
-              className="me-4 inline-block size-[0.8em] select-none align-[-0.05em] drop-shadow-2xl"
-            />
-            {title.text} <span className="text-brand-red ltr:italic">{title.accent}</span>
-          </h1>
-          <p
-            className={cn(
-              taglineSize({ size: tagline.size }),
-              'mb-4 max-w-2xl animate-hero-rise font-heading leading-snug font-medium text-white/90 [animation-delay:500ms]',
-            )}
-            style={fontStyle(tagline.font)}
-          >
-            {tagline.text}
-          </p>
-          <p
-            className={cn(descriptionSize({ size: description.size }), 'mb-10 max-w-xl animate-hero-rise leading-relaxed text-white/80 [animation-delay:600ms]')}
-            style={fontStyle(description.font)}
-          >
-            {description.text}
-          </p>
+          <EditableText
+            as="h1"
+            value={valueOf('title', shown.title)}
+            editing={editing}
+            onChange={(change) => inline.change('title', change)}
+            selected={inline.active === 'title'}
+            onSelect={() => inline.select('title')}
+            label={e.titleMain}
+            locale={locale}
+            placeholder={builtIn.title}
+            sizeClass={(size) => titleSize({ size })}
+            className={cn('mb-5 font-display leading-[1.05] font-bold tracking-display text-white [animation-delay:350ms]', rise)}
+            before={
+              <img
+                src={logoMarkUrl}
+                alt=""
+                width={322}
+                height={322}
+                draggable={false}
+                className="me-4 inline-block size-[0.8em] select-none align-[-0.05em] drop-shadow-2xl"
+              />
+            }
+            after={
+              <>
+                {' '}
+                <EditableText
+                  as="span"
+                  value={editing ? valueOf('accent', shown.title) : { ...shown.title, text: shown.title.accent }}
+                  editing={editing}
+                  onChange={(change) => inline.change('accent', change)}
+                  onSelect={() => inline.select('title')}
+                  label={e.titleAccent}
+                  locale={locale}
+                  placeholder={builtIn.titleAccent}
+                  controls={false}
+                  className="text-brand-red ltr:italic"
+                />
+              </>
+            }
+          />
+          <EditableText
+            value={valueOf('tagline', shown.tagline)}
+            editing={editing}
+            onChange={(change) => inline.change('tagline', change)}
+            selected={inline.active === 'tagline'}
+            onSelect={() => inline.select('tagline')}
+            label={e.tagline}
+            locale={locale}
+            placeholder={builtIn.tagline}
+            sizeClass={(size) => taglineSize({ size })}
+            className={cn('mb-4 max-w-2xl font-heading leading-snug font-medium text-white/90 [animation-delay:500ms]', rise)}
+          />
+          <EditableText
+            value={valueOf('description', shown.description)}
+            editing={editing}
+            onChange={(change) => inline.change('description', change)}
+            selected={inline.active === 'description'}
+            onSelect={() => inline.select('description')}
+            label={e.descriptionText}
+            locale={locale}
+            placeholder={builtIn.description.trim()}
+            multiline
+            sizeClass={(size) => descriptionSize({ size })}
+            className={cn('mb-10 max-w-xl leading-relaxed text-white/80 [animation-delay:600ms]', rise)}
+          />
           <div className="flex animate-hero-rise flex-col gap-4 [animation-delay:750ms] sm:flex-row sm:flex-wrap">
             <Button asChild className="px-9 py-5 text-sm">
               <Link {...HERO_LINKS.brands.link}>
@@ -243,7 +365,7 @@ export function Hero({ images = HERO_IMAGES, content, editor }: { images?: HeroI
               <Link {...HERO_LINKS.business.link}>{HERO_LINKS.business.label(t)}</Link>
             </Button> */}
           </div>
-        </div>
+        </form>
       </div>
 
       {hasControls && (
@@ -297,7 +419,21 @@ export function Hero({ images = HERO_IMAGES, content, editor }: { images?: HeroI
         </div>
       )}
 
-      {editor && <div className={cn('absolute inset-x-0 top-6 z-20 mx-auto flex max-w-screen-2xl justify-end', PAGE_GUTTER)}>{editor}</div>}
+      {(onSave || editor) && (
+        <div className={cn('absolute inset-x-0 top-6 z-20 mx-auto flex max-w-screen-2xl flex-wrap justify-end gap-3', PAGE_GUTTER)}>
+          {onSave && (
+            <InlineEditBar
+              {...inline.bar}
+              onEdit={() => {
+                setSettled(true)
+                inline.start(heroDraft(content, locale), 'title')
+              }}
+            />
+          )}
+          {propBar && <PropBar {...propBar} locale={locale} />}
+          {!editing && editor}
+        </div>
+      )}
 
       <Link
         {...HERO_LINKS.scrollDown}

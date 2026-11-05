@@ -192,6 +192,19 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - `backend/tests/test_schema.py` proves all of this (models == the database built from the SQL, drop order, every
   table and column commented). Run it after any schema change.
 
+### 6. Always build modular, reusable components and keep one cohesive theme
+- **Modular and reusable, always**: every new or changed component must be as modular and reusable as possible. One
+  job per component; extract a piece (card, heading block, CTA row, list item, form field) the moment it could appear
+  elsewhere; vary it through props and `cva` variants with sensible defaults, never by copying markup. Before writing
+  new UI, look for an existing component to reuse or extend (`codegraph_explore`) instead of creating a near-duplicate.
+- **One unified theme across the whole website**: all pages and sections (public site, catalog, portal, admin) must look
+  and feel like one product. Use only the design tokens in `src/index.css` (colors, fonts, type scale, radius, shadows,
+  motion) and the shared components in `components/` and `components/ui/`; no one-off colors, font sizes, spacings,
+  shadows or animations. Equivalent things look the same everywhere (buttons, cards, section headings, forms, dialogs,
+  tables, spacing rhythm). If a design need is not covered, extend the tokens or the shared component once, so every
+  page benefits, rather than styling a single page differently.
+- When reviewing a change, check both: could this be reused, and does it match the rest of the site?
+
 ## Frontend conventions
 
 - **Data-driven components**: components take data through props, with defaults from `src/config.ts`; changing the
@@ -233,6 +246,16 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   lists one target's discounts (add/edit/delete) and is the "Discounts" row action of the products and categories
   tables. A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0.
   **Not yet stored:** `payment_methods.discount_percent` has no amounts or dates (schema change with its page).
+- **Inline section editing** (`InlineEditor.tsx`): a section that staff may edit in place calls
+  `useInlineDraft(onSave)`, wraps its texts in `<form {...formProps}>`, puts `<InlineEditBar {...bar} onEdit={() =>
+  start(values, firstKey)} />` and one `<PropBar {...propBar(labels)} locale />` in its corner, and renders each text
+  with `<EditableText selected={active === key} onSelect={() => select(key)}>` (read mode = the plain element; edit
+  mode = a box with the text's own look). The single PropBar (font + size) controls the selected text, the box that
+  last had the focus; a part without its own style (`controls={false}`, e.g. the hero's red word) selects its owner.
+  Staff can drag the PropBar by its grip (pointer, or arrow keys on the grip); it stays inside its `<section>` and
+  the window, and keeps its spot until edit mode ends.
+  The section supplies its cva size steps and decides how the draft is saved (the hero: `mergeHero` into its
+  `page_sections` content).
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
 - **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
@@ -404,8 +427,9 @@ content exists in each language, and the layout flips direction automatically.
       email, password, remember me; one form for customers and staff, through the API) — the mobile drawer links to `/login`, which shows the same form; signed in, the login button becomes Log out and staff also get an Admin panel button
 - [ ] Footer + floating WhatsApp button
 - [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README); staff
-      edit its title, tagline and description (text, font, size per language) in place with `HeroEditor` (saved as
-      the `page_sections` row "hero", read through `GET /api/sections/hero`; unsaved parts use the dictionaries)
+      edit its title, tagline and description (text, font, size per language) in place ("Edit on page", the page's
+      language, one style bar for the selected text, one Save for all texts: `InlineEditor`) or in the two-language dialog `HeroEditor` (saved as the
+      `page_sections` row "hero", read through `GET /api/sections/hero`; unsaved parts use the dictionaries)
 - [x] Home sections: Stats, Brands, Categories, About, Contact (`Contact` = contact cards + a form that opens a
       prefilled mailto: until Phase 2 lead endpoints exist)
 - [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)

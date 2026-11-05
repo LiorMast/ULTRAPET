@@ -1,7 +1,9 @@
 /**
- * hero-editor.spec.ts — End-to-end checks of the staff's hero editor in real Chromium: the Edit button for signed-in
- * staff only, the dialog's accessibility (axe), a save that changes the hero's text, font and size (the picked font
- * really loads), and the largest sizes still fitting every screen width.
+ * hero-editor.spec.ts — End-to-end checks of the staff's hero editing in real Chromium: the edit buttons for
+ * signed-in staff only; the two-language dialog (axe, a save that changes the hero's text, font and size, the picked
+ * font really loads); editing in place (axe in edit mode, the one style bar following the focused box and dragged by
+ * its grip, one Save
+ * for every text, no horizontal overflow); and the largest sizes still fitting every screen width.
  *
  * The hero's saved content (GET /api/sections/hero) and the staff save (/api/staff/page-sections) are answered
  * in the browser (page.route), so these tests never change the shared dev database that the other specs'
@@ -40,17 +42,64 @@ const LARGEST = Object.fromEntries(
   ['title', 'tagline', 'description'].map((text) => [text, { size: { he: 'xl', en: 'xl' }, font: { he: 'frank-ruhl-libre', en: 'frank-ruhl-libre' } }]),
 )
 
-test('the Edit button is for staff only', async ({ page }) => {
+test('the edit buttons are for staff only', async ({ page }) => {
   await page.goto('/en')
   await page.getByRole('heading', { level: 1 }).waitFor()
-  await expect(page.getByRole('button', { name: 'Edit hero' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Edit both languages' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Edit on page' })).toHaveCount(0)
+})
+
+test('staff edit the texts in place and save them at once', async ({ page }) => {
+  const sent = await fakeHeroSection(page)
+  await signInStaff(page)
+  await page.goto('/en')
+  await page.getByRole('button', { name: 'Edit on page' }).click()
+  const hero = page.locator('#home')
+  await expect(hero.getByRole('textbox', { name: 'Tagline' })).toBeVisible()
+
+  const axe = await new AxeBuilder({ page }).include('#home').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+  expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow, 'no horizontal scrolling in edit mode').toBe(0)
+
+  // One style bar; it starts on the title (focused) and follows the box that gets the focus.
+  const bar = page.getByRole('toolbar', { name: 'Text style' })
+  await expect(bar).toHaveCount(1)
+  await expect(bar).toContainText('Editing: Title words')
+  await expect(hero.getByRole('textbox', { name: 'Title words' })).toBeFocused()
+  // The bar can be dragged out of the way by its grip and keeps working there.
+  const before = (await bar.boundingBox())!
+  const grip = (await bar.getByRole('button', { name: 'Move the style bar' }).boundingBox())!
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(grip.x + grip.width / 2 - 60, grip.y + grip.height / 2 + 80, { steps: 5 })
+  await page.mouse.up()
+  const after = (await bar.boundingBox())!
+  const heroBox = (await hero.boundingBox())!
+  expect(Math.round(after.y - before.y)).toBe(80)
+  // Sideways it moves the 60px asked for, or stops at the hero's edge (on a phone the bar is nearly as wide).
+  const moved = Math.round(before.x - after.x)
+  expect(moved === 60 || Math.round(after.x) === Math.round(heroBox.x), `moved ${moved}px`).toBe(true)
+  expect(after.x + after.width).toBeLessThanOrEqual(heroBox.x + heroBox.width + 0.5)
+  await hero.getByRole('textbox', { name: 'Title words' }).focus()
+  await bar.getByRole('combobox', { name: 'Title words size' }).selectOption('Small')
+  await hero.getByRole('textbox', { name: 'Tagline' }).fill('Wholesale only')
+  await expect(bar).toContainText('Editing: Tagline')
+  await bar.getByRole('combobox', { name: 'Tagline font' }).selectOption('Assistant')
+  await hero.getByRole('button', { name: 'Save' }).click()
+
+  await expect(hero.getByText('Wholesale only')).toHaveCSS('font-family', /Assistant Variable/)
+  await expect(hero.getByRole('textbox')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Edit on page' })).toBeFocused()
+  expect(sent).toHaveLength(1)
+  expect(sent[0].body.content).toMatchObject({ tagline: { text: { en: 'Wholesale only' }, font: { en: 'assistant' } }, title: { size: { en: 'sm' } } })
 })
 
 test('staff change the title text, font and size', async ({ page }) => {
   const sent = await fakeHeroSection(page)
   await signInStaff(page)
   await page.goto('/en')
-  await page.getByRole('button', { name: 'Edit hero' }).click()
+  await page.getByRole('button', { name: 'Edit both languages' }).click()
   const dialog = page.getByRole('dialog', { name: 'Edit the hero' })
   await expect(dialog).toBeVisible()
 
@@ -68,7 +117,7 @@ test('staff change the title text, font and size', async ({ page }) => {
   await expect(heading).toBeVisible()
   await expect(heading).toHaveCSS('font-family', /Rubik Variable/)
   await expect.poll(() => page.evaluate(() => document.fonts.check('700 64px "Rubik Variable"'))).toBe(true)
-  await expect(page.getByRole('button', { name: 'Edit hero' })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Edit both languages' })).toBeFocused()
   expect(sent.map((request) => request.method)).toEqual(['POST'])
 })
 

@@ -1,7 +1,8 @@
 /**
  * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English). Its loader fetches the brands, the
- * stats figures and the hero content staff saved (page_sections "hero") from the API. Signed-in staff get the
- * hero's Edit button (HeroEditor); saving stores the content through the staff API and reloads the page data.
+ * stats figures and the hero content staff saved (page_sections "hero") from the API. Signed-in staff can edit the
+ * hero in place ("Edit on page", the page's language) or in the two-language dialog (HeroEditor); saving stores the
+ * content through the staff API and reloads the page data.
  *
  * The hero, Brands, Stats, Categories, About and Contact are real components. The other sections are TEMPORARY placeholders
  * (Private Label, Business Customers — see the roadmap in CLAUDE.md): each is
@@ -56,7 +57,7 @@ function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
 }
 
 /**
- * The home page: the hero (with its Edit button for staff), the Brands, Stats and Categories sections, About,
+ * The home page: the hero (editable by staff), the Brands, Stats and Categories sections, About,
  * Contact, and one empty placeholder per remaining anchor.
  * @returns The page content.
  */
@@ -78,7 +79,7 @@ function HomePage() {
 
   return (
     <>
-      <Hero content={hero} editor={user?.kind === 'staff' && <HeroEditor content={hero} onSave={saveHero} />} />
+      {user?.kind === 'staff' ? <Hero content={hero} onSave={saveHero} editor={<HeroEditor content={hero} onSave={saveHero} />} /> : <Hero content={hero} />}
       <Stats stats={stats} />
       <Brands brands={brands} />
       <Categories />

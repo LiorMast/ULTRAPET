@@ -1,7 +1,8 @@
 /**
- * HeroEditor.test.tsx — Tests for the staff's hero editor on the real home page against the fake API
- * (src/test/api.ts): who sees the Edit button, what the dialog starts from, saving (create first, then update),
- * the hero showing the saved texts, fonts and sizes, the fonts offered per language, and a refused save.
+ * HeroEditor.test.tsx — Tests for the staff's hero editing on the real home page against the fake API
+ * (src/test/api.ts): who sees the edit buttons; the two-language dialog (what it starts from, saving: create first,
+ * then update, the hero showing the saved texts, fonts and sizes, the fonts offered per language, a refused save);
+ * and editing in place (one Save for every text, the page's language only, the other language kept).
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -27,20 +28,54 @@ const sent = (spy: { mock: { calls: [RequestInfo | URL, RequestInit?][] } }, met
 const fieldsOf = (text: string, language: string) => within(within(screen.getByRole('dialog')).getByRole('group', { name: text })).getByRole('group', { name: language })
 
 describe('HeroEditor', () => {
-  it('is not shown to visitors or customers', async () => {
+  it('is not shown to visitors', async () => {
     await renderPage('/en')
-    expect(screen.queryByRole('button', { name: 'Edit hero' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit both languages' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit on page' })).not.toBeInTheDocument()
   })
 
   it('is not shown to business customers', async () => {
     await renderPage('/en', { user: TEST_USER })
-    expect(screen.queryByRole('button', { name: 'Edit hero' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit both languages' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit on page' })).not.toBeInTheDocument()
+  })
+
+  it('lets staff edit every text in place and save them at once, in the page language only', async () => {
+    signInFakeUser(TEST_STAFF)
+    await createStaffRow('page-sections', { key: 'hero', content: { tagline: { text: { he: 'שורה בעברית' } } } })
+    const { user } = await renderPage('/en', { staff: TEST_STAFF })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    await user.click(screen.getByRole('button', { name: 'Edit on page' }))
+    // The dialog's button steps aside while editing in place.
+    expect(screen.queryByRole('button', { name: 'Edit both languages' })).not.toBeInTheDocument()
+
+    // One style bar, on the title first; it follows the focused box.
+    expect(screen.getByRole('toolbar', { name: 'Text style' })).toHaveTextContent('Editing: Title words')
+    await user.type(screen.getByRole('textbox', { name: 'Tagline' }), 'Wholesale only')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Tagline font' }), 'Assistant')
+    await user.type(screen.getByRole('textbox', { name: 'Red word' }), 'Group')
+    expect(screen.getByRole('toolbar')).toHaveTextContent('Editing: Title words')
+    await user.click(screen.getByRole('textbox', { name: 'Description' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Description size' }), 'Small')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ultra Group' })).toBeInTheDocument()
+    expect(screen.getByText('Wholesale only')).toHaveClass('text-lg')
+    expect(screen.getByText(/^Supplying premium pet brands/)).toHaveClass('text-sm')
+    expect(screen.getByRole('button', { name: 'Edit on page' })).toHaveFocus()
+    const patches = sent(fetchSpy, 'PATCH')
+    expect(patches).toHaveLength(1)
+    expect(patches[0][1].content.tagline.text).toEqual({ he: 'שורה בעברית', en: 'Wholesale only' })
+    expect(patches[0][1].content.title.accent).toEqual({ en: 'Group' })
+    expect(patches[0][1].content.tagline.font).toEqual({ en: 'assistant' })
+    expect(patches[0][1].content.description.size).toEqual({ en: 'sm' })
+    expect(patches[0][1].content.title.size).toEqual({ en: 'md' })
   })
 
   it('lets staff change the texts, fonts and sizes, creating the section on the first save', async () => {
     const { user } = await renderPage('/en', { staff: TEST_STAFF })
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
-    await user.click(screen.getByRole('button', { name: 'Edit hero' }))
+    await user.click(screen.getByRole('button', { name: 'Edit both languages' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit the hero' })
 
     // Nothing saved yet: empty texts with the built-in ones as placeholders, the site's font, the design size.
@@ -61,7 +96,7 @@ describe('HeroEditor', () => {
     expect(heading.style.fontFamily).toContain('Frank Ruhl Libre')
     expect(heading).toHaveClass('text-[clamp(3.4rem,8.5vw,7.5rem)]')
     expect(screen.getByText('Changes saved.')).toHaveAttribute('role', 'status')
-    expect(screen.getByRole('button', { name: 'Edit hero' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Edit both languages' })).toHaveFocus()
 
     const [[url, body]] = sent(fetchSpy, 'POST')
     expect(url).toBe('/api/staff/page-sections')
@@ -75,7 +110,7 @@ describe('HeroEditor', () => {
     expect(body.content.description.text).toEqual({ he: 'מכירה סיטונאית' })
 
     // The second save changes the stored row and starts from what was saved.
-    await user.click(screen.getByRole('button', { name: 'Edit hero' }))
+    await user.click(screen.getByRole('button', { name: 'Edit both languages' }))
     await screen.findByRole('dialog')
     const title = within(fieldsOf('Title', 'English')).getByRole('textbox', { name: 'Title words' })
     expect(title).toHaveValue('Premium')
@@ -94,7 +129,7 @@ describe('HeroEditor', () => {
 
   it('offers Hebrew texts only the fonts with Hebrew letters', async () => {
     const { user } = await renderPage('/', { staff: TEST_STAFF })
-    await user.click(screen.getByRole('button', { name: 'עריכת הכותרת הראשית' }))
+    await user.click(screen.getByRole('button', { name: 'עריכה בשתי השפות' }))
     await screen.findByRole('dialog')
     const options = (language: string) =>
       within(within(fieldsOf('כותרת', language)).getByRole('combobox', { name: 'גופן' }))
@@ -106,7 +141,7 @@ describe('HeroEditor', () => {
 
   it('shows a refused save and keeps the dialog open', async () => {
     const { user } = await renderPage('/en', { staff: TEST_STAFF })
-    await user.click(screen.getByRole('button', { name: 'Edit hero' }))
+    await user.click(screen.getByRole('button', { name: 'Edit both languages' }))
     const dialog = await screen.findByRole('dialog')
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ error: 'invalid', field: 'content' }), { status: 400 }))
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
