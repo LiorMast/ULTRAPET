@@ -2,9 +2,10 @@
  * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English). Its loader fetches the brands, the
  * stats figures and the hero content staff saved (page_sections "hero") from the API. Signed-in staff can edit the
  * hero in place ("Edit on page", the page's language) or in the two-language dialog (HeroEditor); saving stores the
- * content through the staff API and reloads the page data.
+ * content through the staff API and reloads the page data. The head carries the FAQ section's questions as
+ * schema.org FAQPage data.
  *
- * The hero, Brands, Stats, Categories, About and Contact are real components. The other sections are TEMPORARY placeholders
+ * The hero, Brands, Stats, Categories, About, FAQ and Contact are real components. The other sections are TEMPORARY placeholders
  * (Private Label, Business Customers — see the roadmap in CLAUDE.md): each is
  * an empty block carrying the anchor id that the navbar and the hero link to, until the real section
  * replaces it.
@@ -16,12 +17,14 @@ import { About } from '@/components/About'
 import { Brands } from '@/components/Brands'
 import { Categories } from '@/components/Categories'
 import { Contact } from '@/components/Contact'
+import { Faq } from '@/components/Faq'
 import { Hero } from '@/components/Hero'
 import { HeroEditor } from '@/components/HeroEditor'
 import { Stats } from '@/components/Stats'
+import { FAQ_ITEMS } from '@/config'
 import type { Dictionary } from '@/i18n/he'
-import { useI18n } from '@/i18n'
-import { pageHead } from '@/seo'
+import { dictionaryFor, useI18n } from '@/i18n'
+import { faqJsonLd, pageHead } from '@/seo'
 
 export const Route = createFileRoute('/')({
   loader: async ({ abortController }) => {
@@ -29,7 +32,11 @@ export const Route = createFileRoute('/')({
     const [brands, stats, hero] = await Promise.all([fetchBrands(signal), fetchStats(signal), fetchSection<HeroContent>('hero', signal)])
     return { brands, stats, hero }
   },
-  head: ({ match }) => pageHead({ locale: match.context.locale, path: '/' }),
+  head: ({ match }) => {
+    const { locale } = match.context
+    const t = dictionaryFor(locale)
+    return pageHead({ locale, path: '/', jsonLd: [faqJsonLd(FAQ_ITEMS.map((item) => ({ question: item.question(t), answer: item.answer(t) })))] })
+  },
   component: HomePage,
 })
 
@@ -58,7 +65,7 @@ function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
 
 /**
  * The home page: the hero (editable by staff), the Brands, Stats and Categories sections, About,
- * Contact, and one empty placeholder per remaining anchor.
+ * the FAQ, Contact, and one empty placeholder per remaining anchor.
  * @returns The page content.
  */
 function HomePage() {
@@ -87,6 +94,7 @@ function HomePage() {
         <Placeholder key={section.id} section={section} />
       ))}
       <About />
+      <Faq />
       <Contact />
     </>
   )

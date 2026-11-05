@@ -110,6 +110,46 @@ export const en: Dictionary = {
     closing:
       'We believe in professional, courteous service and take the time to understand our customers\' unique needs. Through our wide distribution network we serve pet stores and pet centers nationwide, with fast and efficient deliveries across the country.',
   },
+  faq: {
+    eyebrow: 'FAQ',
+    title: 'Everything you need to know',
+    intro: 'Answers to the questions business customers ask us most: opening an account, prices, orders, payment and delivery.',
+    moreTitle: 'Still have a question?',
+    moreText: 'Our customer service team is happy to help, Sunday to Thursday, 09:00–16:00.',
+    cta: 'Talk to us',
+    items: {
+      wholesale: {
+        question: 'Do you sell to private customers?',
+        answer:
+          'No. Ultra Pet sells wholesale only: to pet stores, retail chains, distributors and wholesalers. Private customers are welcome to find a store near them on the Where to Buy page.',
+      },
+      account: {
+        question: 'How do I open a business account?',
+        answer: 'Leave your details in the contact form or call us, and a sales representative will get back to you to learn about your business, prepare a tailored quote and open your account.',
+      },
+      prices: {
+        question: 'Where can I see the prices?',
+        answer: 'Prices are shown in the catalog to signed-in business customers only. Without signing in you can still browse the full product catalog and download the PDF catalog, without prices.',
+      },
+      minimum: {
+        question: 'Is there a minimum order?',
+        answer: 'Yes, the minimum order is ₪2,000.',
+      },
+      payment: {
+        question: 'Which payment methods do you accept?',
+        answer: 'Credit card, Bit and bank transfer.',
+      },
+      delivery: {
+        question: 'Where do you deliver?',
+        answer: 'Nationwide. Our distribution network supplies pet stores and pet centers across Israel, with fast and efficient deliveries.',
+      },
+      privateLabel: {
+        question: 'Do you make private label products?',
+        answer:
+          'Yes. Ultra Pet develops and manufactures private label products in international factories under strict quality control: dry food, wet food, treats and cat litter, from product selection and formula development to packaging design and distribution.',
+      },
+    },
+  },
   contact: {
     eyebrow: 'Contact',
     title: 'Talk to us',

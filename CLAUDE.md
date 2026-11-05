@@ -49,8 +49,8 @@ frontend/
                         admin.tsx = staff panel layout (shows the shared login form to non-staff), admin.<resource>.tsx = one table each
                         (admin.products / admin.categories also manage their discounts through DiscountsDialog)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
-                        Brands, Stats, Categories, About, Contact, Hero, ...) + their tests
-    components/ui/      shadcn primitives (button, dialog, dropdown-menu, popover, sheet), restyled for the brand
+                        Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, ...) + their tests
+    components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet), restyled for the brand
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
                         imports them (oxlint no-restricted-imports)
     assets/             logo SVGs; hero/ = the home hero photos (drop images in, no code changes)
@@ -256,6 +256,13 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   the window, and keeps its spot until edit mode ends.
   The section supplies its cva size steps and decides how the draft is saved (the hero: `mergeHero` into its
   `page_sections` content).
+- **Section headings**: a section opens with `<SectionHeading id eyebrow title intro />` (red eyebrow, display
+  title, muted intro; `as="h1"` for a page heading), never with copied heading markup.
+- **Accordion** (`ui/accordion.tsx`, Radix): `<Accordion type="single" collapsible variant="line|card">` +
+  `AccordionItem` / `AccordionTrigger` / `AccordionContent`; the variant reaches the parts through context. Panels
+  grow to Radix's measured height on `--ease-spring` while the text fades in; reduced motion opens without resizing
+  (rules in `index.css`). The FAQ (`Faq.tsx`, questions in `FAQ_ITEMS` + `t.faq`) uses it, and the home head carries
+  the same questions as FAQPage JSON-LD (`faqJsonLd` in `seo.ts`), since closed answers are not in the DOM.
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
 - **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
@@ -433,6 +440,8 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Home sections: Stats, Brands, Categories, About, Contact (`Contact` = contact cards + a form that opens a
       prefilled mailto: until Phase 2 lead endpoints exist)
 - [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)
+- [x] Home FAQ (`Faq`, `#faq`, between About and Contact) on the reusable `ui/accordion` (spring animation), with
+      FAQPage JSON-LD; the copy (minimum order, payment methods) awaits the owner's review
 - [x] Where to Buy (`WhereToBuy`, `BranchMap`): search, nearest store, Leaflet map, 124 resellers (table `resellers`, geocoded once)
 - [x] Articles (`/articles`, `/articles/$slug`; `ArticleCard`, `Breadcrumbs`): the 4 WordPress posts (table `articles`;
       Hebrew verbatim + English translation), head tags via `seo.ts` + `<HeadContent />`, BlogPosting/Breadcrumb

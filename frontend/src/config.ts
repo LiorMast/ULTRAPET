@@ -100,6 +100,16 @@ export const ABOUT_ADVANTAGES: { id: string; icon: LucideIcon; label: Label }[] 
   { id: 'support', icon: Package, label: (t: Dictionary) => t.about.advantages.support },
 ]
 
+/** A question of the home page FAQ section (Faq.tsx) and its answer. */
+export type FaqItem = { id: string; question: Label; answer: Label }
+
+/** The questions of the home page FAQ section, in display order (texts: t.faq.items). */
+export const FAQ_ITEMS: FaqItem[] = (['wholesale', 'account', 'prices', 'minimum', 'payment', 'delivery', 'privateLabel'] as const).map((id) => ({
+  id,
+  question: (t: Dictionary) => t.faq.items[id].question,
+  answer: (t: Dictionary) => t.faq.items[id].answer,
+}))
+
 /** Every logo file in src/assets/brands/, keyed by path; a brand's logo is the file named after its slug. */
 const brandLogoFiles = import.meta.glob<string>('/src/assets/brands/*.{svg,png,jpg,jpeg,webp}', { eager: true, import: 'default' })
 

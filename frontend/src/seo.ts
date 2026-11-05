@@ -5,7 +5,7 @@
  *
  * Route files call pageHead() from their `head` option; <HeadContent /> in routes/__root.tsx renders
  * the tags, and the deepest route wins for the title and each meta name. The JSON-LD builders here are
- * shared by the article pages. sitemap.xml is written by the plugin in vite.config.ts.
+ * shared by the article pages (Organization, BreadcrumbList) and the home page (FAQPage). sitemap.xml is built by the backend.
  */
 import type { JSX } from 'react'
 import { DEFAULT_LOCALE, dictionaryFor, ENABLED_LOCALES, LOCALES, localizePath, type Locale } from '@/i18n'
@@ -120,6 +120,24 @@ export function breadcrumbJsonLd(locale: Locale, items: { name: string; path: st
       position: index + 1,
       name: item.name,
       item: absoluteUrl(localizePath(item.path, locale)),
+    })),
+  }
+}
+
+/**
+ * A schema.org FAQPage: the questions and answers of a page, readable by search engines and assistants even while
+ * the page's accordion keeps the answers closed (unrendered).
+ * @param items - The questions and answers, as plain text in the page language.
+ * @returns The FAQPage object.
+ */
+export function faqJsonLd(items: { question: string; answer: string }[]): JsonLd {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: { '@type': 'Answer', text: item.answer },
     })),
   }
 }

@@ -3,6 +3,7 @@
  * with a short label. Used by routes/index.tsx, which loads the figures from the API (fetchStats); the labels
  * come from the dictionaries through STAT_LABELS in config.ts. The numbers count up once when they scroll into view
  * (skipped for visitors who prefer reduced motion); the final value is always in the page for screen readers.
+ * Phones get a smaller number size, so the widest figure ("1,000+") fits its half of the row even at 360px.
  */
 import { useEffect, useRef, useState } from 'react'
 import { cn } from 'cn'
@@ -66,7 +67,7 @@ function StatFigure({ stat, label, className }: { stat: Stat; label: Label; clas
   const format = (n: number) => `${n.toLocaleString(locale)}${stat.suffix}`
   return (
     <li ref={ref} className={cn('px-6 py-10 lg:px-10 lg:py-14', className)}>
-      <p className="font-display text-5xl font-bold leading-none text-brand-red lg:text-6xl">
+      <p className="font-display text-4xl font-bold leading-none text-brand-red sm:text-5xl lg:text-6xl">
         <span aria-hidden="true" dir="ltr" className="inline-block tabular-nums">{format(shown)}</span>
         <span className="sr-only">{format(stat.value)}</span>
       </p>

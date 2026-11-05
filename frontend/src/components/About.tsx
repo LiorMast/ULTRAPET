@@ -5,6 +5,7 @@
  */
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, Check } from 'lucide-react'
+import { SectionHeading } from '@/components/SectionHeading'
 import { Button } from '@/components/ui/button'
 import { ABOUT_ADVANTAGES, ABOUT_OFFERS, ABOUT_PILLARS, type AboutItem } from '@/config'
 import { useI18n } from '@/i18n'
@@ -50,13 +51,7 @@ export function About({
   return (
     <section id="about" aria-labelledby="about-title" className="border-b border-neutral-150 bg-white px-6 py-24 lg:px-10 lg:py-32">
       <div className="mx-auto max-w-7xl">
-        <div className="max-w-3xl">
-          <p className="font-heading text-xs font-bold uppercase tracking-widest text-brand-red">{t.about.eyebrow}</p>
-          <h2 id="about-title" className="mt-4 font-display text-4xl font-bold text-brand-charcoal lg:text-5xl">
-            {t.about.title}
-          </h2>
-          <p className="mt-5 text-lg text-brand-charcoal-muted">{t.about.intro}</p>
-        </div>
+        <SectionHeading id="about-title" eyebrow={t.about.eyebrow} title={t.about.title} intro={t.about.intro} />
 
         <div className="mt-16 grid gap-16 lg:grid-cols-2 lg:gap-20">
           <div>

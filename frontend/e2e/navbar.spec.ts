@@ -128,7 +128,7 @@ test.describe('desktop', () => {
 
   test('the Products menu works with the mouse and the keyboard', async ({ page }) => {
     await page.goto('/en')
-    const products = page.getByRole('button', { name: 'Products' })
+    const products = page.getByRole('banner').getByRole('button', { name: 'Products' })
     const menu = page.getByRole('menu')
 
     await products.click()
@@ -200,7 +200,7 @@ test.describe('desktop', () => {
   test('has no accessibility violations, with menus closed and open', async ({ page }) => {
     await page.goto('/')
     await expectNoA11yViolations(page)
-    await page.getByRole('button', { name: 'מוצרים' }).click()
+    await page.getByRole('banner').getByRole('button', { name: 'מוצרים' }).click()
     await expect(page.getByRole('menu')).toBeVisible()
     await expectNoA11yViolations(page)
   })

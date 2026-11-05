@@ -4,6 +4,7 @@
  */
 import { CategoryCard } from '@/components/CategoryCard'
 import { Carousel } from '@/components/Carousel'
+import { SectionHeading } from '@/components/SectionHeading'
 import { CATEGORIES, type Category } from '@/config'
 import { useI18n } from '@/i18n'
 
@@ -17,13 +18,7 @@ export function Categories({ categories = CATEGORIES }: { categories?: Category[
   return (
     <section id="categories" aria-labelledby="categories-title" className="bg-neutral-50 px-6 py-24 lg:px-10 lg:py-32">
       <div className="mx-auto max-w-7xl">
-        <div className="max-w-2xl">
-          <p className="font-heading text-xs font-bold uppercase tracking-widest text-brand-red">{t.categories.eyebrow}</p>
-          <h2 id="categories-title" className="mt-4 font-display text-4xl font-bold text-brand-charcoal lg:text-5xl">
-            {t.categories.title}
-          </h2>
-          <p className="mt-5 text-lg text-brand-charcoal-muted">{t.categories.intro}</p>
-        </div>
+        <SectionHeading id="categories-title" eyebrow={t.categories.eyebrow} title={t.categories.title} intro={t.categories.intro} className="max-w-2xl" />
         <Carousel label={t.categories.carouselLabel} pageSize={3} className="mt-14">
           {categories.map((category) => (
             <CategoryCard key={category.slug} category={category} />

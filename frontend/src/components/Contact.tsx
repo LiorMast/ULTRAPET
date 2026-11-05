@@ -6,6 +6,7 @@
  */
 import { useState, type FormEvent } from 'react'
 import { CheckCircle2 } from 'lucide-react'
+import { SectionHeading } from '@/components/SectionHeading'
 import { Button } from '@/components/ui/button'
 import { CONTACT, CONTACT_METHODS, type ContactMethod } from '@/config'
 import { useI18n } from '@/i18n'
@@ -173,11 +174,7 @@ export function Contact({ methods = CONTACT_METHODS, email }: { methods?: Contac
   return (
     <section id="contact" aria-labelledby="contact-title" className="bg-neutral-50 px-6 py-24 lg:px-10 lg:py-32">
       <div className="mx-auto max-w-7xl">
-        <div className="max-w-3xl">
-          <p className="font-heading text-xs font-bold uppercase tracking-widest text-brand-red">{t.contact.eyebrow}</p>
-          <h2 id="contact-title" className="mt-4 font-display text-4xl font-bold text-brand-charcoal lg:text-5xl">{t.contact.title}</h2>
-          <p className="mt-5 text-lg text-brand-charcoal-muted">{t.contact.description}</p>
-        </div>
+        <SectionHeading id="contact-title" eyebrow={t.contact.eyebrow} title={t.contact.title} intro={t.contact.description} />
         <div className="mt-14 grid gap-10 lg:grid-cols-2">
           <ul className="space-y-3">
             {methods.map((method) => (

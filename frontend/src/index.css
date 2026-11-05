@@ -281,6 +281,13 @@ html:lang(he) {
   }
 }
 
+/* An accordion panel's reduced-motion close (ui/accordion.tsx): it fades out instead of collapsing. */
+@keyframes accordion-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
 /*
  * Admin data tables (DataTable.tsx): the DataTables default look (datatables.net-dt, loaded with the admin pages)
  * restyled to the brand. Every rule starts with the component's `.data-table` wrapper so it outranks the
@@ -422,6 +429,13 @@ html:lang(he) {
   }
   details::details-content {
     transition: none;
+  }
+  /* Accordion panels (ui/accordion.tsx) stop resizing: they open at full height (the text still fades in) and fade out. */
+  [data-slot='accordion-content'][data-state='open'] {
+    animation: none;
+  }
+  [data-slot='accordion-content'][data-state='closed'] {
+    animation-name: accordion-fade-out;
   }
   html {
     scroll-behavior: auto;
