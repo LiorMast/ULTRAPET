@@ -6,8 +6,8 @@
  * useSubNavDrawer() holds the open state and returns the props for both halves: `trigger` for the toggle
  * button (aria-expanded, aria-controls, data-state) and `drawer` for <SubNavDrawer>. The drawer is a disclosure
  * (WAI-ARIA APG "disclosure navigation"), not a dialog: non-modal like the header dropdowns, the page stays
- * usable. It closes when the toggle is pressed again, on Escape (from the toggle or a link) and when a link is
- * chosen; focus then returns to the toggle.
+ * usable. It closes when the toggle is pressed again or on Escape (from the toggle or a link); focus then
+ * returns to the toggle. Choosing a link keeps it open. Its links are centered with the main menu's gaps.
  *
  * Motion: the bar grows and shrinks with a grid-template-rows transition (0fr ↔ 1fr, so it animates to the
  * links' own height) on --ease-spring, while the links fade and settle into place. Transitions, unlike
@@ -15,7 +15,7 @@
  * The exit is quicker than the entrance. Reduced motion keeps the fade and drops the movement (index.css).
  * While closed the bar is `inert`: its links can't be focused, clicked or read by screen readers.
  */
-import { useCallback, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
 import { NAV_TEXT, Underline } from '@/components/NavText'
@@ -88,9 +88,11 @@ export function useSubNavDrawer(owner: string | null): { open: boolean; trigger:
  * The sliding bar of links under the header's main row. Render it inside the <header>, after the main row.
  * @param props.id - The element id the toggle's aria-controls points to (from useSubNavDrawer).
  * @param props.open - Whether the bar is shown.
- * @param props.onClose - Closes the bar (Escape inside it, or a link chosen).
+ * @param props.onClose - Closes the bar (Escape inside it).
  * @param props.items - The links, in order (e.g. ADMIN_NAV from src/config.ts).
  * @param props.label - The accessible name of the <nav> (e.g. "Admin panel", the toggle's own label).
+ * @param props.alignWith - An element (e.g. the main menu <nav>) whose horizontal span the links are centered
+ *   in, so they line up with its buttons; without it they are centered in the bar.
  * @param props.className - Extra classes for the outer element (e.g. "hidden xl:grid" to show it only where
  *   its toggle is shown).
  * @returns The drawer: a <nav> inside an element that grows to the links' height.
@@ -101,9 +103,31 @@ export function SubNavDrawer({
   onClose,
   items,
   label,
+  alignWith,
   className,
-}: DrawerProps & { items: NavLink[]; label: string; className?: string }) {
+}: DrawerProps & { items: NavLink[]; label: string; alignWith?: RefObject<HTMLElement | null>; className?: string }) {
   const { t } = useI18n()
+  const listRef = useRef<HTMLUListElement>(null)
+
+  // Pads the list (physical left/right: they are measured screen positions) so its content spans `alignWith`.
+  useEffect(() => {
+    const target = alignWith?.current
+    const list = listRef.current
+    if (!target || !list) return
+    /** Copies the target's left and right insets within the list's box into the list's padding. */
+    const align = () => {
+      const box = list.getBoundingClientRect()
+      const span = target.getBoundingClientRect()
+      list.style.paddingLeft = `${Math.max(0, span.left - box.left)}px`
+      list.style.paddingRight = `${Math.max(0, box.right - span.right)}px`
+    }
+    align()
+    const observer = new ResizeObserver(align)
+    observer.observe(target)
+    observer.observe(list)
+    return () => observer.disconnect()
+  }, [alignWith])
+
   return (
     <div
       id={id}
@@ -122,10 +146,10 @@ export function SubNavDrawer({
           }}
           className="mx-auto max-w-screen-2xl -translate-y-3 px-6 opacity-0 transition-[opacity,translate] duration-200 group-data-[state=open]/drawer:translate-y-0 group-data-[state=open]/drawer:opacity-100 group-data-[state=open]/drawer:delay-75 group-data-[state=open]/drawer:duration-500 lg:px-10 xl:px-6 2xl:px-10"
         >
-          <ul className="mt-4 flex flex-wrap items-center justify-end gap-x-8 gap-y-3 border-t border-neutral-150 pt-4 pb-1">
+          <ul ref={listRef} className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-3 border-t border-neutral-150 pt-4 pb-1 rtl:gap-x-7 2xl:gap-x-7">
             {items.map((item) => (
               <li key={item.id}>
-                <Link {...item.link} onClick={onClose} className={NAV_TEXT}>
+                <Link {...item.link} className={NAV_TEXT}>
                   {item.label(t)}
                   <Underline />
                 </Link>

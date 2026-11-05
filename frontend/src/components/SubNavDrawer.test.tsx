@@ -53,15 +53,14 @@ describe('Admin drawer', () => {
     ])
   })
 
-  it('goes to the chosen page, closes and gives the focus back to the button', async () => {
+  it('goes to the chosen page and stays open', async () => {
     const { user, router } = await renderPage('/en', { staff: TEST_STAFF })
     const { toggle, drawer } = await findAdminDrawer()
     await user.click(toggle)
     await user.click(within(drawer).getByRole('link', { name: 'Categories' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/admin/categories'))
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(drawer).toHaveAttribute('inert')
-    expect(toggle).toHaveFocus()
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(drawer).not.toHaveAttribute('inert')
     // On the page itself the drawer marks it as the current one.
     expect(within(drawer).getByRole('link', { name: 'Categories' })).toHaveAttribute('aria-current', 'page')
   })

@@ -2,7 +2,7 @@
  * admin-drawer.spec.ts — End-to-end checks of the header's admin drawer (SubNavDrawer) in real Chromium, signed in
  * as the seed staff admin (desktop only: the Admin panel button is part of the desktop header; the mobile drawer
  * has its own Admin panel link): the button slides the drawer down with a transition and back up, the drawer
- * lists the admin pages and takes staff there, Escape closes it, no axe violations, and a screenshot (Hebrew).
+ * lists the admin pages and takes staff there (and stays open), Escape closes it, no axe violations, and a screenshot (Hebrew).
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Locator } from '@playwright/test'
@@ -55,14 +55,14 @@ test('the Admin panel button slides the drawer down and back up', async ({ page 
   expect((await drawer.boundingBox())!.height).toBe(0)
 })
 
-test('a page chosen in the drawer opens, and the drawer closes', async ({ page }) => {
+test('a page chosen in the drawer opens, and the drawer stays open', async ({ page }) => {
   const { toggle, drawer } = await adminDrawer(page)
   await toggle.click()
   await drawer.getByRole('link', { name: 'קטגוריות' }).click()
   await expect(page).toHaveURL(/\/admin\/categories$/)
   await expect(page.getByRole('table')).toBeVisible()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-  await expect(toggle).toBeFocused()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(drawer.getByRole('link', { name: 'קטגוריות' })).toBeVisible()
 })
 
 test('Escape closes the drawer and puts the focus back on the button', async ({ page }) => {

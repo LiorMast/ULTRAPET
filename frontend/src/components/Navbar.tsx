@@ -14,7 +14,7 @@
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
  *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
  */
-import { Fragment, useEffect } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { ChevronDown } from 'lucide-react'
 import { cn } from 'cn'
@@ -49,6 +49,7 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
   const { user } = useAuth()
   const staff = user?.kind === 'staff' ? user : null
   const adminDrawer = useSubNavDrawer(staff ? staff.email : null)
+  const mainNavRef = useRef<HTMLElement>(null)
 
   return (
     <header className="material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]">
@@ -62,7 +63,7 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
           <Logo className="h-14" />
         </Link>
 
-        <nav aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
+        <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
           {items.map((item) => (
             <DesktopNavItem key={item.id} item={item} />
           ))}
@@ -79,7 +80,7 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
         </div>
       </div>
 
-      {staff && <SubNavDrawer {...adminDrawer.drawer} items={ADMIN_NAV} label={t.nav.adminPanel} className="hidden xl:grid" />}
+      {staff && <SubNavDrawer {...adminDrawer.drawer} items={ADMIN_NAV} label={t.nav.adminPanel} alignWith={mainNavRef} className="hidden xl:grid" />}
     </header>
   )
 }
