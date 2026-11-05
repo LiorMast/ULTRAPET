@@ -2,9 +2,10 @@
  * admin-catalog.spec.ts — End-to-end checks of the staff panel's catalog pages (/admin/products,
  * /admin/categories, DataTable) and their discounts (DiscountsDialog, DiscountDialog) in real Chromium against the
  * real backend: the tables show the seeded catalog, a product discount added with the keyboard is saved to the
- * database (shown in the table, still there after a reload) and then deleted, no axe violations (tables, the
- * discounts dialog, the discount form), no horizontal page overflow on a phone, and screenshots of the categories
- * page (Hebrew, English).
+ * database (shown in the table, still there after a reload) and then deleted, the product form's type-to-search
+ * category field (SearchableField: keyboard picking, Escape closing only its list, a screenshot of the open list),
+ * no axe violations (tables, the discounts dialog, the discount form, the open suggestion list), no horizontal
+ * page overflow on a phone, and screenshots of the categories page (Hebrew, English).
  *
  * The discount is put on the last seeded product (found with the table's search), so it never shows in the
  * screenshots, which other workers may take at the same time; leftovers of an interrupted run are deleted first.
@@ -113,6 +114,42 @@ test('adds a product discount with the keyboard, then deletes it', async ({ page
     // Whatever state the steps above stopped in.
     await deleteTestDiscounts(page)
   }
+})
+
+test("picks a product's category by typing, with the keyboard", async ({ page }, testInfo) => {
+  test.slow() // the 400-product table loads slowly when every worker is busy
+  const product = products[0].name.en
+  await signInStaff(page, '/en/admin/products')
+  await page.getByRole('searchbox').fill(product)
+  await page.getByRole('button', { name: `Edit ${product}` }).click()
+  const dialog = page.getByRole('dialog', { name: `Edit ${product}` })
+  await settled(dialog)
+  const category = dialog.getByRole('combobox', { name: 'Category *' })
+  const saved = await category.inputValue()
+  await category.selectText()
+  await page.keyboard.type('cat')
+  const list = page.getByRole('listbox', { name: 'Category' })
+  await expect(list.getByRole('option')).toHaveText(['Cat Cans & Treats', 'Cat Snacks', 'Cat Litter', 'Cat Scratchers', 'Dry Cat Food'])
+  await expect(list.getByRole('option', { name: 'Dry Cat Food' })).toBeInViewport()
+  await settled(list)
+  expect((await new AxeBuilder({ page }).include('[role=dialog]').analyze()).violations).toEqual([])
+  if (testInfo.project.name !== 'mobile') await expect(dialog).toHaveScreenshot('searchable-field-open.png')
+
+  // Escape closes the list (not the dialog) and puts back the saved category.
+  await page.keyboard.press('Escape')
+  await expect(list).toBeHidden()
+  await expect(dialog).toBeVisible()
+  await expect(category).toHaveValue(saved)
+
+  await category.selectText()
+  await page.keyboard.type('litter')
+  await page.keyboard.press('Enter')
+  await expect(category).toHaveValue('Cat Litter')
+  await expect(dialog).toBeVisible()
+  await expect(category).toBeFocused()
+  // Nothing is saved: the shared database stays as seeded.
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  await expect(dialog).toBeHidden()
 })
 
 test('the catalog pages do not scroll sideways on a phone', async ({ page }, testInfo) => {

@@ -291,6 +291,13 @@ export const he = {
     defaultDescription:
       'אולטרה פט – יבואן ומפיץ ארצי של מזון ומוצרי פרימיום לחיות מחמד. מספקים מותגים מובילים לחנויות, רשתות ומפיצים בכל הארץ.',
   },
+  searchField: {
+    loading: 'מחפש…',
+    noMatches: 'אין תוצאות',
+    typeToSearch: 'הקלידו כדי לחפש',
+    failed: 'החיפוש נכשל. נסו שוב.',
+    count: '{count} הצעות',
+  },
   admin: {
     metaTitle: 'ניהול האתר',
     signInTitle: 'כניסת צוות',

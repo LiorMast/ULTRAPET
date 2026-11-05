@@ -6,7 +6,7 @@
  * customers' prices. A product's photos are kept as they are (editing them comes with the product upload page).
  *
  * The page is a DataTable with the products' column config (the category and brand are picked from the current
- * lists) and a "Discounts" row action (DiscountsDialog); after every change it reloads the rows and the rules
+ * lists, by typing to search: SearchableField) and a "Discounts" row action (DiscountsDialog); after every change it reloads the rows and the rules
  * from the server. Loads nothing when signed out (the layout shows the sign-in form instead).
  */
 import { useMemo } from 'react'
@@ -68,10 +68,11 @@ function AdminProducts() {
         key: 'categoryId',
         label: f.category,
         type: 'select',
+        searchable: true,
         required: true,
         options: categories.map((category) => ({ value: category.id, label: localized(category.name, locale) })),
       },
-      { key: 'brandId', label: f.brand, type: 'select', options: brands.map((brand) => ({ value: brand.id, label: brand.name })) },
+      { key: 'brandId', label: f.brand, type: 'select', searchable: true, options: brands.map((brand) => ({ value: brand.id, label: brand.name })) },
       { key: 'listPrice', label: f.listPrice, type: 'money', hint: f.listPriceHint },
       { key: 'discountText', label: f.discounts, inForm: false, render: (row) => <DiscountsCell rules={row.discounts} /> },
       { key: 'isActive', label: f.isActive, type: 'boolean' },

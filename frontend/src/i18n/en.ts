@@ -284,6 +284,13 @@ export const en: Dictionary = {
     defaultDescription:
       "Israel's national importer and distributor of premium pet food and supplies, serving retailers, chains and distributors nationwide.",
   },
+  searchField: {
+    loading: 'Searching…',
+    noMatches: 'No matches',
+    typeToSearch: 'Type to search',
+    failed: 'The search failed. Please try again.',
+    count: '{count} suggestions',
+  },
   admin: {
     metaTitle: 'Site admin',
     signInTitle: 'Staff sign-in',

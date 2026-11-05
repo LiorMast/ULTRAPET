@@ -43,7 +43,9 @@ export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 
  * One column of a DataTable and one field of its edit form.
  * - `key`: the row property (the staff API's camelCase JSON key, e.g. "sortOrder").
  * - `type`: see FieldType; default "text". `multiline`: a text or localized field edited in a textarea.
- * - `options`: the choices of a "select" column.
+ * - `options`: the choices of a "select" column, or the suggestions of a searchable "text" column.
+ * - `searchable`: the form edits the column with a SearchableField: a "select" column becomes a type-to-search
+ *   field limited to its options (strict), a "text" column a free field that suggests its options.
  * - `required`: the form refuses an empty value. `pattern` / `hint`: input pattern (regex) and help text.
  * - `ltr`: left-to-right content in any language (slugs, URLs, codes).
  * - `readOnly`: shown in the form but not editable. `inTable` / `inForm`: false hides it there (default true).
@@ -55,6 +57,7 @@ export type DataColumn<Row> = {
   type?: FieldType
   multiline?: boolean
   options?: { value: string; label: string }[]
+  searchable?: boolean
   required?: boolean
   pattern?: string
   hint?: string

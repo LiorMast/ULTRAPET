@@ -3,7 +3,7 @@
  * table's column config (DataColumn), so every admin table gets its form for free.
  *
  * Each column type has its input (text or textarea, a Hebrew + English pair for localized text, number, money,
- * checkbox, select, colour, URL, date and time). The form checks required fields, patterns and numbers before
+ * checkbox, select, colour, URL, date and time; a `searchable` select or text column gets a SearchableField). The form checks required fields, patterns and numbers before
  * sending; on an edit it sends only the fields that changed. When the server refuses the change, its error lands
  * on the field it names (`field`, or the column in a constraint name such as "brands_slug_key"), or above the
  * buttons when it names none. Used only by DataTable.
@@ -11,6 +11,7 @@
 import { useId, useState, type FormEvent } from 'react'
 import { ApiError } from '@/api'
 import type { DataColumn, RowValues } from '@/components/DataTable'
+import { SearchableField } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { Dictionary } from '@/i18n/he'
@@ -293,7 +294,22 @@ function Field<Row>({ id, column, value, error, onChange }: { id: string; column
 
   const text = String(value)
   let input
-  if (column.type === 'select') {
+  if (column.searchable) {
+    input = (
+      <SearchableField
+        id={id}
+        label={column.label}
+        value={text}
+        onChange={(next) => onChange(next)}
+        options={column.options}
+        strict={column.type === 'select'}
+        dir={column.ltr ? 'ltr' : undefined}
+        className="mt-2"
+        inputClassName={INPUT_CLASS}
+        {...common}
+      />
+    )
+  } else if (column.type === 'select') {
     input = (
       <select id={id} value={text} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS} {...common}>
         {!column.required && <option value="">—</option>}
