@@ -47,7 +47,7 @@ test('lists the products and categories with no accessibility violations', async
   await expect(page.getByText(new RegExp(`^Showing 1–25 of ${products.length.toLocaleString('en')}$`))).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 
-  await page.getByRole('navigation', { name: 'Admin' }).getByRole('link', { name: 'Categories' }).click()
+  await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('link', { name: 'Categories' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible()
   expect(await page.getByRole('table', { name: 'Categories' }).getByRole('row').count()).toBeGreaterThan(1)
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
@@ -156,7 +156,7 @@ test('the catalog pages do not scroll sideways on a phone', async ({ page }, tes
   test.skip(testInfo.project.name !== 'mobile', 'phone layout')
   await signInStaff(page, '/en/admin/products')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  await page.getByRole('navigation', { name: 'Admin' }).getByRole('link', { name: 'Categories' }).click()
+  await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('link', { name: 'Categories' }).click()
   await page.getByRole('table', { name: 'Categories' }).waitFor()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })

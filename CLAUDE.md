@@ -424,7 +424,7 @@ content exists in each language, and the layout flips direction automatically.
 **Phase 1 — Frontend (static data first)**
 - [x] Scaffold: Vite, Tailwind tokens, TanStack Router, i18n, shadcn/ui, Vitest + Playwright
 - [x] Navbar (`Navbar`, `MobileMenu`, `LanguageSwitcher`, `Logo`), with the login popover (`LoginPopover`, `LoginForm`:
-      email, password, remember me; one form for customers and staff, through the API) — the mobile drawer links to `/login`, which shows the same form; signed in, the login button becomes Log out and staff also get an Admin panel button
+      email, password, remember me; one form for customers and staff, through the API) — the mobile drawer links to `/login`, which shows the same form; signed in, the login button becomes Log out and staff also get an Admin panel button, a toggle that slides the admin drawer (`SubNavDrawer`: the `ADMIN_NAV` pages from `config.ts`) down out of the header and back up
 - [ ] Footer + floating WhatsApp button
 - [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README); staff
       edit its title, tagline and description (text, font, size per language) in place ("Edit on page", the page's

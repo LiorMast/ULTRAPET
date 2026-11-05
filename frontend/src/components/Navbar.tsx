@@ -9,6 +9,8 @@
  *   offset their content by the same amount.
  * - The menu is built by mainNav() in src/config.ts (the Products dropdown lists the categories passed in); an item with `children` opens a dropdown (Products).
  * - From the xl breakpoint the full menu is shown; below it, <MobileMenu> (a drawer) takes over.
+ * - Staff get an Admin panel button (in LoginPopover) that slides the admin drawer (<SubNavDrawer>, the
+ *   pages of ADMIN_NAV) down out of the header and back up; the header grows with it, over the page.
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
  *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
  */
@@ -20,6 +22,8 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LoginPopover } from '@/components/LoginPopover'
 import { Logo } from '@/components/Logo'
 import { MobileMenu } from '@/components/MobileMenu'
+import { NAV_TEXT, Underline } from '@/components/NavText'
+import { SubNavDrawer, useSubNavDrawer } from '@/components/SubNavDrawer'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,17 +31,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { mainNav, type NavItem } from '@/config'
+import { ADMIN_NAV, mainNav, type NavItem } from '@/config'
 import type { ProductCategory } from '@/api'
+import { useAuth } from '@/auth'
 import { useI18n } from '@/i18n'
-
-/**
- * Text style of the top-level menu entries (legacy look). Left-to-right (English) labels use 0.1em
- * letter-spacing instead of the 0.25em `tracking-widest`, so the seven entries fit on one line at every
- * desktop width (Hebrew has its own tight tracking).
- */
-const NAV_TEXT =
-  'group relative whitespace-nowrap font-heading text-xs font-medium uppercase tracking-widest ltr:tracking-[0.1em] 2xl:text-sm min-[1920px]:text-base text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:text-brand-red data-[status=active]:text-brand-red'
 
 /**
  * The site header.
@@ -49,6 +46,9 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
   const { t, locale } = useI18n()
   items ??= mainNav(categories, locale)
   useScrollSpy()
+  const { user } = useAuth()
+  const staff = user?.kind === 'staff' ? user : null
+  const adminDrawer = useSubNavDrawer(staff ? staff.email : null)
 
   return (
     <header className="material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]">
@@ -70,7 +70,7 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
 
         <div className="hidden shrink-0 items-center gap-2 xl:flex">
           <LanguageSwitcher variant="dropdown" />
-          <LoginPopover />
+          <LoginPopover adminToggle={adminDrawer.trigger} />
         </div>
 
         <div className="flex items-center gap-1 xl:hidden">
@@ -78,6 +78,8 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
           <MobileMenu items={items} />
         </div>
       </div>
+
+      {staff && <SubNavDrawer {...adminDrawer.drawer} items={ADMIN_NAV} label={t.nav.adminPanel} className="hidden xl:grid" />}
     </header>
   )
 }
@@ -189,20 +191,5 @@ function DesktopNavItem({ item }: { item: NavItem }) {
         })}
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-/**
- * The thin red underline of a menu entry: grows from the start side on hover or keyboard focus (a scale,
- * so it animates on the compositor), and
- * stays visible on the active page and while a dropdown is open.
- * @returns A decorative <span>, hidden from screen readers.
- */
-function Underline() {
-  return (
-    <span
-      aria-hidden="true"
-      className="absolute -bottom-1 start-0 h-px w-full origin-left scale-x-0 bg-brand-red transition-transform duration-300 group-hover:scale-x-100 group-focus-visible:scale-x-100 group-data-[state=open]:scale-x-100 group-data-[status=active]:scale-x-100 rtl:origin-right"
-    />
   )
 }

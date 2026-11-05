@@ -48,7 +48,9 @@ test('staff sign in from the header: Admin panel and Log out appear, then it is 
   await dialog.getByRole('button', { name: 'התחברות' }).click()
   await expect(header.getByRole('button', { name: 'התנתקות' })).toBeVisible()
   await expect(header.getByRole('button', { name: 'התחברות' })).toHaveCount(0)
-  await header.getByRole('link', { name: 'לוח ניהול' }).click()
+  // Admin panel opens the admin drawer (admin-drawer.spec.ts); its Brands link opens the brands table.
+  await header.getByRole('button', { name: 'לוח ניהול' }).click()
+  await header.getByRole('navigation', { name: 'לוח ניהול' }).getByRole('link', { name: 'מותגים' }).click()
   await expect(page).toHaveURL(/\/admin\/brands$/)
   await expect(page.getByRole('table')).toBeVisible()
   await header.getByRole('button', { name: 'התנתקות' }).click()
@@ -67,7 +69,7 @@ test('customers sign in from the header and get Log out without an Admin panel b
   await dialog.getByLabel('סיסמה').fill(password)
   await dialog.getByRole('button', { name: 'התחברות' }).click()
   await expect(header.getByRole('button', { name: 'התנתקות' })).toBeVisible()
-  await expect(header.getByRole('link', { name: 'לוח ניהול' })).toHaveCount(0)
+  await expect(header.getByRole('button', { name: 'לוח ניהול' })).toHaveCount(0)
   await header.getByRole('button', { name: 'התנתקות' }).click()
 })
 

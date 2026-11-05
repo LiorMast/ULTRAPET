@@ -2,13 +2,15 @@
  * LoginPopover.tsx — The header's account buttons. Signed out: the login button and the popover it opens,
  * holding the login form (the same form customers and staff both use; the mobile drawer links to the /login
  * page instead). Signed in: the login button turns into a Log out button, and staff also get an Admin panel
- * button before it. Used by the desktop Navbar.
+ * button before it, which opens and closes the header's admin drawer (SubNavDrawer, wired by the Navbar through
+ * `adminToggle`; without it the button is a plain link to /admin). Used by the desktop Navbar.
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { LogOut, ShieldCheck, UserRound } from 'lucide-react'
+import { ChevronDown, LogOut, ShieldCheck, UserRound } from 'lucide-react'
 import { useAuth } from '@/auth'
 import { LoginForm } from '@/components/LoginForm'
+import type { DrawerTriggerProps } from '@/components/SubNavDrawer'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { HEADER_LOGIN } from '@/config'
 import { useI18n } from '@/i18n'
@@ -19,10 +21,12 @@ const PILL_CLASS =
 
 /**
  * The header's account buttons: signed out = the login button with its popover (title, form and a link to
- * open an account); signed in = a Log out button, preceded by an Admin panel link for staff.
+ * open an account); signed in = a Log out button, preceded by an Admin panel button for staff.
+ * @param props.adminToggle - The admin drawer's toggle props (useSubNavDrawer().trigger): the Admin panel button
+ *   then opens and closes the drawer. Without it, Admin panel is a link to /admin.
  * @returns The buttons (and, when open, the popover panel).
  */
-export function LoginPopover() {
+export function LoginPopover({ adminToggle }: { adminToggle?: DrawerTriggerProps }) {
   const { t } = useI18n()
   const { user, signOut } = useAuth()
   const [open, setOpen] = useState(false)
@@ -30,12 +34,19 @@ export function LoginPopover() {
   if (user) {
     return (
       <>
-        {user.kind === 'staff' && (
-          <Link to="/admin" className={PILL_CLASS}>
-            <ShieldCheck size={18} aria-hidden="true" />
-            {t.nav.adminPanel}
-          </Link>
-        )}
+        {user.kind === 'staff' &&
+          (adminToggle ? (
+            <button type="button" {...adminToggle} className={PILL_CLASS}>
+              <ShieldCheck size={18} aria-hidden="true" />
+              {t.nav.adminPanel}
+              <ChevronDown size={16} aria-hidden="true" className="transition-transform duration-300 in-data-[state=open]:rotate-180" />
+            </button>
+          ) : (
+            <Link to="/admin" className={PILL_CLASS}>
+              <ShieldCheck size={18} aria-hidden="true" />
+              {t.nav.adminPanel}
+            </Link>
+          ))}
         <button type="button" onClick={() => void signOut()} className={PILL_CLASS}>
           <LogOut size={18} aria-hidden="true" />
           {t.login.signOut}

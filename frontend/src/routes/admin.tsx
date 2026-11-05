@@ -10,10 +10,11 @@
  * Disallow and no sitemap entry. The data pages (e.g. admin.brands.tsx) show their table in the <Outlet />.
  */
 import { useEffect, useRef } from 'react'
-import { createFileRoute, Link, linkOptions, Outlet, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet, useRouter } from '@tanstack/react-router'
 import { fetchSession, type User } from '@/api'
 import { useAuth } from '@/auth'
 import { LoginForm } from '@/components/LoginForm'
+import { ADMIN_NAV } from '@/config'
 import { dictionaryFor, useI18n } from '@/i18n'
 
 export const Route = createFileRoute('/admin')({
@@ -65,17 +66,13 @@ function AdminLayout() {
       <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-150 pb-4">
         <nav aria-label={t.admin.navLabel}>
           <ul className="flex flex-wrap gap-6">
-            {[
-              { link: linkOptions({ to: '/admin/products' }), label: t.admin.navProducts },
-              { link: linkOptions({ to: '/admin/categories' }), label: t.admin.navCategories },
-              { link: linkOptions({ to: '/admin/brands' }), label: t.admin.navBrands },
-            ].map(({ link, label }) => (
-              <li key={link.to}>
+            {ADMIN_NAV.map(({ id, link, label }) => (
+              <li key={id}>
                 <Link
                   {...link}
                   className="font-heading text-xs font-semibold uppercase tracking-widest text-brand-charcoal-muted transition-colors hover:text-brand-charcoal aria-[current=page]:text-brand-red"
                 >
-                  {label}
+                  {label(t)}
                 </Link>
               </li>
             ))}

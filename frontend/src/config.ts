@@ -28,8 +28,11 @@ export type NavChild = { id: string; label: Label; divider?: boolean } & (
   | { href: string }
 )
 
+/** A plain menu link: an id (the React key), a translated label and an internal link. */
+export type NavLink = { id: string; label: Label; link: AppLink }
+
 /** A top-level menu entry: a link, or a dropdown with `children`. */
-export type NavItem = { id: string; label: Label } & ({ link: AppLink } | { children: NavChild[] })
+export type NavItem = NavLink | ({ id: string; label: Label } & { children: NavChild[] })
 
 /** The PDF catalog without prices (still hosted on the WordPress site until the backend serves it). */
 export const CATALOG_PDF_URL = 'https://www.ultrapet.co.il/wp-content/uploads/2025/03/ultrapetcatalog.pdf'
@@ -210,6 +213,16 @@ export const HEADER_CTA = {
   label: (t: Dictionary) => t.nav.businessCta,
   link: linkOptions({ to: '/', hash: 'business' }),
 }
+
+/**
+ * The pages of the staff panel, in menu order: the panel's own menu (routes/admin.tsx) and the header's admin
+ * drawer (SubNavDrawer, opened by the Admin panel button) both list these. A new admin page = one entry here.
+ */
+export const ADMIN_NAV: NavLink[] = [
+  { id: 'products', label: (t: Dictionary) => t.admin.navProducts, link: linkOptions({ to: '/admin/products' }) },
+  { id: 'categories', label: (t: Dictionary) => t.admin.navCategories, link: linkOptions({ to: '/admin/categories' }) },
+  { id: 'brands', label: (t: Dictionary) => t.admin.navBrands, link: linkOptions({ to: '/admin/brands' }) },
+]
 
 /** The header's login link (the B2B customer portal). */
 export const HEADER_LOGIN = {

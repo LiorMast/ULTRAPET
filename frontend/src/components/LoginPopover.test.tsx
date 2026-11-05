@@ -90,7 +90,7 @@ describe('Login popover', () => {
 
     const logout = await within(screen.getByRole('banner')).findByRole('button', { name: 'Sign out' })
     expect(within(screen.getByRole('banner')).queryByRole('button', { name: 'Login' })).not.toBeInTheDocument()
-    expect(within(screen.getByRole('banner')).queryByRole('link', { name: 'Admin panel' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).queryByRole('button', { name: 'Admin panel' })).not.toBeInTheDocument()
 
     await user.click(logout)
     expect(await within(screen.getByRole('banner')).findByRole('button', { name: 'Login' })).toBeInTheDocument()
@@ -105,7 +105,8 @@ describe('Login popover', () => {
     await user.type(within(dialog).getByLabelText('Password'), 'secret')
     await user.click(within(dialog).getByRole('button', { name: 'Log in' }))
     const header = within(screen.getByRole('banner'))
-    expect(await header.findByRole('link', { name: 'Admin panel' })).toHaveAttribute('href', '/en/admin')
+    // A toggle for the admin drawer (SubNavDrawer.test.tsx), closed at first.
+    expect(await header.findByRole('button', { name: 'Admin panel' })).toHaveAttribute('aria-expanded', 'false')
     expect(header.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
