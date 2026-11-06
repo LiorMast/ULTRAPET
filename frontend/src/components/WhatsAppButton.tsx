@@ -3,7 +3,7 @@
  * Rendered once by routes/__root.tsx; it opens a chat with the customer-service number (the setting contact_whatsapp,
  * which the root route loads with fetchContact).
  */
-import { MessageCircle } from 'lucide-react'
+import whatsappLogo from '@/assets/whatsapp.svg'
 import { Popover } from '@/components/Popover'
 import { whatsappUrl } from '@/config'
 import { useI18n } from '@/i18n'
@@ -24,7 +24,8 @@ export function WhatsAppButton({ phone }: { phone: string }) {
       aria-label={`${t.header.whatsappLabel} – WhatsApp`}
       className="group fixed bottom-5 end-5 z-40 flex size-16 items-center justify-center rounded-full bg-[#21c063] text-white shadow-premium transition-[background-color,box-shadow,scale] hover:bg-[#1aa854] active:scale-[0.97] active:duration-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#21c063]/40 lg:bottom-8 lg:end-8"
     >
-      <MessageCircle aria-hidden="true" className="size-8" />
+      {/* 52px: the bubble's tail tip (the logo's farthest point from its center) touches the 64px circle's edge. */}
+      <img src={whatsappLogo} alt="" width={52} height={52} className="size-13" />
       <Popover
         message={t.header.whatsappLabel}
         color="#1A1A1A"

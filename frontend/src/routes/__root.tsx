@@ -1,11 +1,11 @@
 /**
  * routes/__root.tsx — The layout shared by every page: the route-managed <head> tags, a "skip to
- * content" link, the Navbar (its Products dropdown lists the categories this route loads), the current page inside <main>, the floating WhatsApp button (the
- * contact details this route loads; the home page's Contact section reads them from here too), the "page not found" screen for
+ * content" link, the Navbar (its Products dropdown lists the categories this route loads), the current page inside <main>, the floating WhatsApp button (not on the staff
+ * panel, /admin/...; the contact details this route loads; the home page's Contact section reads them from here too), the "page not found" screen for
  * unknown URLs, and the "could not load" screen (LoadError, the router's default error component) for pages
  * whose API request failed. Its `head` sets the default title and description; pages override them (see seo.ts).
  */
-import { createRootRouteWithContext, HeadContent, Link, Outlet, useRouter } from '@tanstack/react-router'
+import { createRootRouteWithContext, HeadContent, Link, Outlet, useMatchRoute, useRouter } from '@tanstack/react-router'
 import { fetchCategories, fetchContact, type ContactDetails, type ProductCategory } from '@/api'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
@@ -31,12 +31,14 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 /**
  * Renders the site chrome around the current page. The fixed 88px header is always white, so every
- * page gets matching top padding and nothing is hidden under it.
+ * page gets matching top padding and nothing is hidden under it. The WhatsApp button is left out of the staff panel.
  * @returns The page layout.
  */
 function RootLayout() {
   const { t } = useI18n()
   const { categories, contact } = Route.useLoaderData()
+  const matchRoute = useMatchRoute()
+  const isAdmin = Boolean(matchRoute({ to: '/admin', fuzzy: true }))
 
   return (
     <>
@@ -51,7 +53,7 @@ function RootLayout() {
       <main id="main" tabIndex={-1} className="pt-22 outline-none">
         <Outlet />
       </main>
-      <WhatsAppButton phone={contact.whatsapp} />
+      {!isAdmin && <WhatsAppButton phone={contact.whatsapp} />}
     </>
   )
 }
