@@ -4,6 +4,9 @@
  * business customer, through the staff API (backend/app/staff/routes.py, resources "categories" and
  * "price-rules"); a change shows on the catalog at once and the discounts in the customers' prices.
  *
+ * A category's picture (shown on the home page categories carousel) is uploaded in its edit form (column type
+ * "image": ImageUploadField stores the file through the staff upload API and the form saves its URL in imageUrl).
+ *
  * The page is a DataTable with the categories' column config and a "Discounts" row action (DiscountsDialog);
  * after every change it reloads the rows and the rules from the server. Loads nothing when signed out (the
  * layout shows the sign-in form instead).
@@ -54,7 +57,7 @@ function AdminCategories() {
       { key: 'name', label: f.name, type: 'localized', required: true },
       { key: 'slug', label: f.slug, required: true, ltr: true, pattern: '[a-z0-9]+(-[a-z0-9]+)*', hint: f.slugHint },
       { key: 'discountText', label: f.discounts, inForm: false, render: (row) => <DiscountsCell rules={row.discounts} /> },
-      { key: 'imageUrl', label: f.imageUrl, type: 'url', inTable: false },
+      { key: 'imageUrl', label: f.image, type: 'image', folder: 'categories', hint: f.imageHint },
       { key: 'legacyPath', label: f.legacyPath, ltr: true, hint: f.legacyPathHint, inTable: false },
       { key: 'sortOrder', label: f.sortOrder, type: 'integer', required: true },
       { key: 'isActive', label: f.isActive, type: 'boolean' },

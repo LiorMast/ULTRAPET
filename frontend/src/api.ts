@@ -17,6 +17,7 @@
  * Staff panel (backend/app/staff/routes.py): its own sign-in, and one generic create/read/update/delete API for
  * every resource (fetchStaffRows, createStaffRow, updateStaffRow, deleteStaffRow), used by the /admin pages and the
  * in-place editors; a resource edited as one ordered list (the FAQ) is saved whole with replaceStaffRows.
+ * Pictures are uploaded with uploadImage (multipart; the server stores them in its S3 stub and returns their URL).
  */
 import { notFound } from '@tanstack/react-router'
 import type { Localized } from '@/config'
@@ -188,7 +189,10 @@ export class ApiError extends Error {
   }
 }
 
-/** Options of one API call. `csrf` picks the CSRF cookie to send (only the refresh call uses 'refresh'). */
+/**
+ * Options of one API call. `body`: JSON-serializable data, or FormData for an upload. `csrf` picks the CSRF cookie
+ * to send (only the refresh call uses 'refresh').
+ */
 type CallOptions = { method?: string; body?: unknown; signal?: AbortSignal; csrf?: 'access' | 'refresh' }
 
 /** Methods the server checks for the CSRF header. */
@@ -206,17 +210,20 @@ function readCookie(name: string): string | undefined {
 }
 
 /**
- * Sends one request (JSON in and out, same-origin cookies, the CSRF header on unsafe methods).
+ * Sends one request (JSON in and out, same-origin cookies, the CSRF header on unsafe methods). A FormData body (a
+ * file upload) is sent as multipart/form-data, with the boundary the browser sets.
  * @param path - The API path, e.g. "/api/brands".
- * @param options - Method, JSON body, abort signal and which CSRF cookie to send.
+ * @param options - Method, JSON or FormData body, abort signal and which CSRF cookie to send.
  * @returns The raw response.
  */
 function send(path: string, { method = 'GET', body, signal, csrf = 'access' }: CallOptions): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const multipart = body instanceof FormData
+  if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json'
   const token = UNSAFE_METHODS.has(method) ? readCookie(csrf === 'refresh' ? 'csrf_refresh_token' : 'csrf_access_token') : undefined
   if (token) headers['X-CSRF-TOKEN'] = token
-  return fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal, credentials: 'same-origin' })
+  const payload = body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body)
+  return fetch(path, { method, headers, body: payload, signal, credentials: 'same-origin' })
 }
 
 /**
@@ -564,3 +571,25 @@ export async function saveSetting(key: string, value: unknown): Promise<unknown>
  */
 export const replaceStaffRows = <Row,>(resource: StaffListResource, rows: Record<string, unknown>[]) =>
   apiFetch<Row[]>(`/api/staff/${resource}`, { method: 'PUT', body: rows })
+
+/** The folders pictures are uploaded into (UPLOAD_FOLDERS in backend/app/staff/routes.py), one per kind of picture. */
+export type UploadFolder = 'categories'
+
+/** An uploaded file: its storage key and the URL to save in a row and show it from. */
+export type UploadedFile = { key: string; url: string }
+
+/**
+ * Uploads a picture to the file storage (an S3 stub on the server for now); save the returned URL in the row it
+ * belongs to (e.g. a category's imageUrl).
+ * @param folder - Where it goes, e.g. "categories".
+ * @param file - A JPEG, PNG, WebP or AVIF image of at most 5 MB.
+ * @param signal - Aborts the upload.
+ * @returns The stored file; throws ApiError 400 ("unsupported_type", "too_large", "required"), 413, or 401/403
+ *   without a staff sign-in.
+ */
+export function uploadImage(folder: UploadFolder, file: File, signal?: AbortSignal): Promise<UploadedFile> {
+  const body = new FormData()
+  body.append('folder', folder)
+  body.append('file', file)
+  return apiFetch<UploadedFile>('/api/staff/uploads', { method: 'POST', body, signal })
+}

@@ -2,7 +2,7 @@
 
 Public, no sign-in:
     GET /categories, /products, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
-    /articles, /articles/<slug>, /resellers, /sitemap.xml
+    /articles, /articles/<slug>, /resellers, /sitemap.xml, /media/<key> (uploaded files: the S3 stub's objects)
 Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
     POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me
 Business customers only:
@@ -21,6 +21,7 @@ from flask_jwt_extended import current_user, verify_jwt_in_request
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import contains_eager, selectinload
 
+from app import storage
 from app.auth import authenticate, clear_tokens, issue_tokens, read_credentials, refresh_access, require_user, user_type
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
@@ -367,6 +368,20 @@ def list_resellers() -> list[dict[str, Any]]:
         }
         for r in resellers
     ]
+
+
+@bp.get("/media/<path:key>")
+def media(key: str) -> Response:
+    """Serves an uploaded file (a category picture, ...) from the S3 stub; with real S3 the files have S3 URLs and
+    this route goes away (see app/storage.py).
+
+    Args:
+        key: The object key, e.g. "categories/3f2a....png".
+
+    Returns:
+        The file, cached for a year; 404 when there is no such file.
+    """
+    return storage.send_object(key)
 
 
 @bp.get("/sitemap.xml")

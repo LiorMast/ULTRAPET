@@ -20,7 +20,7 @@ import DataTableLib, { type DataTableSlots } from 'datatables.net-react'
 import DT, { type ColumnOptions, type Options } from 'datatables.net-dt'
 import 'datatables.net-dt/css/dataTables.dataTables.css'
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { ApiError } from '@/api'
+import { ApiError, type UploadFolder } from '@/api'
 import { localized, type Localized } from '@/config'
 import { RecordDialog, errorMessage } from '@/components/RecordDialog'
 import { Button } from '@/components/ui/button'
@@ -35,9 +35,10 @@ registerLibrary(DT)
 /**
  * How a column's value is shown and edited: plain or multiline `text`, `localized` text ({ he, en }),
  * `integer`, `number` (decimal), `money` (shekels), `boolean`, `select` (one of `options`), `color` ('#RRGGBB'),
- * `url` or `datetime` (an ISO timestamp).
+ * `url`, `datetime` (an ISO timestamp) or `image` (a picture URL: a thumbnail cell, and an upload field into the
+ * column's `folder`).
  */
-export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 'boolean' | 'select' | 'color' | 'url' | 'datetime'
+export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 'boolean' | 'select' | 'color' | 'url' | 'datetime' | 'image'
 
 /**
  * One column of a DataTable and one field of its edit form.
@@ -48,6 +49,7 @@ export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 
  *   field limited to its options (strict), a "text" column a free field that suggests its options.
  * - `required`: the form refuses an empty value. `pattern` / `hint`: input pattern (regex) and help text.
  * - `ltr`: left-to-right content in any language (slugs, URLs, codes).
+ * - `folder`: where an "image" column's uploads are stored (e.g. "categories").
  * - `readOnly`: shown in the form but not editable. `inTable` / `inForm`: false hides it there (default true).
  * - `render`: overrides the cell (the form still uses `type`).
  */
@@ -62,6 +64,7 @@ export type DataColumn<Row> = {
   pattern?: string
   hint?: string
   ltr?: boolean
+  folder?: UploadFolder
   readOnly?: boolean
   inTable?: boolean
   inForm?: boolean
@@ -178,6 +181,8 @@ function Cell<Row>({ column, value, locale, yes, no }: { column: DataColumn<Row>
       )
     case 'datetime':
       return <>{new Date(String(value)).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}</>
+    case 'image':
+      return <img src={String(value)} alt="" width={64} height={48} loading="lazy" className="aspect-[4/3] w-16 border border-neutral-300 object-cover" />
     default:
       return column.ltr ? <span dir="ltr">{String(value)}</span> : <>{String(value)}</>
   }

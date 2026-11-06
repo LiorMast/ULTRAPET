@@ -3,14 +3,16 @@
  * table's column config (DataColumn), so every admin table gets its form for free.
  *
  * Each column type has its input (text or textarea, a Hebrew + English pair for localized text, number, money,
- * checkbox, select, colour, URL, date and time; a `searchable` select or text column gets a SearchableField). The form checks required fields, patterns and numbers before
- * sending; on an edit it sends only the fields that changed. When the server refuses the change, its error lands
+ * checkbox, select, colour, URL, date and time; a `searchable` select or text column gets a SearchableField; an
+ * "image" column an ImageUploadField, which uploads the file at once and holds Save until it is stored). The form
+ * checks required fields, patterns and numbers before sending; on an edit it sends only the fields that changed. When the server refuses the change, its error lands
  * on the field it names (`field`, or the column in a constraint name such as "brands_slug_key"), or above the
  * buttons when it names none. Used only by DataTable.
  */
 import { useId, useState, type FormEvent } from 'react'
 import { ApiError } from '@/api'
 import type { DataColumn, RowValues } from '@/components/DataTable'
+import { ImageUploadField } from '@/components/ImageUploadField'
 import { SearchableField } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -153,6 +155,8 @@ export function RecordDialog<Row>({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
+  // How many picture fields are uploading: Save waits for them (the field's value is the stored file's URL).
+  const [uploads, setUploads] = useState(0)
 
   /**
    * Submit handler: checks every field, sends the new row or the changed fields, and shows the server's error.
@@ -206,6 +210,7 @@ export function RecordDialog<Row>({
                 value={values[column.key]}
                 error={errors[column.key]}
                 onChange={(value) => setValues((current) => ({ ...current, [column.key]: value }))}
+                onBusyChange={(busy) => setUploads((count) => count + (busy ? 1 : -1))}
               />
             ))}
           </div>
@@ -218,7 +223,7 @@ export function RecordDialog<Row>({
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               {t.admin.cancel}
             </Button>
-            <Button type="submit" size="sm" disabled={pending}>
+            <Button type="submit" size="sm" disabled={pending || uploads > 0}>
               {t.admin.save}
             </Button>
           </DialogFooter>
@@ -235,9 +240,24 @@ export function RecordDialog<Row>({
  * @param props.value - The input's value.
  * @param props.error - The error message to show, if any.
  * @param props.onChange - Called with the new value.
+ * @param props.onBusyChange - An "image" field tells when an upload starts (true) and ends (false).
  * @returns The field.
  */
-function Field<Row>({ id, column, value, error, onChange }: { id: string; column: DataColumn<Row>; value: FormValue; error?: string; onChange: (value: FormValue) => void }) {
+function Field<Row>({
+  id,
+  column,
+  value,
+  error,
+  onChange,
+  onBusyChange,
+}: {
+  id: string
+  column: DataColumn<Row>
+  value: FormValue
+  error?: string
+  onChange: (value: FormValue) => void
+  onBusyChange: (busy: boolean) => void
+}) {
   const { t } = useI18n()
   const described = [column.hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined
   const label = `${column.label}${column.required ? ' *' : ''}`
@@ -293,6 +313,17 @@ function Field<Row>({ id, column, value, error, onChange }: { id: string; column
   }
 
   const text = String(value)
+
+  if (column.type === 'image' && column.folder) {
+    return (
+      <fieldset>
+        <legend className={LABEL_CLASS}>{label}</legend>
+        <ImageUploadField id={id} value={text} onChange={onChange} folder={column.folder} onBusyChange={onBusyChange} inputClassName={INPUT_CLASS} {...common} />
+        {footer}
+      </fieldset>
+    )
+  }
+
   let input
   if (column.searchable) {
     input = (

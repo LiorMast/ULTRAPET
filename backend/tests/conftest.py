@@ -6,7 +6,8 @@ name `content_test`, created on first use. The schema is built once per run from
 create-tables.sql (the same way `flask reset-db` does), and every table is emptied after each database test.
 Tests that need the database take the `database` fixture; the pure pricing tests do not. API tests take `client`
 (signed out), `customer_client` or `staff_client` (signed in through the real login routes, so they hold the JWT
-cookies), and `csrf` for the X-CSRF-TOKEN header that POST/PATCH/DELETE with a token need.
+cookies), and `csrf` for the X-CSRF-TOKEN header that POST/PATCH/DELETE with a token need. Uploads (the S3 stub)
+go to a temporary folder.
 """
 import os
 from collections.abc import Callable, Iterator
@@ -58,8 +59,11 @@ def ensure_database(url: str) -> None:
 
 
 @pytest.fixture(scope="session")
-def app() -> Flask:
-    """The Flask app on a freshly built test database (once per test run).
+def app(tmp_path_factory: pytest.TempPathFactory) -> Flask:
+    """The Flask app on a freshly built test database (once per test run), storing uploads in a temporary folder.
+
+    Args:
+        tmp_path_factory: pytest's temporary folders (the S3 stub's MEDIA_ROOT, so tests never write backend/media).
 
     Returns:
         The application.
@@ -67,7 +71,12 @@ def app() -> Flask:
     url = resolve_test_database_url()
     ensure_database(url)
     application = create_app(
-        {"SQLALCHEMY_DATABASE_URI": url, "SECRET_KEY": "test-secret-at-least-32-bytes-long", "TESTING": True}
+        {
+            "SQLALCHEMY_DATABASE_URI": url,
+            "SECRET_KEY": "test-secret-at-least-32-bytes-long",
+            "TESTING": True,
+            "MEDIA_ROOT": str(tmp_path_factory.mktemp("media")),
+        }
     )
     with application.app_context():
         run_sql_file(DROP_TABLES_SQL)

@@ -12,7 +12,8 @@
  * with STATS and stubs/contact.json), the FAQ's PUT that replaces the whole list at once (all or nothing), with the server's
  * errors (401 signed out, 403 for a customer, 400 required / a failed check / an unknown reference or id, 405 PUT on
  * another table, 409 duplicate or in use, 404) and its cascade (a deleted category's or product's price rules go with
- * it).
+ * it). POST /api/staff/uploads fakes the S3-stub upload (staff only; folder "categories"; JPEG/PNG/WebP/AVIF by the
+ * file's type, at most 5 MB; answers `/api/media/<folder>/fake-<n>.<ext>`, nothing is stored).
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
@@ -65,10 +66,14 @@ type StaffRow = { id: string; createdAt: string; updatedAt: string } & Record<st
 /** The staff tables (each a promise, so concurrent first requests share one copy); built from the stubs on first use. */
 let staffRows: Partial<Record<string, Promise<StaffRow[]>>> = {}
 
+/** How many files the fake upload route took (numbers the fake URLs). */
+let uploadCount = 0
+
 /** Signs the fake out and forgets staff edits; setup.ts calls it after every test. */
 export function resetFakeApi() {
   session = null
   staffRows = {}
+  uploadCount = 0
 }
 
 /**
@@ -370,6 +375,29 @@ async function replaceAnswer(table: FakeTable, rows: StaffRow[], body: unknown):
   return json(next)
 }
 
+/** The picture types the upload route takes, by media type -> extension (IMAGE_TYPES on the server). */
+const UPLOAD_TYPES: Partial<Record<string, string>> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' }
+
+/**
+ * Answers POST /api/staff/uploads like the server's upload route (the type is read from the File, not its bytes).
+ * @param body - The multipart body: `folder` and `file`.
+ * @returns 201 { key, url }, or the server's errors (401/403, invalid folder, required, too_large, unsupported_type).
+ */
+function uploadAnswer(body: BodyInit | null | undefined): Response {
+  if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  const form = body instanceof FormData ? body : new FormData()
+  const folder = form.get('folder')
+  if (folder !== 'categories') return json({ error: 'invalid', field: 'folder' }, 400)
+  const file = form.get('file')
+  if (!(file instanceof File) || file.size === 0) return json({ error: 'required', field: 'file' }, 400)
+  if (file.size > 5 * 1024 * 1024) return json({ error: 'too_large', field: 'file' }, 400)
+  const extension = UPLOAD_TYPES[file.type]
+  if (!extension) return json({ error: 'unsupported_type', field: 'file' }, 400)
+  uploadCount += 1
+  const key = `${folder}/fake-${uploadCount}.${extension}`
+  return json({ key, url: `/api/media/${key}` }, 201)
+}
+
 /**
  * Answers /api/staff/<resource>[/<id>] like the server's generic staff CRUD.
  * @param resource - The table's URL name, e.g. "price-rules".
@@ -483,6 +511,7 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
    */
   const slug = (prefix: string) => (path.startsWith(prefix) ? decodeURIComponent(path.slice(prefix.length)) : null)
 
+  if (path === '/api/staff/uploads' && method === 'POST') return uploadAnswer(init.body)
   const staff = /^\/api\/staff\/([a-z-]+)(?:\/(.+))?$/.exec(path)
   if (staff) return staffAnswer(staff[1], method, staff[2] ? decodeURIComponent(staff[2]) : null, init.body)
 

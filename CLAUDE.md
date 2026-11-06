@@ -50,7 +50,8 @@ frontend/
                         (admin.products / admin.categories also manage their discounts through DiscountsDialog)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
                         Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, InlineEditor,
-                        EditableSection (the shared in-place editing of the home sections), ...) + their tests
+                        EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
+                        ImageUploadField (picture upload of the admin forms), ...) + their tests
     components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet), restyled for the brand
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
                         imports them (oxlint no-restricted-imports)
@@ -64,12 +65,16 @@ backend/
                         issue_tokens, refresh_access, clear_tokens, require_user(kind)
     customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), brands, stats,
                         contact (the contact_* settings), sections + sections/<key> (saved home page section content),
-                        faq, articles, resellers, sitemap.xml, the shared auth (login/refresh/logout/me: customers AND staff), prices
+                        faq, articles, resellers, sitemap.xml, media/<key> (the S3 stub's files), the shared auth
+                        (login/refresh/logout/me: customers AND staff), prices
     staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
                         products+images, price-rules, settings, articles, resellers, page-sections, faq-items (these two
                         stamp updated_by_id)); PUT /<resource> replaces a whole ordered list in one transaction (only
-                        `replaceable` resources: faq-items); DB constraint errors -> 400/409
+                        `replaceable` resources: faq-items); DB constraint errors -> 400/409; POST /uploads stores a
+                        picture (multipart file + folder) through storage.py and returns its URL
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
+    storage.py          the S3 stub for uploaded files: put_object / delete_object / public_url write and serve
+                        backend/media (MEDIA_ROOT, git-ignored); swap the bodies for boto3 when a bucket exists
     database/           everything about the database
       create-tables.sql   the schema: every table and column, explained (source of truth, working rule 5)
       drop-tables.sql     drops every table, children first
@@ -244,6 +249,13 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   (e.g. "Discounts"). Columns and options are read once at mount (DataTables' rule); `deferRender` builds only the
   shown page's cells.
   DataTables' CSS loads with the admin chunk; the brand overrides live in `index.css` under `.data-table`.
+- **Uploads** (S3 stub, `backend/app/storage.py`): a picture column (`type: 'image'`, `folder: 'categories'`) shows a
+  thumbnail cell and an `ImageUploadField` in the form (preview, Upload/Replace, Remove, the URL input; Save waits for
+  the upload). The file goes to `POST /api/staff/uploads` (`uploadImage` in `api.ts`, multipart), which accepts JPEG,
+  PNG, WebP and AVIF by their bytes (no SVG), at most 5 MB, into a folder of `UPLOAD_FOLDERS`, under a random key, and
+  returns `/api/media/<folder>/<key>`; the form saves that URL in the row. New kind of picture = a folder in
+  `UPLOAD_FOLDERS` + the `UploadFolder` type + the column. Real S3 later: change only `storage.py`. Replaced files are
+  not deleted yet.
 - **Discounts** (`DiscountDialog`): one dialog for every discount (category, product, customer, payment method):
   percent/amount switch, a positive value (no surcharges), start date, end date or "no end date". It returns a
   `DiscountValue` ({ type, value, startsOn, endsOn: null = open-ended }) and the caller stores it. `DiscountsDialog`
@@ -510,6 +522,7 @@ content exists in each language, and the layout flips direction automatically.
 **Phase 3 — Admin CMS**: port the legacy admin.
 - [x] Reusable admin table (`DataTable`, `RecordDialog`, `ui/dialog`), the shared sign-in form at `/admin`, `/admin/brands`
 - [x] `/admin/products`, `/admin/categories` (+ their general discounts: `DiscountsDialog`, row action "Discounts")
+- [x] Picture uploads (S3 stub `storage.py`, `ImageUploadField`): the categories' home carousel pictures
 - [ ] Product images in the admin; tables for settings, articles, resellers (a column config + route each)
 - [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API; [ ] customer and payment-method
       discount pages

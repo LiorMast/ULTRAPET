@@ -5,7 +5,13 @@
  * database (shown in the table, still there after a reload) and then deleted, the product form's type-to-search
  * category field (SearchableField: keyboard picking, Escape closing only its list, a screenshot of the open list),
  * no axe violations (tables, the discounts dialog, the discount form, the open suggestion list), no horizontal
- * page overflow on a phone, and screenshots of the categories page (Hebrew, English).
+ * page overflow on a phone, and screenshots of the categories page (Hebrew, English). Plus a category picture
+ * uploaded in the edit form (ImageUploadField) that then shows on the home page carousel.
+ *
+ * The upload goes to the real backend (its S3 stub stores the file under backend/media, which nothing else reads),
+ * but the category save (PATCH /api/staff/categories/<id>) is answered in the browser and laid over the reads that
+ * follow (GET /api/staff/categories, /api/categories), so the shared dev database the screenshots read never
+ * changes (as in home-editor.spec.ts).
  *
  * The discount is put on the last seeded product (found with the table's search), so it never shows in the
  * screenshots, which other workers may take at the same time; leftovers of an interrupted run are deleted first.
@@ -13,8 +19,9 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import categories from '../src/stubs/product-categories.json' with { type: 'json' }
 import products from '../src/stubs/products.json' with { type: 'json' }
-import { hideFixedOverlays, signInStaff } from './utils.ts'
+import { hideFixedOverlays, scrollIntoViewSettled, signInStaff } from './utils.ts'
 
 /** The product the discount test changes: the last one, on the table's last page. */
 const PRODUCT = products[products.length - 1].name.en
@@ -171,3 +178,73 @@ for (const [name, path] of [['he', '/admin/categories'], ['en', '/en/admin/categ
     await expect(page.locator('main')).toHaveScreenshot(`admin-categories-${name}.png`)
   })
 }
+
+/** The category the upload test gives a picture: the first seeded one, on the home carousel's first page. */
+const CATEGORY = categories[0].name.en
+
+/** A real 1×1 PNG (decodable, so the browser shows it), uploaded as the category picture. */
+const PICTURE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+
+/**
+ * Answers the category saves in the browser and lays them over the real category reads (see the file header).
+ * @param page - The Playwright page.
+ */
+async function keepCategorySavesInBrowser(page: Page) {
+  const saved = new Map<string, Record<string, unknown>>()
+  const slugs = new Map<string, string>()
+  await page.route('**/api/staff/categories', async (route) => {
+    const response = await route.fetch()
+    const rows = (await response.json()) as { id: string; slug: string }[]
+    for (const row of rows) slugs.set(row.id, row.slug)
+    await route.fulfill({ response, json: rows.map((row) => ({ ...row, ...saved.get(row.id) })) })
+  })
+  await page.route('**/api/staff/categories/*', async (route) => {
+    if (route.request().method() !== 'PATCH') return route.fallback()
+    const id = new URL(route.request().url()).pathname.split('/').pop()!
+    saved.set(id, { ...saved.get(id), ...(route.request().postDataJSON() as Record<string, unknown>) })
+    await route.fulfill({ json: { id, ...saved.get(id) } })
+  })
+  await page.route('**/api/categories', async (route) => {
+    const response = await route.fetch()
+    const bySlug = new Map([...saved].map(([id, changes]) => [slugs.get(id), changes]))
+    const rows = (await response.json()) as { slug: string }[]
+    await route.fulfill({ response, json: rows.map((row) => ({ ...row, ...bySlug.get(row.slug) })) })
+  })
+}
+
+/**
+ * Whether an image has loaded and decoded (a broken or still-loading image has no natural width).
+ * @param image - The <img>.
+ * @returns Its natural width in pixels; 0 until it has loaded.
+ */
+const loadedWidth = (image: Locator) => image.evaluate((element: HTMLImageElement) => (element.complete ? element.naturalWidth : 0))
+
+test('uploads a category picture that shows on the home page carousel', async ({ page }) => {
+  test.slow() // the admin table, an upload, an axe scan and the home page
+  await keepCategorySavesInBrowser(page)
+  await signInStaff(page, '/en/admin/categories')
+  await page.getByRole('button', { name: `Edit ${CATEGORY}` }).click()
+  const dialog = page.getByRole('dialog', { name: `Edit ${CATEGORY}` })
+  await settled(dialog)
+  const picture = dialog.getByRole('group', { name: 'Picture' })
+
+  await picture.locator('input[type="file"]').setInputFiles({ name: 'category.png', mimeType: 'image/png', buffer: PICTURE })
+  await expect(picture.getByRole('status')).toHaveText('Picture uploaded. Save to keep it.')
+  const preview = picture.getByRole('img', { name: 'Current picture' })
+  await expect(preview).toHaveAttribute('src', /^\/api\/media\/categories\/[0-9a-f]{32}\.png$/)
+  await expect.poll(() => loadedWidth(preview)).toBe(1)
+  const url = await preview.getAttribute('src')
+  expect((await new AxeBuilder({ page }).include('[role="dialog"]').analyze()).violations).toEqual([])
+
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('row', { name: new RegExp(CATEGORY) }).locator('img')).toHaveAttribute('src', url!)
+
+  await page.goto('/en')
+  const section = page.locator('#categories')
+  await scrollIntoViewSettled(section)
+  const card = section.getByRole('link', { name: CATEGORY }).locator('img')
+  await card.scrollIntoViewIfNeeded()
+  await expect(card).toHaveAttribute('src', url!)
+  await expect.poll(() => loadedWidth(card)).toBe(1)
+})

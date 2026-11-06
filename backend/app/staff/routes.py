@@ -15,6 +15,8 @@ resource in RESOURCES:
 JSON keys are camelCase (column `sort_order` -> `sortOrder`); a row also carries `id`, `createdAt`, `updatedAt`.
 `page-sections` (the editable home page sections, keyed by the section name) and `faq-items` (the questions of the
 home page FAQ) also record who made the last change (`updatedById`).
+Uploads: POST /uploads stores a picture (multipart `file` + `folder`) in the file storage (app/storage.py, an S3
+stub for now) and returns its URL, which the staff panel then saves in a row (e.g. a category's imageUrl).
 Each field checks its JSON type here; the database's constraints (create-tables.sql) do the rest of the validation,
 and their errors become 400 (a failed check, a missing required field, an unknown reference) or 409 (a duplicate,
 or deleting a row others still use, e.g. a category with products).
@@ -33,6 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import selectinload
 
+from app import storage
 from app.auth import require_user
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
@@ -678,3 +681,60 @@ def replace_rows(resource: str) -> list[dict[str, Any]]:
             row.updated_by_id = current_user.id
     commit()
     return [row_json(spec, row) for row in rows]
+
+
+# Uploads (the S3 stub, app/storage.py): the folders staff may upload into (one per kind of picture; add "brands" or
+# "products" with their admin fields), the largest file, and the image types by their first bytes: (extension,
+# media type, test). SVG is refused on purpose: it can carry scripts, and the files are served from our own origin.
+UPLOAD_FOLDERS = frozenset({"categories"})
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+IMAGE_TYPES: tuple[tuple[str, str, Callable[[bytes], bool]], ...] = (
+    ("jpg", "image/jpeg", lambda head: head.startswith(b"\xff\xd8\xff")),
+    ("png", "image/png", lambda head: head.startswith(b"\x89PNG\r\n\x1a\n")),
+    ("webp", "image/webp", lambda head: head[:4] == b"RIFF" and head[8:12] == b"WEBP"),
+    ("avif", "image/avif", lambda head: head[4:12] in (b"ftypavif", b"ftypavis")),
+)
+
+
+def image_type(body: bytes) -> tuple[str, str] | None:
+    """Recognizes an image by its first bytes (what the file is, whatever its name or the browser claims).
+
+    Args:
+        body: The file's bytes.
+
+    Returns:
+        (extension, media type) for a JPEG, PNG, WebP or AVIF image; None for anything else.
+    """
+    return next(((extension, media) for extension, media, test in IMAGE_TYPES if test(body[:16])), None)
+
+
+@bp.post("/uploads")
+def upload() -> tuple[dict[str, str], int]:
+    """Stores an uploaded picture (the S3 stub) under a new random key; the caller saves the returned URL in a row
+    (e.g. a category's imageUrl).
+
+    The body is multipart/form-data: `file` (the image) and `folder` (one of UPLOAD_FOLDERS).
+
+    Returns:
+        {"key", "url"} with 201. Errors: 400 {"error": "invalid", "field": "folder"} for an unknown folder; 400
+        {"error": "required", "field": "file"} without a file; 400 {"error": "too_large", "field": "file"} over 5 MB
+        (413 "request_entity_too_large" for a body over the app's limit); 400 {"error": "unsupported_type",
+        "field": "file"} for anything but a JPEG, PNG, WebP or AVIF image.
+    """
+    folder = request.form.get("folder", "")
+    if folder not in UPLOAD_FOLDERS:
+        fail(400, error="invalid", field="folder")
+    file = request.files.get("file")
+    if file is None:
+        fail(400, error="required", field="file")
+    body = file.read(MAX_UPLOAD_BYTES + 1)
+    if not body:
+        fail(400, error="required", field="file")
+    if len(body) > MAX_UPLOAD_BYTES:
+        fail(400, error="too_large", field="file")
+    kind = image_type(body)
+    if kind is None:
+        fail(400, error="unsupported_type", field="file")
+    extension, media_type = kind
+    key = f"{folder}/{uuid.uuid4().hex}.{extension}"
+    return {"key": key, "url": storage.put_object(key, body, media_type)}, 201

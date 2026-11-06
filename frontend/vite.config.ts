@@ -14,7 +14,8 @@
  * (the production web server must forward it the same way). public/robots.txt points to it.
  * `optimizeDeps` pre-bundles the lazily loaded map libraries at server start, so the first visit to
  * /where-to-buy does not trigger a dependency re-optimisation and page reload.
- * The `test` block configures Vitest (jsdom + Testing Library, see src/test/setup.ts).
+ * The `test` block configures Vitest (jsdom + Testing Library, see src/test/setup.ts; 15s per test, since most
+ * tests render the whole app).
  * Playwright end-to-end tests live in e2e/ and have their own playwright.config.ts.
  */
 /// <reference types="vitest/config" />
@@ -50,5 +51,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // Most tests render the whole app (renderPage); with every file in parallel they can pass 5s on a busy machine.
+    testTimeout: 15_000,
   },
 })

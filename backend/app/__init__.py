@@ -4,7 +4,7 @@ create_app() builds the application: configuration from the environment, the dat
 sign-in (app.auth), the CLI commands (app.database.seed) and the routes. The routes are two blueprints, each in its
 own folder: customers/ (prefix /api: everything the public site and the business customers call) and staff/
 (prefix /api/staff: the staff panel API). Other modules: database/ (schema SQL, SQLAlchemy base, models, seed
-commands) and pricing (the customer's price).
+commands), pricing (the customer's price) and storage (the stub of the S3 file storage for uploads).
 
 Run: `flask --app app run --debug` (DATABASE_URL and SECRET_KEY must be set; compose sets them and FLASK_APP).
 """
@@ -26,6 +26,10 @@ from app.database import models  # noqa: F401  (registers every model on db.meta
 from app.database.db import db
 from app.database.seed import reset_db_command, seed_command
 from app.staff.routes import bp as staff_bp
+
+# The largest request body Flask reads (uploads are refused above 5 MB by the upload route; this cap is the backstop
+# against huge bodies, answered 413 "request_entity_too_large").
+MAX_CONTENT_LENGTH = 6 * 1024 * 1024
 
 
 def json_default(value: Any) -> Any:
@@ -70,7 +74,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     """Builds the Flask application.
 
     Args:
-        config: Settings that override the environment (tests pass their own database URL and secret).
+        config: Settings that override the environment (tests pass their own database URL, secret and media folder).
 
     Returns:
         The configured application.
@@ -85,6 +89,9 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
         SECRET_KEY=os.environ.get("SECRET_KEY"),
         SITE_URL=os.environ.get("SITE_URL", "https://www.ultrapet.co.il"),
+        # The S3 stub's folder (app/storage.py): backend/media, git-ignored, inside compose's bind mount.
+        MEDIA_ROOT=os.environ.get("MEDIA_ROOT", os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")),
+        MAX_CONTENT_LENGTH=MAX_CONTENT_LENGTH,
     )
     if config:
         app.config.update(config)
