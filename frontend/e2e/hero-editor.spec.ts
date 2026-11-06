@@ -5,7 +5,7 @@
  * its grip, one Save
  * for every text, no horizontal overflow); and the largest sizes still fitting every screen width.
  *
- * The hero's saved content (GET /api/sections/hero) and the staff save (/api/staff/page-sections) are answered
+ * The hero's saved content (its part of GET /api/sections) and the staff save (/api/staff/page-sections) are answered
  * in the browser (page.route), so these tests never change the shared dev database that the other specs'
  * screenshots read. The real save path is covered by the backend tests (test_staff_api.py).
  */
@@ -14,8 +14,9 @@ import { expect, test, type Page } from '@playwright/test'
 import { signInStaff } from './utils.ts'
 
 /**
- * Answers the hero's section API in the browser: GET /api/sections/hero from memory (404 while nothing is
- * saved) and the staff create/update, which store the content they receive.
+ * Answers the hero's section API in the browser: the hero's part of GET /api/sections from memory (missing while
+ * nothing is saved; the other sections are the real ones) and the staff create/update, which store the content they
+ * receive.
  * @param page - The Playwright page, before it loads the home page.
  * @param initial - The content the hero starts with; null = never edited.
  * @returns The request bodies the page sent to the staff API, oldest first.
@@ -23,11 +24,11 @@ import { signInStaff } from './utils.ts'
 async function fakeHeroSection(page: Page, initial: unknown = null) {
   let content = initial
   const sent: { method: string; body: { content: unknown } }[] = []
-  await page.route('**/api/sections/hero', (route) =>
-    content === null
-      ? route.fulfill({ status: 404, json: { error: 'not_found' } })
-      : route.fulfill({ json: { key: 'hero', content, updatedAt: new Date().toISOString() } }),
-  )
+  // The home page reads every section at once: the real ones, with the hero's replaced (left out while never saved).
+  await page.route('**/api/sections', async (route) => {
+    const { hero: _saved, ...others } = (await (await route.fetch()).json()) as Record<string, unknown>
+    return route.fulfill({ json: content === null ? others : { ...others, hero: content } })
+  })
   await page.route('**/api/staff/page-sections**', (route) => {
     const body = route.request().postDataJSON() as { content: unknown }
     sent.push({ method: route.request().method(), body })

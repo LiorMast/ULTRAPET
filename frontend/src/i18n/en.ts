@@ -223,6 +223,30 @@ export const en: Dictionary = {
     sizeOf: '{label} size',
     siteFont: 'Site default',
     sizes: { sm: 'Small', md: 'Medium', lg: 'Large', xl: 'Extra large' },
+    // The names of a section's text boxes; {field} + {item} name a text of a card or list item, e.g. 'Title: Cat litter'.
+    fields: {
+      eyebrow: 'Eyebrow',
+      title: 'Title',
+      intro: 'Intro',
+      text: 'Text',
+      label: 'Label',
+      sub: 'Sub-line',
+      value: 'Value',
+      closing: 'Closing paragraph',
+      number: 'Number',
+      suffix: 'Suffix',
+      phone: 'Phone number',
+      whatsapp: 'WhatsApp number',
+      email: 'Email address',
+    },
+    fieldOf: '{field}: {item}',
+    // Why a section refused a save (the named box gets the focus).
+    errors: {
+      number: 'Enter a whole number, in digits only.',
+      phone: 'Enter a valid phone number (digits, spaces, dashes and +).',
+      email: 'Enter a valid email address.',
+      required: 'This field cannot be left empty.',
+    },
   },
   lang: {
     switchLabel: 'Language',

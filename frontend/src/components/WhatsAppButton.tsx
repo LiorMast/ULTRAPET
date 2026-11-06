@@ -1,22 +1,24 @@
 /**
  * WhatsAppButton.tsx — The floating WhatsApp circle fixed to the bottom corner of every page.
- * Rendered once by routes/__root.tsx; it opens a chat with the customer-service number (CONTACT.whatsapp).
+ * Rendered once by routes/__root.tsx; it opens a chat with the customer-service number (the setting contact_whatsapp,
+ * which the root route loads with fetchContact).
  */
 import { MessageCircle } from 'lucide-react'
 import { Popover } from '@/components/Popover'
-import { CONTACT } from '@/config'
+import { whatsappUrl } from '@/config'
 import { useI18n } from '@/i18n'
 
 /**
  * A 64px round link that opens a WhatsApp chat in a new tab and shows a Popover label on hover/focus. Sits at the end corner (right in LTR, left in RTL).
- * @param props.phone - The WhatsApp number in international format without "+"; defaults to CONTACT.whatsapp.
- * @returns The fixed circular link.
+ * @param props.phone - The WhatsApp number, international (e.g. "+972 52-214-2410"; only its digits are used).
+ * @returns The fixed circular link, or nothing when no number is set.
  */
-export function WhatsAppButton({ phone = CONTACT.whatsapp }: { phone?: string }) {
+export function WhatsAppButton({ phone }: { phone: string }) {
   const { t } = useI18n()
+  if (!phone.replace(/\D/g, '')) return null
   return (
     <a
-      href={`https://wa.me/${phone}`}
+      href={whatsappUrl(phone)}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`${t.header.whatsappLabel} – WhatsApp`}

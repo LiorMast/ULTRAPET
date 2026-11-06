@@ -40,7 +40,7 @@ frontend/
     router.ts           createAppRouter(): /en prefix rewrite, route staticData types
     index.css           Tailwind + brand tokens + base styles
     api.ts              the one API layer: every backend call (typed), CSRF header, refresh-and-retry on token_expired
-    config.ts           menu (mainNav: Products dropdown = the API categories), home page category cards, stat labels, header buttons, external links,
+    config.ts           menu (mainNav: Products dropdown = the API categories), the article pages' marketing categories, stat labels, header buttons, external links,
                         bundled photos (brandLogo, articleImage), the fonts and size steps of editable texts (FONTS, SIZE_STEPS)
     seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
     auth.tsx            AuthProvider/useAuth: the session of a business customer or a staff member (one sign-in through the API, JWT cookies)
@@ -49,7 +49,8 @@ frontend/
                         admin.tsx = staff panel layout (shows the shared login form to non-staff), admin.<resource>.tsx = one table each
                         (admin.products / admin.categories also manage their discounts through DiscountsDialog)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
-                        Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, ...) + their tests
+                        Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, InlineEditor,
+                        EditableSection (the shared in-place editing of the home sections), ...) + their tests
     components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet), restyled for the brand
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
                         imports them (oxlint no-restricted-imports)
@@ -62,7 +63,8 @@ backend/
     auth.py             JWT sign-in in HttpOnly cookies (CSRF double-submit, 15 min access + 30 day refresh): authenticate,
                         issue_tokens, refresh_access, clear_tokens, require_user(kind)
     customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), brands, stats,
-                        sections/<key> (saved home page section content), faq, articles, resellers, sitemap.xml, the shared auth (login/refresh/logout/me: customers AND staff), prices
+                        contact (the contact_* settings), sections + sections/<key> (saved home page section content),
+                        faq, articles, resellers, sitemap.xml, the shared auth (login/refresh/logout/me: customers AND staff), prices
     staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
                         products+images, price-rules, settings, articles, resellers, page-sections, faq-items (these two
                         stamp updated_by_id)); PUT /<resource> replaces a whole ordered list in one transaction (only
@@ -249,7 +251,8 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   tables. A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0.
   **Not yet stored:** `payment_methods.discount_percent` has no amounts or dates (schema change with its page).
 - **Inline section editing** (`InlineEditor.tsx`): a section that staff may edit in place calls
-  `useInlineDraft(onSave)`, wraps its texts in `<form {...formProps}>`, puts `<InlineEditBar {...bar} onEdit={() =>
+  `useInlineDraft(onSave)` (`onSave` undefined = the user may not edit: signing out while editing drops the draft and
+  ends edit mode), wraps its texts in `<form {...formProps}>`, puts `<InlineEditBar {...bar} onEdit={() =>
   start(values, firstKey)} />` and one `<PropBar {...propBar(labels)} locale />` in its corner, and renders each text
   with `<EditableText selected={active === key} onSelect={() => select(key)}>` (read mode = the plain element; edit
   mode = a box with the text's own look). The single PropBar (font + size) controls the selected text, the box that
@@ -260,15 +263,31 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   `page_sections` content).
   **Lists** (a section whose entries staff add and delete, e.g. the FAQ): each entry owns a few draft keys
   (`"<id>:question"`, `"<id>:answer"`; new entries a `new-<n>` id); `add(values)` appends an entry and focuses its first
-  box (the plus button), `remove(keys, next)` drops one and focuses `next` (or the form's first control, e.g. "Add",
-  when none is left); the draft keeps insertion order, so the section reads its order from `Object.keys(draft)`. A
+  box (the plus button), `remove(keys, next)` drops one and focuses `next` (or the control marked `data-focus-fallback`,
+  e.g. "Add", when none is left); the draft keeps insertion order, so the section reads its order from `Object.keys(draft)`. A
   section without per-text styling omits the PropBar. `onSave` may throw `InlineEditError(message, key)` to refuse a
   save itself (the bar shows the translated message, the named box gets the focus). Give `InlineEditBar` a `label`
   (accessible name "Edit on page: FAQ"; a page can have several editable sections) and `tone="light"` on a white
   section (outlined Cancel). `EditableText wrap` = a one-line text that wraps (Enter saves, line breaks become
   spaces), `multiline` = a paragraph box. Save the list whole with `replaceStaffRows` (PUT, one transaction).
+- **Every home section is editable in place** (`EditableSection.tsx`, on top of InlineEditor), one section at a time.
+  A section with fixed texts calls `useEditableSection({ content, defaults, labels, styled, data, onSave })`: `defaults`
+  = the dictionary's words per text key (also the empty box's placeholder), `labels` = the boxes' names (`fieldLabel`,
+  `headingLabels`), `styled` = the keys with a font + size (only the heading's: `HEADING_KEYS`; every other text is words
+  only, so the PropBar hides while one is selected), `data` = texts stored elsewhere (the stats numbers, the contact
+  details: settings, saved by the section's `onSave` through `saveSetting`). It returns `field(key)` (spread on an
+  `EditableText`), `formProps` and `edit` for `<SectionEditBar edit label tone className={bg} />` (Edit/Save/Cancel +
+  PropBar, sticky while editing). `<SectionHeading edit={field} tone />` renders the editable eyebrow/title/intro
+  with size steps. The content is `page_sections` row `<section>` = `{ <key>: { text, font?, size? } }` per language
+  (`mergeSection` writes the page's language only); the home route's `saver(key)` stores the changed settings, then
+  the content (`saveSection`), and reloads. **Cards that show database rows are never edited in place** (the
+  Categories cards are the `categories` table, edited in /admin/categories: in a section with such cards only the
+  heading is editable). A card that is a link and has editable texts renders as a `<div>` while editing (Contact cards); a section whose content holds another form wraps its texts in `<form className="contents">`
+  (Contact). The FAQ adds its heading keys to its list draft with `sectionFields`. Button labels, carousel and form
+  labels stay in the dictionaries.
 - **Section headings**: a section opens with `<SectionHeading id eyebrow title intro />` (red eyebrow, display
-  title, muted intro; `as="h1"` for a page heading), never with copied heading markup.
+  title, muted intro; `as="h1"` for a page heading; `tone="dark"` on a black section; `edit={field}` for an editable
+  section), never with copied heading markup.
 - **Accordion** (`ui/accordion.tsx`, Radix): `<Accordion type="single" collapsible variant="line|card">` +
   `AccordionItem` / `AccordionTrigger` / `AccordionContent`; the variant reaches the parts through context. Panels
   grow to Radix's measured height on `--ease-spring` while the text fades in; reduced motion opens without resizing
@@ -404,19 +423,24 @@ content exists in each language, and the layout flips direction automatically.
 - **Postgres seed** (`backend/app/database/seed.py`): the catalog from `frontend/src/stubs/` (categories, products with their
   WooCommerce id in `products.woocommerce_id`, their stub order in `sort_order` and their images, placeholder prices into
   `products.list_price`, brands), the articles, resellers and FAQ questions (`faq.json`), the home stats from
-  `legacy/supabase-export/cms_settings.json`, and optionally a staff admin and a demo customer (`SEED_ADMIN_*`,
+  `legacy/supabase-export/cms_settings.json`, the contact details (`contact.json`), and optionally a staff admin and a demo customer (`SEED_ADMIN_*`,
   `SEED_CUSTOMER_*`). The rest of the export (hero banners, contact, sections, text blocks,
   media and `legacy/supabase-export/media/`) waits for the CMS tables (Phase 3); schema hints in
   `legacy/supabase/migrations/`.
 - **Real contact facts** (from the live site; legacy CMS values such as `+972 3 000 0000` are placeholders):
   phone **1700-55-99-92**, WhatsApp **+972 52-214-2410**, hours Sun–Thu 09:00–16:00, closed Fridays and holiday eves.
-  Email is unconfirmed (the legacy CMS says office@ultrapet.co.il) — ask the owner.
+  Email is unconfirmed (the legacy CMS says office@ultrapet.co.il) — ask the owner. They live in the settings
+  `contact_phone` / `contact_whatsapp` / `contact_email` (seeded from `stubs/contact.json`, read with `GET /api/contact`
+  by the root route for the Contact section and the WhatsApp button; staff edit them in the Contact section).
 - **PDF catalog**: https://www.ultrapet.co.il/wp-content/uploads/2025/03/ultrapetcatalog.pdf (`CATALOG_PDF_URL` in
   `config.ts` until the backend serves it).
 - **WordPress product categories (15)**: dry cat food, dry dog food, cat cans & treats, dog cans & treats, cat
   snacks, dog snacks & bones, cat litter, beds & mattresses, grooming & hygiene, cat scratchers, rodents, birds,
   plastics, collars & leashes, equipment. **Decided:** the catalog uses these 15 (`stubs/product-categories.json`);
-  legacy's 6 categories stay as the home page's marketing cards.
+  the home page's Categories cards show them too (from `GET /api/categories`: the active ones in order, name, photo =
+  `image_url` else `src/assets/categories/<slug>.*` else an icon; each links to `/catalog?category=<slug>`). Legacy's 6
+  marketing categories (`CATEGORIES` in config.ts) remain only for the article pages' related categories and the
+  `/categories/$slug` placeholder.
 - **Ids**: every table's primary key is a UUID generated by the database (`gen_random_uuid()`, helper `uuid_pk()` in
   `app/database/db.py`); only `settings` and `payment_methods` use a text key. The API returns the UUIDs (prices are
   keyed by product UUID); the stubs' product `id` is the WooCommerce id, kept in `products.woocommerce_id`.
@@ -451,12 +475,14 @@ content exists in each language, and the layout flips direction automatically.
       `page_sections` row "hero", read through `GET /api/sections/hero`; unsaved parts use the dictionaries)
 - [x] Home sections: Stats, Brands, Categories, About, Contact (`Contact` = contact cards + a form that opens a
       prefilled mailto: until Phase 2 lead endpoints exist)
+- [x] Every home section editable in place by staff (`EditableSection`): Stats (numbers, suffixes, labels), Brands,
+      Categories (heading only; the cards are the database's categories), About (every text), FAQ heading, Contact (texts + phone/WhatsApp/email)
 - [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)
 - [x] Home FAQ (`Faq`, `#faq`, between About and Contact) on the reusable `ui/accordion` (spring animation), with
       FAQPage JSON-LD; the questions are rows of `faq_items` (seeded from `stubs/faq.json`), shown in a language only
       when both texts exist in it; staff edit them in place in the page's language ("Edit on page": change, "Add a
-      question", Delete, one Save = `PUT /api/staff/faq-items`); the copy (minimum order, payment methods) awaits the
-      owner's review; [ ] reorder questions, edit the heading texts
+      question", Delete, one Save = `PUT /api/staff/faq-items`, plus the heading and contact-box texts); the copy
+      (minimum order, payment methods) awaits the owner's review; [ ] reorder questions
 - [x] Where to Buy (`WhereToBuy`, `BranchMap`): search, nearest store, Leaflet map, 124 resellers (table `resellers`, geocoded once)
 - [x] Articles (`/articles`, `/articles/$slug`; `ArticleCard`, `Breadcrumbs`): the 4 WordPress posts (table `articles`;
       Hebrew verbatim + English translation), head tags via `seo.ts` + `<HeadContent />`, BlogPosting/Breadcrumb

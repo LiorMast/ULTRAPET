@@ -239,11 +239,12 @@ CREATE TABLE settings (
 -- Editable home page sections.
 -- ===================================================================================================================
 
--- page_sections — The editable content of the home page sections (hero, stats, private label, ...), one row per
--- section. The content shape differs per section, so it is JSONB. Staff edit it in the staff panel; the public site
--- reads it. Only the last change is remembered: who made it (updated_by_id) and when (updated_at).
+-- page_sections — The editable content of the home page sections (hero, stats, brands, categories, about, faq,
+-- contact, ...), one row per section. The content shape differs per section, so it is JSONB (the sections other than
+-- the hero hold {<text key>: {text, font, size}}, each per language). Staff edit it in place on the home page; the
+-- public site reads it. Only the last change is remembered: who made it (updated_by_id) and when (updated_at).
 CREATE TABLE page_sections (
-  key           TEXT        PRIMARY KEY CHECK (key ~ '^[a-z0-9_]+$'), -- section id, e.g. 'hero', 'private_label'
+  key           TEXT        PRIMARY KEY CHECK (key ~ '^[a-z0-9_]+$'), -- section id, e.g. 'hero', 'about', 'private_label'
   content       JSONB       NOT NULL CHECK (jsonb_typeof(content) = 'object'), -- the section's content (an object whose shape depends on the section; translated texts as {"he": ..., "en": ...})
   updated_by_id UUID        REFERENCES staff_users (id) ON DELETE SET NULL, -- staff member who made the last change; NULL = unknown, seeded or since deleted
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),         -- when the section was added

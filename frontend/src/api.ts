@@ -32,8 +32,11 @@ export type ProductImage = { src: string; thumbnail: string; srcSet: string }
  */
 export type Product = { id: string; slug: string; name: Localized<string>; category: string; image: ProductImage | null }
 
-/** A catalog category (the store's 15), e.g. { slug: 'dry-dog-food', name: { he, en } }. */
-export type ProductCategory = { slug: string; name: Localized<string>; legacyPath: string | null }
+/**
+ * A catalog category (the store's 15), e.g. { slug: 'dry-dog-food', name: { he, en } }. `imageUrl` is the photo of
+ * its home page card that staff set (null = none: the card falls back to a bundled photo or an icon).
+ */
+export type ProductCategory = { slug: string; name: Localized<string>; legacyPath: string | null; imageUrl: string | null }
 
 /**
  * One page of catalog results. `total` counts every product matching the category and search; `category` is
@@ -71,6 +74,12 @@ export type Brand = {
 
 /** A company figure of the home page Stats band, e.g. { id: 'retail', value: 350, suffix: '+' }. */
 export type Stat = { id: string; value: number; suffix: string }
+
+/**
+ * The customer-service contact details (settings contact_phone / contact_whatsapp / contact_email), as shown on the
+ * site: the links use their digits (tel:, wa.me) or the address (mailto:). An unset one is "".
+ */
+export type ContactDetails = { phone: string; whatsapp: string; email: string }
 
 /** One block of article text: a paragraph or a numbered list. */
 export type ArticleBlock = { type: 'p'; text: string } | { type: 'ol'; items: string[] }
@@ -122,6 +131,13 @@ export type SectionText = {
   font?: Partial<Record<Locale, FontKey>>
   size?: Partial<Record<Locale, SizeStep>>
 }
+
+/**
+ * The saved content of an editable home section other than the hero (page_sections rows "stats", "brands",
+ * "categories", "about", "faq", "contact"): one SectionText per text, by the section's text keys (e.g. "title",
+ * "pillar.expertise.text"). A missing key shows the dictionary's text.
+ */
+export type SectionContent = Partial<Record<string, SectionText>>
 
 /**
  * The hero's saved content (page_sections row "hero"): the title (`text` = the white words, `accent` = the red
@@ -333,19 +349,18 @@ export const fetchBrand = (slug: string, signal?: AbortSignal) => apiFetch<Brand
 export const fetchStats = (signal?: AbortSignal) => apiFetch<Stat[]>('/api/stats', { signal })
 
 /**
- * The content staff saved for one editable home page section.
- * @param key - The section name, e.g. "hero".
+ * The customer-service contact details.
  * @param signal - Aborts the request.
- * @returns The content, or null when the section was never edited (the page then shows its built-in texts).
+ * @returns The phone, WhatsApp number and email as shown on the site.
  */
-export async function fetchSection<Content>(key: string, signal?: AbortSignal): Promise<Content | null> {
-  try {
-    return (await apiFetch<{ content: Content }>(`/api/sections/${encodeURIComponent(key)}`, { signal })).content
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null
-    throw error
-  }
-}
+export const fetchContact = (signal?: AbortSignal) => apiFetch<ContactDetails>('/api/contact', { signal })
+
+/**
+ * The content staff saved for every editable home page section, in one call.
+ * @param signal - Aborts the request.
+ * @returns The content by section key; a section never edited is missing.
+ */
+export const fetchSections = (signal?: AbortSignal) => apiFetch<Partial<Record<string, unknown>>>('/api/sections', { signal })
 
 /**
  * The questions of the home page FAQ section.
@@ -513,6 +528,31 @@ export const updateStaffRow = <Row,>(resource: StaffResource, key: string, chang
  */
 export const deleteStaffRow = (resource: StaffResource, key: string) =>
   apiFetch<void>(`/api/staff/${resource}/${encodeURIComponent(key)}`, { method: 'DELETE' })
+
+/**
+ * Stores the content of an editable page section: changes its page_sections row, or creates it on the first save.
+ * @param key - The section, e.g. "about".
+ * @param content - Its whole new content.
+ * @param saved - Whether the row exists already (the page loaded content for it).
+ * @returns The saved row; throws ApiError like createStaffRow / updateStaffRow.
+ */
+export const saveSection = (key: string, content: object, saved: boolean) =>
+  saved ? updateStaffRow('page-sections', key, { content }) : createStaffRow('page-sections', { key, content })
+
+/**
+ * Stores one site setting: changes its value, or creates the setting when it does not exist yet.
+ * @param key - The setting, e.g. "stat_retail_value".
+ * @param value - Its new JSON value.
+ * @returns The saved row; throws ApiError like updateStaffRow (other than 404) or createStaffRow.
+ */
+export async function saveSetting(key: string, value: unknown): Promise<unknown> {
+  try {
+    return await updateStaffRow('settings', key, { value })
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return createStaffRow('settings', { key, value })
+    throw error
+  }
+}
 
 /**
  * Replaces the whole list of a list resource in one transaction: rows with an `id` are kept and changed, rows without

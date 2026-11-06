@@ -179,7 +179,13 @@ function ArticlePage() {
           </h2>
           <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {categories.map((category) => (
-              <CategoryCard key={category.slug} category={category} />
+              <CategoryCard
+                key={category.slug}
+                name={category.label(t)}
+                image={category.image}
+                icon={category.icon}
+                link={linkOptions({ to: '/categories/$slug', params: { slug: category.slug } })}
+              />
             ))}
           </div>
         </section>

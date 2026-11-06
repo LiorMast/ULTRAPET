@@ -6,20 +6,22 @@
  * search in every language, category filter, chip counts and paging; brands and articles by slug; sign-in that
  * accepts any credentials except the password WRONG_PASSWORD (the email admin@example.com signs in as the staff
  * user TEST_STAFF, anyone else as the customer TEST_USER). The staff API (backend/app/staff/routes.py) is
- * faked for brands, categories, products, price rules, page sections and FAQ items: list/create/update/delete on
- * in-memory copies of the stubs (no price rules or page sections at first; GET /api/sections/<key> reads the latter,
- * GET /api/faq the FAQ items), the FAQ's PUT that replaces the whole list at once (all or nothing), with the server's
+ * faked for brands, categories, products, price rules, settings, page sections and FAQ items: list/create/update/delete
+ * on in-memory copies of the stubs (no price rules or page sections at first; GET /api/sections and
+ * /api/sections/<key> read the latter, GET /api/faq the FAQ items, GET /api/stats and /api/contact the settings, seeded
+ * with STATS and stubs/contact.json), the FAQ's PUT that replaces the whole list at once (all or nothing), with the server's
  * errors (401 signed out, 403 for a customer, 400 required / a failed check / an unknown reference or id, 405 PUT on
  * another table, 409 duplicate or in use, 404) and its cascade (a deleted category's or product's price rules go with
  * it).
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
-import type { Brand, Branch, ProductCategory, ProductImage, ProductPage, Stat, User } from '@/api'
+import type { Brand, Branch, ContactDetails, ProductCategory, ProductImage, ProductPage, Stat, User } from '@/api'
 import type { Localized } from '@/config'
 import articles from '@/stubs/articles.json'
 import branches from '@/stubs/branches.json'
 import brands from '@/stubs/brands.json'
+import contact from '@/stubs/contact.json'
 import faq from '@/stubs/faq.json'
 import categories from '@/stubs/product-categories.json'
 
@@ -261,6 +263,25 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     },
     order: (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
   },
+  settings: {
+    key: 'key',
+    fields: ['key', 'value', 'description'],
+    required: ['key', 'value'],
+    defaults: { description: null },
+    seed: () =>
+      [
+        ...STATS.flatMap((stat) => [
+          [`stat_${stat.id}_value`, stat.value],
+          [`stat_${stat.id}_suffix`, stat.suffix],
+        ]),
+        ...Object.entries(contact).map(([field, value]) => [`contact_${field}`, value]),
+      ].map(([key, value]) => ({ id: String(key), key, value, description: null, createdAt: SEEDED, updatedAt: SEEDED })),
+    check: (setting, others) => {
+      if (!/^[a-z0-9_]+$/.test(String(setting.key))) return invalid('settings_key_check')
+      return duplicate(setting, others, 'key', 'settings_pkey')
+    },
+    order: (a, b) => String(a.key).localeCompare(String(b.key)),
+  },
   'page-sections': {
     key: 'key',
     fields: ['key', 'content'],
@@ -466,12 +487,24 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
   if (staff) return staffAnswer(staff[1], method, staff[2] ? decodeURIComponent(staff[2]) : null, init.body)
 
   if (method === 'GET') {
-    if (path === '/api/categories') return json(categories satisfies ProductCategory[])
+    if (path === '/api/categories') {
+      // The active rows of the staff table, so staff edits (e.g. a card photo) show up as on the server.
+      const rows = [...(await tableRows('categories'))].filter((row) => row.isActive).sort(STAFF_TABLES.categories.order)
+      return json(rows.map(({ slug, name, legacyPath, imageUrl }) => ({ slug, name, legacyPath, imageUrl })) as ProductCategory[])
+    }
     if (path === '/api/products') return json(await productPage(url.searchParams))
     if (path === '/api/brands') return json(brands.map(brandJson))
     const brand = brands.find((b) => b.slug === slug('/api/brands/'))
     if (brand) return json(brandJson(brand))
-    if (path === '/api/stats') return json(STATS)
+    if (path === '/api/stats' || path === '/api/contact') {
+      const values = new Map((await tableRows('settings')).map((row) => [String(row.key), row.value]))
+      if (path === '/api/contact') {
+        const fields = ['phone', 'whatsapp', 'email'] as const
+        return json(Object.fromEntries(fields.map((field) => [field, String(values.get(`contact_${field}`) ?? '')])) as ContactDetails)
+      }
+      return json(STATS.flatMap(({ id }) => (values.has(`stat_${id}_value`) ? [{ id, value: values.get(`stat_${id}_value`), suffix: values.get(`stat_${id}_suffix`) ?? '' }] : [])))
+    }
+    if (path === '/api/sections') return json(Object.fromEntries((await tableRows('page-sections')).map((row) => [row.key, row.content])))
     if (path === '/api/articles') return json(publishedArticles)
     const article = articles.find((a) => a.slug === slug('/api/articles/'))
     if (article) return json(article)
@@ -479,7 +512,7 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
       const items = [...(await tableRows('faq-items'))].sort(STAFF_TABLES['faq-items'].order)
       return json(items.map(({ id, question, answer }) => ({ id, question, answer })))
     }
-    const section = (await staffRows['page-sections'])?.find((row) => row.key === slug('/api/sections/'))
+    const section = (await tableRows('page-sections')).find((row) => row.key === slug('/api/sections/'))
     if (section) return json({ key: section.key, content: section.content, updatedAt: section.updatedAt })
     if (path === '/api/resellers') return json(branches.map((b) => ({ approximate: false, ...b })) satisfies Branch[])
     if (path === '/api/prices') {

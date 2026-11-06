@@ -162,7 +162,8 @@ describe('FAQ in-place editing', () => {
     await user.click(screen.getByRole('button', { name: 'Delete Question 1' }))
     expect(screen.getByRole('button', { name: 'Add a question' })).toHaveFocus()
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(onSave).toHaveBeenCalledWith([])
+    // The list goes first; the second argument is the section's own texts (none changed here).
+    expect(onSave).toHaveBeenCalledWith([], expect.any(Object))
   })
 
   it('shows staff a question missing the page language as empty boxes, with the other language as a hint', async () => {
@@ -177,7 +178,7 @@ describe('FAQ in-place editing', () => {
     expect(screen.getByRole('textbox', { name: 'Answer 1' })).toHaveAttribute('placeholder', 'תשובה בעברית')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     // Left untranslated, the question keeps its Hebrew.
-    expect(onSave).toHaveBeenCalledWith([item])
+    expect(onSave).toHaveBeenCalledWith([item], expect.any(Object))
   })
 
   it('merges one language into the list: other languages kept, new questions without an id, empty ones dropped', () => {

@@ -1,11 +1,12 @@
 /**
  * routes/__root.tsx — The layout shared by every page: the route-managed <head> tags, a "skip to
- * content" link, the Navbar (its Products dropdown lists the categories this route loads), the current page inside <main>, the floating WhatsApp button, the "page not found" screen for
+ * content" link, the Navbar (its Products dropdown lists the categories this route loads), the current page inside <main>, the floating WhatsApp button (the
+ * contact details this route loads; the home page's Contact section reads them from here too), the "page not found" screen for
  * unknown URLs, and the "could not load" screen (LoadError, the router's default error component) for pages
  * whose API request failed. Its `head` sets the default title and description; pages override them (see seo.ts).
  */
 import { createRootRouteWithContext, HeadContent, Link, Outlet, useRouter } from '@tanstack/react-router'
-import { fetchCategories } from '@/api'
+import { fetchCategories, fetchContact, type ContactDetails, type ProductCategory } from '@/api'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
@@ -15,11 +16,15 @@ import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 export type RouterContext = { locale: Locale }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
+  loader: async ({ abortController }): Promise<{ categories: ProductCategory[]; contact: ContactDetails }> => {
+    const { signal } = abortController
+    const [categories, contact] = await Promise.all([fetchCategories(signal), fetchContact(signal)])
+    return { categories, contact }
+  },
   head: ({ match }) => {
     const { seo } = dictionaryFor(match.context.locale)
     return { meta: [{ title: seo.defaultTitle }, { name: 'description', content: seo.defaultDescription }] }
   },
-  loader: ({ abortController }) => fetchCategories(abortController.signal),
   component: RootLayout,
   notFoundComponent: NotFound,
 })
@@ -31,7 +36,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
  */
 function RootLayout() {
   const { t } = useI18n()
-  const categories = Route.useLoaderData()
+  const { categories, contact } = Route.useLoaderData()
 
   return (
     <>
@@ -46,7 +51,7 @@ function RootLayout() {
       <main id="main" tabIndex={-1} className="pt-22 outline-none">
         <Outlet />
       </main>
-      <WhatsAppButton />
+      <WhatsAppButton phone={contact.whatsapp} />
     </>
   )
 }

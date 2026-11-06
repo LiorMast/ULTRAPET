@@ -26,11 +26,12 @@ import { ArrowRight, ChevronDown, Pause, Play } from 'lucide-react'
 import { cva } from 'class-variance-authority'
 import { cn } from 'cn'
 import type { HeroContent, SectionText } from '@/api'
+import { putLocale, resolveText } from '@/components/EditableSection'
 import { EditableText, InlineEditBar, PropBar, useInlineDraft, type TextValue } from '@/components/InlineEditor'
 import { useReducedMotion } from '@/components/useReducedMotion'
 import { Button } from '@/components/ui/button'
 import logoMarkUrl from '@/assets/logo-mark.svg'
-import { FONTS, HERO_IMAGES, HERO_LINKS, SIZE_STEPS, type HeroImage } from '@/config'
+import { HERO_IMAGES, HERO_LINKS, type HeroImage } from '@/config'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 
 /** Same side padding as the navbar, so the hero text lines up with the logo. */
@@ -65,24 +66,6 @@ export type ResolvedHero = { title: TextValue & { accent: string }; tagline: Tex
 
 /** The texts of the hero's inline editor (the red accent word is a text of its own, styled like the title). */
 type HeroDraft = Record<'title' | 'accent' | 'tagline' | 'description', TextValue>
-
-/**
- * Works out what one hero text shows in a language: the saved value, else the default.
- * @param saved - The text's saved content, if any.
- * @param locale - The language.
- * @param fallback - The dictionary's words for this text.
- * @returns The words, font ("default" when unset) and size ("md" when unset).
- */
-function resolveText(saved: SectionText | undefined, locale: Locale, fallback: string): TextValue {
-  // Unknown keys (e.g. a font removed from FONTS since it was saved) fall back too.
-  const font = saved?.font?.[locale]
-  const size = saved?.size?.[locale]
-  return {
-    text: saved?.text?.[locale]?.trim() || fallback,
-    font: font && font in FONTS ? font : 'default',
-    size: size && SIZE_STEPS.includes(size) ? size : 'md',
-  }
-}
 
 /**
  * Works out what the hero shows in a language: the staff's saved content, with the dictionary's texts, the site's
@@ -133,17 +116,12 @@ function heroDraft(content: HeroContent | null | undefined, locale: Locale): Her
  */
 export function mergeHero(content: HeroContent | null | undefined, locale: Locale, draft: HeroDraft): HeroContent {
   /**
-   * Sets or removes one language's value of a per-language map.
+   * Sets or removes this language's value of a per-language map.
    * @param values - The saved map, e.g. { he: "...", en: "..." }.
    * @param value - The new value; '' removes it.
    * @returns The new map.
    */
-  const put = <T,>(values: Partial<Record<Locale, T>> | undefined, value: T | '') => {
-    const next = { ...values }
-    if (value === '') delete next[locale]
-    else next[locale] = value
-    return next
-  }
+  const put = <T,>(values: Partial<Record<Locale, T>> | undefined, value: T | '') => putLocale(values, locale, value)
   /**
    * Merges one text.
    * @param saved - Its saved content.
@@ -187,7 +165,7 @@ export function Hero({
 }) {
   const { t, locale } = useI18n()
   const shown = resolveHero(content, locale)
-  const inline = useInlineDraft<keyof HeroDraft>(async (draft) => onSave?.(mergeHero(content, locale, draft)))
+  const inline = useInlineDraft<keyof HeroDraft>(onSave && ((draft) => onSave(mergeHero(content, locale, draft))))
   const { editing } = inline
   // Once edited, the texts stop rising in: they would replay the entrance on every switch between the modes.
   const [settled, setSettled] = useState(false)

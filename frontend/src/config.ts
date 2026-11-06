@@ -1,10 +1,10 @@
 /**
  * config.ts — Site content and settings that are not translations and do not come from the API: the main
  * menu, the home page category cards, the labels of the stats figures, the header buttons, external links,
- * contact facts, the photos bundled with the site (hero, brand logos, article photos) and the fonts and size steps
+ * the contact cards (their phone, WhatsApp and email come from the API), the photos bundled with the site (hero, brand logos, article photos) and the fonts and size steps
  * staff can pick for editable texts (FONTS, SIZE_STEPS). Components take
  * their defaults from here, so changing the menu is a data change, not a component change. Data from the
- * database (catalog, brands, stats values, FAQ, articles, resellers) comes from src/api.ts.
+ * database (catalog, brands, stats values, contact details, FAQ, articles, resellers) comes from src/api.ts.
  *
  * Labels are functions that pick a string from the current language's dictionary, which keeps this
  * file language-free. Internal links are built with TanStack's `linkOptions`, so a link to a route that
@@ -12,7 +12,7 @@
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
 import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Clock, Handshake, Heart, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
-import type { FontKey, ProductCategory, SizeStep } from '@/api'
+import type { ContactDetails, FontKey, ProductCategory, SizeStep } from '@/api'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
 
@@ -48,6 +48,13 @@ const fileBySlug = (files: Record<string, string>, slug: string) =>
 
 /** Every photo in src/assets/categories/, keyed by path; a category's photo is the file named after its slug. */
 const categoryPhotoFiles = import.meta.glob<string>('/src/assets/categories/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
+
+/**
+ * The photo bundled with the site for a category: the file in src/assets/categories/ named after its slug.
+ * @param slug - The category slug, e.g. "cat-litter".
+ * @returns The file URL, or undefined when there is none.
+ */
+export const categoryPhoto = (slug: string) => fileBySlug(categoryPhotoFiles, slug)
 
 /** A product category card: URL slug, label, fallback icon and optional photo (a file in src/assets/categories/, else a placeholder URL). */
 export type Category = { slug: string; label: Label; icon: LucideIcon; image?: string }
@@ -230,23 +237,28 @@ export const HEADER_LOGIN = {
   link: linkOptions({ to: '/login' }),
 }
 
-/** Real contact facts (from the live site; the email is unconfirmed by the owner). Backend phase: from the CMS. */
-export const CONTACT = {
-  phone: '1700-55-99-92',
-  whatsapp: '972522142410',
-  whatsappDisplay: '+972 52-214-2410',
-  email: 'office@ultrapet.co.il',
-}
+/**
+ * The link that opens a WhatsApp chat with a number.
+ * @param number - The number as shown, international (e.g. "+972 52-214-2410"); only its digits are used.
+ * @returns The wa.me URL.
+ */
+export const whatsappUrl = (number: string) => `https://wa.me/${number.replace(/\D/g, '')}`
 
-/** A contact card: icon, label, value, a sub-line and an optional link (no link = plain text, e.g. hours). */
-export type ContactMethod = { id: string; icon: LucideIcon; label: Label; value: Label; sub: Label; href?: string }
+/**
+ * A contact card: icon, label, sub-line and its value: one of the contact details staff edit (`detail`, from the API,
+ * with the link `href` builds from it) or a dictionary text (`value`; no link, e.g. the opening hours).
+ */
+export type ContactMethod = { id: string; icon: LucideIcon; label: Label; sub: Label } & (
+  | { detail: keyof ContactDetails; href: (value: string) => string }
+  | { detail?: undefined; value: Label }
+)
 
-/** The contact cards of the Contact section, in display order. */
+/** The contact cards of the Contact section, in display order (the details come from fetchContact). */
 export const CONTACT_METHODS: ContactMethod[] = [
-  { id: 'phone', icon: Phone, label: (t: Dictionary) => t.contact.methods.phone.label, value: () => CONTACT.phone, sub: (t: Dictionary) => t.contact.methods.phone.sub, href: `tel:${CONTACT.phone.replaceAll('-', '')}` },
-  { id: 'whatsapp', icon: MessageCircle, label: (t: Dictionary) => t.contact.methods.whatsapp.label, value: () => CONTACT.whatsappDisplay, sub: (t: Dictionary) => t.contact.methods.whatsapp.sub, href: `https://wa.me/${CONTACT.whatsapp}` },
-  { id: 'email', icon: Mail, label: (t: Dictionary) => t.contact.methods.email.label, value: () => CONTACT.email, sub: (t: Dictionary) => t.contact.methods.email.sub, href: `mailto:${CONTACT.email}` },
-  { id: 'hours', icon: Clock, label: (t: Dictionary) => t.contact.methods.hours.label, value: (t: Dictionary) => t.contact.methods.hours.value, sub: (t: Dictionary) => t.contact.methods.hours.sub },
+  { id: 'phone', icon: Phone, label: (t: Dictionary) => t.contact.methods.phone.label, sub: (t: Dictionary) => t.contact.methods.phone.sub, detail: 'phone', href: (phone) => `tel:${phone.replace(/[^\d+]/g, '')}` },
+  { id: 'whatsapp', icon: MessageCircle, label: (t: Dictionary) => t.contact.methods.whatsapp.label, sub: (t: Dictionary) => t.contact.methods.whatsapp.sub, detail: 'whatsapp', href: whatsappUrl },
+  { id: 'email', icon: Mail, label: (t: Dictionary) => t.contact.methods.email.label, sub: (t: Dictionary) => t.contact.methods.email.sub, detail: 'email', href: (email) => `mailto:${email}` },
+  { id: 'hours', icon: Clock, label: (t: Dictionary) => t.contact.methods.hours.label, sub: (t: Dictionary) => t.contact.methods.hours.sub, value: (t: Dictionary) => t.contact.methods.hours.value },
 ]
 
 /** Text in every language that has it; Hebrew is always present and is the fallback. */

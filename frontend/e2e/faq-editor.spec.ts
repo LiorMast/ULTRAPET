@@ -4,7 +4,8 @@
  * the header while scrolling the list, screenshots in Hebrew and English); and one save of the whole list after
  * changing, adding (the plus button) and deleting questions.
  *
- * The FAQ list (GET /api/faq) and the staff save (PUT /api/staff/faq-items) are answered in the browser (page.route),
+ * The FAQ list (GET /api/faq), the staff save (PUT /api/staff/faq-items) and the save of the section's texts
+ * (/api/staff/page-sections, read back through GET /api/sections) are answered in the browser (page.route),
  * starting from the seed's questions (src/stubs/faq.json), so these tests never change the shared dev database that
  * the other specs' screenshots read. The real save path is covered by the backend tests (test_staff_api.py).
  */
@@ -35,6 +36,16 @@ async function fakeFaq(page: Page) {
     items = body.map((item, i) => ({ id: item.id ?? `new${i}`, question: item.question, answer: item.answer }))
     return route.fulfill({ json: items.map((item, i) => ({ ...item, sortOrder: i })) })
   })
+  // The section's own texts (heading, contact box) are saved after the list: answered in memory too.
+  let texts: Record<string, unknown> | null = null
+  await page.route('**/api/staff/page-sections**', (route) => {
+    texts = (route.request().postDataJSON() as { content: Record<string, unknown> }).content
+    return route.fulfill({ json: { key: 'faq', content: texts } })
+  })
+  await page.route('**/api/sections', async (route) => {
+    const real = (await (await route.fetch()).json()) as Record<string, unknown>
+    return route.fulfill({ json: texts ? { ...real, faq: texts } : real })
+  })
   return sent
 }
 
@@ -50,7 +61,8 @@ async function editFaq(page: Page, path = '/en') {
   const faq = page.locator('#faq')
   await scrollIntoViewSettled(faq)
   await faq.getByRole('button', { name: path === '/en' ? 'Edit on page: FAQ' : 'עריכה בעמוד: שאלות נפוצות' }).click()
-  await expect(faq.getByRole('textbox').first()).toBeFocused()
+  // The first question's box gets the focus (the heading's boxes come before it in the page).
+  await expect(faq.getByRole('textbox', { name: path === '/en' ? 'Question 1' : 'שאלה 1' })).toBeFocused()
   return faq
 }
 

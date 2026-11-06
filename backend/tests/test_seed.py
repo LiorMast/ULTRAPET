@@ -42,7 +42,7 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
         "articles": 4,
         "resellers": 124,
         "faq_items": 7,
-        "settings": 11,
+        "settings": 14,
         "payment_methods": 3,
         "staff_users": 1,
         "business_users": 1,
@@ -76,6 +76,7 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
     assert get_setting("min_order_amount") == 2000
     assert get_setting("stat_retail_value") == 350
     assert get_setting("missing", "fallback") == "fallback"
+    assert (get_setting("contact_phone"), get_setting("contact_whatsapp")) == ("1700-55-99-92", "+972 52-214-2410")
 
     # A product created later has no WooCommerce id and still gets its own id.
     new = Product(slug="new-product", name={"he": "מוצר חדש"}, category=product.category)

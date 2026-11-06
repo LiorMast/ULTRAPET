@@ -8,6 +8,7 @@ still use them as fixtures):
 - the articles (with their WordPress dates) and the resellers of the Where to Buy page;
 - the questions of the home page FAQ section (stubs/faq.json, in file order);
 - the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order and the currency;
+- the contact details of the Contact section and the WhatsApp button (stubs/contact.json: settings contact_<field>);
 - the three payment methods;
 - a staff admin, when SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are set, and a demo business customer (to see
   prices in the catalog), when SEED_CUSTOMER_EMAIL and SEED_CUSTOMER_PASSWORD are set.
@@ -45,6 +46,13 @@ BASE_SETTINGS = [
     ("min_order_amount", 2000, "Minimum order subtotal in shekels before VAT"),
     ("currency", "ILS", "Currency of all prices (ISO 4217)"),
 ]
+
+# What each contact setting (contact_<field>, from stubs/contact.json) holds.
+CONTACT_DESCRIPTIONS = {
+    "phone": "Customer-service phone number, as shown (the tel: link uses its digits)",
+    "whatsapp": "Customer-service WhatsApp number, as shown, international (the wa.me link uses its digits)",
+    "email": "Customer-service email address (the Contact form sends to it)",
+}
 
 # Payment methods offered at checkout: (code, Hebrew name, English name).
 PAYMENT_METHODS = [
@@ -183,6 +191,9 @@ def seed_database() -> dict[str, int]:
         )
     for key, value, description in BASE_SETTINGS:
         db.session.add(Setting(key=key, value=value, description=description))
+    contact = read_json(STUBS_DIR / "contact.json")
+    for field, value in contact.items():
+        db.session.add(Setting(key=f"contact_{field}", value=value, description=CONTACT_DESCRIPTIONS[field]))
 
     for order, (code, name_he, name_en) in enumerate(PAYMENT_METHODS):
         db.session.add(PaymentMethod(code=code, name={"he": name_he, "en": name_en}, sort_order=order))
@@ -212,7 +223,7 @@ def seed_database() -> dict[str, int]:
         "articles": len(articles),
         "resellers": len(resellers),
         "faq_items": len(faq),
-        "settings": len(legacy_settings) + len(BASE_SETTINGS),
+        "settings": len(legacy_settings) + len(BASE_SETTINGS) + len(contact),
         "payment_methods": len(PAYMENT_METHODS),
         "staff_users": staff,
         "business_users": customers,

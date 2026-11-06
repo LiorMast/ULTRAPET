@@ -12,15 +12,18 @@
  *   button on each and "Add a question" below, as many as they want; one Save stores the whole list (mergeFaq). A
  *   question with only one of its two texts is refused before saving and its empty box gets the focus; a question
  *   left with no text in any language is deleted. An empty box shows the question's text in another language as its
- *   placeholder, so staff see what to translate. The texts keep the section's typography (no font or size bar).
+ *   placeholder, so staff see what to translate. The questions keep the section's typography (no font or size bar).
+ *   The same edit mode also edits the section's own texts (EditableSection, saved in page_sections "faq"): the
+ *   heading's words, font and size (the PropBar shows while one of them is selected) and the contact box's title and
+ *   text (words only; its button keeps its label). One Save stores the list, then the texts.
  */
 import { useRef } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, Plus, Trash2 } from 'lucide-react'
-import { cn } from 'cn'
-import type { FaqItem, FaqItemInput } from '@/api'
-import { EditableText, InlineEditBar, InlineEditError, useInlineDraft, type TextValue } from '@/components/InlineEditor'
-import { SectionHeading } from '@/components/SectionHeading'
+import type { FaqItem, FaqItemInput, SectionContent } from '@/api'
+import { fieldLabel, mergeSection, SectionEditBar, sectionFields, type SectionOptions } from '@/components/EditableSection'
+import { EditableText, InlineEditError, useInlineDraft, type TextValue } from '@/components/InlineEditor'
+import { HEADING_KEYS, headingLabels, SectionHeading, type HeadingKey } from '@/components/SectionHeading'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { useI18n, type Locale } from '@/i18n'
@@ -31,8 +34,15 @@ import { useI18n, type Locale } from '@/i18n'
  */
 type FaqKey = `${string}:${'question' | 'answer'}`
 
+/** The section's own texts (page_sections "faq"): the heading's and the contact box's. */
+type TextKey = HeadingKey | 'moreTitle' | 'moreText'
+
 /** The editor's draft: both texts of every question, in list order. */
 type FaqDraft = Record<FaqKey, TextValue>
+
+/** The questions' part of a draft that also holds the section's own texts. */
+const questionsOf = (draft: Partial<Record<string, TextValue>>): FaqDraft =>
+  Object.fromEntries(Object.entries(draft).filter(([key]) => /:(question|answer)$/.test(key))) as FaqDraft
 
 /** The start of the entry of a question added in the editor (saved questions use their id). */
 const NEW_ENTRY = 'new-'
@@ -136,30 +146,53 @@ export function mergeFaq(items: FaqItem[], locale: Locale, draft: FaqDraft): Faq
 
 /**
  * The FAQ section: the heading and contact box (sticky beside the list on desktop) and one accordion panel per shown
- * question, one open at a time; for staff, the in-place editor of the questions (see the file header).
+ * question, one open at a time; for staff, the in-place editor of the questions and the section's texts (see the file
+ * header).
  * @param props.items - Every question, in display order (from the API).
- * @param props.onSave - Stores the new list of questions (rejects with an ApiError on refusal); given = staff can edit
- *   in place.
+ * @param props.content - The section's texts staff saved (page_sections "faq"); null or omitted = the dictionary's.
+ * @param props.onSave - Stores the new list of questions and the section's new content (rejects with an ApiError on
+ *   refusal); given = staff can edit in place.
  * @param props.defaultOpen - The id of the question open on load; default the first shown one, null = all closed.
  * @returns The <section>, or nothing for visitors when no question has the page language.
  */
-export function Faq({ items, onSave, defaultOpen }: { items: FaqItem[]; onSave?: (items: FaqItemInput[]) => Promise<unknown>; defaultOpen?: string | null }) {
+export function Faq({
+  items,
+  content,
+  onSave,
+  defaultOpen,
+}: {
+  items: FaqItem[]
+  content?: SectionContent | null
+  onSave?: (items: FaqItemInput[], content: SectionContent) => Promise<unknown>
+  defaultOpen?: string | null
+}) {
   const { t, locale } = useI18n()
   const e = t.faq.edit
   const shown = shownFaq(items, locale)
   const open = defaultOpen === undefined ? shown[0]?.id : (defaultOpen ?? undefined)
-  const inline = useInlineDraft<FaqKey>(async (draft) => {
-    const missing = incompleteText(draft)
-    if (missing) throw new InlineEditError(e.incomplete, missing)
-    await onSave?.(mergeFaq(items, locale, draft))
-  })
+  const texts: SectionOptions<TextKey> = {
+    content,
+    defaults: { eyebrow: t.faq.eyebrow, title: t.faq.title, intro: t.faq.intro, moreTitle: t.faq.moreTitle, moreText: t.faq.moreText },
+    labels: { ...headingLabels(t), moreTitle: fieldLabel(t, 'title', t.faq.moreTitle), moreText: fieldLabel(t, 'text', t.faq.moreTitle) },
+    styled: HEADING_KEYS,
+  }
+  const inline = useInlineDraft<FaqKey | TextKey>(
+    onSave &&
+      (async (all) => {
+        const draft = questionsOf(all)
+        const missing = incompleteText(draft)
+        if (missing) throw new InlineEditError(e.incomplete, missing)
+        await onSave(mergeFaq(items, locale, draft), mergeSection(texts, locale, all))
+      }),
+  )
+  const { field, draft: textsDraft, propBar } = sectionFields<FaqKey | TextKey, TextKey>(inline, texts, locale)
   /** Counts the questions added in this editor, to give each a unique entry. */
   const added = useRef(0)
 
   if (!shown.length && !onSave) return null
 
   const { draft } = inline
-  const entries = draft ? draftEntries(draft) : []
+  const entries = draft ? draftEntries(questionsOf(draft)) : []
 
   /** Appends an empty question to the list and focuses its box. */
   const addQuestion = () => {
@@ -189,12 +222,13 @@ export function Faq({ items, onSave, defaultOpen }: { items: FaqItem[]; onSave?:
 
   return (
     <section id="faq" aria-labelledby="faq-title" className="bg-white px-6 py-24 lg:px-10 lg:py-32">
-      <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
+      {/* One form for the whole section: the questions and the section's texts are saved together. */}
+      <form {...inline.formProps} className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
         <div className="lg:sticky lg:top-32 lg:self-start">
-          <SectionHeading id="faq-title" eyebrow={t.faq.eyebrow} title={t.faq.title} intro={t.faq.intro} />
+          <SectionHeading id="faq-title" edit={field} />
           <div className="mt-10 border-s-2 border-brand-red ps-6">
-            <h3 className="font-display text-xl font-bold text-brand-charcoal">{t.faq.moreTitle}</h3>
-            <p className="mt-2 text-brand-charcoal-muted">{t.faq.moreText}</p>
+            <EditableText as="h3" wrap {...field('moreTitle')} className="font-display text-xl font-bold text-brand-charcoal" />
+            <EditableText multiline {...field('moreText')} className="mt-2 text-brand-charcoal-muted" />
             <Button asChild className="mt-6">
               <Link to="/" hash="contact">
                 {t.faq.cta}
@@ -205,17 +239,14 @@ export function Faq({ items, onSave, defaultOpen }: { items: FaqItem[]; onSave?:
         </div>
         <div>
           {onSave && (
-            <InlineEditBar
-              {...inline.bar}
+            <SectionEditBar
+              edit={{ bar: { ...inline.bar, onEdit: () => inline.start({ ...faqDraft(items, locale), ...textsDraft() }) }, propBar }}
               label={t.faq.eyebrow}
-              tone="light"
-              onEdit={() => inline.start(faqDraft(items, locale))}
-              // While editing, Save and Cancel stay in reach below the header however long the list is.
-              className={cn('mb-6', draft && 'sticky top-24 z-20 bg-white py-3')}
+              className="bg-white"
             />
           )}
           {draft ? (
-            <form {...inline.formProps}>
+            <div>
               <ol>
                 {entries.map((entry, i) => {
                   const saved = items.find((item) => item.id === entry)
@@ -258,11 +289,12 @@ export function Faq({ items, onSave, defaultOpen }: { items: FaqItem[]; onSave?:
                   )
                 })}
               </ol>
-              <Button type="button" variant="outline" size="sm" className="mt-6" onClick={addQuestion}>
+              {/* data-focus-fallback: the focus lands here when the last question is deleted. */}
+              <Button type="button" variant="outline" size="sm" className="mt-6" data-focus-fallback onClick={addQuestion}>
                 <Plus aria-hidden="true" />
                 {e.add}
               </Button>
-            </form>
+            </div>
           ) : shown.length ? (
             <Accordion type="single" collapsible defaultValue={open}>
               {shown.map((item) => (
@@ -277,7 +309,7 @@ export function Faq({ items, onSave, defaultOpen }: { items: FaqItem[]; onSave?:
             <p className="text-brand-charcoal-muted">{e.empty}</p>
           )}
         </div>
-      </div>
+      </form>
     </section>
   )
 }

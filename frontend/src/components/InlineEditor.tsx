@@ -7,10 +7,11 @@
  *   - a fixed set of texts (the hero: title, tagline, ...): start(values) with one key per text;
  *   - a list that grows and shrinks (the FAQ's questions): every entry owns a few keys (e.g. "<id>:question",
  *     "<id>:answer"); add(values) appends an entry's texts and focuses its first box, remove(keys, next) drops
- *     them and moves the focus to `next`. The draft keeps its keys in the order they were added, so the section
+ *     them and moves the focus to `next` (none: the control marked data-focus-fallback, e.g. the list's "Add"). The draft keeps its keys in the order they were added, so the section
  *     can read its entries' order from Object.keys(draft).
  *   A section may refuse a save itself before storing anything by throwing InlineEditError from onSave: the bar
- *   shows its message and the box it names gets the focus.
+ *   shows its message and the box it names gets the focus. Without onSave (a visitor, or staff who just signed out)
+ *   the section cannot edit: an open draft is dropped, so signing out in edit mode leaves edit mode.
  * - InlineEditBar: "Edit on page", then Save (all the section's texts at once) and Cancel, the refusal message and
  *   a status line that announces the save. The keyboard focus returns to "Edit on page" afterwards. `tone` matches
  *   the section's background (dark photo or white); `label` names the section in the button's accessible name
@@ -69,12 +70,13 @@ export class InlineEditError extends Error {
 /**
  * The edit state of one section (see the file header).
  * @param onSave - Stores the draft; rejects with an ApiError when the server refuses it, or with an InlineEditError
- *   when the section refuses it itself.
+ *   when the section refuses it itself. Undefined = the user may not edit (not staff, or signed out): edit mode ends
+ *   and the draft is thrown away.
  * @returns `editing`, `draft`, `active` (the selected text), `start(values, first?)`, `add(values, first?)`,
  *   `remove(keys, next?)`, `select(key)`, `change(key, partial)`, `cancel()`, `formProps` for the section's <form>,
  *   `bar` for its InlineEditBar and `propBar(labels)` for its PropBar.
  */
-export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, TextValue>) => Promise<unknown>) {
+export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, TextValue>) => Promise<unknown>) | undefined) {
   const { t } = useI18n()
   const formId = useId()
   const editButton = useRef<HTMLButtonElement>(null)
@@ -90,6 +92,14 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
   /** Bumped by requestFocus, so the effect runs even when neither the draft nor the selection changed. */
   const [focusRequest, setFocusRequest] = useState(0)
 
+  // The right to edit is gone (signed out while editing): leave edit mode right away, during this render (React's way
+  // to adjust state to a changed prop), so the boxes never show to a visitor. The draft is not kept for later.
+  if (!onSave && (draft !== null || active !== null || error)) {
+    setDraft(null)
+    setActive(null)
+    setError('')
+  }
+
   useEffect(() => {
     if (returnFocus.current && !draft) {
       returnFocus.current = false
@@ -98,8 +108,12 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
     if (focusSelected.current && draft) {
       focusSelected.current = false
       const form = document.getElementById(formId)
-      // No text selected (e.g. the last entry of a list was removed): the form's first control, such as "Add".
-      const target = form?.querySelector<HTMLElement>('[data-selected="true"]') ?? form?.querySelector<HTMLElement>('input, textarea, select, button')
+      // No text selected (e.g. the last entry of a list was removed): the control the section marked with
+      // data-focus-fallback (such as "Add"), else the form's first control.
+      const target =
+        form?.querySelector<HTMLElement>('[data-selected="true"]') ??
+        form?.querySelector<HTMLElement>('[data-focus-fallback]') ??
+        form?.querySelector<HTMLElement>('input, textarea, select, button')
       target?.focus()
     }
   }, [draft, focusRequest, formId])
@@ -140,7 +154,7 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
    * @param keys - The texts to remove.
    * @param next - The text to select and focus next (e.g. the next entry's first text). Omitted: the selected text
    *   keeps the selection and gets the focus, or, when it was among the removed ones, the selection is cleared and the
-   *   focus goes to the form's first control.
+   *   focus goes to the form's control marked data-focus-fallback (e.g. "Add"), else its first control.
    */
   const remove = (keys: Key[], next?: Key) => {
     setDraft((current) => current && (Object.fromEntries(Object.entries(current).filter(([key]) => !keys.includes(key as Key))) as Record<Key, TextValue>))
@@ -169,7 +183,7 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
    */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!draft || pending) return
+    if (!draft || pending || !onSave) return
     setPending(true)
     setError('')
     try {
@@ -214,13 +228,16 @@ export function useInlineDraft<Key extends string>(onSave: (draft: Record<Key, T
 
   /**
    * The PropBar's props: the selected text's name, values and change handler.
-   * @param labels - Every text's name, e.g. { tagline: "Tagline" }.
-   * @returns Props for <PropBar> (add `locale`), or null outside edit mode.
+   * @param labels - The name of every text that has a font and size of its own, e.g. { tagline: "Tagline" }; a text
+   *   left out has none (words only), so no bar shows while it is selected.
+   * @returns Props for <PropBar> (add `locale`), or null outside edit mode or when the selected text has no style.
    */
-  const propBar = (labels: Record<Key, string>) =>
-    draft && active
-      ? { label: labels[active], value: draft[active], onChange: (partial: Partial<TextValue>) => change(active, partial), onKeyDown: handleKeyDown }
+  const propBar = (labels: Partial<Record<Key, string>>) => {
+    const label = active === null ? undefined : labels[active]
+    return draft && active !== null && label !== undefined
+      ? { label, value: draft[active], onChange: (partial: Partial<TextValue>) => change(active, partial), onKeyDown: handleKeyDown }
       : null
+  }
 
   return {
     editing: draft !== null,
@@ -489,6 +506,9 @@ const BOX_CLASS =
  * @param props.placeholder - Shown in an empty box (e.g. the built-in text an empty value falls back to).
  * @param props.before - Shown before the words in both modes (e.g. a decorative logo).
  * @param props.after - Shown after the words in both modes (e.g. an accent word, itself an EditableText).
+ * @param props.id - The element's id (on the box's wrapper while editing), e.g. a section title's for aria-labelledby.
+ * @param props.dir - The text direction, e.g. "ltr" for numbers, phone numbers and addresses; omitted = the page's.
+ * @param props.inputMode - The on-screen keyboard of the box, e.g. "numeric", "tel" or "email".
  * @returns The element, or the box.
  */
 export function EditableText({
@@ -508,8 +528,11 @@ export function EditableText({
   placeholder,
   before,
   after,
+  id,
+  dir,
+  inputMode,
 }: {
-  as?: 'h1' | 'h2' | 'h3' | 'p' | 'span'
+  as?: 'h1' | 'h2' | 'h3' | 'h4' | 'p' | 'span'
   value: TextValue
   editing: boolean
   onChange: (change: Partial<TextValue>) => void
@@ -525,6 +548,9 @@ export function EditableText({
   placeholder?: string
   before?: ReactNode
   after?: ReactNode
+  id?: string
+  dir?: 'ltr' | 'rtl' | 'auto'
+  inputMode?: 'text' | 'numeric' | 'tel' | 'email'
 }) {
   const look = cn(controls && sizeClass?.(value.size), className)
   const style = controls ? fontStyle(value.font) : undefined
@@ -536,7 +562,7 @@ export function EditableText({
 
   if (!editing) {
     return (
-      <As className={look} style={style}>
+      <As id={id} dir={dir} className={look} style={style}>
         {before}
         {value.text}
         {after}
@@ -550,6 +576,8 @@ export function EditableText({
     placeholder,
     'aria-label': label,
     lang: locale,
+    dir,
+    inputMode,
     'data-selected': selected,
     onFocus: onSelect,
     onChange: (event: { target: { value: string } }) => onChange({ text: oneLineWrap ? event.target.value.replace(/\s*[\r\n]+\s*/g, ' ') : event.target.value }),
@@ -563,10 +591,10 @@ export function EditableText({
       <input type="text" size={Math.max((value.text || placeholder || '').length, 2)} className={cn(BOX_CLASS, 'inline-block w-auto max-w-full field-sizing-content')} {...box} />
     )
 
-  if (!controls) return <span className={look}>{field}</span>
+  if (!controls) return <span id={id} className={look}>{field}</span>
 
   return (
-    <div className={look} style={style}>
+    <div id={id} className={look} style={style}>
       {before}
       {field}
       {after}

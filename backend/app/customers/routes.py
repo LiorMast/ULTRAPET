@@ -1,8 +1,8 @@
 """routes.py — Blueprint `customers` (prefix /api): everything the public site and the business customers call.
 
 Public, no sign-in:
-    GET /categories, /products, /brands, /brands/<slug>, /stats, /sections/<key>, /faq, /articles,
-    /articles/<slug>, /resellers, /sitemap.xml
+    GET /categories, /products, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
+    /articles, /articles/<slug>, /resellers, /sitemap.xml
 Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
     POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me
 Business customers only:
@@ -38,6 +38,8 @@ PAGE_SIZE = 24
 MAX_PAGE_SIZE = 100
 # The home page figures, in display order; each reads the settings stat_<id>_value and stat_<id>_suffix.
 STAT_IDS = ("retail", "partners", "products", "years")
+# The contact details, each read from the setting contact_<field>.
+CONTACT_FIELDS = ("phone", "whatsapp", "email")
 # Sitemap: the URL prefix of each served language (Hebrew, the default, has none) and the pages always listed.
 SITEMAP_LOCALES = {"he": "", "en": "/en"}
 SITEMAP_PAGES = ("/", "/where-to-buy", "/catalog", "/articles")
@@ -102,13 +104,14 @@ def search_conditions(q: str) -> list[ColumnElement[bool]]:
 
 @bp.get("/categories")
 def list_categories() -> list[dict[str, Any]]:
-    """The catalog categories (the store's 15), for the catalog's filter chips.
+    """The catalog categories (the store's 15), for the catalog's filter chips, the header's Products menu and the
+    home page's category cards.
 
     Returns:
-        [{slug, name, legacyPath}] in display order.
+        [{slug, name, legacyPath, imageUrl}] in display order; imageUrl is the card photo staff set (None = none).
     """
     categories = db.session.scalars(select(Category).where(Category.is_active).order_by(Category.sort_order, Category.slug))
-    return [{"slug": c.slug, "name": c.name, "legacyPath": c.legacy_path} for c in categories]
+    return [{"slug": c.slug, "name": c.name, "legacyPath": c.legacy_path, "imageUrl": c.image_url} for c in categories]
 
 
 @bp.get("/products")
@@ -228,6 +231,29 @@ def list_stats() -> list[dict[str, Any]]:
         for stat_id in STAT_IDS
         if f"stat_{stat_id}_value" in values
     ]
+
+
+@bp.get("/contact")
+def get_contact() -> dict[str, str]:
+    """The customer-service contact details (the Contact section, the WhatsApp button), from the settings staff edit.
+
+    Returns:
+        {phone, whatsapp, email} as shown on the site; a field without its setting is "".
+    """
+    keys = [f"contact_{field}" for field in CONTACT_FIELDS]
+    values = dict(db.session.execute(select(Setting.key, Setting.value).where(Setting.key.in_(keys))).all())
+    return {field: str(values.get(f"contact_{field}") or "") for field in CONTACT_FIELDS}
+
+
+@bp.get("/sections")
+def list_sections() -> dict[str, Any]:
+    """The content staff saved for every editable home page section, for the home page's one loader call.
+
+    Returns:
+        {<key>: content} of every saved section; a section never edited is missing (the site shows its built-in
+        texts).
+    """
+    return {section.key: section.content for section in db.session.scalars(select(PageSection))}
 
 
 @bp.get("/sections/<key>")

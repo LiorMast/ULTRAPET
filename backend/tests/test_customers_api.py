@@ -29,7 +29,7 @@ def catalog(database) -> SimpleNamespace:
         The rows by name: dogs, cats, hidden, treat, cat_food, beef, chew.
     """
     dogs = Category(slug="dogs", name={"he": "כלבים", "en": "Dogs"}, legacy_path="/product-category/כלבים/", sort_order=0)
-    cats = Category(slug="cats", name={"he": "חתולים", "en": "Cats"}, sort_order=1)
+    cats = Category(slug="cats", name={"he": "חתולים", "en": "Cats"}, image_url="https://example.com/cats.jpg", sort_order=1)
     hidden = Category(slug="hidden", name={"he": "מוסתר"}, sort_order=2, is_active=False)
     treat = Product(
         slug="dog-treat",
@@ -64,8 +64,8 @@ def slugs(response) -> list[str]:
 
 def test_categories_lists_the_active_ones_in_order(client, catalog):
     assert client.get("/api/categories").get_json() == [
-        {"slug": "dogs", "name": {"he": "כלבים", "en": "Dogs"}, "legacyPath": "/product-category/כלבים/"},
-        {"slug": "cats", "name": {"he": "חתולים", "en": "Cats"}, "legacyPath": None},
+        {"slug": "dogs", "name": {"he": "כלבים", "en": "Dogs"}, "legacyPath": "/product-category/כלבים/", "imageUrl": None},
+        {"slug": "cats", "name": {"he": "חתולים", "en": "Cats"}, "legacyPath": None, "imageUrl": "https://example.com/cats.jpg"},
     ]
 
 
@@ -219,6 +219,22 @@ def test_sections_returns_the_saved_content(client, database):
     data = client.get("/api/sections/hero").get_json()
     assert (data["key"], data["content"]) == ("hero", {"title": {"text": {"he": "שלום"}}})
     assert data["updatedAt"].endswith(("+02:00", "+03:00"))
+
+
+def test_sections_lists_every_saved_section_by_key(client, database):
+    assert client.get("/api/sections").get_json() == {}
+    database.add_all([PageSection(key="hero", content={"a": 1}), PageSection(key="about", content={"b": 2})])
+    database.commit()
+    assert client.get("/api/sections").get_json() == {"hero": {"a": 1}, "about": {"b": 2}}
+
+
+def test_contact_reads_the_settings(client, database):
+    assert client.get("/api/contact").get_json() == {"phone": "", "whatsapp": "", "email": ""}
+    database.add_all(
+        [Setting(key="contact_phone", value="1700-55-99-92"), Setting(key="contact_email", value="office@example.com")]
+    )
+    database.commit()
+    assert client.get("/api/contact").get_json() == {"phone": "1700-55-99-92", "whatsapp": "", "email": "office@example.com"}
 
 
 def test_faq_lists_the_questions_in_display_order(client, database):

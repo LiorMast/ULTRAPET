@@ -230,6 +230,30 @@ export const he = {
     sizeOf: 'גודל {label}',
     siteFont: 'ברירת המחדל של האתר',
     sizes: { sm: 'קטן', md: 'בינוני', lg: 'גדול', xl: 'גדול מאוד' },
+    // The names of a section's text boxes; {field} + {item} name a text of a card or list item, e.g. 'כותרת: חול לחתולים'.
+    fields: {
+      eyebrow: 'כותרת עליונה',
+      title: 'כותרת',
+      intro: 'פתיח',
+      text: 'טקסט',
+      label: 'תווית',
+      sub: 'שורת משנה',
+      value: 'ערך',
+      closing: 'פסקת סיום',
+      number: 'מספר',
+      suffix: 'סיומת',
+      phone: 'מספר טלפון',
+      whatsapp: 'מספר וואטסאפ',
+      email: 'כתובת דוא"ל',
+    },
+    fieldOf: '{field}: {item}',
+    // Why a section refused a save (the named box gets the focus).
+    errors: {
+      number: 'כתבו מספר שלם, בספרות בלבד.',
+      phone: 'כתבו מספר טלפון תקין (ספרות, רווחים, מקפים ו-+).',
+      email: 'כתבו כתובת דוא"ל תקינה.',
+      required: 'השדה הזה לא יכול להישאר ריק.',
+    },
   },
   lang: {
     switchLabel: 'שפה',
