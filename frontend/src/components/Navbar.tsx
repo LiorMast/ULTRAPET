@@ -17,7 +17,6 @@
 import { Fragment, useEffect, useRef } from 'react'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { ChevronDown } from 'lucide-react'
-import { cn } from 'cn'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LoginPopover } from '@/components/LoginPopover'
 import { Logo } from '@/components/Logo'
@@ -162,7 +161,7 @@ function DesktopNavItem({ item }: { item: NavItem }) {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
-        className={cn(NAV_TEXT, 'flex items-center gap-1.5')}
+        className={`${NAV_TEXT} flex items-center gap-1.5`}
       >
         {item.label(t)}
         <ChevronDown size={15} aria-hidden="true" className="transition-transform duration-200 group-data-[state=open]:rotate-180" />

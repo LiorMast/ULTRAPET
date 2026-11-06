@@ -7,10 +7,12 @@
 /**
  * Text style of the header's menu entries (legacy look). Left-to-right (English) labels use 0.1em
  * letter-spacing instead of the 0.25em `tracking-widest`, so the seven main entries fit on one line at every
- * desktop width (Hebrew has its own tight tracking). The active page (TanStack's data-status="active") is red.
+ * desktop width (Hebrew has its own tight tracking). The sizes are the text-nav* tokens of index.css, larger in
+ * Hebrew so Hebrew labels look as big as the English capitals; don't pass this through cn() (tailwind-merge would
+ * drop text-nav as a second text color). The active page (TanStack's data-status="active") is red.
  */
 export const NAV_TEXT =
-  'group relative whitespace-nowrap font-heading text-xs font-medium uppercase tracking-widest ltr:tracking-[0.1em] 2xl:text-sm min-[1920px]:text-base text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:text-brand-red data-[status=active]:text-brand-red'
+  'group relative whitespace-nowrap font-heading text-nav font-medium uppercase tracking-widest ltr:tracking-[0.1em] 2xl:text-nav-lg min-[1920px]:text-nav-xl text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:text-brand-red data-[status=active]:text-brand-red'
 
 /**
  * The thin red underline of a menu entry (put it inside an element styled with NAV_TEXT): grows from the start
