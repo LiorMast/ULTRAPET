@@ -1,7 +1,8 @@
 /**
  * DiscountDialog.test.tsx — Tests for the discount dialog: the defaults (percentage, from today, no end date),
- * the percent/amount switch, an amount for a dated period, the field checks (empty, zero, negative, not a number,
- * over 100%, end before start, missing end), editing an existing discount, the server's
+ * the percent/amount switch, an amount for a dated period, a bulk discount and its minimum quantity check, the field
+ * checks (empty, zero, negative, not a number, over 100%, end before start, missing end), editing an existing
+ * discount (regular and bulk), the server's
  * refusal keeping the dialog open, and the Hebrew texts.
  */
 import { useState } from 'react'
@@ -53,7 +54,7 @@ describe('DiscountDialog', () => {
     await user.type(valueInput(), '12.5')
     expect(screen.getByText(/^\u206612\.5%\u2069 off, from .+, with no end date$/)).toHaveAttribute('role', 'status')
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(onSave).toHaveBeenCalledWith({ type: 'percent', value: 12.5, startsOn: israelToday(), endsOn: null })
+    expect(onSave).toHaveBeenCalledWith({ type: 'percent', value: 12.5, minQuantity: null, startsOn: israelToday(), endsOn: null })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
@@ -69,7 +70,46 @@ describe('DiscountDialog', () => {
     await user.type(screen.getByLabelText('End date'), '2026-12-31')
     expect(screen.getByText(/^\u2066₪20\.00\u2069 off, from Dec 1, 2026 to Dec 31, 2026$/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(onSave).toHaveBeenCalledWith({ type: 'amount', value: 20, startsOn: '2026-12-01', endsOn: '2026-12-31' })
+    expect(onSave).toHaveBeenCalledWith({ type: 'amount', value: 20, minQuantity: null, startsOn: '2026-12-01', endsOn: '2026-12-31' })
+  })
+
+  it('saves a bulk discount with its minimum quantity', async () => {
+    const onSave = vi.fn(async () => {})
+    const { user } = await renderDialog({ onSave })
+    expect(screen.getByRole('checkbox', { name: 'Bulk discount' })).not.toBeChecked()
+    expect(screen.queryByLabelText('Minimum quantity *')).not.toBeInTheDocument()
+    await user.type(valueInput(), '5')
+    await user.click(screen.getByRole('checkbox', { name: 'Bulk discount' }))
+    const quantity = screen.getByLabelText('Minimum quantity *')
+    expect(quantity).toHaveAccessibleDescription(/at least this many units/)
+    await user.type(quantity, '10')
+    expect(screen.getByText(/^\u20665%\u2069 off for \u206610\u2069 units or more, from .+, with no end date$/)).toHaveAttribute('role', 'status')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onSave).toHaveBeenCalledWith({ type: 'percent', value: 5, minQuantity: 10, startsOn: israelToday(), endsOn: null })
+  })
+
+  it('checks the minimum quantity', async () => {
+    const onSave = vi.fn(async () => {})
+    const { user } = await renderDialog({ onSave })
+    const save = () => user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.type(valueInput(), '5')
+    await user.click(screen.getByRole('checkbox', { name: 'Bulk discount' }))
+    const quantity = screen.getByLabelText('Minimum quantity *')
+    await save()
+    expect(quantity).toHaveAccessibleDescription(/Required/)
+    expect(quantity).toHaveFocus()
+    for (const wrong of ['1', '2.5', 'ten']) {
+      await user.clear(quantity)
+      await user.type(quantity, wrong)
+      await save()
+      expect(quantity).toHaveAccessibleDescription(/Enter a whole number, 2 or more/)
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    }
+    expect(onSave).not.toHaveBeenCalled()
+    // Unticking makes it a regular discount again.
+    await user.click(screen.getByRole('checkbox', { name: 'Bulk discount' }))
+    await save()
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ minQuantity: null }))
   })
 
   it('checks the value before saving', async () => {
@@ -118,7 +158,7 @@ describe('DiscountDialog', () => {
 
   it('edits an existing discount', async () => {
     const onSave = vi.fn(async () => {})
-    const { user } = await renderDialog({ onSave, initial: { type: 'amount', value: 15, startsOn: '2026-11-01', endsOn: '2026-11-30' } })
+    const { user } = await renderDialog({ onSave, initial: { type: 'amount', value: 15, minQuantity: null, startsOn: '2026-11-01', endsOn: '2026-11-30' } })
     expect(await screen.findByRole('dialog', { name: 'Edit discount' })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: 'Amount (₪)' })).toBeChecked()
     expect(valueInput()).toHaveValue('15')
@@ -126,7 +166,18 @@ describe('DiscountDialog', () => {
     await user.clear(valueInput())
     await user.type(valueInput(), '25')
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(onSave).toHaveBeenCalledWith({ type: 'amount', value: 25, startsOn: '2026-11-01', endsOn: '2026-11-30' })
+    expect(onSave).toHaveBeenCalledWith({ type: 'amount', value: 25, minQuantity: null, startsOn: '2026-11-01', endsOn: '2026-11-30' })
+  })
+
+  it('edits a bulk discount', async () => {
+    const onSave = vi.fn(async () => {})
+    const { user } = await renderDialog({ onSave, initial: { type: 'percent', value: 10, minQuantity: 24, startsOn: '2026-11-01', endsOn: null } })
+    expect(screen.getByRole('checkbox', { name: 'Bulk discount' })).toBeChecked()
+    expect(screen.getByLabelText('Minimum quantity *')).toHaveValue('24')
+    await user.clear(screen.getByLabelText('Minimum quantity *'))
+    await user.type(screen.getByLabelText('Minimum quantity *'), '48')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onSave).toHaveBeenCalledWith({ type: 'percent', value: 10, minQuantity: 48, startsOn: '2026-11-01', endsOn: null })
   })
 
   it("keeps the dialog open with the server's reason when the save is refused", async () => {
@@ -147,5 +198,8 @@ describe('DiscountDialog', () => {
     await user.click(screen.getByRole('radio', { name: 'סכום (₪)' }))
     await user.type(screen.getByLabelText('ערך *'), '30')
     expect(screen.getByText(/^הנחה של \u2066.*30.*₪.*\u2069, מ־/)).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: 'הנחת כמות' }))
+    await user.type(screen.getByLabelText('כמות מינימלית *'), '12')
+    expect(screen.getByText(/^הנחה של \u2066.*30.*₪.*\u2069 בקנייה של \u206612\u2069 יחידות ומעלה, מ־/)).toBeInTheDocument()
   })
 })

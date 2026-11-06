@@ -2,8 +2,11 @@
  * DiscountDialog.tsx — The admin panel's dialog for creating or editing one discount, whatever it applies to: a
  * category or a product (for all customers or one customer), or a payment method.
  *
- * It asks for the type (a percentage or an amount in shekels before VAT, as a switch), the value, a start date
- * and an end date or "no end date". The value is always positive: the percent or the shekels taken off. A live summary reads the result back in words ("10% off, from 3 Nov 2026, with no end date"). The
+ * It asks for the type (a percentage or an amount in shekels before VAT, as a switch), the value, whether it is a
+ * bulk discount (with its minimum quantity: it applies from that many units of one product, on top of the regular
+ * discounts), a start date and an end date or "no end date". The value is always positive: the percent or the
+ * shekels taken off. A live summary reads the result back in words ("10% off for 12 units or more, from 3 Nov 2026,
+ * with no end date"). The
  * dialog knows nothing about storage: it hands the caller a DiscountValue, and the caller saves it for its
  * target (e.g. a price rule); when the save is refused, the dialog shows why and stays open. describeDiscount
  * words a discount the same way for lists (DiscountsDialog).
@@ -20,11 +23,19 @@ import type { Dictionary } from '@/i18n/he'
 /**
  * One discount. `value` > 0 is what is taken off: percent for "percent", shekels before VAT for
  * "amount". `startsOn` / `endsOn` are Israel dates ("2026-11-03", inclusive); `endsOn` null = no end date.
+ * `minQuantity` (a whole number >= 2) makes it a bulk discount: it applies when one product is ordered in at least
+ * that many units; null = a regular discount (any quantity).
  */
-export type DiscountValue = { type: 'percent' | 'amount'; value: number; startsOn: string; endsOn: string | null }
+export type DiscountValue = { type: 'percent' | 'amount'; value: number; minQuantity: number | null; startsOn: string; endsOn: string | null }
+
+/** The row of a checkbox and its label ("Bulk discount", "No end date"). */
+const CHECKBOX_LABEL_CLASS = 'flex cursor-pointer items-center gap-3 text-sm text-brand-charcoal'
+
+/** A checkbox in the brand red, with the site's focus ring. */
+const CHECKBOX_CLASS = 'size-4 accent-brand-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red'
 
 /** The field a message belongs to. */
-type FieldName = 'value' | 'startsOn' | 'endsOn'
+type FieldName = 'value' | 'minQuantity' | 'startsOn' | 'endsOn'
 
 /**
  * Today's date in Israel, the day discount periods are counted in (as backend/app/pricing.py does).
@@ -61,16 +72,18 @@ function formatDate(date: string, locale: Locale): string {
 }
 
 /**
- * Words a discount for people: its value and its period.
+ * Words a discount for people: its value, its minimum quantity (a bulk discount) and its period.
  * @param discount - The discount; an empty `startsOn` leaves the period out.
  * @param t - The dictionary.
  * @param locale - The page language.
- * @returns E.g. "10% off, from 3 Nov 2026, with no end date" or "₪20.00 off, from 1 Nov 2026 to 30 Nov 2026".
+ * @returns E.g. "10% off, from 3 Nov 2026, with no end date" or "₪20.00 off for 12 units or more, from 1 Nov 2026 to
+ *   30 Nov 2026".
  */
-export function describeDiscount({ type, value, startsOn, endsOn }: DiscountValue, t: Dictionary, locale: Locale): string {
+export function describeDiscount({ type, value, minQuantity, startsOn, endsOn }: DiscountValue, t: Dictionary, locale: Locale): string {
   const d = t.admin.discount
+  const off = d.summaryDiscount.replace('{value}', formatValue(type, value, locale))
   return [
-    d.summaryDiscount.replace('{value}', formatValue(type, value, locale)),
+    minQuantity === null ? off : `${off} ${d.summaryBulk.replace('{quantity}', `\u2066${minQuantity.toLocaleString(locale)}\u2069`)}`,
     startsOn &&
       (endsOn ? d.summaryPeriod : d.summaryOpen)
         .replace('{start}', formatDate(startsOn, locale))
@@ -132,7 +145,7 @@ export function DiscountDialog({
 }
 
 /**
- * The dialog's form: the type switch, value, dates, summary and buttons.
+ * The dialog's form: the type switch, value, bulk minimum quantity, dates, summary and buttons.
  * @param props.initial - The discount being edited, if any.
  * @param props.title - The dialog title.
  * @param props.target - What the discount applies to, if given.
@@ -158,6 +171,8 @@ function DiscountForm({
   const id = useId()
   const [type, setType] = useState<DiscountValue['type']>(initial?.type ?? 'percent')
   const [value, setValue] = useState(initial ? String(initial.value) : '')
+  const [bulk, setBulk] = useState(initial ? initial.minQuantity !== null : false)
+  const [minQuantity, setMinQuantity] = useState(initial?.minQuantity != null ? String(initial.minQuantity) : '')
   const [startsOn, setStartsOn] = useState(initial?.startsOn || israelToday())
   const [endsOn, setEndsOn] = useState(initial?.endsOn ?? '')
   const [noEnd, setNoEnd] = useState(initial ? initial.endsOn === null : true)
@@ -167,7 +182,12 @@ function DiscountForm({
 
   const number = Number(value.trim())
   const valid = /^-?\d+(\.\d{1,2})?$/.test(value.trim()) && number > 0
-  const summary = valid ? describeDiscount({ type, value: number, startsOn, endsOn: noEnd || !endsOn ? null : endsOn }, t, locale) : ''
+  const quantity = /^\d+$/.test(minQuantity.trim()) ? Number(minQuantity.trim()) : NaN
+  const quantityValid = !bulk || quantity >= 2
+  const summary =
+    valid && quantityValid
+      ? describeDiscount({ type, value: number, minQuantity: bulk ? quantity : null, startsOn, endsOn: noEnd || !endsOn ? null : endsOn }, t, locale)
+      : ''
 
   /**
    * Checks the fields, then saves; puts each problem (or the server's reason) next to its field.
@@ -180,19 +200,21 @@ function DiscountForm({
     else if (!/^-?\d+(\.\d{1,2})?$/.test(value.trim())) found.value = d.errorNumber
     else if (number <= 0) found.value = d.errorPositive
     else if (type === 'percent' && number > 100) found.value = d.errorPercent
+    if (bulk && !minQuantity.trim()) found.minQuantity = t.admin.errors.required
+    else if (!quantityValid) found.minQuantity = d.errorQuantity
     if (!startsOn) found.startsOn = t.admin.errors.required
     if (!noEnd && !endsOn) found.endsOn = t.admin.errors.required
     else if (!noEnd && startsOn && endsOn < startsOn) found.endsOn = d.errorEnd
     setErrors(found)
     setFormError('')
-    const first = (['value', 'startsOn', 'endsOn'] as const).find((name) => found[name])
+    const first = (['value', 'minQuantity', 'startsOn', 'endsOn'] as const).find((name) => found[name])
     if (first) {
       document.getElementById(`${id}-${first}`)?.focus()
       return
     }
     setPending(true)
     try {
-      await onSave({ type, value: number, startsOn, endsOn: noEnd ? null : endsOn })
+      await onSave({ type, value: number, minQuantity: bulk ? quantity : null, startsOn, endsOn: noEnd ? null : endsOn })
     } catch (error) {
       setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
       setPending(false)
@@ -267,6 +289,37 @@ function DiscountForm({
             {fieldError('value')}
           </div>
 
+          <div>
+            <label htmlFor={`${id}-bulk`} className={CHECKBOX_LABEL_CLASS}>
+              <input id={`${id}-bulk`} type="checkbox" checked={bulk} onChange={(e) => setBulk(e.target.checked)} className={CHECKBOX_CLASS} />
+              {d.bulk}
+            </label>
+            {bulk && (
+              <div className="mt-3">
+                <label htmlFor={`${id}-minQuantity`} className={LABEL_CLASS}>{`${d.minQuantity} *`}</label>
+                <span className="relative mt-2 block" dir="ltr">
+                  <input
+                    id={`${id}-minQuantity`}
+                    type="text"
+                    inputMode="numeric"
+                    value={minQuantity}
+                    onChange={(e) => setMinQuantity(e.target.value)}
+                    aria-required
+                    className={cn(INPUT_CLASS, 'mt-0 pe-16')}
+                    {...described('minQuantity', `${id}-minQuantity-hint`)}
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 end-4 flex items-center text-sm text-brand-charcoal-muted" aria-hidden>
+                    {d.units}
+                  </span>
+                </span>
+                <p id={`${id}-minQuantity-hint`} className="mt-1 text-xs text-brand-charcoal-muted">
+                  {d.minQuantityHint}
+                </p>
+                {fieldError('minQuantity')}
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <label htmlFor={`${id}-startsOn`} className={LABEL_CLASS}>{`${d.startsOn} *`}</label>
@@ -286,14 +339,8 @@ function DiscountForm({
                 {...described('endsOn')}
               />
               {fieldError('endsOn')}
-              <label htmlFor={`${id}-noEnd`} className="mt-3 flex cursor-pointer items-center gap-3 text-sm text-brand-charcoal">
-                <input
-                  id={`${id}-noEnd`}
-                  type="checkbox"
-                  checked={noEnd}
-                  onChange={(e) => setNoEnd(e.target.checked)}
-                  className="size-4 accent-brand-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
-                />
+              <label htmlFor={`${id}-noEnd`} className={cn(CHECKBOX_LABEL_CLASS, 'mt-3')}>
+                <input id={`${id}-noEnd`} type="checkbox" checked={noEnd} onChange={(e) => setNoEnd(e.target.checked)} className={CHECKBOX_CLASS} />
                 {d.noEnd}
               </label>
             </div>

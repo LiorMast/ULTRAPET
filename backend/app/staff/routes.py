@@ -514,7 +514,7 @@ RESOURCES: dict[str, Resource] = {
     "price-rules": Resource(
         PriceRule,
         {"business_user_id": reference, "category_id": reference, "product_id": reference, "kind": text,
-         "value": money, "starts_on": day, "ends_on": day, "is_active": boolean, "note": text},
+         "value": money, "starts_on": day, "ends_on": day, "min_quantity": integer, "is_active": boolean, "note": text},
         (PriceRule.created_at, PriceRule.id),
         stamp_creator=True,
     ),

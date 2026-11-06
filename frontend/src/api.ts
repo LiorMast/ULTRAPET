@@ -495,6 +495,8 @@ export type StaffProduct = StaffRowBase & {
  * (`businessUserId` null) or one customer. `kind` "percent" / "amount" (shekels before VAT): `value` (> 0) is
  * what is taken off; "fixed_price" (one customer, one product): the price itself.
  * `startsOn` / `endsOn` are Israel dates ("2026-11-03", inclusive); null = no limit.
+ * `minQuantity` (>= 2): a bulk discount, applied when an order line has at least that many units of one product, on
+ * top of the regular discounts; null = a regular rule.
  */
 export type StaffPriceRule = StaffRowBase & {
   id: string
@@ -505,6 +507,7 @@ export type StaffPriceRule = StaffRowBase & {
   value: number
   startsOn: string | null
   endsOn: string | null
+  minQuantity: number | null
   isActive: boolean
   note: string | null
 }

@@ -187,15 +187,18 @@ CREATE INDEX ON product_suppliers (supplier_id);
 -- ===================================================================================================================
 
 -- price_rules — Every discount and special price, general or per customer, for a set period or
--- open-ended. Written by staff (the staff panel's discount dialogs). How a customer's price is computed
--- (backend/app/pricing.py):
+-- open-ended, and the bulk discounts that apply from a minimum quantity. Written by staff (the staff panel's discount
+-- dialogs). How a customer's price is computed (backend/app/pricing.py):
 --   1. Rules count only while active: is_active and starts_on <= today <= ends_on (a NULL date = no limit), where
 --      today is the date in Israel.
---   2. Two layers are picked separately: the customer's own rules, and the general rules (business_user_id NULL).
---      In each layer a product rule beats a category rule, and among rules on the same target the one that started
---      last wins (NULL start = earliest), so a temporary deal overrides permanent terms while it lasts.
---   3. A customer fixed_price is the final price. Otherwise the customer's discount, then the general discount, is
---      taken off list_price (a percent: x (1 - value/100); an amount: - value), never below 0, rounded to agorot once.
+--   2. Four layers are picked separately: the customer's own regular rules, the general regular rules
+--      (business_user_id NULL), then the customer's bulk rules and the general bulk rules (min_quantity set). A bulk
+--      rule counts only when the order line has at least min_quantity units of the one product. In each layer a
+--      product rule beats a category rule; among bulk rules on the same target the highest threshold reached wins;
+--      then the rule that started last wins (NULL start = earliest), so a temporary deal overrides permanent terms.
+--   3. A customer fixed_price is the final price. Otherwise the layers stack in that order: each discount is taken
+--      off the price so far, starting from list_price (a percent: x (1 - value/100); an amount: - value), never
+--      below 0, rounded to agorot once.
 CREATE TABLE price_rules (
   id               UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- rule id
   business_user_id UUID        REFERENCES business_users (id) ON DELETE CASCADE, -- the customer the rule is for; NULL = a general rule for all customers
@@ -205,6 +208,7 @@ CREATE TABLE price_rules (
   value            NUMERIC(10,2) NOT NULL CHECK (value > 0), -- percent or shekels before VAT (see kind); always positive: what is taken off, or the fixed price
   starts_on        DATE,                                  -- first day the rule applies (Israel date, inclusive); NULL = already in effect
   ends_on          DATE,                                  -- last day the rule applies (inclusive); NULL = no end date
+  min_quantity     INTEGER       CHECK (min_quantity IS NULL OR min_quantity >= 2), -- bulk discount: applies only when an order line has at least this many units of the product, on top of the regular discounts; NULL = a regular rule (any quantity)
   is_active        BOOLEAN       NOT NULL DEFAULT true,   -- false = paused: ignored without being deleted
   note             TEXT,                                  -- why the rule exists (e.g. 'November promotion', 'negotiated terms'); staff only
   created_by_id    UUID        REFERENCES staff_users (id) ON DELETE SET NULL, -- staff member who created the rule; NULL = unknown or since deleted
@@ -213,7 +217,8 @@ CREATE TABLE price_rules (
   CONSTRAINT price_rules_one_target_check CHECK (num_nonnulls(category_id, product_id) = 1), -- exactly one target: a category or a product
   CONSTRAINT price_rules_percent_max_check CHECK (kind <> 'percent' OR value <= 100), -- a percent discount is at most 100 percent
   CONSTRAINT price_rules_fixed_price_target_check CHECK (kind <> 'fixed_price' OR (product_id IS NOT NULL AND business_user_id IS NOT NULL)), -- a fixed price is set on one product for one customer
-  CONSTRAINT price_rules_dates_check CHECK (starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on) -- the period does not end before it starts
+  CONSTRAINT price_rules_dates_check CHECK (starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on), -- the period does not end before it starts
+  CONSTRAINT price_rules_fixed_price_bulk_check CHECK (kind <> 'fixed_price' OR min_quantity IS NULL) -- a fixed price is never a bulk rule
 );
 CREATE INDEX ON price_rules (business_user_id);
 CREATE INDEX ON price_rules (category_id);

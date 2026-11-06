@@ -1,4 +1,4 @@
-"""test_pricing.py — The price a customer pays (app.pricing): rule choice, stacking, periods and rounding.
+"""test_pricing.py — The price a customer pays (app.pricing): rule choice, stacking, bulk discounts, periods and rounding.
 
 Most tests call the pure functions with unsaved PriceRule objects; the last one prices a small catalog through
 the database with customer_prices().
@@ -26,7 +26,7 @@ def rule(kind: str, value: str, *, product: bool = False, created: int = 0, **fi
         value: Percent or shekels.
         product: True to target the product instead of the category.
         created: Days after 1 Oct 2026 the rule was created (decides ties between rules with the same start).
-        **fields: Other PriceRule fields (starts_on, ends_on, is_active).
+        **fields: Other PriceRule fields (starts_on, ends_on, is_active, min_quantity).
 
     Returns:
         The PriceRule.
@@ -42,6 +42,7 @@ def price(
     general: Iterable[PriceRule] = (),
     list_price: Decimal | None = LIST,
     today: date = TODAY,
+    quantity: int = 1,
 ) -> Decimal | None:
     """Prices the test product.
 
@@ -50,11 +51,12 @@ def price(
         general: The general rules.
         list_price: The product's list price.
         today: The date to price on.
+        quantity: Units on the order line.
 
     Returns:
         What resolve_price returns.
     """
-    return resolve_price(list_price, customer, general, PRODUCT, CATEGORY, today)
+    return resolve_price(list_price, customer, general, PRODUCT, CATEGORY, today, quantity)
 
 
 def test_no_rules_gives_the_list_price():
@@ -126,6 +128,40 @@ def test_prices_round_half_up_to_agorot():
     assert price(general=[rule("percent", "10")], list_price=Decimal("1.65")) == Decimal("1.49")
 
 
+def test_a_bulk_discount_applies_only_from_its_minimum_quantity():
+    bulk = rule("percent", "10", min_quantity=10)
+    assert price(general=[bulk], quantity=9) == LIST
+    assert price(general=[bulk], quantity=10) == Decimal("90.00")
+    assert price(general=[bulk], quantity=50) == Decimal("90.00")
+    assert price(general=[bulk]) == LIST  # one unit, as the catalog shows
+
+
+def test_a_bulk_discount_stacks_on_the_regular_discounts():
+    customer = [rule("percent", "10"), rule("amount", "8", min_quantity=5)]
+    general = [rule("percent", "10", product=True), rule("percent", "50", min_quantity=5)]
+    # 100 x 0.9 (customer) x 0.9 (general) = 81, - 8 (customer bulk) = 73, x 0.5 (general bulk) = 36.50.
+    assert price(customer, general, quantity=5) == Decimal("36.50")
+    assert price(customer, general, quantity=4) == Decimal("81.00")
+
+
+def test_the_highest_bulk_tier_reached_wins():
+    tiers = [rule("percent", "5", min_quantity=10, created=5), rule("percent", "10", min_quantity=50, created=1)]
+    assert price(general=tiers, quantity=10) == Decimal("95.00")
+    assert price(general=tiers, quantity=49) == Decimal("95.00")
+    assert price(general=tiers, quantity=50) == Decimal("90.00")
+
+
+def test_a_product_bulk_discount_beats_a_category_bulk_discount():
+    rules = [rule("percent", "20", min_quantity=5), rule("percent", "10", min_quantity=10, product=True)]
+    assert price(general=rules, quantity=10) == Decimal("90.00")
+    assert price(general=rules, quantity=5) == Decimal("80.00")  # the product's tier is not reached yet
+
+
+def test_a_customer_fixed_price_ignores_bulk_discounts():
+    fixed = rule("fixed_price", "60", product=True)
+    assert price([fixed], [rule("percent", "50", min_quantity=2)], quantity=10) == Decimal("60.00")
+
+
 def test_customer_prices_uses_only_this_customer_and_the_general_rules(database):
     food = Category(slug="food", name={"he": "מזון"})
     toys = Category(slug="toys", name={"he": "צעצועים"})
@@ -167,6 +203,7 @@ def test_customer_prices_uses_only_this_customer_and_the_general_rules(database)
             PriceRule(business_user=other, category=toys, kind="percent", value=Decimal(50)),  # someone else's
             PriceRule(category=toys, kind="percent", value=Decimal(25), ends_on=TODAY - timedelta(days=1)),  # expired
             PriceRule(product=p1, kind="percent", value=Decimal(10)),
+            PriceRule(category=toys, kind="percent", value=Decimal(40), min_quantity=2),  # bulk: not for one unit
         ]
     )
     database.commit()

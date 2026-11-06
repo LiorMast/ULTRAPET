@@ -295,10 +295,10 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     order: (a, b) => Number(a.sortOrder) - Number(b.sortOrder) || a.id.localeCompare(b.id),
   },
   'price-rules': {
-    fields: ['businessUserId', 'categoryId', 'productId', 'kind', 'value', 'startsOn', 'endsOn', 'isActive', 'note'],
+    fields: ['businessUserId', 'categoryId', 'productId', 'kind', 'value', 'startsOn', 'endsOn', 'minQuantity', 'isActive', 'note'],
     required: ['kind', 'value', 'isActive'],
-    numeric: ['value'],
-    defaults: { businessUserId: null, categoryId: null, productId: null, startsOn: null, endsOn: null, isActive: true, note: null },
+    numeric: ['value', 'minQuantity'],
+    defaults: { businessUserId: null, categoryId: null, productId: null, startsOn: null, endsOn: null, minQuantity: null, isActive: true, note: null },
     seed: () => [],
     check: (rule) => {
       if (!['percent', 'amount', 'fixed_price'].includes(String(rule.kind))) return invalid('price_rules_kind_check')
@@ -307,6 +307,8 @@ const STAFF_TABLES: Record<string, FakeTable> = {
       if (rule.kind === 'percent' && Number(rule.value) > 100) return invalid('price_rules_percent_max_check')
       if (rule.kind === 'fixed_price' && (rule.productId === null || rule.businessUserId === null)) return invalid('price_rules_fixed_price_target_check')
       if (rule.startsOn !== null && rule.endsOn !== null && String(rule.endsOn) < String(rule.startsOn)) return invalid('price_rules_dates_check')
+      if (rule.minQuantity !== null && !(Number.isInteger(Number(rule.minQuantity)) && Number(rule.minQuantity) >= 2)) return invalid('price_rules_min_quantity_check')
+      if (rule.kind === 'fixed_price' && rule.minQuantity !== null) return invalid('price_rules_fixed_price_bulk_check')
       return null
     },
     order: (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),

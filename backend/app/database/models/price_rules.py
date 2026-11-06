@@ -1,7 +1,7 @@
 """price_rules.py — The PriceRule model: every discount and fixed price staff set.
 
 One row of `price_rules` is a rule for all customers or one customer, on a category or a product, for a set period
-or open-ended. The logic that turns rules into a customer's price lives in app/pricing.py. Column meanings are
+or open-ended; a rule with `min_quantity` is a bulk discount (it applies from that many units on one order line). The logic that turns rules into a customer's price lives in app/pricing.py. Column meanings are
 documented in create-tables.sql.
 """
 from __future__ import annotations
@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, ForeignKey
+from sqlalchemy import CheckConstraint, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.db import TimestampMixin, db, uuid_pk
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 class PriceRule(TimestampMixin, db.Model):
-    """A discount (percent or amount), or a customer's fixed price, on a category or a product."""
+    """A discount (percent or amount, regular or bulk), or a customer's fixed price, on a category or a product."""
 
     __tablename__ = "price_rules"
     __table_args__ = (
@@ -35,6 +35,8 @@ class PriceRule(TimestampMixin, db.Model):
             name="fixed_price_target",
         ),
         CheckConstraint("starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on", name="dates"),
+        CheckConstraint("min_quantity IS NULL OR min_quantity >= 2", name="min_quantity"),
+        CheckConstraint("kind <> 'fixed_price' OR min_quantity IS NULL", name="fixed_price_bulk"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -47,6 +49,7 @@ class PriceRule(TimestampMixin, db.Model):
     value: Mapped[Decimal]
     starts_on: Mapped[date | None]
     ends_on: Mapped[date | None]
+    min_quantity: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
     note: Mapped[str | None]
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("staff_users.id", ondelete="SET NULL"), index=True)

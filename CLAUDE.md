@@ -284,10 +284,12 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   (converter `media_key`). Real S3 later: change
   only `storage.py`. Replaced files are not deleted yet.
 - **Discounts** (`DiscountDialog`): one dialog for every discount (category, product, customer, payment method):
-  percent/amount switch, a positive value (no surcharges), start date, end date or "no end date". It returns a
-  `DiscountValue` ({ type, value, startsOn, endsOn: null = open-ended }) and the caller stores it. `DiscountsDialog`
+  percent/amount switch, a positive value (no surcharges), "Bulk discount" + minimum quantity (whole number >= 2),
+  start date, end date or "no end date". It returns a `DiscountValue` ({ type, value, minQuantity: null = regular,
+  startsOn, endsOn: null = open-ended }) and the caller stores it. `DiscountsDialog`
   lists one target's discounts (add/edit/delete) and is the "Discounts" row action of the products and categories
-  tables. A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0.
+  tables. A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0,
+  `min_quantity` = the bulk threshold (NULL = a regular discount; never on a fixed price).
   **Not yet stored:** `payment_methods.discount_percent` has no amounts or dates (schema change with its page).
 - **Inline section editing** (`InlineEditor.tsx`): a section that staff may edit in place calls
   `useInlineDraft(onSave)` (`onSave` undefined = the user may not edit: signing out while editing drops the draft and
@@ -441,6 +443,11 @@ statement (הצהרת נגישות), refund/returns policy, privacy policy.
   customer's rules, the general rules) a product rule beats a category rule and the rule that started last wins. The
   layers **stack**: the customer's discount, then the general discount, taken off the list price (percent:
   x (1 - v/100); amount: - v), never below 0, rounded half-up to agorot once; a customer fixed price is final.
+  **Bulk discounts** (`price_rules.min_quantity`): apply when one order line has at least that many units of the
+  product (a category rule counts each product separately); they form two more layers (customer bulk, then general
+  bulk) stacked after the regular ones; in a bulk layer the highest threshold reached wins (tiers). The catalog's
+  unit price (`/api/prices`) is for one unit, so bulk never changes it; the cart prices a line with
+  `resolve_price(..., quantity)`.
 - Submitted orders are written directly to **Rivhit (רווחית)** through its API.
 - A product upload page; an API for pulling product images (later).
 - "WooCommerce-ready architecture" means our own e-commerce-ready data model (products, SKUs, prices, customers,

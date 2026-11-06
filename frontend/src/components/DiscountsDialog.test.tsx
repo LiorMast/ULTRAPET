@@ -2,7 +2,8 @@
  * DiscountsDialog.test.tsx — Tests for the staff panel's catalog pages (/admin/categories, /admin/products) and
  * their discounts (DiscountsDialog, DataTable's row actions) against the fake staff API (src/test/api.ts): the
  * menu, the tables, adding/editing a category and a product, adding, editing and deleting a discount (what is
- * sent, what the list and the table show, where the focus goes), ended discounts, and the Hebrew texts.
+ * sent, what the list and the table show, where the focus goes), a bulk discount, ended discounts, and the Hebrew
+ * texts.
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -74,7 +75,7 @@ describe('/admin/categories', () => {
     await user.type(within(form).getByLabelText('Value *'), '10')
     await user.click(within(form).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New discount' })).not.toBeInTheDocument())
-    expect(bodies(fetchSpy, 'POST')).toEqual([{ categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 10, startsOn: israelToday(), endsOn: null }])
+    expect(bodies(fetchSpy, 'POST')).toEqual([{ categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 10, minQuantity: null, startsOn: israelToday(), endsOn: null }])
     const added = `⁦10%⁩ off, from ${todayText()}, with no end date`
     expect(await within(dialog).findByText(added)).toBeInTheDocument()
     expect(within(dialog).getByRole('status')).toHaveTextContent('Discount saved.')
@@ -87,6 +88,27 @@ describe('/admin/categories', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(within(rowOf(name)).getAllByRole('cell')[1]).toHaveTextContent(added)
     await waitFor(() => expect(screen.getByRole('button', { name: `Discounts: ${name}` })).toHaveFocus())
+  })
+
+  it('adds a bulk discount', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { user } = await renderPage('/en/admin/categories', { staff: TEST_STAFF })
+    const name = categories[0].name.en
+    await user.click(screen.getByRole('button', { name: `Discounts: ${name}` }))
+    const dialog = await screen.findByRole('dialog', { name: 'Discounts' })
+    await user.click(within(dialog).getByRole('button', { name: 'Add discount' }))
+    const form = await screen.findByRole('dialog', { name: 'New discount' })
+    await user.type(within(form).getByLabelText('Value *'), '5')
+    await user.click(within(form).getByRole('checkbox', { name: 'Bulk discount' }))
+    await user.type(within(form).getByLabelText('Minimum quantity *'), '12')
+    await user.click(within(form).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New discount' })).not.toBeInTheDocument())
+    expect(bodies(fetchSpy, 'POST')).toEqual([{ categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 5, minQuantity: 12, startsOn: israelToday(), endsOn: null }])
+    const added = `⁦5%⁩ off for ⁦12⁩ units or more, from ${todayText()}, with no end date`
+    expect(await within(dialog).findByText(added)).toBeInTheDocument()
+    await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(within(rowOf(name)).getAllByRole('cell')[1]).toHaveTextContent(added)
   })
 
   it('edits a discount', async () => {
@@ -107,7 +129,7 @@ describe('/admin/categories', () => {
     const changed = `⁦₪20.00⁩ off, from ${todayText()}, with no end date`
     expect(await within(dialog).findByText(changed)).toBeInTheDocument()
     await waitFor(() => expect(within(dialog).getByRole('button', { name: `Edit: ${changed}` })).toHaveFocus())
-    expect(bodies(fetchSpy, 'PATCH')).toEqual([{ kind: 'amount', value: 20, startsOn: israelToday(), endsOn: null }])
+    expect(bodies(fetchSpy, 'PATCH')).toEqual([{ kind: 'amount', value: 20, minQuantity: null, startsOn: israelToday(), endsOn: null }])
   })
 
   it('deletes a discount after a confirmation that can be cancelled', async () => {

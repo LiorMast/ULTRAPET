@@ -29,16 +29,22 @@ export type DiscountRow<Row> = Row & { discounts: StaffPriceRule[]; discountText
  * @returns The discount; a rule without a start date gets an empty `startsOn` (in effect since it was made).
  */
 export function ruleDiscount(rule: StaffPriceRule): DiscountValue {
-  return { type: rule.kind === 'amount' ? 'amount' : 'percent', value: rule.value, startsOn: rule.startsOn ?? '', endsOn: rule.endsOn }
+  return {
+    type: rule.kind === 'amount' ? 'amount' : 'percent',
+    value: rule.value,
+    minQuantity: rule.minQuantity,
+    startsOn: rule.startsOn ?? '',
+    endsOn: rule.endsOn,
+  }
 }
 
 /**
  * The price rule fields of a discount, for the staff API (createStaffRow / updateStaffRow 'price-rules').
  * @param discount - The discount from DiscountDialog.
- * @returns { kind, value, startsOn, endsOn }.
+ * @returns { kind, value, minQuantity, startsOn, endsOn }.
  */
 export function discountFields(discount: DiscountValue) {
-  return { kind: discount.type, value: discount.value, startsOn: discount.startsOn, endsOn: discount.endsOn }
+  return { kind: discount.type, value: discount.value, minQuantity: discount.minQuantity, startsOn: discount.startsOn, endsOn: discount.endsOn }
 }
 
 /**

@@ -8,6 +8,7 @@ import pytest
 from app.database.models.catalog import Category, Product
 from app.database.models.content import FaqItem
 from app.database.models.price_rules import PriceRule
+from app.database.models.users import BusinessUser
 
 
 @pytest.fixture
@@ -166,6 +167,7 @@ def test_price_rules_are_discounts_on_a_category_or_product(api, database, staff
         ({"kind": "percent", "value": 101}, {"error": "invalid", "constraint": "price_rules_percent_max_check"}),
         ({"kind": "percent", "value": 5, "startsOn": "2026-12-01", "endsOn": "2026-11-01"}, {"error": "invalid", "constraint": "price_rules_dates_check"}),
         ({"kind": "percent", "value": 5, "startsOn": "1 Nov"}, {"error": "invalid", "field": "startsOn"}),
+        ({"kind": "percent", "value": 5, "minQuantity": 1}, {"error": "invalid", "constraint": "price_rules_min_quantity_check"}),
         ({"kind": "percent"}, {"error": "required", "field": "value"}),
     ],
 )
@@ -175,6 +177,26 @@ def test_invalid_price_rules_are_refused(api, database, body, error):
     database.commit()
     response = api("POST", "/price-rules", {"categoryId": str(category.id), **body})
     assert (response.status_code, response.get_json()) == (400, error)
+
+
+def test_bulk_discounts_store_their_minimum_quantity(api, database):
+    category = Category(slug="dogs", name={"he": "כלבים"})
+    product = Product(slug="bones", name={"he": "עצמות"}, category=category)
+    customer = BusinessUser(email="shop@example.com", full_name="shop", company_name="shop", password_hash="x")
+    database.add_all([product, customer])
+    database.commit()
+
+    response = api("POST", "/price-rules", {"categoryId": str(category.id), "kind": "percent", "value": 5, "minQuantity": 10})
+    assert (response.status_code, response.get_json()["minQuantity"]) == (201, 10)
+    regular = api("POST", "/price-rules", {"productId": str(product.id), "kind": "amount", "value": 3}).get_json()
+    assert regular["minQuantity"] is None
+    changed = api("PATCH", f"/price-rules/{regular['id']}", {"minQuantity": 24}).get_json()
+    assert changed["minQuantity"] == 24
+
+    # A customer's fixed price is never a bulk rule.
+    fixed = api("POST", "/price-rules", {"productId": str(product.id), "businessUserId": str(customer.id),
+                                         "kind": "fixed_price", "value": 40, "minQuantity": 10})
+    assert (fixed.status_code, fixed.get_json()) == (400, {"error": "invalid", "constraint": "price_rules_fixed_price_bulk_check"})
 
 
 def test_a_category_with_products_cannot_be_deleted(api, database):

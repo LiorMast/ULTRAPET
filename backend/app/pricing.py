@@ -5,12 +5,17 @@ set. The functions below turn a product's list price and those rules into the cu
 
 1. A rule counts only while active: `is_active` and starts_on <= today <= ends_on (a missing date = no limit),
    where today is the date in Israel.
-2. Two layers are picked separately: the customer's own rules and the general rules. In each layer a product rule
-   beats a category rule; among rules on the same target the one that started last wins (no start = earliest),
-   so a temporary deal overrides permanent terms while it lasts.
-3. A customer fixed price is final. Otherwise the layers stack: the customer's discount, then the general discount, is
-   taken off the list price (a percent rule: x (1 - value / 100); an amount rule: - value), never going below 0, and
-   the result is rounded half-up to agorot once.
+2. Four layers are picked separately: the customer's own regular rules, the general regular rules, then the
+   customer's bulk rules and the general bulk rules (rules with `min_quantity`, which count only when the order line
+   has at least that many units of the product). In each layer a product rule beats a category rule; among bulk rules
+   on the same target the highest threshold reached wins (tiers: 10 units -> 5%, 50 units -> 10%); then the rule
+   that started last wins (no start = earliest), so a temporary deal overrides permanent terms while it lasts.
+3. A customer fixed price is final. Otherwise the layers stack in that order: each discount is taken off the price so
+   far, starting from the list price (a percent rule: x (1 - value / 100); an amount rule: - value), never going
+   below 0, and the result is rounded half-up to agorot once.
+
+The catalog's unit price (`customer_prices`) is the price of one unit, so bulk rules never change it; an order line
+is priced with `resolve_price(..., quantity=<units>)`.
 
 `pick_rule` and `resolve_price` are pure (no database), so they are unit-tested directly; `customer_prices` loads
 the data for the catalog. Column meanings are documented in create-tables.sql.
@@ -55,30 +60,48 @@ def rule_age(rule: PriceRule) -> tuple[date, datetime, uuid.UUID]:
     return (rule.starts_on or date.min, rule.created_at or datetime.min.replace(tzinfo=UTC), rule.id or uuid.UUID(int=0))
 
 
-def pick_rule(rules: Iterable[PriceRule], product_id: uuid.UUID, category_id: uuid.UUID, today: date) -> PriceRule | None:
+def pick_rule(
+    rules: Iterable[PriceRule],
+    product_id: uuid.UUID,
+    category_id: uuid.UUID,
+    today: date,
+    bulk_quantity: int | None = None,
+) -> PriceRule | None:
     """Chooses the one rule of a layer that applies to a product today.
 
-    A rule on the product beats a rule on its category. Among rules on the same target, the one with the latest
-    start wins (no start counts as the earliest), then the most recently created one (ids are random UUIDs, so they
-    say nothing about age; they only break an exact tie, to keep the choice stable).
+    A rule on the product beats a rule on its category. In the bulk layer, among rules on the same target the highest
+    threshold reached wins. Then the one with the latest start wins (no start counts as the earliest), then the most
+    recently created one (ids are random UUIDs, so they say nothing about age; they only break an exact tie, to keep
+    the choice stable).
 
     Args:
-        rules: Rules of one layer (one customer's rules, or the general rules); others are ignored.
+        rules: Rules of one audience (one customer's rules, or the general rules); others are ignored.
         product_id: The product being priced.
         category_id: The product's category.
         today: The Israel date to price on.
+        bulk_quantity: None = pick from the regular rules (no min_quantity); a number of units = pick from the bulk
+            rules whose min_quantity is at most that number.
 
     Returns:
-        The winning rule, or None when no active rule targets the product or its category.
+        The winning rule, or None when no active rule of the layer targets the product or its category.
     """
-    active = [rule for rule in rules if rule.applies_on(today)]
+    active = [
+        rule
+        for rule in rules
+        if rule.applies_on(today)
+        and (
+            rule.min_quantity is None
+            if bulk_quantity is None
+            else rule.min_quantity is not None and rule.min_quantity <= bulk_quantity
+        )
+    ]
     for matches in (
         lambda rule: rule.product_id == product_id,
         lambda rule: rule.product_id is None and rule.category_id == category_id,
     ):
         candidates = [rule for rule in active if matches(rule)]
         if candidates:
-            return max(candidates, key=rule_age)
+            return max(candidates, key=lambda rule: (rule.min_quantity or 0, *rule_age(rule)))
     return None
 
 
@@ -103,33 +126,40 @@ def resolve_price(
     product_id: uuid.UUID,
     category_id: uuid.UUID,
     today: date,
+    quantity: int = 1,
 ) -> Decimal | None:
-    """Computes the price one customer pays for one product.
+    """Computes the unit price one customer pays for one product, bought in a given quantity.
 
     Args:
         list_price: The product's list price, or None when it has none.
-        customer_rules: The customer's own rules.
-        general_rules: The rules for all customers (percent and amount rules).
+        customer_rules: The customer's own rules (regular and bulk).
+        general_rules: The rules for all customers (percent and amount rules, regular and bulk).
         product_id: The product being priced.
         category_id: The product's category.
         today: The Israel date to price on.
+        quantity: Units of the product on the order line; bulk rules with a min_quantity above it are ignored.
 
     Returns:
         The unit price in shekels before VAT, rounded to agorot; None when the product has no price for this
         customer (no list price and no fixed price).
     """
+    customer_rules, general_rules = list(customer_rules), list(general_rules)
     customer_rule = pick_rule(customer_rules, product_id, category_id, today)
     if customer_rule is not None and customer_rule.kind == "fixed_price":
         return customer_rule.value.quantize(AGORA, ROUND_HALF_UP)
     if list_price is None:
         return None
 
+    layers = (
+        customer_rule,
+        pick_rule(general_rules, product_id, category_id, today),
+        pick_rule(customer_rules, product_id, category_id, today, bulk_quantity=quantity),
+        pick_rule(general_rules, product_id, category_id, today, bulk_quantity=quantity),
+    )
     price = list_price
-    if customer_rule is not None:
-        price = apply_rule(price, customer_rule)
-    general_rule = pick_rule(general_rules, product_id, category_id, today)
-    if general_rule is not None:
-        price = apply_rule(price, general_rule)
+    for layer_rule in layers:
+        if layer_rule is not None:
+            price = apply_rule(price, layer_rule)
     return price.quantize(AGORA, ROUND_HALF_UP)
 
 
