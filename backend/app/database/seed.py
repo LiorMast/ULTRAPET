@@ -3,17 +3,19 @@
 reset-db rebuilds the schema by running drop-tables.sql and then create-tables.sql. seed fills an empty database
 from the stub files in frontend/src/stubs/ (the data the frontend showed before the API existed; its unit tests
 still use them as fixtures):
-- categories, products (in stub order, with their WooCommerce ids in woocommerce_id, and images), placeholder prices
-  and brands;
+- categories, products (in stub order, with their WooCommerce ids in woocommerce_id, and images: object keys in the
+  file storage, see app/storage.py), placeholder prices and brands;
 - the articles (with their WordPress dates) and the resellers of the Where to Buy page;
 - the questions of the home page FAQ section (stubs/faq.json, in file order);
-- the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order and the currency;
+- the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order, the currency and the
+  PDF catalog's object key;
 - the contact details of the Contact section and the WhatsApp button (stubs/contact.json: settings contact_<field>);
 - the three payment methods;
 - a staff admin, when SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are set, and a demo business customer (to see
   prices in the catalog), when SEED_CUSTOMER_EMAIL and SEED_CUSTOMER_PASSWORD are set.
 Paths are relative to the repository root; compose mounts the same folders at the same relative places, so the
-commands work both locally and in the backend container. Also used by the tests (run_sql_file, seed_database).
+commands work both locally and in the backend container. The seed writes only rows: the files they name (product
+photos, the PDF catalog) are copied into the file storage once by `flask import-media` (app/database/legacy_media.py). Also used by the tests (run_sql_file, seed_database).
 """
 import json
 import os
@@ -45,6 +47,7 @@ BASE_SETTINGS = [
     ("vat_percent", 18, "VAT rate in percent, added to prices at checkout"),
     ("min_order_amount", 2000, "Minimum order subtotal in shekels before VAT"),
     ("currency", "ILS", "Currency of all prices (ISO 4217)"),
+    ("catalog_pdf", "catalog/ultrapetcatalog.pdf", "Object key of the downloadable PDF catalog (no prices) in the file storage; /api/catalog.pdf redirects to it"),
 ]
 
 # What each contact setting (contact_<field>, from stubs/contact.json) holds.

@@ -5,7 +5,9 @@
  * letter-spacing, lifting slightly with a red glow on hover. Every variant reacts the instant it is pressed
  * (scales to 97% in 100ms) and springs back on release, so a press never feels dead. Sizes: "default" (legacy px-8 py-4) and
  * "sm" (the header's call to action). The "ghostWhite" variant is the white-outline button for dark photo
- * backgrounds (hero), from legacy `.btn-ghost-white`. The other shadcn variants and icon sizes are kept for
+ * backgrounds (hero), from legacy `.btn-ghost-white`. The "action" variant with size "action" is a record's action
+ * (the admin tables' Edit / Discounts / Delete): outlined, an uppercase label, filled charcoal on hover;
+ * "actionDanger" is the same for a destructive one (red outline and fill). The other shadcn variants and icon sizes are kept for
  * shadcn components that use them. Use `asChild` to style a <Link> or <a> as a button.
  */
 import * as React from "react"
@@ -31,11 +33,16 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
         link: "text-primary underline-offset-4 hover:underline",
+        action:
+          "border-neutral-300 bg-white font-heading font-semibold uppercase tracking-wider text-brand-charcoal duration-200 hover:border-brand-charcoal hover:bg-brand-charcoal hover:text-white focus-visible:border-brand-red focus-visible:ring-brand-red/40",
+        actionDanger:
+          "border-brand-red/40 bg-white font-heading font-semibold uppercase tracking-wider text-brand-red-dark duration-200 hover:border-brand-red hover:bg-brand-red hover:text-white focus-visible:border-brand-red focus-visible:ring-brand-red/40",
       },
       size: {
         default: "gap-2 px-8 py-4 text-xs",
         sm: "gap-2 px-6 py-3 text-2xs",
         xs: "h-6 gap-1 px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
+        action: "h-9 gap-1.5 rounded-none px-3.5 text-2xs [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-10 gap-1.5 px-2.5",
         icon: "size-9",
         "icon-xs": "size-6 [&_svg:not([class*='size-'])]:size-3",
@@ -52,8 +59,9 @@ const buttonVariants = cva(
 
 /**
  * A button, or — with `asChild` — any single child element (such as a router <Link>) styled as one.
- * @param props.variant - Visual style; "default" is the brand-red primary button, "ghostWhite" a white outline for dark backgrounds.
- * @param props.size - "default", "sm" (header), or one of the shadcn icon/compact sizes.
+ * @param props.variant - Visual style; "default" is the brand-red primary button, "ghostWhite" a white outline for dark
+ *   backgrounds, "action" / "actionDanger" a record's action in a table row.
+ * @param props.size - "default", "sm" (header), "action" (with the action variants), or one of the shadcn icon/compact sizes.
  * @param props.asChild - Render the child element instead of a <button>, merging the button styles into it.
  * @param props.className - Extra classes, merged over the variant classes.
  * @param props - Any other <button> attributes.

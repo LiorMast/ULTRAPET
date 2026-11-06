@@ -98,25 +98,31 @@ def test_a_change_needs_a_json_body(staff_client, csrf):
     assert response.status_code == 415
 
 
-def test_products_with_images_and_references(api):
+def test_products_with_images_and_references(api, database):
     category = api("POST", "/categories", {"slug": "dogs", "name": {"he": "כלבים", "en": "Dogs"}}).get_json()
     product = {
         "slug": "beef-14kg",
         "name": {"he": "בקר 14 ק\"ג", "en": "Beef 14 kg"},
         "categoryId": category["id"],
         "listPrice": "303.90",
-        "images": [{"url": "https://img/a.jpg", "thumbnailUrl": "https://img/a-300.jpg"}, {"url": "https://img/b.jpg"}],
+        "images": [
+            {"url": "products/a.jpg", "thumbnailUrl": "/api/media/products/a-300.jpg", "srcset": "products/a-500.jpg 500w, /api/media/products/a-768.jpg 768w"},
+            {"url": "products/b.jpg"},
+        ],
     }
     response = api("POST", "/products", product)
     assert response.status_code == 201
     created = response.get_json()
     assert (created["listPrice"], created["categoryId"], created["brandId"]) == (303.9, category["id"], None)
-    assert [image["url"] for image in created["images"]] == ["https://img/a.jpg", "https://img/b.jpg"]
-    assert created["images"][0]["thumbnailUrl"] == "https://img/a-300.jpg"
+    # Stored as keys (a key or our URL is accepted), answered as URLs.
+    assert [image["url"] for image in created["images"]] == ["/api/media/products/a.jpg", "/api/media/products/b.jpg"]
+    assert created["images"][0]["thumbnailUrl"] == "/api/media/products/a-300.jpg"
+    assert created["images"][0]["srcset"] == "/api/media/products/a-500.jpg 500w, /api/media/products/a-768.jpg 768w"
+    assert database.get(Product, uuid.UUID(created["id"])).images[0].srcset == "products/a-500.jpg 500w, products/a-768.jpg 768w"
 
     # Images are replaced as a whole.
-    changed = api("PATCH", f"/products/{created['id']}", {"images": [{"url": "https://img/c.jpg"}]}).get_json()
-    assert [image["url"] for image in changed["images"]] == ["https://img/c.jpg"]
+    changed = api("PATCH", f"/products/{created['id']}", {"images": [{"url": "products/c.jpg"}]}).get_json()
+    assert [image["url"] for image in changed["images"]] == ["/api/media/products/c.jpg"]
     assert [p["slug"] for p in api("GET", "/products").get_json()] == ["beef-14kg"]
 
     missing = api("POST", "/products", {**product, "slug": "other", "categoryId": str(uuid.uuid4())})
@@ -311,6 +317,116 @@ def test_an_id_listed_twice_is_refused(api, database):
     database.commit()
     twice = {"id": str(item.id), "question": {"he": "קיימת"}, "answer": {"he": "כן"}}
     assert api("PUT", "/faq-items", [twice, twice]).get_json() == {"error": "invalid", "field": "id"}
+
+
+def test_product_pictures_must_be_in_the_file_storage(api, database):
+    category = Category(slug="birds", name={"he": "ציפורים"})
+    database.add(category)
+    database.commit()
+    product = {"slug": "seeds", "name": {"he": "זרעים"}, "categoryId": str(category.id)}
+    for image in (
+        {"url": "https://www.ultrapet.co.il/wp-content/uploads/a.jpg"},
+        {"url": "products/a.jpg", "thumbnailUrl": "https://other.example/a.jpg"},
+        {"url": "products/a.jpg", "srcset": "https://other.example/a.jpg 300w"},
+        {"url": "products/a.jpg", "srcset": "products/a.jpg"},  # no width
+    ):
+        response = api("POST", "/products", {**product, "images": [image]})
+        assert (response.status_code, response.get_json()["error"]) == (400, "invalid")
+
+
+def test_brand_logos_must_be_in_the_file_storage(api):
+    created = api("POST", "/brands", {"slug": "paw", "name": "Paw", "logoUrl": "brands/paw.png"}).get_json()
+    assert created["logoUrl"] == "/api/media/brands/paw.png"
+    response = api("PATCH", f"/brands/{created['id']}", {"logoUrl": "https://example.com/paw.svg"})
+    assert response.get_json() == {"error": "invalid", "field": "logoUrl"}
+
+
+def test_a_new_category_is_named_after_its_english_name_and_goes_last(api, database):
+    database.add_all([
+        Category(slug="dry-dog-food", name={"he": "מזון יבש לכלבים"}, sort_order=0),
+        Category(slug="birds", name={"he": "ציפורים"}, sort_order=7),
+    ])
+    database.commit()
+    first = api("POST", "/categories", {"name": {"he": "מזון יבש", "en": "Dry Dog Food!"}}).get_json()
+    assert (first["slug"], first["sortOrder"]) == ("dry-dog-food-2", 8)
+    second = api("POST", "/categories", {"name": {"he": "עוד", "en": "Dry dog food"}}).get_json()
+    assert (second["slug"], second["sortOrder"]) == ("dry-dog-food-3", 9)
+    # Hebrew only: a neutral name. Given values are kept.
+    assert api("POST", "/categories", {"name": {"he": "חדש"}}).get_json()["slug"] == "category"
+    assert api("POST", "/categories", {"name": {"he": "חדש"}}).get_json()["slug"] == "category-2"
+    given = api("POST", "/categories", {"name": {"he": "x", "en": "X"}, "slug": "mine", "sortOrder": 3}).get_json()
+    assert (given["slug"], given["sortOrder"]) == ("mine", 3)
+    # An edit never renames it.
+    renamed = api("PATCH", f"/categories/{first['id']}", {"name": {"he": "אחר", "en": "Other"}}).get_json()
+    assert renamed["slug"] == "dry-dog-food-2"
+
+
+def test_the_first_category_starts_the_order(api):
+    assert api("POST", "/categories", {"name": {"he": "ציפורים", "en": "Birds"}}).get_json()["sortOrder"] == 0
+
+
+def test_categories_are_reordered_at_once(api, database, client):
+    rows = [Category(slug=slug, name={"he": slug}, sort_order=n) for n, slug in enumerate(["a", "b", "c"])]
+    database.add_all(rows)
+    database.commit()
+    a, b, c = (str(row.id) for row in rows)
+    response = api("PUT", "/categories/order", {"ids": [c, a, b]})
+    assert response.status_code == 200
+    assert [(row["slug"], row["sortOrder"]) for row in response.get_json()] == [("c", 0), ("a", 1), ("b", 2)]
+    assert [row["slug"] for row in api("GET", "/categories").get_json()] == ["c", "a", "b"]
+    assert [row["slug"] for row in client.get("/api/categories").get_json()] == ["c", "a", "b"]
+
+
+@pytest.mark.parametrize(
+    "ids",
+    [
+        lambda a, b, c: [a, b],  # a row is missing
+        lambda a, b, c: [a, b, c, str(uuid.uuid4())],  # a row that does not exist
+        lambda a, b, c: [a, b, b],  # listed twice
+        lambda a, b, c: [a, b, "not-a-uuid"],
+        lambda a, b, c: [a, b, 3],
+    ],
+)
+def test_a_wrong_order_list_changes_nothing(api, database, ids):
+    rows = [Category(slug=slug, name={"he": slug}, sort_order=n) for n, slug in enumerate(["a", "b", "c"])]
+    database.add_all(rows)
+    database.commit()
+    response = api("PUT", "/categories/order", {"ids": ids(*(str(row.id) for row in rows))})
+    assert (response.status_code, response.get_json()) == (400, {"error": "invalid", "field": "ids"})
+    assert [row["slug"] for row in api("GET", "/categories").get_json()] == ["a", "b", "c"]
+
+
+@pytest.mark.parametrize("body", [[], {"order": []}, {"ids": "a,b"}])
+def test_an_order_needs_an_ids_list(api, body):
+    assert api("PUT", "/categories/order", body).get_json() == {"error": "invalid_body"}
+
+
+def test_only_orderable_resources_can_be_reordered(api):
+    assert api("PUT", "/price-rules/order", {"ids": []}).status_code == 405
+    assert api("PUT", "/faq-items/order", {"ids": []}).status_code == 405
+
+
+def test_brands_and_products_are_named_placed_and_reordered_like_categories(api, database):
+    paw = api("POST", "/brands", {"name": "Paw"}).get_json()
+    jr = api("POST", "/brands", {"name": "JR Farm"}).get_json()
+    assert [(b["slug"], b["sortOrder"]) for b in (paw, jr)] == [("paw", 0), ("jr-farm", 1)]
+    assert api("POST", "/brands", {"name": "Paw"}).get_json()["slug"] == "paw-2"
+    assert api("POST", "/brands", {"name": "פאו"}).get_json()["slug"] == "brand"
+    reordered = api("PUT", "/brands/order", {"ids": [b["id"] for b in reversed(api("GET", "/brands").get_json())]}).get_json()
+    assert [b["slug"] for b in reordered] == ["brand", "paw-2", "jr-farm", "paw"]
+
+    category = Category(slug="dogs", name={"he": "כלבים"})
+    database.add(category)
+    database.commit()
+    beef = api("POST", "/products", {"name": {"he": "בקר", "en": "Beef 14 kg"}, "categoryId": str(category.id)}).get_json()
+    plain = api("POST", "/products", {"name": {"he": "עוף"}, "categoryId": str(category.id)}).get_json()
+    assert [(p["slug"], p["sortOrder"]) for p in (beef, plain)] == [("beef-14-kg", 0), ("product", 1)]
+    reordered = api("PUT", "/products/order", {"ids": [plain["id"], beef["id"]]}).get_json()
+    assert [(p["slug"], p["sortOrder"]) for p in reordered] == [("product", 0), ("beef-14-kg", 1)]
+
+
+def test_customers_cannot_reorder_categories(customer_client, csrf):
+    assert customer_client.put("/api/staff/categories/order", json={"ids": []}, headers=csrf(customer_client)).status_code == 403
 
 
 def test_only_list_resources_can_be_replaced(api):

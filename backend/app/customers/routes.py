@@ -2,21 +2,23 @@
 
 Public, no sign-in:
     GET /categories, /products, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
-    /articles, /articles/<slug>, /resellers, /sitemap.xml, /media/<key> (uploaded files: the S3 stub's objects)
+    /articles, /articles/<slug>, /resellers, /sitemap.xml, /media/<key> (stored files: the S3 stub's objects),
+    /catalog.pdf (redirects to the PDF catalog in the file storage)
 Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
     POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me
 Business customers only:
     GET /prices
 
 JSON keys are camelCase, in the shapes the frontend types in src/api.ts (the same shapes as its stub fixtures).
-Only active rows are shown. The public routes never return a price: prices come only from /prices, computed for
+Only active rows are shown. Pictures are stored as object keys and answered as URLs (storage.url_of /
+storage.srcset_urls). The public routes never return a price: prices come only from /prices, computed for
 the signed-in customer by app.pricing.
 """
 import math
 from typing import Any
 from xml.sax.saxutils import escape
 
-from flask import Blueprint, Response, abort, current_app, jsonify, request
+from flask import Blueprint, Response, abort, current_app, jsonify, redirect, request
 from flask_jwt_extended import current_user, verify_jwt_in_request
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import contains_eager, selectinload
@@ -53,9 +55,14 @@ def image_json(image: ProductImage) -> dict[str, str]:
         image: The photo.
 
     Returns:
-        {src, thumbnail, srcSet}; the thumbnail falls back to the full image, the srcset to "".
+        {src, thumbnail, srcSet}: the URLs of the stored pictures (the row holds their keys); the thumbnail falls back
+        to the full image, the srcset to "".
     """
-    return {"src": image.url, "thumbnail": image.thumbnail_url or image.url, "srcSet": image.srcset or ""}
+    return {
+        "src": storage.public_url(image.url),
+        "thumbnail": storage.public_url(image.thumbnail_url or image.url),
+        "srcSet": storage.srcset_urls(image.srcset) or "",
+    }
 
 
 def product_json(product: Product) -> dict[str, Any]:
@@ -109,10 +116,11 @@ def list_categories() -> list[dict[str, Any]]:
     home page's category cards.
 
     Returns:
-        [{slug, name, legacyPath, imageUrl}] in display order; imageUrl is the card photo staff set (None = none).
+        [{slug, name, legacyPath, imageUrl}] in display order; imageUrl is the URL of the card photo staff set (the row
+        stores its object key; None = none).
     """
     categories = db.session.scalars(select(Category).where(Category.is_active).order_by(Category.sort_order, Category.slug))
-    return [{"slug": c.slug, "name": c.name, "legacyPath": c.legacy_path, "imageUrl": c.image_url} for c in categories]
+    return [{"slug": c.slug, "name": c.name, "legacyPath": c.legacy_path, "imageUrl": storage.url_of(c.image_url)} for c in categories]
 
 
 @bp.get("/products")
@@ -177,8 +185,8 @@ def brand_json(brand: Brand) -> dict[str, Any]:
         brand: The brand.
 
     Returns:
-        {slug, name, accent, tagline, description, logoUrl}; null accent = the site red, null logoUrl = the frontend's
-        bundled logo (or the name as text).
+        {slug, name, accent, tagline, description, logoUrl}; null accent = the site red; logoUrl = the URL of the logo
+        staff uploaded (the row stores its key), null = the frontend's bundled logo (or the name as text).
     """
     return {
         "slug": brand.slug,
@@ -186,7 +194,7 @@ def brand_json(brand: Brand) -> dict[str, Any]:
         "accent": brand.accent_color,
         "tagline": brand.tagline,
         "description": brand.description,
-        "logoUrl": brand.logo_url,
+        "logoUrl": storage.url_of(brand.logo_url),
     }
 
 
@@ -372,7 +380,7 @@ def list_resellers() -> list[dict[str, Any]]:
 
 @bp.get("/media/<path:key>")
 def media(key: str) -> Response:
-    """Serves an uploaded file (a category picture, ...) from the S3 stub; with real S3 the files have S3 URLs and
+    """Serves a stored file (a category picture, a product photo, the PDF catalog, ...) from the S3 stub; with real S3 the files have S3 URLs and
     this route goes away (see app/storage.py).
 
     Args:
@@ -382,6 +390,20 @@ def media(key: str) -> Response:
         The file, cached for a year; 404 when there is no such file.
     """
     return storage.send_object(key)
+
+
+@bp.get("/catalog.pdf")
+def catalog_pdf() -> Response:
+    """The downloadable PDF catalog (without prices): a redirect to the file in the storage, whose key is the setting
+    `catalog_pdf` (so a new catalog is a new object and a changed setting, and links to /api/catalog.pdf stay).
+
+    Returns:
+        302 to the file's URL; 404 when no catalog is set.
+    """
+    key = get_setting("catalog_pdf")
+    if not key:
+        abort(404)
+    return redirect(storage.public_url(key))
 
 
 @bp.get("/sitemap.xml")

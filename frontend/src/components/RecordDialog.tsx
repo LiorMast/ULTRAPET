@@ -4,7 +4,7 @@
  *
  * Each column type has its input (text or textarea, a Hebrew + English pair for localized text, number, money,
  * checkbox, select, colour, URL, date and time; a `searchable` select or text column gets a SearchableField; an
- * "image" column an ImageUploadField, which uploads the file at once and holds Save until it is stored). The form
+ * "image" column an upload-only ImageUploadField, which uploads the file at once and holds Save until it is stored). The form
  * checks required fields, patterns and numbers before sending; on an edit it sends only the fields that changed. When the server refuses the change, its error lands
  * on the field it names (`field`, or the column in a constraint name such as "brands_slug_key"), or above the
  * buttons when it names none. Used only by DataTable.
@@ -318,7 +318,7 @@ function Field<Row>({
     return (
       <fieldset>
         <legend className={LABEL_CLASS}>{label}</legend>
-        <ImageUploadField id={id} value={text} onChange={onChange} folder={column.folder} onBusyChange={onBusyChange} inputClassName={INPUT_CLASS} {...common} />
+        <ImageUploadField id={id} value={text} onChange={onChange} folder={column.folder} onBusyChange={onBusyChange} disabled={common.disabled} aria-invalid={common['aria-invalid']} aria-describedby={described} />
         {footer}
       </fieldset>
     )

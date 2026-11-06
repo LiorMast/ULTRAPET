@@ -29,7 +29,7 @@ def catalog(database) -> SimpleNamespace:
         The rows by name: dogs, cats, hidden, treat, cat_food, beef, chew.
     """
     dogs = Category(slug="dogs", name={"he": "כלבים", "en": "Dogs"}, legacy_path="/product-category/כלבים/", sort_order=0)
-    cats = Category(slug="cats", name={"he": "חתולים", "en": "Cats"}, image_url="https://example.com/cats.jpg", sort_order=1)
+    cats = Category(slug="cats", name={"he": "חתולים", "en": "Cats"}, image_url="categories/cats.webp", sort_order=1)
     hidden = Category(slug="hidden", name={"he": "מוסתר"}, sort_order=2, is_active=False)
     treat = Product(
         slug="dog-treat",
@@ -38,7 +38,7 @@ def catalog(database) -> SimpleNamespace:
         category=dogs,
         list_price=Decimal("10.00"),
         sort_order=0,
-        images=[ProductImage(url="https://img/treat.jpg", sort_order=0)],
+        images=[ProductImage(url="products/treat.jpg", sort_order=0)],
     )
     cat_food = Product(slug="salmon-cat-food", name={"he": "מזון סלמון לחתולים", "en": "Salmon Cat Food"}, category=cats, sort_order=1)
     beef = Product(slug="beef-dog-food", name={"he": "מזון בקר לכלבים", "en": "Beef Dog Food"}, category=dogs, sort_order=2)
@@ -65,7 +65,7 @@ def slugs(response) -> list[str]:
 def test_categories_lists_the_active_ones_in_order(client, catalog):
     assert client.get("/api/categories").get_json() == [
         {"slug": "dogs", "name": {"he": "כלבים", "en": "Dogs"}, "legacyPath": "/product-category/כלבים/", "imageUrl": None},
-        {"slug": "cats", "name": {"he": "חתולים", "en": "Cats"}, "legacyPath": None, "imageUrl": "https://example.com/cats.jpg"},
+        {"slug": "cats", "name": {"he": "חתולים", "en": "Cats"}, "legacyPath": None, "imageUrl": "/api/media/categories/cats.webp"},
     ]
 
 
@@ -81,8 +81,8 @@ def test_products_lists_the_visible_ones_in_catalog_order_without_prices(client,
         "slug": "dog-treat",
         "name": {"he": "חטיף לכלבים", "en": "Dog Treat"},
         "category": "dogs",
-        # No thumbnail or srcset stored: the card falls back to the full image.
-        "image": {"src": "https://img/treat.jpg", "thumbnail": "https://img/treat.jpg", "srcSet": ""},
+        # The stored key becomes its URL; no thumbnail or srcset stored: the card falls back to the full image.
+        "image": {"src": "/api/media/products/treat.jpg", "thumbnail": "/api/media/products/treat.jpg", "srcSet": ""},
     }
     assert data["items"][1]["image"] is None
     assert "price" not in str(data).lower()
@@ -286,6 +286,20 @@ def test_the_sitemap_lists_the_pages_and_published_articles_in_each_language(cli
     assert '<xhtml:link rel="alternate" hreflang="en" href="https://www.ultrapet.co.il/en/articles/older"/>' in xml
     assert "<lastmod>2024-03-18</lastmod>" in xml  # the update date in Israel
     assert "draft" not in xml and "scheduled" not in xml
+
+
+def test_the_catalog_pdf_redirects_to_the_stored_file(client, database):
+    assert client.get("/api/catalog.pdf").status_code == 404
+    database.add(Setting(key="catalog_pdf", value="catalog/ultrapetcatalog.pdf"))
+    database.commit()
+    response = client.get("/api/catalog.pdf")
+    assert (response.status_code, response.headers["Location"]) == (302, "/api/media/catalog/ultrapetcatalog.pdf")
+
+
+def test_brand_logos_are_answered_as_urls(client, database):
+    database.add(Brand(slug="paw", name="Paw", logo_url="brands/paw.png"))
+    database.commit()
+    assert client.get("/api/brands").get_json()[0]["logoUrl"] == "/api/media/brands/paw.png"
 
 
 def test_prices_need_a_signed_in_customer(client):

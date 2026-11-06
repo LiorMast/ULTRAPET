@@ -41,6 +41,9 @@ services:
       SEED_CUSTOMER_PASSWORD: ${SEED_CUSTOMER_PASSWORD:-}
       # Plain http in dev; set to 1 behind https so the sign-in cookies are sent over https only.
       JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-0}
+      # The S3 bucket and region the picture URLs are built from (empty = the local stub at /api/media/).
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
     volumes:
       # Source code (reloads on change), plus the seed data at the same paths relative to backend/ as in the repo.
       - ./backend:/srv/backend

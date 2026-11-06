@@ -16,7 +16,7 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
 
 - **Frontend** (`frontend/`): React 19 + TypeScript 6, Vite 8, Tailwind CSS v4 (tokens in `src/index.css`),
   TanStack Router (file-based, `src/routes/`), shadcn/ui on Radix (`radix-ui`), lucide-react icons,
-  self-hosted fonts (`@fontsource-variable/*`), oxlint.
+  self-hosted fonts (`@fontsource-variable/*`), @dnd-kit (drag to reorder: `ReorderDialog`), oxlint.
 - **Tests**: Vitest 5 + React Testing Library (jsdom); Playwright (Chromium) + `@axe-core/playwright`.
 - **Backend** (`backend/`): Flask 3 (app factory, one monolith, routes in two blueprints), Flask-SQLAlchemy on
   SQLAlchemy 2.1 (typed models), Flask-JWT-Extended (sign-in), psycopg 3, PostgreSQL 17, pytest. The schema is `backend/app/database/create-tables.sql` (working rule 5): no Alembic migrations
@@ -51,11 +51,14 @@ frontend/
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
                         Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, InlineEditor,
                         EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
-                        ImageUploadField (picture upload of the admin forms), ...) + their tests
+                        ImageUploadField (picture upload of the admin forms), ReorderDialog (drag a list into order), ...)
+                        + their tests
     components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet), restyled for the brand
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
-                        imports them (oxlint no-restricted-imports)
-    assets/             logo SVGs; hero/ = the home hero photos (drop images in, no code changes)
+                        imports them (oxlint no-restricted-imports); legacy-media.json = object key -> WordPress URL
+                        of every file `flask import-media` copies into the storage
+    assets/             logo SVGs; hero/ = the home hero photos (drop images in, no code changes); categories/,
+                        category-cards/ (the marketing categories' placeholders), articles/, brands/ = bundled photos by slug
     test/               setup.ts (jsdom polyfills, fake fetch), utils.tsx (renderPage), api.ts (fake backend API)
 backend/
   Dockerfile  requirements.txt  pyproject.toml (pytest config)
@@ -65,21 +68,27 @@ backend/
                         issue_tokens, refresh_access, clear_tokens, require_user(kind)
     customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), brands, stats,
                         contact (the contact_* settings), sections + sections/<key> (saved home page section content),
-                        faq, articles, resellers, sitemap.xml, media/<key> (the S3 stub's files), the shared auth
+                        faq, articles, resellers, sitemap.xml, media/<key> (the S3 stub's files), catalog.pdf
+                        (redirect to the stored PDF catalog, setting `catalog_pdf`), the shared auth
                         (login/refresh/logout/me: customers AND staff), prices
     staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
                         products+images, price-rules, settings, articles, resellers, page-sections, faq-items (these two
                         stamp updated_by_id)); PUT /<resource> replaces a whole ordered list in one transaction (only
-                        `replaceable` resources: faq-items); DB constraint errors -> 400/409; POST /uploads stores a
+                        `replaceable` resources: faq-items); PUT /<resource>/order sets the order from every row's id
+                        (`orderable`: categories, brands, products); `create_defaults` (new_row_defaults) fill a new
+                        row of these three (slug from its English / brand name, last place); DB constraint errors -> 400/409; POST /uploads stores a
                         picture (multipart file + folder) through storage.py and returns its URL
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
-    storage.py          the S3 stub for uploaded files: put_object / delete_object / public_url write and serve
-                        backend/media (MEDIA_ROOT, git-ignored); swap the bodies for boto3 when a bucket exists
+    storage.py          the S3 stub for every stored file: put_object / delete_object / object_exists write and serve
+                        backend/media (MEDIA_ROOT, git-ignored); rows store object keys, public_url / url_of / srcset_urls
+                        build the URLs from S3_BUCKET + S3_REGION, object_key validates a submitted one, file_type
+                        recognizes a file by its bytes; swap the bodies for boto3 later
     database/           everything about the database
       create-tables.sql   the schema: every table and column, explained (source of truth, working rule 5)
       drop-tables.sql     drops every table, children first
       db.py               `db`, the declarative base (naming convention, column types), TimestampMixin
       seed.py             `flask reset-db --yes`, `flask seed` (from the frontend stubs)
+      legacy_media.py     `flask import-media`: copies the WordPress files of stubs/legacy-media.json into the storage
       models/             the SQLAlchemy models, one module per area (importing the package registers them all):
         users.py            AppUser -> StaffUser / BusinessUser (joined-table inheritance), BusinessLead
         catalog.py          Supplier, Brand, Category, Product, ProductImage, ProductSupplier (junction)
@@ -108,6 +117,9 @@ backend/
 - `docker compose exec backend pytest` — backend tests (database `content_test`; the dev data is never touched).
 - `docker compose exec backend flask seed` — fill an empty database from the frontend stubs (plus the staff admin and
   the demo customer when SEED_ADMIN_* / SEED_CUSTOMER_* are set in `.env`).
+- `docker compose exec backend flask import-media` — copy the old site's files (product photos, the PDF catalog; about
+  1,370 files, 215 MB) into the storage (backend/media); skips what is there, so rerun it after a failure. Once the
+  WordPress site is gone, copy the bucket / backend/media instead.
 - `docker compose exec backend flask reset-db --yes` — drop and recreate every table (all data is lost); then `seed`.
 - A fresh volume runs `create-tables.sql` by itself; after a schema change run `reset-db` (there are no migrations).
 
@@ -176,11 +188,13 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - Every component ships with tests: co-located Vitest tests (`*.test.tsx`) that render the real app with
   `renderPage(url)` from `src/test/utils.tsx`, plus Playwright specs for user flows, layout overflow, axe and
   screenshots.
-- A step is done only when `npm run check`, `npm run test:e2e` and `npm run build` all pass and changed
-  screenshots were reviewed. Never weaken or delete a test to make it pass.
-- **Test scope during work:** after a small change, run only the tests that cover the changed code (e.g. the
-  matching `*.test.tsx` file and the related e2e spec), not the whole suite every time.
-- **Full gate before committing:** run `npm run check` and `npm run test:e2e` in full before any commit.
+- A step is done only when `npm run check` and `npm run build` pass; the e2e suite and the screenshot review
+  happen at commit time (below). Never weaken or delete a test to make it pass.
+- **No e2e tests during work:** never run Playwright (`npm run test:e2e`, any spec) unless a commit is about to be
+  made. While working, run only the Vitest tests that cover the changed code (e.g. the matching `*.test.tsx` file),
+  not the whole suite every time.
+- **Full gate before committing:** run `npm run check` and `npm run test:e2e` in full before any commit, and review
+  changed screenshots.
 - **Commit only when the user says so.** Never commit on your own initiative.
 - Never edit `legacy/` or `requirements/`.
 
@@ -246,16 +260,29 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   staff API's camelCase field, `type`, `required`, `pattern`, `ltr`, `inTable`/`inForm`). The same config drives the
   cells, sorting/search and the generated edit form; editing is our Radix dialog (not the paid DataTables Editor);
   omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons that open its dialog
-  (e.g. "Discounts"). Columns and options are read once at mount (DataTables' rule); `deferRender` builds only the
+  (e.g. "Discounts"); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
+  plus up/down buttons; Save sends every row key in order, e.g. `reorderStaffRows`). Technical fields staff need not
+  see (slugs, legacy paths, sort orders) stay out of the config: the server fills them (`create_defaults`) and the
+  order comes from `onReorder` (the categories, brands and products tables). Columns and options are read once at mount (DataTables' rule); `deferRender` builds only the
   shown page's cells.
   DataTables' CSS loads with the admin chunk; the brand overrides live in `index.css` under `.data-table`.
-- **Uploads** (S3 stub, `backend/app/storage.py`): a picture column (`type: 'image'`, `folder: 'categories'`) shows a
-  thumbnail cell and an `ImageUploadField` in the form (preview, Upload/Replace, Remove, the URL input; Save waits for
-  the upload). The file goes to `POST /api/staff/uploads` (`uploadImage` in `api.ts`, multipart), which accepts JPEG,
-  PNG, WebP and AVIF by their bytes (no SVG), at most 5 MB, into a folder of `UPLOAD_FOLDERS`, under a random key, and
-  returns `/api/media/<folder>/<key>`; the form saves that URL in the row. New kind of picture = a folder in
-  `UPLOAD_FOLDERS` + the `UploadFolder` type + the column. Real S3 later: change only `storage.py`. Replaced files are
-  not deleted yet.
+- **Every resource comes from our storage or is bundled**: pictures, PDFs and other files the site loads are objects
+  in the file storage (S3 / the stub, served at `/api/media/<key>`) or files under `src/assets/` / `public/`. Never
+  hot-link another site (the old WordPress files were moved by `flask import-media`; the manifest is
+  `stubs/legacy-media.json`). Picture fields are upload-only (no URL input). Links to other sites (wa.me, Waze, the
+  resellers' websites) are links, not resources; the Where to Buy map tiles are OpenStreetMap's (a map service).
+- **Uploads** (S3 stub, `backend/app/storage.py`): a picture column (`type: 'image'`, `folder: 'categories'` or
+  `'brands'`) shows a thumbnail cell and an `ImageUploadField` in the form (preview, Upload/Replace, Remove; no address
+  input; Save waits for the upload). The file goes to `POST /api/staff/uploads` (`uploadImage` in `api.ts`, multipart), which accepts JPEG,
+  PNG, WebP and AVIF by their bytes (no SVG), at most 5 MB, into a folder of `UPLOAD_FOLDERS`, under `<folder>/<UTC timestamp>_<uuid>.<ext>` (never the file's own name), and
+  returns `{ key, url }`; the form saves that URL. **The row stores only the object key** (`categories/<hex>.webp`,
+  converter `media_key` in the staff routes): responses rebuild the URL (`storage.url_of`) from `S3_BUCKET` +
+  `S3_REGION` in `.env` (`https://<bucket>.s3.<region>.amazonaws.com/<key>`; both empty = the stub's `/api/media/<key>`).
+  A picture field accepts only a key or one of our URLs; another site's URL is 400 `invalid`. Product photos store keys
+  in `product_images.url` / `thumbnail_url` and a srcset of keys (converter `media_srcset`, answered by
+  `storage.srcset_urls`). New kind of picture = a folder in `UPLOAD_FOLDERS` + the `UploadFolder` type + the column
+  (converter `media_key`). Real S3 later: change
+  only `storage.py`. Replaced files are not deleted yet.
 - **Discounts** (`DiscountDialog`): one dialog for every discount (category, product, customer, payment method):
   percent/amount switch, a positive value (no surcharges), start date, end date or "no end date". It returns a
   `DiscountValue` ({ type, value, startsOn, endsOn: null = open-ended }) and the caller stores it. `DiscountsDialog`
@@ -435,7 +462,8 @@ content exists in each language, and the layout flips direction automatically.
 - **Postgres seed** (`backend/app/database/seed.py`): the catalog from `frontend/src/stubs/` (categories, products with their
   WooCommerce id in `products.woocommerce_id`, their stub order in `sort_order` and their images, placeholder prices into
   `products.list_price`, brands), the articles, resellers and FAQ questions (`faq.json`), the home stats from
-  `legacy/supabase-export/cms_settings.json`, the contact details (`contact.json`), and optionally a staff admin and a demo customer (`SEED_ADMIN_*`,
+  `legacy/supabase-export/cms_settings.json`, the contact details (`contact.json`), the PDF catalog's key (`catalog_pdf`),
+  and optionally a staff admin and a demo customer (`SEED_ADMIN_*`,
   `SEED_CUSTOMER_*`). The rest of the export (hero banners, contact, sections, text blocks,
   media and `legacy/supabase-export/media/`) waits for the CMS tables (Phase 3); schema hints in
   `legacy/supabase/migrations/`.
@@ -444,8 +472,9 @@ content exists in each language, and the layout flips direction automatically.
   Email is unconfirmed (the legacy CMS says office@ultrapet.co.il) — ask the owner. They live in the settings
   `contact_phone` / `contact_whatsapp` / `contact_email` (seeded from `stubs/contact.json`, read with `GET /api/contact`
   by the root route for the Contact section and the WhatsApp button; staff edit them in the Contact section).
-- **PDF catalog**: https://www.ultrapet.co.il/wp-content/uploads/2025/03/ultrapetcatalog.pdf (`CATALOG_PDF_URL` in
-  `config.ts` until the backend serves it).
+- **PDF catalog**: the object `catalog/ultrapetcatalog.pdf` in the storage (copied from the WordPress site by
+  `flask import-media`), named by the setting `catalog_pdf`; `CATALOG_PDF_URL` in `config.ts` = `/api/catalog.pdf`,
+  which redirects to it.
 - **WordPress product categories (15)**: dry cat food, dry dog food, cat cans & treats, dog cans & treats, cat
   snacks, dog snacks & bones, cat litter, beds & mattresses, grooming & hygiene, cat scratchers, rodents, birds,
   plastics, collars & leashes, equipment. **Decided:** the catalog uses these 15 (`stubs/product-categories.json`);
@@ -457,7 +486,8 @@ content exists in each language, and the layout flips direction automatically.
   `app/database/db.py`); only `settings` and `payment_methods` use a text key. The API returns the UUIDs (prices are
   keyed by product UUID); the stubs' product `id` is the WooCommerce id, kept in `products.woocommerce_id`.
 - **Products**: the 400 products of the WooCommerce Store API (`/wp-json/wc/store/v1/products`) are in
-  `stubs/products.json` (images still hot-linked from WordPress — move them to the backend in Phase 2). Each product's
+  `stubs/products.json`; their photos are object keys (`products/<yyyy>-<mm>-<WordPress file name>.<ext>`) of the
+  files `flask import-media` copied into the storage. Each product's
   `name` / `description` holds one translation per language (`{ he, en }`, the DB's product translations; Hebrew from
   the store, English translated for all 400; add `ru` / `ar` the same way); catalog search matches every language. The store
   publishes no prices: `stubs/prices.json` holds **placeholder** prices until real ones come from Rivhit/the admin.
@@ -517,12 +547,16 @@ content exists in each language, and the layout flips direction automatically.
       page sections, FAQ items (+ PUT that replaces the FAQ list at once)
 - [x] staff API for price rules (`price-rules`: positive percent/amount discounts, dated)
 - [ ] staff API for customers, leads, payment methods and orders (with the admin UI, Phase 3)
-- [ ] lead/contact endpoints (`business_leads`); serve the PDF catalog
+- [ ] lead/contact endpoints (`business_leads`)
+- [x] serve the PDF catalog (`/api/catalog.pdf`) and every product photo from the storage (`flask import-media`)
 
 **Phase 3 — Admin CMS**: port the legacy admin.
 - [x] Reusable admin table (`DataTable`, `RecordDialog`, `ui/dialog`), the shared sign-in form at `/admin`, `/admin/brands`
-- [x] `/admin/products`, `/admin/categories` (+ their general discounts: `DiscountsDialog`, row action "Discounts")
-- [x] Picture uploads (S3 stub `storage.py`, `ImageUploadField`): the categories' home carousel pictures
+- [x] `/admin/products`, `/admin/categories` (+ their general discounts: `DiscountsDialog`, row action "Discounts";
+      the categories, brands and products tables hide slug / legacy path / order and set the order in "Change order",
+      `ReorderDialog`)
+- [x] Picture uploads (S3 stub `storage.py`, `ImageUploadField`, upload-only): the categories' home carousel pictures,
+      the brands' logos
 - [ ] Product images in the admin; tables for settings, articles, resellers (a column config + route each)
 - [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API; [ ] customer and payment-method
       discount pages

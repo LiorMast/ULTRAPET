@@ -2,7 +2,7 @@
  * Catalog.test.tsx — Tests for the catalog page (/catalog), built from Catalog, CatalogCard and Pagination:
  * no prices for visitors who are not signed in, prices for signed-in customers in both languages, paging
  * through real links, category chips, search (in either language), product translations, the empty state,
- * the page-number window, and the head tags.
+ * the page-number window, the head tags, and product photos served from our own file storage.
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
@@ -30,6 +30,18 @@ describe('Catalog page', () => {
     expect(screen.getByRole('main').textContent).not.toMatch(/₪|\d+\.\d\d/)
     expect(within(cards()[0]).getByRole('link', { name: 'התחברו לצפייה במחיר' })).toHaveAttribute('href', '/login')
     expect(screen.getByText('מחירים סיטונאיים ללקוחות עסקיים')).toBeInTheDocument()
+  })
+
+  it("loads the product photos from the site's own file storage, never from the old WordPress store", async () => {
+    await renderPage('/catalog')
+    const photo = cards()[0].querySelector('img')!
+    expect(photo).toHaveAttribute('src', `/api/media/${products[0].image.thumbnail}`)
+    for (const card of cards()) {
+      const img = card.querySelector('img')!
+      for (const url of [img.getAttribute('src'), ...(img.getAttribute('srcset') ?? '').split(',').map((entry) => entry.trim().split(' ')[0])]) {
+        expect(url).toMatch(/^\/api\/media\/products\//)
+      }
+    }
   })
 
   it('pages with real links and marks the current page', async () => {

@@ -6,8 +6,9 @@
  * once (DataColumn: key, label, type, required, ...); the same config drives the table cells, what search and
  * sorting see, and the edit form (RecordDialog). Editing is our own Radix dialog, not the paid DataTables
  * Editor. Each handler left out hides its action, so a table with none is read-only. `rowActions` add buttons of
- * the caller's own (e.g. "Discounts") that open the caller's dialog for the row. Used by the /admin pages
- * (e.g. routes/admin.brands.tsx), one column config per resource.
+ * the caller's own (e.g. "Discounts") that open the caller's dialog for the row. `onReorder` adds "Change order",
+ * which opens ReorderDialog (drag the rows into order) for a table whose rows have a display order. Used by the
+ * /admin pages (e.g. routes/admin.brands.tsx), one column config per resource.
  *
  * How it talks to DataTables: the options, columns and cell renderers are read once, when the table mounts
  * (the library's rule), so the renderers read the latest props through a ref; new `rows` redraw the table
@@ -19,10 +20,11 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import DataTableLib, { type DataTableSlots } from 'datatables.net-react'
 import DT, { type ColumnOptions, type Options } from 'datatables.net-dt'
 import 'datatables.net-dt/css/dataTables.dataTables.css'
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ArrowUpDown, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { ApiError, type UploadFolder } from '@/api'
 import { localized, type Localized } from '@/config'
 import { RecordDialog, errorMessage } from '@/components/RecordDialog'
+import { ReorderDialog } from '@/components/ReorderDialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n, type Locale } from '@/i18n'
@@ -35,8 +37,8 @@ registerLibrary(DT)
 /**
  * How a column's value is shown and edited: plain or multiline `text`, `localized` text ({ he, en }),
  * `integer`, `number` (decimal), `money` (shekels), `boolean`, `select` (one of `options`), `color` ('#RRGGBB'),
- * `url`, `datetime` (an ISO timestamp) or `image` (a picture URL: a thumbnail cell, and an upload field into the
- * column's `folder`).
+ * `url`, `datetime` (an ISO timestamp) or `image` (a stored picture's URL: a thumbnail cell, and an upload-only
+ * field into the column's `folder`).
  */
 export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 'boolean' | 'select' | 'color' | 'url' | 'datetime' | 'image'
 
@@ -103,15 +105,17 @@ export type DataTableProps<Row> = {
   onCreate?: (values: RowValues) => Promise<unknown>
   onUpdate?: (key: string, changes: RowValues) => Promise<unknown>
   onDelete?: (key: string) => Promise<unknown>
+  onReorder?: (keys: string[]) => Promise<unknown>
   rowActions?: RowAction<Row>[]
 }
 
 /**
- * What is open: the form for a new row, the form for a row, the delete confirmation for a row, or the dialog of
- * one of the caller's row actions (by its name).
+ * What is open: the form for a new row, the form for a row, the delete confirmation for a row, the dialog of
+ * one of the caller's row actions (by its name), or the order of all rows.
  */
 type OpenDialog<Row> =
   | { mode: 'create' }
+  | { mode: 'reorder' }
   | { mode: 'edit'; row: Row }
   | { mode: 'delete'; row: Row }
   | { mode: 'action'; name: string; row: Row }
@@ -222,21 +226,21 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
   const name = rowLabel(row)
   const key = rowKey(row)
   return (
-    <span className="flex gap-1">
+    <span className="flex gap-2">
       {onUpdate && (
-        <Button variant="ghost" size="xs" data-row={key} data-action="edit" aria-label={t.admin.editRow.replace('{name}', name)} onClick={() => onOpen({ mode: 'edit', row })}>
+        <Button variant="action" size="action" data-row={key} data-action="edit" aria-label={t.admin.editRow.replace('{name}', name)} onClick={() => onOpen({ mode: 'edit', row })}>
           <Pencil aria-hidden />
           {t.admin.edit}
         </Button>
       )}
       {rowActions.map((action) => (
-        <Button key={action.name} variant="ghost" size="xs" data-row={key} data-action={action.name} aria-label={action.rowLabel(name)} onClick={() => onOpen({ mode: 'action', name: action.name, row })}>
+        <Button key={action.name} variant="action" size="action" data-row={key} data-action={action.name} aria-label={action.rowLabel(name)} onClick={() => onOpen({ mode: 'action', name: action.name, row })}>
           {action.icon}
           {action.label}
         </Button>
       ))}
       {onDelete && (
-        <Button variant="ghost" size="xs" data-row={key} data-action="delete" aria-label={t.admin.deleteRow.replace('{name}', name)} onClick={() => onOpen({ mode: 'delete', row })}>
+        <Button variant="actionDanger" size="action" data-row={key} data-action="delete" aria-label={t.admin.deleteRow.replace('{name}', name)} onClick={() => onOpen({ mode: 'delete', row })}>
           <Trash2 aria-hidden />
           {t.admin.delete}
         </Button>
@@ -246,8 +250,8 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
 }
 
 /**
- * The data table: a toolbar ("Add"), the DataTables table with an actions column, the edit form and the delete
- * confirmation.
+ * The data table: a toolbar ("Change order", "Add"), the DataTables table with an actions column, the edit form,
+ * the delete confirmation and the reorder dialog.
  * @param props.rows - The rows to show; a new array redraws the table (search, sort and page are kept).
  * @param props.columns - The column config (read once at mount; see DataColumn).
  * @param props.caption - The table's accessible name (e.g. "Brands").
@@ -258,11 +262,13 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
  * @param props.onCreate - Saves a new row (rejects with ApiError to show the server's error); omit to hide "Add".
  * @param props.onUpdate - Saves the changed fields of a row; omit to hide "Edit".
  * @param props.onDelete - Deletes a row; omit to hide "Delete".
+ * @param props.onReorder - Saves a new order: every row's key, first to last (the caller gives `rows` in their display
+ *   order, which the table keeps until staff sort a column); omit to hide "Change order".
  * @param props.rowActions - Buttons of the caller's own on every row, each opening its dialog (see RowAction).
  * @returns The table section.
  */
 export function DataTable<Row>(props: DataTableProps<Row>) {
-  const { rows, caption, rowLabel, onCreate, onDelete } = props
+  const { rows, caption, rowLabel, onCreate, onDelete, onReorder } = props
   const { t, locale, dir } = useI18n()
   const [open, setOpen] = useState<OpenDialog<Row>>(null)
   const [status, setStatus] = useState('')
@@ -337,7 +343,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   const handleCloseFocus = (event: Event) => {
     event.preventDefault()
     const action = open?.mode === 'action' ? open.name : open?.mode
-    const target = open && open.mode !== 'create' ? `[data-row="${CSS.escape(props.rowKey(open.row))}"][data-action="${action}"]` : '[data-action="create"]'
+    const target = open && open.mode !== 'create' && open.mode !== 'reorder' ? `[data-row="${CSS.escape(props.rowKey(open.row))}"][data-action="${action}"]` : `[data-action="${action}"]`
     focusSettled(wrapper.current, target)
   }
 
@@ -376,12 +382,20 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
         <p role="status" className="text-sm text-brand-charcoal-muted">
           {status}
         </p>
-        {onCreate && (
-          <Button size="sm" data-action="create" onClick={() => setOpen({ mode: 'create' })}>
-            <Plus aria-hidden />
-            {t.admin.add}
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {onReorder && rows.length > 1 && (
+            <Button size="sm" variant="outline" data-action="reorder" onClick={() => setOpen({ mode: 'reorder' })}>
+              <ArrowUpDown aria-hidden />
+              {t.admin.reorder.button}
+            </Button>
+          )}
+          {onCreate && (
+            <Button size="sm" data-action="create" onClick={() => setOpen({ mode: 'create' })}>
+              <Plus aria-hidden />
+              {t.admin.add}
+            </Button>
+          )}
+        </div>
       </div>
       <div className="overflow-x-auto">{memoTable}</div>
 
@@ -392,6 +406,19 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
           initial={props.newRow}
           title={open.mode === 'edit' ? t.admin.editTitle.replace('{name}', rowLabel(open.row)) : t.admin.addTitle}
           onSave={handleSave}
+          onClose={() => setOpen(null)}
+          onCloseAutoFocus={handleCloseFocus}
+        />
+      )}
+      {open?.mode === 'reorder' && onReorder && (
+        <ReorderDialog
+          items={rows.map((row) => ({ id: props.rowKey(row), label: rowLabel(row) }))}
+          title={t.admin.reorder.title}
+          onSave={async (keys) => {
+            await onReorder(keys)
+            setStatus(t.admin.reorder.saved)
+            setOpen(null)
+          }}
           onClose={() => setOpen(null)}
           onCloseAutoFocus={handleCloseFocus}
         />

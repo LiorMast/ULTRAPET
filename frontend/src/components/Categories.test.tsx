@@ -41,9 +41,9 @@ describe('Categories section', () => {
   })
 
   it('shows the photo staff set on a category, and the icon panel for one without', async () => {
-    await changeCategory('birds', { imageUrl: 'https://example.com/birds.jpg' })
+    await changeCategory('birds', { imageUrl: '/api/media/categories/birds.webp' })
     await renderPage('/en')
-    expect(section().getByRole('link', { name: 'Birds' }).querySelector('img')).toHaveAttribute('src', 'https://example.com/birds.jpg')
+    expect(section().getByRole('link', { name: 'Birds' }).querySelector('img')).toHaveAttribute('src', '/api/media/categories/birds.webp')
     const plain = section().getByRole('link', { name: 'Rodents' })
     expect(plain.querySelector('img')).toBeNull()
     expect(plain.querySelector('svg')).not.toBeNull()

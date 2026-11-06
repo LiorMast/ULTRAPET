@@ -16,14 +16,20 @@
  *
  * Staff panel (backend/app/staff/routes.py): its own sign-in, and one generic create/read/update/delete API for
  * every resource (fetchStaffRows, createStaffRow, updateStaffRow, deleteStaffRow), used by the /admin pages and the
- * in-place editors; a resource edited as one ordered list (the FAQ) is saved whole with replaceStaffRows.
+ * in-place editors; a resource edited as one ordered list (the FAQ) is saved whole with replaceStaffRows, and the
+ * order of a table staff drag into order (categories, brands, products) with reorderStaffRows.
  * Pictures are uploaded with uploadImage (multipart; the server stores them in its S3 stub and returns their URL).
+ * Every picture and file the API names is one of the server's stored objects (or the site bundles it): nothing is
+ * loaded from another site.
  */
 import { notFound } from '@tanstack/react-router'
 import type { Localized } from '@/config'
 import type { Locale } from '@/i18n'
 
-/** A product photo from the store: the full file, a 300px square thumbnail and a `srcset` of the sized copies. */
+/**
+ * A product photo: the full file, a 300px square thumbnail and a `srcset` of the sized copies, all URLs of the
+ * server's file storage (the photos were moved from the WordPress store by `flask import-media`).
+ */
 export type ProductImage = { src: string; thumbnail: string; srcSet: string }
 
 /**
@@ -433,6 +439,9 @@ export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules'
 /** The staff resources edited as one ordered list, which replaceStaffRows saves whole (`replaceable` on the server). */
 export type StaffListResource = 'faq-items'
 
+/** The staff resources whose order staff set by dragging, saved by reorderStaffRows (`orderable` on the server). */
+export type OrderableResource = 'categories' | 'brands' | 'products'
+
 /** What every staff row carries besides its fields: when it was created and last changed (ISO timestamps). */
 type StaffRowBase = { createdAt: string; updatedAt: string }
 
@@ -572,15 +581,26 @@ export async function saveSetting(key: string, value: unknown): Promise<unknown>
 export const replaceStaffRows = <Row,>(resource: StaffListResource, rows: Record<string, unknown>[]) =>
   apiFetch<Row[]>(`/api/staff/${resource}`, { method: 'PUT', body: rows })
 
-/** The folders pictures are uploaded into (UPLOAD_FOLDERS in backend/app/staff/routes.py), one per kind of picture. */
-export type UploadFolder = 'categories'
+/**
+ * Sets the display order of a table in one transaction: each row's sortOrder becomes its position in `ids`.
+ * @param resource - The table, e.g. "categories".
+ * @param ids - Every row's id, each once, first to last.
+ * @returns The rows in their new order; throws ApiError 400 "invalid" (field "ids") when the list is not exactly the
+ *   table's rows (e.g. one was added or deleted meanwhile), and nothing is changed.
+ */
+export const reorderStaffRows = <Row,>(resource: OrderableResource, ids: string[]) =>
+  apiFetch<Row[]>(`/api/staff/${resource}/order`, { method: 'PUT', body: { ids } })
 
-/** An uploaded file: its storage key and the URL to save in a row and show it from. */
+/** The folders pictures are uploaded into (UPLOAD_FOLDERS in backend/app/staff/routes.py), one per kind of picture. */
+export type UploadFolder = 'categories' | 'brands'
+
+/** An uploaded file: its storage key and its URL (save the URL in a row; the server stores only the key and answers the URL). */
 export type UploadedFile = { key: string; url: string }
 
 /**
  * Uploads a picture to the file storage (an S3 stub on the server for now); save the returned URL in the row it
- * belongs to (e.g. a category's imageUrl).
+ * belongs to (e.g. a category's imageUrl). The row stores the object key; the server builds the URL from its S3
+ * bucket and region, and refuses a picture URL that is not one of its own objects (400 "invalid").
  * @param folder - Where it goes, e.g. "categories".
  * @param file - A JPEG, PNG, WebP or AVIF image of at most 5 MB.
  * @param signal - Aborts the upload.

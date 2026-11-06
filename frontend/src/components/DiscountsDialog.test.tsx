@@ -10,7 +10,7 @@ import { createStaffRow } from '@/api'
 import { israelToday } from '@/components/DiscountDialog'
 import categories from '@/stubs/product-categories.json'
 import products from '@/stubs/products.json'
-import { signInFakeUser, TEST_STAFF } from '@/test/api'
+import { fakeFetch, signInFakeUser, TEST_STAFF } from '@/test/api'
 import { renderPage } from '@/test/utils'
 
 /** The id the fake gives the first category (seeded rows have fixed ids). */
@@ -56,7 +56,7 @@ describe('/admin/categories', () => {
     expect(within(menu).getByRole('link', { name: 'Categories' })).toHaveAttribute('aria-current', 'page')
     const table = screen.getByRole('table', { name: 'Categories' })
     expect(within(table).getAllByRole('row')).toHaveLength(categories.length + 1)
-    expect(within(rowOf(categories[0].name.en)).getAllByRole('cell')[2]).toHaveTextContent('—')
+    expect(within(rowOf(categories[0].name.en)).getAllByRole('cell')[1]).toHaveTextContent('—')
   })
 
   it('adds a discount to a category', async () => {
@@ -85,7 +85,7 @@ describe('/admin/categories', () => {
     // back on the row's button.
     await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(within(rowOf(name)).getAllByRole('cell')[2]).toHaveTextContent(added)
+    expect(within(rowOf(name)).getAllByRole('cell')[1]).toHaveTextContent(added)
     await waitFor(() => expect(screen.getByRole('button', { name: `Discounts: ${name}` })).toHaveFocus())
   })
 
@@ -148,7 +148,6 @@ describe('/admin/categories', () => {
     const name = within(dialog).getByRole('group', { name: 'Name *' })
     await user.type(within(name).getByLabelText('Hebrew'), 'זוחלים')
     await user.type(within(name).getByLabelText('English'), 'Reptiles')
-    await user.type(within(dialog).getByLabelText('URL name *'), 'reptiles')
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
     expect(await within(screen.getByRole('table')).findByText('Reptiles')).toBeInTheDocument()
   })
@@ -209,11 +208,14 @@ describe('/admin/products', () => {
     const dialog = await screen.findByRole('dialog', { name: 'New record' })
     expect(within(dialog).getByLabelText('Category *')).toHaveDisplayValue(categories[0].name.en)
     const name = within(dialog).getByRole('group', { name: 'Name *' })
+    for (const label of [/URL name/, /Old site address/, /^Order/]) expect(within(dialog).queryByLabelText(label)).not.toBeInTheDocument()
     await user.type(within(name).getByLabelText('Hebrew'), 'חטיף חדש')
-    await user.type(within(dialog).getByLabelText('URL name *'), 'new-treat')
+    await user.type(within(name).getByLabelText('English'), 'New Treat')
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(bodies(fetchSpy, 'POST')).toEqual([{ name: { he: 'חטיף חדש' }, categoryId: FIRST_CATEGORY_ID, isActive: true, slug: 'new-treat', sortOrder: 0 }])
+    expect(bodies(fetchSpy, 'POST')).toEqual([{ name: { he: 'חטיף חדש', en: 'New Treat' }, categoryId: FIRST_CATEGORY_ID, isActive: true }])
+    const saved = (await (await fakeFetch('/api/staff/products')).json()) as { slug: string; sortOrder: number }[]
+    expect(saved.at(-1)).toMatchObject({ slug: 'new-treat', sortOrder: 400 })
   })
 
   it('adds a discount to a product', async () => {

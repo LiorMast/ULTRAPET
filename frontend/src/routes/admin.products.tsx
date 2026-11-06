@@ -4,6 +4,9 @@
  * discounts on a product for every business customer, through the staff API (backend/app/staff/routes.py,
  * resources "products" and "price-rules"); a change shows on the catalog at once and the discounts in the
  * customers' prices. A product's photos are kept as they are (editing them comes with the product upload page).
+ * The technical fields stay out of the table and the form: the URL name (the server names a new product after its
+ * English name and never renames it), the old site address and the order number; the order is set in "Change order"
+ * (DataTable's onReorder: ReorderDialog) and the table lists the products in it, the catalog's order.
  *
  * The page is a DataTable with the products' column config (the category and brand are picked from the current
  * lists, by typing to search: SearchableField) and a "Discounts" row action (DiscountsDialog); after every change it reloads the rows and the rules
@@ -15,6 +18,7 @@ import {
   createStaffRow,
   deleteStaffRow,
   fetchStaffRows,
+  reorderStaffRows,
   updateStaffRow,
   type StaffBrand,
   type StaffCategory,
@@ -76,11 +80,8 @@ function AdminProducts() {
       { key: 'listPrice', label: f.listPrice, type: 'money', hint: f.listPriceHint },
       { key: 'discountText', label: f.discounts, inForm: false, render: (row) => <DiscountsCell rules={row.discounts} /> },
       { key: 'isActive', label: f.isActive, type: 'boolean' },
-      { key: 'slug', label: f.slug, required: true, inTable: false },
       { key: 'barcode', label: f.barcode, ltr: true, inTable: false },
       { key: 'description', label: f.description, type: 'localized', multiline: true, inTable: false },
-      { key: 'legacyPath', label: f.legacyPath, ltr: true, inTable: false },
-      { key: 'sortOrder', label: f.sortOrder, type: 'integer', required: true, inTable: false },
     ],
     [f, categories, brands, locale],
   )
@@ -108,7 +109,7 @@ function AdminProducts() {
         caption={t.admin.productsTitle}
         rowKey={(product) => product.id}
         rowLabel={(product) => localized(product.name, locale)}
-        newRow={{ isActive: true, sortOrder: 0, categoryId: categories[0]?.id }}
+        newRow={{ isActive: true, categoryId: categories[0]?.id }}
         onCreate={async (values) => {
           await createStaffRow('products', values)
           await router.invalidate()
@@ -119,6 +120,10 @@ function AdminProducts() {
         }}
         onDelete={async (id) => {
           await deleteStaffRow('products', id)
+          await router.invalidate()
+        }}
+        onReorder={async (ids) => {
+          await reorderStaffRows('products', ids)
           await router.invalidate()
         }}
         rowActions={[discounts]}

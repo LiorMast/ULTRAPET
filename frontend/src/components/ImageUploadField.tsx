@@ -1,8 +1,9 @@
 /**
- * ImageUploadField.tsx — Edits a picture URL by uploading a file: a preview of the current picture (or a quiet
- * placeholder), "Upload / Replace picture" and "Remove picture" buttons, and the URL input itself, so staff can also
- * paste an address. The file goes to the server's file storage (uploadImage in src/api.ts; an S3 stub for now) and
- * the field's value becomes the stored file's URL; the caller saves it with the rest of its form.
+ * ImageUploadField.tsx — Edits a picture by uploading a file: a preview of the current picture (or a quiet
+ * placeholder) and "Upload / Replace picture" and "Remove picture" buttons. The file goes to the server's file
+ * storage (uploadImage in src/api.ts; an S3 stub for now) and the field's value becomes the stored file's URL; the
+ * caller saves it with the rest of its form. There is no address input on purpose: every picture the site shows
+ * comes from our storage (or is bundled with the site), never from another site.
  *
  * Only JPEG, PNG, WebP and AVIF pictures of up to 5 MB are sent (the server checks again). Upload progress and
  * results are announced in a live region; while a file uploads, `onBusyChange(true)` lets the form hold its Save.
@@ -35,28 +36,28 @@ function uploadErrorMessage(error: unknown, t: Dictionary): string {
   return t.admin.errors.failed
 }
 
-/** The props of ImageUploadField (see the component); other attributes go to the URL input. */
-type ImageUploadFieldProps = Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'type'> & {
+/** The props of ImageUploadField (see the component); the form's state attributes go to the upload button. */
+type ImageUploadFieldProps = Pick<ComponentProps<'button'>, 'className' | 'disabled' | 'aria-invalid' | 'aria-describedby'> & {
   id: string
   value: string
   onChange: (url: string) => void
   folder: UploadFolder
   onBusyChange?: (busy: boolean) => void
-  inputClassName?: string
 }
 
 /**
  * The picture field.
- * @param props.id - The URL input's id (the form's label and error focus target).
+ * @param props.id - The upload button's id (the form's error focus target).
  * @param props.value - The current picture URL; "" = none.
- * @param props.onChange - Called with the new URL: the uploaded file's, a typed one, or "" after "Remove".
+ * @param props.onChange - Called with the new URL: the uploaded file's, or "" after "Remove".
  * @param props.folder - The storage folder the files go to, e.g. "categories".
  * @param props.onBusyChange - Told true when an upload starts and false when it ends (the form disables Save).
  * @param props.className - Classes of the wrapper (outer spacing).
- * @param props.inputClassName - Classes of the URL input (its look, e.g. the admin forms' INPUT_CLASS).
- * @param props.disabled - Read-only: no upload, remove or typing.
- * @param props - Other <input> attributes for the URL input (aria-invalid, aria-describedby, aria-required, ...).
- * @returns The preview, the buttons, the status line and the URL input.
+ * @param props.disabled - Read-only: no upload or remove.
+ * @param props.aria-invalid - The form found the field wrong (set on the upload button).
+ * @param props.aria-describedby - The ids of the form's hint and error (the upload button's description, plus the
+ *   field's own upload error).
+ * @returns The preview, the buttons and the status line.
  */
 export function ImageUploadField({
   id,
@@ -65,10 +66,9 @@ export function ImageUploadField({
   folder,
   onBusyChange,
   className,
-  inputClassName,
   disabled,
+  'aria-invalid': invalid,
   'aria-describedby': describedBy,
-  ...inputProps
 }: ImageUploadFieldProps) {
   const { t } = useI18n()
   const fileId = useId()
@@ -144,7 +144,17 @@ export function ImageUploadField({
           )}
         </div>
         <div className="flex flex-col items-start gap-2">
-          <Button ref={chooseButton} type="button" variant="outline" size="sm" disabled={disabled || busy} onClick={() => fileInput.current?.click()}>
+          <Button
+            ref={chooseButton}
+            id={id}
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={disabled || busy}
+            aria-invalid={invalid}
+            aria-describedby={[describedBy, problem && problemId].filter(Boolean).join(' ') || undefined}
+            onClick={() => fileInput.current?.click()}
+          >
             <Upload aria-hidden />
             {value ? t.admin.upload.replace : t.admin.upload.choose}
           </Button>
@@ -176,20 +186,6 @@ export function ImageUploadField({
           {problem}
         </p>
       )}
-      <label htmlFor={id} className="mt-3 block text-xs text-brand-charcoal-muted">
-        {t.admin.upload.url}
-        <input
-          id={id}
-          type="url"
-          dir="ltr"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled || busy}
-          aria-describedby={[describedBy, problem && problemId].filter(Boolean).join(' ') || undefined}
-          className={inputClassName}
-          {...inputProps}
-        />
-      </label>
     </div>
   )
 }

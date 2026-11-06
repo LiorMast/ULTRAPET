@@ -1,14 +1,16 @@
 /**
  * DataTable.test.tsx — Tests for the admin data table (DataTable, RecordDialog) on the real /admin/brands page
  * against the fake staff API (src/test/api.ts): the staff sign-in gate, listing, search and sorting, editing
- * (only the changed fields are sent), adding, deleting with confirmation, server and client errors shown on
- * their field, Hebrew/RTL and English texts, and a read-only table without action buttons.
+ * (only the changed fields are sent), adding without a URL name or order (the server fills them), "Change order",
+ * deleting with confirmation, server and client errors shown on their field (a table of its own for patterns and
+ * duplicates), Hebrew/RTL and English texts, and a read-only table without action buttons.
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/api'
 import { DataTable, type DataColumn } from '@/components/DataTable'
 import brands from '@/stubs/brands.json'
-import { TEST_STAFF } from '@/test/api'
+import { fakeFetch, TEST_STAFF } from '@/test/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
 /** The brands table on the page. */
@@ -67,42 +69,44 @@ describe('DataTable on /admin/brands', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: `Edit ${brands[0].name}` })).toHaveFocus())
   })
 
-  it('adds a brand', async () => {
-    const { user } = await renderPage('/en/admin/brands', { staff: TEST_STAFF })
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-    const dialog = await screen.findByRole('dialog', { name: 'New record' })
-    await user.type(within(dialog).getByLabelText('Name *'), 'Acme Pets')
-    await user.type(within(dialog).getByLabelText('URL name *'), 'acme-pets')
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(await within(table()).findByText('Acme Pets')).toBeInTheDocument()
-    expect(screen.getByText('Record added.')).toHaveAttribute('role', 'status')
-  })
-
-  it('checks required fields and patterns before sending', async () => {
+  it('adds a brand without a URL name or order: the server names it and puts it last', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const { user } = await renderPage('/en/admin/brands', { staff: TEST_STAFF })
     await user.click(screen.getByRole('button', { name: 'Add' }))
     const dialog = await screen.findByRole('dialog', { name: 'New record' })
-    await user.type(within(dialog).getByLabelText('URL name *'), 'Not A Slug')
+    for (const label of [/URL name/, /^Order/]) expect(within(dialog).queryByLabelText(label)).not.toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Name *'), 'Acme Pets')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await within(table()).findByText('Acme Pets')).toBeInTheDocument()
+    expect(names().at(-1)).toBe('Acme Pets')
+    expect(screen.getByText('Record added.')).toHaveAttribute('role', 'status')
+    const post = fetchSpy.mock.calls.find(([, init]) => init?.method === 'POST')!
+    expect(JSON.parse(String(post[1]?.body))).toEqual({ name: 'Acme Pets', isActive: true })
+    const saved = (await (await fakeFetch('/api/staff/brands')).json()) as { slug: string }[]
+    expect(saved.at(-1)?.slug).toBe('acme-pets')
+  })
+
+  it('shows no URL name or order column, and reorders the brands in "Change order"', async () => {
+    const { user } = await renderPage('/en/admin/brands', { staff: TEST_STAFF })
+    const headers = within(table()).getAllByRole('columnheader').map((header) => header.textContent)
+    expect(headers).toEqual(['Name', 'Tagline', 'Colour', 'Active', 'Actions'])
+    await user.click(screen.getByRole('button', { name: 'Change order' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Change the order' })
+    await user.click(within(dialog).getByRole('button', { name: `Move ${brands[1].name} up` }))
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(names().slice(0, 2)).toEqual([brands[1].name, brands[0].name]))
+  })
+
+  it('checks required fields before sending', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { user } = await renderPage('/en/admin/brands', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New record' })
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
     expect(within(dialog).getByLabelText('Name *')).toHaveAccessibleDescription('Required')
     expect(within(dialog).getByLabelText('Name *')).toHaveFocus()
-    expect(within(dialog).getByLabelText('URL name *')).toHaveAttribute('aria-invalid', 'true')
     expect(fetchSpy.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
-  })
-
-  it("shows the server's duplicate error on the field it is about", async () => {
-    const { user } = await renderPage('/en/admin/brands', { staff: TEST_STAFF })
-    await user.click(screen.getByRole('button', { name: `Edit ${brands[0].name}` }))
-    const dialog = await screen.findByRole('dialog')
-    const slug = within(dialog).getByLabelText('URL name *')
-    await user.clear(slug)
-    await user.type(slug, brands[1].slug)
-    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(slug).toHaveAttribute('aria-invalid', 'true'))
-    expect(slug).toHaveAccessibleDescription(/Another record already has this value/)
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('deletes a brand after confirming', async () => {
@@ -136,6 +140,55 @@ describe('DataTable on /admin/brands', () => {
   })
 })
 
+describe('DataTable with a column config of its own', () => {
+  type Coded = { id: string; name: string; code: string }
+  const columns: DataColumn<Coded>[] = [
+    { key: 'name', label: 'Name', required: true },
+    { key: 'code', label: 'Code', required: true, ltr: true, pattern: '[A-Z]{3}' },
+  ]
+
+  it('checks patterns before sending', async () => {
+    const onCreate = vi.fn(() => Promise.resolve())
+    const { user } = renderComponent(
+      <DataTable<Coded> rows={[]} columns={columns} caption="Items" rowKey={(item) => item.id} rowLabel={(item) => item.name} onCreate={onCreate} />,
+      'en',
+    )
+    await user.click(await screen.findByRole('button', { name: 'Add' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New record' })
+    await user.type(within(dialog).getByLabelText('Name *'), 'Alpha')
+    await user.type(within(dialog).getByLabelText('Code *'), 'not a code')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(within(dialog).getByLabelText('Code *')).toHaveAttribute('aria-invalid', 'true')
+    expect(within(dialog).getByLabelText('Code *')).toHaveFocus()
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
+  it("shows the server's duplicate error on the field it is about", async () => {
+    const onUpdate = vi.fn(() => Promise.reject(new ApiError(409, { error: 'duplicate', constraint: 'items_code_key' })))
+    const { user } = renderComponent(
+      <DataTable<Coded>
+        rows={[{ id: '1', name: 'Alpha', code: 'AAA' }]}
+        columns={columns}
+        caption="Items"
+        rowKey={(item) => item.id}
+        rowLabel={(item) => item.name}
+        onUpdate={onUpdate}
+      />,
+      'en',
+    )
+    await user.click(await screen.findByRole('button', { name: 'Edit Alpha' }))
+    const dialog = await screen.findByRole('dialog')
+    const code = within(dialog).getByLabelText('Code *')
+    await user.clear(code)
+    await user.type(code, 'BBB')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(code).toHaveAttribute('aria-invalid', 'true'))
+    expect(code).toHaveAccessibleDescription(/Another record already has this value/)
+    expect(onUpdate).toHaveBeenCalledWith('1', { code: 'BBB' })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})
+
 describe('DataTable without handlers', () => {
   it('is read-only: no Add, Edit or Delete buttons and no actions column', async () => {
     type Item = { id: string; name: string; isActive: boolean }
@@ -150,7 +203,7 @@ describe('DataTable without handlers', () => {
     const items = await screen.findByRole('table', { name: 'Items' })
     expect(within(items).getByText('Alpha')).toBeInTheDocument()
     expect(within(items).getByRole('img', { name: 'Yes' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^(Add|Edit|Delete)/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^(Add|Edit|Delete|Change order)/ })).not.toBeInTheDocument()
     expect(within(items).queryByRole('columnheader', { name: /Actions/ })).not.toBeInTheDocument()
   })
 })

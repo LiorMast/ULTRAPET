@@ -7,7 +7,7 @@ import pytest
 from click import ClickException
 from sqlalchemy import func, select
 
-from app.database.models.catalog import Brand, Category, Product
+from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.models.content import Article, FaqItem, Reseller
 from app.database.models.orders import PaymentMethod
 from app.database.seed import seed_database
@@ -42,7 +42,7 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
         "articles": 4,
         "resellers": 124,
         "faq_items": 7,
-        "settings": 14,
+        "settings": 15,
         "payment_methods": 3,
         "staff_users": 1,
         "business_users": 1,
@@ -56,7 +56,11 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
     assert product.category.slug == "dry-dog-food"
     assert product.list_price == Decimal("303.90")
     assert product.name["en"] == "INTERNUTRI ORIGINAL DOG BEEF Dog Food 14 kg"
-    assert product.images[0].thumbnail_url.endswith("-300x300.png")
+    # Pictures are object keys in the file storage (copied there by `flask import-media`), never WordPress URLs.
+    assert product.images[0].url == "products/2026-05-45f8dcaa-598f-4d57-91c3-e59a834a5d80.png"
+    assert product.images[0].thumbnail_url == "products/2026-05-45f8dcaa-598f-4d57-91c3-e59a834a5d80-300x300.png"
+    assert database.scalar(select(func.count()).select_from(ProductImage).where(ProductImage.url.contains("://"))) == 0
+    assert get_setting("catalog_pdf") == "catalog/ultrapetcatalog.pdf"
     # The catalog keeps the stub order: 1081 is the first product of products.json.
     assert product.sort_order == 0
     assert database.scalar(select(func.max(Product.sort_order))) == 399

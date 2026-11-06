@@ -2,7 +2,8 @@
  * ImageUploadField.test.tsx — Tests for the picture upload field (ImageUploadField, the "image" column type of
  * DataTable/RecordDialog) on the real /admin/categories page against the fake staff API (src/test/api.ts): uploading
  * a category picture that then shows in the table and on the home page carousel, the type and size checks before
- * sending, the server's refusal, Save held while a file uploads, removing a picture, and the Hebrew labels.
+ * sending, the server's refusal, Save held while a file uploads, removing a picture, no address input (pictures come
+ * only from uploads) with a refused value's error on the upload button, and the Hebrew labels.
  */
 import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -53,7 +54,6 @@ describe('ImageUploadField on /admin/categories', () => {
     await user.upload(fileInput, png())
     expect(await within(picture).findByText('Picture uploaded. Save to keep it.')).toBeInTheDocument()
     expect(within(picture).getByRole('img', { name: 'Current picture' })).toHaveAttribute('src', '/api/media/categories/fake-1.png')
-    expect(within(picture).getByLabelText(/paste the picture address/)).toHaveValue('/api/media/categories/fake-1.png')
     expect(within(picture).getByRole('button', { name: 'Replace picture' })).toBeInTheDocument()
     const upload = fetchSpy.mock.calls.find(([url]) => url === '/api/staff/uploads')!
     expect(upload[1]?.method).toBe('POST')
@@ -80,7 +80,7 @@ describe('ImageUploadField on /admin/categories', () => {
     expect(await within(picture).findByRole('alert')).toHaveTextContent('Choose a JPEG, PNG, WebP or AVIF picture.')
     await user.upload(fileInput, png('huge.png', 5 * 1024 * 1024 + 1))
     expect(await within(picture).findByRole('alert')).toHaveTextContent('The file is larger than 5 MB.')
-    expect(within(picture).getByLabelText(/paste the picture address/)).toHaveAccessibleDescription(/larger than 5 MB/)
+    expect(within(picture).getByRole('button', { name: 'Upload picture' })).toHaveAccessibleDescription(/larger than 5 MB/)
     expect(fetchSpy.mock.calls.some(([url]) => url === '/api/staff/uploads')).toBe(false)
   })
 
@@ -122,6 +122,33 @@ describe('ImageUploadField on /admin/categories', () => {
     expect(await screen.findByText('Changes saved.')).toBeInTheDocument()
     const patch = fetchSpy.mock.calls.find(([, init]) => init?.method === 'PATCH')!
     expect(JSON.parse(String(patch[1]?.body))).toEqual({ imageUrl: null })
+  })
+
+  it('has no address input: a picture can only be uploaded', async () => {
+    const { picture } = await openEditForm()
+    expect(within(picture).queryByRole('textbox')).not.toBeInTheDocument()
+    expect(picture.querySelector('input:not([type="file"])')).toBeNull()
+  })
+
+  it("puts the server's refusal of the picture on the upload button", async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+      init?.method === 'PATCH' ? Promise.resolve(Response.json({ error: 'invalid', field: 'imageUrl' }, { status: 400 })) : fakeFetch(input, init),
+    )
+    const { dialog, picture, fileInput, user } = await openEditForm()
+    await user.upload(fileInput, png())
+    await within(picture).findByText('Picture uploaded. Save to keep it.')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(await within(dialog).findByText('Invalid value')).toBeInTheDocument()
+    const button = within(picture).getByRole('button', { name: 'Replace picture' })
+    expect(button).toHaveAttribute('aria-invalid', 'true')
+    expect(button).toHaveAccessibleDescription(/Invalid value/)
+    expect(button).toHaveFocus()
+  })
+
+  it('keeps out a picture of another site (the fake API refuses it like the server)', async () => {
+    signInFakeUser(TEST_STAFF)
+    const rows = await fetchStaffRows<{ id: string; slug: string }>('categories')
+    await expect(updateStaffRow('categories', rows[0].id, { imageUrl: 'https://example.com/birds.png' })).rejects.toMatchObject({ code: 'invalid', field: 'imageUrl' })
   })
 
   it('has Hebrew labels', async () => {

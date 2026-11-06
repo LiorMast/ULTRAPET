@@ -1,7 +1,7 @@
 """app — The Ultra Pet backend: one Flask application (monolith) over PostgreSQL.
 
 create_app() builds the application: configuration from the environment, the database (app.database.db), JWT
-sign-in (app.auth), the CLI commands (app.database.seed) and the routes. The routes are two blueprints, each in its
+sign-in (app.auth), the CLI commands (app.database.seed, app.database.legacy_media) and the routes. The routes are two blueprints, each in its
 own folder: customers/ (prefix /api: everything the public site and the business customers call) and staff/
 (prefix /api/staff: the staff panel API). Other modules: database/ (schema SQL, SQLAlchemy base, models, seed
 commands), pricing (the customer's price) and storage (the stub of the S3 file storage for uploads).
@@ -24,6 +24,7 @@ from app.auth import init_auth
 from app.customers.routes import bp as customers_bp
 from app.database import models  # noqa: F401  (registers every model on db.metadata)
 from app.database.db import db
+from app.database.legacy_media import import_media_command
 from app.database.seed import reset_db_command, seed_command
 from app.staff.routes import bp as staff_bp
 
@@ -91,6 +92,10 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         SITE_URL=os.environ.get("SITE_URL", "https://www.ultrapet.co.il"),
         # The S3 stub's folder (app/storage.py): backend/media, git-ignored, inside compose's bind mount.
         MEDIA_ROOT=os.environ.get("MEDIA_ROOT", os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")),
+        # The S3 bucket and its region: picture URLs are built from them and the stored object keys (app/storage.py).
+        # Empty (dev, until the stub uses a real bucket) = the stub's /api/media/ URLs.
+        S3_BUCKET=os.environ.get("S3_BUCKET", ""),
+        S3_REGION=os.environ.get("S3_REGION", ""),
         MAX_CONTENT_LENGTH=MAX_CONTENT_LENGTH,
     )
     if config:
@@ -104,6 +109,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     init_auth(app)
     app.cli.add_command(reset_db_command)
     app.cli.add_command(seed_command)
+    app.cli.add_command(import_media_command)
     app.register_error_handler(HTTPException, http_error)
     app.register_blueprint(customers_bp)
     app.register_blueprint(staff_bp)

@@ -34,8 +34,11 @@ export type NavLink = { id: string; label: Label; link: AppLink }
 /** A top-level menu entry: a link, or a dropdown with `children`. */
 export type NavItem = NavLink | ({ id: string; label: Label } & { children: NavChild[] })
 
-/** The PDF catalog without prices (still hosted on the WordPress site until the backend serves it). */
-export const CATALOG_PDF_URL = 'https://www.ultrapet.co.il/wp-content/uploads/2025/03/ultrapetcatalog.pdf'
+/**
+ * The PDF catalog without prices: the backend redirects to the file in its storage (the setting `catalog_pdf`), so a
+ * new catalog needs no frontend change.
+ */
+export const CATALOG_PDF_URL = '/api/catalog.pdf'
 
 /**
  * Finds the file named after a slug among globbed asset files (e.g. "dog-food" -> .../dog-food.jpg).
@@ -56,22 +59,33 @@ const categoryPhotoFiles = import.meta.glob<string>('/src/assets/categories/*.{p
  */
 export const categoryPhoto = (slug: string) => fileBySlug(categoryPhotoFiles, slug)
 
-/** A product category card: URL slug, label, fallback icon and optional photo (a file in src/assets/categories/, else a placeholder URL). */
+/** A product category card: URL slug, label, fallback icon and optional photo (a bundled file; none = the icon). */
 export type Category = { slug: string; label: Label; icon: LucideIcon; image?: string }
 
 /**
- * The home page's marketing categories (from legacy/supabase-export/cms_categories.json; the catalog's 15
- * store categories come from the API). Until real photos are dropped into src/assets/categories/, each card
- * shows a placeholder: a product photo from the WordPress store.
+ * The placeholder photos of the marketing categories: product photos of the old store, bundled in
+ * src/assets/category-cards/ (named after the slug) and resized to an 800px WebP at build time.
+ */
+const categoryCardFiles = import.meta.glob<string>('/src/assets/category-cards/*.{png,jpg,jpeg,webp}', {
+  eager: true,
+  import: 'default',
+  query: { w: '800', format: 'webp' },
+})
+
+/**
+ * The marketing categories of legacy (from legacy/supabase-export/cms_categories.json), now only the article pages'
+ * related categories and the /categories/$slug placeholder; the catalog's 15 store categories come from the API.
+ * Each card shows the photo in src/assets/categories/ named after its slug, else its placeholder in
+ * src/assets/category-cards/, else its icon.
  */
 export const CATEGORIES: Category[] = [
-  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, icon: Dog, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2026/05/45f8dcaa-598f-4d57-91c3-e59a834a5d80.png' },
-  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, icon: Cat, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2024/03/easy-cat-3d-sakoyla_-1-463x1024-1.png' },
-  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, icon: Bone, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2025/01/Ultrapet-52.-Web.jpg' },
-  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, icon: Sparkles, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2024/03/71gTdjfLT0L._AC_SL1500_-2.jpg' },
-  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, icon: Rabbit, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2025/10/01850.jpg' },
-  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, icon: Bird, placeholder: 'https://www.ultrapet.co.il/wp-content/uploads/2025/10/08460.jpg' },
-].map(({ placeholder, ...category }) => ({ ...category, image: fileBySlug(categoryPhotoFiles, category.slug) ?? placeholder }))
+  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, icon: Dog },
+  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, icon: Cat },
+  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, icon: Bone },
+  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, icon: Sparkles },
+  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, icon: Rabbit },
+  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, icon: Bird },
+].map((category) => ({ ...category, image: fileBySlug(categoryPhotoFiles, category.slug) ?? fileBySlug(categoryCardFiles, category.slug) }))
 
 /** The label of each home page figure, by the figure's id (the values come from the API, see fetchStats). */
 export const STAT_LABELS: Record<string, Label> = {

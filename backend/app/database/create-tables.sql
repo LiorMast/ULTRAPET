@@ -105,13 +105,13 @@ CREATE TABLE suppliers (
 -- public site.
 CREATE TABLE brands (
   id           UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- brand id
-  slug         TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name of the brand page, e.g. 'jr-farm'
+  slug         TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name of the brand page, e.g. 'jr-farm'; the staff API names a new brand after its name and never changes it
   name         TEXT        NOT NULL,                      -- brand name as printed (not translated)
   tagline      JSONB       CHECK (tagline IS NULL OR coalesce(tagline ->> 'he', '') <> ''), -- short slogan per language; NULL = none
   description  JSONB       CHECK (description IS NULL OR coalesce(description ->> 'he', '') <> ''), -- brand page text per language; NULL = none
   accent_color TEXT        CHECK (accent_color ~ '^#[0-9A-Fa-f]{6}$'), -- brand colour for its cards, '#RRGGBB'; NULL = the site red
-  logo_url     TEXT,                                      -- logo image URL; NULL = show the name as text
-  sort_order   INTEGER     NOT NULL DEFAULT 0,            -- position in brand lists, lowest first
+  logo_url     TEXT,                                      -- object key of the uploaded logo in the file storage, e.g. 'brands/20261106T132045Z_3f2a.png' (never a URL: the API builds it); NULL = the frontend's bundled logo, else the name as text
+  sort_order   INTEGER     NOT NULL DEFAULT 0,            -- position in brand lists, lowest first (staff drag the order: PUT /api/staff/brands/order; a new brand goes last)
   is_active    BOOLEAN     NOT NULL DEFAULT true,         -- false = hidden from the public site
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),        -- when the brand was added
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()         -- last change
@@ -121,11 +121,11 @@ CREATE TABLE brands (
 -- parent categories. Discounts can target a whole category (price_rules).
 CREATE TABLE categories (
   id          UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- category id
-  slug        TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name, e.g. 'dry-dog-food' (the catalog's ?category=)
+  slug        TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name, e.g. 'dry-dog-food' (the catalog's ?category=); the staff API names a new category after its English name and never changes it
   name        JSONB       NOT NULL CHECK (coalesce(name ->> 'he', '') <> ''), -- display name per language
-  image_url   TEXT,                                       -- category photo URL; NULL = use a product photo
+  image_url   TEXT,                                       -- object key of the category photo in the file storage, e.g. 'categories/3f2a.webp' (never a URL: the API builds it from S3_BUCKET/S3_REGION); NULL = the frontend's bundled photo for the slug, else an icon
   legacy_path TEXT,                                       -- the old WordPress URL, for 301 redirects; NULL = none
-  sort_order  INTEGER     NOT NULL DEFAULT 0,             -- position in category lists, lowest first
+  sort_order  INTEGER     NOT NULL DEFAULT 0,             -- position in category lists, lowest first (staff drag the order: PUT /api/staff/categories/order; a new category goes last)
   is_active   BOOLEAN     NOT NULL DEFAULT true,          -- false = hidden from the catalog
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),         -- when the category was added
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()          -- last change
@@ -136,7 +136,7 @@ CREATE TABLE categories (
 CREATE TABLE products (
   id          UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- product id
   woocommerce_id BIGINT     UNIQUE,                       -- the product's id on the old WooCommerce site (also the id in the frontend's stub data); NULL = created after the migration
-  slug        TEXT          NOT NULL UNIQUE,              -- URL name of the product page (may be Hebrew)
+  slug        TEXT          NOT NULL UNIQUE,              -- URL name of the product page (may be Hebrew: the imported ones); the staff API names a new product after its English name and never changes it
   sku         TEXT          UNIQUE,                       -- Ultra Pet's item code (the Rivhit item number); NULL = not assigned yet
   barcode     TEXT,                                       -- EAN/UPC barcode printed on the package; NULL = unknown
   name        JSONB         NOT NULL CHECK (coalesce(name ->> 'he', '') <> ''), -- product name per language
@@ -144,7 +144,7 @@ CREATE TABLE products (
   category_id UUID        NOT NULL REFERENCES categories (id) ON DELETE RESTRICT, -- the product's category; a category with products cannot be deleted
   brand_id    UUID        REFERENCES brands (id) ON DELETE SET NULL, -- the product's brand; NULL = unbranded or not set
   list_price  NUMERIC(10,2) CHECK (list_price >= 0),      -- base wholesale price per unit, shekels before VAT, before any price rule; NULL = no price yet (cannot be ordered)
-  sort_order  INTEGER       NOT NULL DEFAULT 0,           -- position in product lists (the catalog), lowest first
+  sort_order  INTEGER       NOT NULL DEFAULT 0,           -- position in product lists (the catalog), lowest first (staff drag the order: PUT /api/staff/products/order; a new product goes last)
   is_active   BOOLEAN       NOT NULL DEFAULT true,        -- false = hidden from the catalog and cannot be ordered
   legacy_path TEXT,                                       -- the old WooCommerce URL, for 301 redirects; NULL = none
   created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),       -- when the product was added
@@ -157,9 +157,9 @@ CREATE INDEX ON products (brand_id);
 CREATE TABLE product_images (
   id            UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- image id
   product_id    UUID      NOT NULL REFERENCES products (id) ON DELETE CASCADE, -- the product; deleting it deletes its images
-  url           TEXT        NOT NULL,                     -- full-size image URL
-  thumbnail_url TEXT,                                     -- small square copy for cards (300x300); NULL = use url
-  srcset        TEXT,                                     -- HTML srcset of other sized copies; NULL = none
+  url           TEXT        NOT NULL,                     -- object key of the full-size picture in the file storage, e.g. 'products/2026-05-45f8.png' (never a URL: the API builds it)
+  thumbnail_url TEXT,                                     -- object key of a small square copy for cards (300x300); NULL = use url
+  srcset        TEXT,                                     -- HTML srcset of other sized copies, with object keys: 'products/a-500x500.png 500w, products/a-768x768.png 768w'; NULL = none
   alt           JSONB       CHECK (alt IS NULL OR coalesce(alt ->> 'he', '') <> ''), -- alternative text per language; NULL = decorative (the product name is shown next to it)
   sort_order    INTEGER     NOT NULL DEFAULT 0,           -- display position, lowest first (0 = main photo)
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),       -- when the image was added

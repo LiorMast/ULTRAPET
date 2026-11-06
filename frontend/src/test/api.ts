@@ -9,11 +9,18 @@
  * faked for brands, categories, products, price rules, settings, page sections and FAQ items: list/create/update/delete
  * on in-memory copies of the stubs (no price rules or page sections at first; GET /api/sections and
  * /api/sections/<key> read the latter, GET /api/faq the FAQ items, GET /api/stats and /api/contact the settings, seeded
- * with STATS and stubs/contact.json), the FAQ's PUT that replaces the whole list at once (all or nothing), with the server's
- * errors (401 signed out, 403 for a customer, 400 required / a failed check / an unknown reference or id, 405 PUT on
+ * with STATS and stubs/contact.json), the FAQ's PUT that replaces the whole list at once (all or nothing), the categories'
+ * PUT /order, the brands' and the products' (every id once, in the new order; a new category, brand or product also gets
+ * the server's slug and last place), with the
+ * server's errors (401 signed out, 403 for a customer, 400 required / a failed check / an unknown reference or id, 405 PUT on
  * another table, 409 duplicate or in use, 404) and its cascade (a deleted category's or product's price rules go with
- * it). POST /api/staff/uploads fakes the S3-stub upload (staff only; folder "categories"; JPEG/PNG/WebP/AVIF by the
- * file's type, at most 5 MB; answers `/api/media/<folder>/fake-<n>.<ext>`, nothing is stored).
+ * it). POST /api/staff/uploads fakes the S3-stub upload (staff only; folder "categories" or "brands"; JPEG/PNG/WebP/AVIF by the
+ * file's type, at most 5 MB; answers `/api/media/<folder>/fake-<n>.<ext>`, nothing is stored; the server names it
+ * `<folder>/<UTC timestamp>_<uuid>.<ext>`). A picture field
+ * (`media`, e.g. a category's imageUrl) takes only one of our objects, like the server's media_key: an object key or
+ * its `/api/media/` URL ("" = none); anything else (another site's URL, "../x") is 400 invalid. The server stores the
+ * key and answers its URL; the fake keeps the URL, which answers the same with no S3 bucket configured. The stub
+ * products' photos are object keys too, answered as `/api/media/<key>` URLs (mediaImage).
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
@@ -105,13 +112,19 @@ function seedId(table: number, index: number): string {
  * - `order`: the list order. `inUse`: the foreign key that keeps a row from being deleted, if any applies.
  * - `key`: the field that names a row in the URL when it is not a generated `id` (page sections: "key").
  * - `replaceable`: PUT replaces the whole list (`replaceable` on the server; the table has a sortOrder field).
+ * - `orderable`: PUT /order sets the order from a list of ids (`orderable` on the server; a sortOrder field).
+ * - `createDefaults`: fills a new row's missing values from the table (`create_defaults` on the server).
+ * - `media`: picture fields (the server's media_key converter), see mediaUrl.
  */
 type FakeTable = {
   key?: string
   replaceable?: boolean
+  orderable?: boolean
+  createDefaults?: (values: Record<string, unknown>, rows: StaffRow[]) => Record<string, unknown>
   fields: string[]
   required: string[]
   numeric?: string[]
+  media?: string[]
   defaults: Record<string, unknown>
   seed: () => StaffRow[] | Promise<StaffRow[]>
   check: (row: StaffRow, others: StaffRow[]) => Response | null | Promise<Response | null>
@@ -157,11 +170,36 @@ const noHebrew = (value: unknown) => value !== null && !(value as Partial<Locali
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
+/**
+ * Builds the create defaults of a table whose URL name and order the staff panel hides, like the server's
+ * new_row_defaults (categories, brands, products).
+ * @param fallback - The URL name when the name gives none, e.g. "category".
+ * @returns A function (values, rows) -> the values plus `slug` (the English name, or a brand's plain name, slugified,
+ *   else `fallback`; "-2", "-3", ... when taken) and `sortOrder` (after the last row) when missing.
+ */
+const newRowDefaults = (fallback: string) => (values: Record<string, unknown>, rows: StaffRow[]): Record<string, unknown> => {
+  const filled = { ...values }
+  if (!filled.slug) {
+    const name = typeof filled.name === 'string' ? filled.name : ((filled.name as Partial<Localized<string>> | undefined)?.en ?? '')
+    const base = name.toLowerCase().match(/[a-z0-9]+/g)?.join('-') || fallback
+    let slug = base
+    for (let n = 2; rows.some((row) => row.slug === slug); n++) slug = `${base}-${n}`
+    filled.slug = slug
+  }
+  if (filled.sortOrder === undefined || filled.sortOrder === null) {
+    filled.sortOrder = rows.length ? Math.max(...rows.map((row) => Number(row.sortOrder))) + 1 : 0
+  }
+  return filled
+}
+
 /** The staff tables the fake serves, by their URL name. */
 const STAFF_TABLES: Record<string, FakeTable> = {
   brands: {
     fields: ['slug', 'name', 'tagline', 'description', 'accentColor', 'logoUrl', 'sortOrder', 'isActive'],
     required: ['name', 'slug', 'sortOrder', 'isActive'],
+    media: ['logoUrl'],
+    orderable: true,
+    createDefaults: newRowDefaults('brand'),
     defaults: { tagline: null, description: null, accentColor: null, logoUrl: null, sortOrder: 0, isActive: true },
     seed: () =>
       brands.map((brand, index) => ({
@@ -187,6 +225,9 @@ const STAFF_TABLES: Record<string, FakeTable> = {
   categories: {
     fields: ['slug', 'name', 'imageUrl', 'legacyPath', 'sortOrder', 'isActive'],
     required: ['slug', 'name', 'sortOrder', 'isActive'],
+    media: ['imageUrl'],
+    orderable: true,
+    createDefaults: newRowDefaults('category'),
     defaults: { imageUrl: null, legacyPath: null, sortOrder: 0, isActive: true },
     seed: () =>
       categories.map((category, index) => ({
@@ -212,6 +253,8 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     fields: ['woocommerceId', 'slug', 'sku', 'barcode', 'name', 'description', 'categoryId', 'brandId', 'listPrice', 'sortOrder', 'isActive', 'legacyPath', 'images'],
     required: ['slug', 'name', 'categoryId', 'sortOrder', 'isActive'],
     numeric: ['listPrice'],
+    orderable: true,
+    createDefaults: newRowDefaults('product'),
     defaults: { woocommerceId: null, sku: null, barcode: null, description: null, brandId: null, listPrice: null, sortOrder: 0, isActive: true, legacyPath: null, images: [] },
     seed: async () => {
       const [{ default: products }, { default: prices }, categoryRows] = await Promise.all([
@@ -233,7 +276,7 @@ const STAFF_TABLES: Record<string, FakeTable> = {
         sortOrder: index,
         isActive: true,
         legacyPath: null,
-        images: product.image ? [{ url: product.image.src, thumbnailUrl: product.image.thumbnail, srcset: product.image.srcSet, alt: null }] : [],
+        images: product.image ? [mediaImage(product.image)].map(({ src, thumbnail, srcSet }) => ({ url: src, thumbnailUrl: thumbnail, srcset: srcSet, alt: null })) : [],
         createdAt: SEEDED,
         updatedAt: SEEDED,
       }))
@@ -327,6 +370,39 @@ const STAFF_TABLES: Record<string, FakeTable> = {
   },
 }
 
+/** Where the server's S3 stub serves its objects (storage.MEDIA_URL; no bucket is configured in tests). */
+const MEDIA_URL = '/api/media/'
+
+/** The shape of an object key, "<folder>/<name>.<ext>" (storage.KEY_PATTERN on the server). */
+const OBJECT_KEY = /^[a-z0-9-]+\/[A-Za-z0-9_-]+\.[a-z0-9]+$/
+
+/**
+ * A stub product photo (object keys) as the server answers it: every key turned into its URL.
+ * @param image - The photo from stubs/products.json.
+ * @returns The photo with `/api/media/<key>` URLs (the srcset's entries too).
+ */
+function mediaImage(image: ProductImage): ProductImage {
+  const srcSet = image.srcSet
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => `${MEDIA_URL}${entry}`)
+    .join(', ')
+  return { src: `${MEDIA_URL}${image.src}`, thumbnail: `${MEDIA_URL}${image.thumbnail}`, srcSet }
+}
+
+/**
+ * Reads a picture field like the server's media_key converter: an object key, or our URL of it.
+ * @param value - The JSON value.
+ * @returns The URL the server would answer (null for none), or undefined when the value is not one of our objects.
+ */
+function mediaUrl(value: unknown): string | null | undefined {
+  if (value === null || value === '') return null
+  if (typeof value !== 'string') return undefined
+  const key = value.startsWith(MEDIA_URL) ? value.slice(MEDIA_URL.length) : value
+  return OBJECT_KEY.test(key) ? `${MEDIA_URL}${key}` : undefined
+}
+
 /**
  * Checks a row the way the database does: its required fields, then its table's constraints.
  * @param table - The table.
@@ -375,6 +451,27 @@ async function replaceAnswer(table: FakeTable, rows: StaffRow[], body: unknown):
   return json(next)
 }
 
+/**
+ * Answers PUT /api/staff/<resource>/order like the server's reorder_rows: `ids` must be every row's id, each once;
+ * each row's sortOrder becomes its position. A wrong list changes nothing.
+ * @param rows - The table's rows, changed in place on success.
+ * @param body - The parsed request body.
+ * @returns The rows in their new order, or the server's error answer.
+ */
+function orderAnswer(rows: StaffRow[], body: unknown): Response {
+  const ids = (body as { ids?: unknown } | null)?.ids
+  if (!Array.isArray(ids)) return json({ error: 'invalid_body' }, 400)
+  const known = new Set(rows.map((row) => row.id))
+  if (ids.length !== rows.length || new Set(ids).size !== ids.length || !ids.every((id) => known.has(String(id)))) return json({ error: 'invalid', field: 'ids' }, 400)
+  const now = new Date().toISOString()
+  const ordered = ids.map((id, position) => ({ ...rows.find((row) => row.id === id)!, sortOrder: position, updatedAt: now }))
+  rows.splice(0, rows.length, ...ordered)
+  return json(ordered)
+}
+
+/** The folders the upload route takes (UPLOAD_FOLDERS on the server). */
+const UPLOAD_FOLDERS = ['categories', 'brands']
+
 /** The picture types the upload route takes, by media type -> extension (IMAGE_TYPES on the server). */
 const UPLOAD_TYPES: Partial<Record<string, string>> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' }
 
@@ -387,7 +484,7 @@ function uploadAnswer(body: BodyInit | null | undefined): Response {
   if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
   const form = body instanceof FormData ? body : new FormData()
   const folder = form.get('folder')
-  if (folder !== 'categories') return json({ error: 'invalid', field: 'folder' }, 400)
+  if (typeof folder !== 'string' || !UPLOAD_FOLDERS.includes(folder)) return json({ error: 'invalid', field: 'folder' }, 400)
   const file = form.get('file')
   if (!(file instanceof File) || file.size === 0) return json({ error: 'required', field: 'file' }, 400)
   if (file.size > 5 * 1024 * 1024) return json({ error: 'too_large', field: 'file' }, 400)
@@ -411,17 +508,25 @@ async function staffAnswer(resource: string, method: string, id: string | null, 
   const table = STAFF_TABLES[resource]
   if (!table) return json({ error: 'not_found' }, 404)
   const rows = await tableRows(resource)
+  if (id === 'order' && method === 'PUT') return table.orderable ? orderAnswer(rows, body ? JSON.parse(String(body)) : null) : json({ error: 'method_not_allowed' }, 405)
   const values = body && method !== 'PUT' ? (JSON.parse(String(body)) as Record<string, unknown>) : {}
   const unknown = Object.keys(values).find((key) => !table.fields.includes(key))
   if (unknown) return json({ error: 'unknown_field', field: unknown }, 400)
   for (const key of table.numeric ?? []) if (typeof values[key] === 'string') values[key] = Number(values[key])
+  for (const key of table.media ?? []) {
+    if (!(key in values)) continue
+    const url = mediaUrl(values[key])
+    if (url === undefined) return json({ error: 'invalid', field: key }, 400)
+    values[key] = url
+  }
   const now = new Date().toISOString()
   if (id === null) {
     if (method === 'GET') return json([...rows].sort(table.order))
     if (method === 'PUT') return table.replaceable ? replaceAnswer(table, rows, body ? JSON.parse(String(body)) : null) : json({ error: 'method_not_allowed' }, 405)
     if (method !== 'POST') return json({ error: 'not_found' }, 404)
     // A keyed table's rows keep their key as the fake's internal id, so the lookups below work for both kinds.
-    const row = { ...table.defaults, ...values, id: table.key ? String(values[table.key]) : crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffRow
+    const filled = table.createDefaults ? table.createDefaults(values, rows) : values
+    const row = { ...table.defaults, ...filled, id: table.key ? String(values[table.key]) : crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffRow
     const refused = await refusal(table, row, rows)
     if (refused) return refused
     rows.push(row)
@@ -477,7 +582,7 @@ async function productPage(params: URLSearchParams): Promise<ProductPage> {
   const pageSize = Math.min(Math.max(Number(params.get('pageSize')) || PAGE_SIZE, 1), MAX_PAGE_SIZE)
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const page = Math.min(Math.max(Math.trunc(Number(params.get('page'))) || 1, 1), pageCount)
-  const items = shown.slice((page - 1) * pageSize, page * pageSize).map(({ id, slug, name, category, image }) => ({ id, slug, name, category, image }))
+  const items = shown.slice((page - 1) * pageSize, page * pageSize).map(({ id, slug, name, category, image }) => ({ id, slug, name, category, image: image && mediaImage(image) }))
   return { items, page, pageSize, pageCount, total: shown.length, category: applied, categoryCounts }
 }
 
