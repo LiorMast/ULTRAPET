@@ -9,12 +9,17 @@
  * with no end date"). The
  * dialog knows nothing about storage: it hands the caller a DiscountValue, and the caller saves it for its
  * target (e.g. a price rule); when the save is refused, the dialog shows why and stays open. describeDiscount
- * words a discount the same way for lists (DiscountsDialog).
+ * words a discount the same way for lists (DiscountsDialog, the Discounts page).
+ *
+ * Given `scope` (the Discounts page, routes/admin.discounts.tsx), the form also asks what the discount applies to:
+ * a category or a product (one searchable list of both) and all customers or one customer (a searchable list), and
+ * hands that back as a RuleScope; scopeFields turns it into a price rule's target fields.
  */
 import { useId, useState, type FormEvent } from 'react'
 import { cn } from 'cn'
 import { ApiError } from '@/api'
 import { errorMessage, INPUT_CLASS, LABEL_CLASS } from '@/components/RecordDialog'
+import { SearchableField, type SearchOption } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n, type Locale } from '@/i18n'
@@ -28,6 +33,37 @@ import type { Dictionary } from '@/i18n/he'
  */
 export type DiscountValue = { type: 'percent' | 'amount'; value: number; minQuantity: number | null; startsOn: string; endsOn: string | null }
 
+/**
+ * What a discount applies to (the Discounts page): `target` = "category:<id>" or "product:<id>" ('' = not chosen
+ * yet); `customerId` = one business customer, or null for every customer.
+ */
+export type RuleScope = { target: string; customerId: string | null }
+
+/**
+ * The choices of the "applies to" fields: `targets` = the categories and products (values "category:<id>" /
+ * "product:<id>", see scopeTarget), `customers` = the business customers (value = id); `initial` = the edited rule's.
+ */
+export type ScopeChoices = { targets: SearchOption[]; customers: SearchOption[]; initial?: RuleScope }
+
+/**
+ * The value of a category or product among the scope's targets.
+ * @param kind - "category" or "product".
+ * @param id - Its id.
+ * @returns E.g. "category:3f2a…".
+ */
+export const scopeTarget = (kind: 'category' | 'product', id: string) => `${kind}:${id}`
+
+/**
+ * A price rule's target fields for the staff API (createStaffRow / updateStaffRow 'price-rules'); the target not
+ * chosen is set to null, so an edit that moves a rule from a category to a product keeps exactly one target.
+ * @param scope - The scope from DiscountDialog.
+ * @returns { categoryId, productId, businessUserId }.
+ */
+export function scopeFields({ target, customerId }: RuleScope) {
+  const [kind, id] = target.split(':')
+  return { categoryId: kind === 'category' ? id : null, productId: kind === 'product' ? id : null, businessUserId: customerId }
+}
+
 /** The row of a checkbox and its label ("Bulk discount", "No end date"). */
 const CHECKBOX_LABEL_CLASS = 'flex cursor-pointer items-center gap-3 text-sm text-brand-charcoal'
 
@@ -35,7 +71,7 @@ const CHECKBOX_LABEL_CLASS = 'flex cursor-pointer items-center gap-3 text-sm tex
 const CHECKBOX_CLASS = 'size-4 accent-brand-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red'
 
 /** The field a message belongs to. */
-type FieldName = 'value' | 'minQuantity' | 'startsOn' | 'endsOn'
+type FieldName = 'target' | 'customer' | 'value' | 'minQuantity' | 'startsOn' | 'endsOn'
 
 /**
  * Today's date in Israel, the day discount periods are counted in (as backend/app/pricing.py does).
@@ -52,7 +88,7 @@ export function israelToday(): string {
  * @param locale - The page language.
  * @returns E.g. "10%" or "₪20.00", isolated from the text around it so Hebrew sentences keep "7.5%" in order.
  */
-function formatValue(type: DiscountValue['type'], value: number, locale: Locale): string {
+export function formatValue(type: DiscountValue['type'], value: number, locale: Locale): string {
   const text =
     type === 'percent'
       ? `${value.toLocaleString(locale, { maximumFractionDigits: 2 })}%`
@@ -67,7 +103,7 @@ function formatValue(type: DiscountValue['type'], value: number, locale: Locale)
  * @param locale - The page language.
  * @returns E.g. "3 Nov 2026".
  */
-function formatDate(date: string, locale: Locale): string {
+export function formatDate(date: string, locale: Locale): string {
   return new Date(`${date}T12:00:00`).toLocaleDateString(locale, { dateStyle: 'medium' })
 }
 
@@ -103,6 +139,8 @@ export function describeDiscount({ type, value, minQuantity, startsOn, endsOn }:
  *   percentage, from today, no end date).
  * @param props.title - The title; defaults to "New discount", or "Edit discount" when `initial` is given.
  * @param props.target - What the discount applies to, shown under the title (e.g. "Dry dog food — Demo Pet Shop").
+ * @param props.scope - Adds the "applies to" fields (a category or product, all customers or one); `onSave` then
+ *   also gets the chosen RuleScope. Omit when the caller already knows the target.
  * @param props.onCloseAutoFocus - Where the focus goes after closing (the button that opened it); without it, the
  *   focus is left on the page.
  * @returns The dialog.
@@ -114,14 +152,16 @@ export function DiscountDialog({
   initial,
   title,
   target,
+  scope,
   onCloseAutoFocus,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (discount: DiscountValue) => Promise<unknown>
+  onSave: (discount: DiscountValue, scope?: RuleScope) => Promise<unknown>
   initial?: DiscountValue
   title?: string
   target?: string
+  scope?: ScopeChoices
   onCloseAutoFocus?: (event: Event) => void
 }) {
   const { t } = useI18n()
@@ -133,8 +173,9 @@ export function DiscountDialog({
           initial={initial}
           title={title ?? (initial ? t.admin.discount.editTitle : t.admin.discount.createTitle)}
           target={target}
-          onSave={async (discount) => {
-            await onSave(discount)
+          scope={scope}
+          onSave={async (discount, chosen) => {
+            await (chosen ? onSave(discount, chosen) : onSave(discount))
             onOpenChange(false)
           }}
           onCancel={() => onOpenChange(false)}
@@ -145,10 +186,12 @@ export function DiscountDialog({
 }
 
 /**
- * The dialog's form: the type switch, value, bulk minimum quantity, dates, summary and buttons.
+ * The dialog's form: the "applies to" fields (with `scope`), the type switch, value, bulk minimum quantity, dates,
+ * summary and buttons.
  * @param props.initial - The discount being edited, if any.
  * @param props.title - The dialog title.
  * @param props.target - What the discount applies to, if given.
+ * @param props.scope - The "applies to" choices, if the form asks for them.
  * @param props.onSave - Saves (rejects with ApiError on refusal).
  * @param props.onCancel - Closes without saving.
  * @returns The title block and the form.
@@ -157,13 +200,15 @@ function DiscountForm({
   initial,
   title,
   target,
+  scope,
   onSave,
   onCancel,
 }: {
   initial?: DiscountValue
   title: string
   target?: string
-  onSave: (discount: DiscountValue) => Promise<void>
+  scope?: ScopeChoices
+  onSave: (discount: DiscountValue, scope?: RuleScope) => Promise<void>
   onCancel: () => void
 }) {
   const { t, locale } = useI18n()
@@ -176,6 +221,9 @@ function DiscountForm({
   const [startsOn, setStartsOn] = useState(initial?.startsOn || israelToday())
   const [endsOn, setEndsOn] = useState(initial?.endsOn ?? '')
   const [noEnd, setNoEnd] = useState(initial ? initial.endsOn === null : true)
+  const [ruleTarget, setRuleTarget] = useState(scope?.initial?.target ?? '')
+  const [oneCustomer, setOneCustomer] = useState(Boolean(scope?.initial?.customerId))
+  const [customerId, setCustomerId] = useState(scope?.initial?.customerId ?? '')
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({})
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
@@ -196,6 +244,8 @@ function DiscountForm({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const found: Partial<Record<FieldName, string>> = {}
+    if (scope && !ruleTarget) found.target = t.admin.errors.required
+    if (scope && oneCustomer && !customerId) found.customer = t.admin.errors.required
     if (!value.trim()) found.value = t.admin.errors.required
     else if (!/^-?\d+(\.\d{1,2})?$/.test(value.trim())) found.value = d.errorNumber
     else if (number <= 0) found.value = d.errorPositive
@@ -207,14 +257,15 @@ function DiscountForm({
     else if (!noEnd && startsOn && endsOn < startsOn) found.endsOn = d.errorEnd
     setErrors(found)
     setFormError('')
-    const first = (['value', 'minQuantity', 'startsOn', 'endsOn'] as const).find((name) => found[name])
+    const first = (['target', 'customer', 'value', 'minQuantity', 'startsOn', 'endsOn'] as const).find((name) => found[name])
     if (first) {
       document.getElementById(`${id}-${first}`)?.focus()
       return
     }
     setPending(true)
     try {
-      await onSave({ type, value: number, minQuantity: bulk ? quantity : null, startsOn, endsOn: noEnd ? null : endsOn })
+      const chosen = scope ? { target: ruleTarget, customerId: oneCustomer ? customerId : null } : undefined
+      await onSave({ type, value: number, minQuantity: bulk ? quantity : null, startsOn, endsOn: noEnd ? null : endsOn }, chosen)
     } catch (error) {
       setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
       setPending(false)
@@ -250,20 +301,71 @@ function DiscountForm({
       </DialogHeader>
       <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-col">
         <div className="min-h-0 space-y-5 overflow-y-auto px-6 py-5">
-          <fieldset>
-            <legend className={LABEL_CLASS}>{d.type}</legend>
-            <div className="mt-2 grid grid-cols-2 border border-neutral-300">
-              {(['percent', 'amount'] as const).map((option) => (
-                <label
-                  key={option}
-                  className="flex cursor-pointer items-center justify-center py-2.5 text-sm font-medium text-brand-charcoal transition-colors has-checked:bg-brand-charcoal has-checked:text-white has-focus-visible:outline-2 has-focus-visible:-outline-offset-2 has-focus-visible:outline-brand-red"
-                >
-                  <input type="radio" name={`${id}-type`} value={option} checked={type === option} onChange={() => setType(option)} className="sr-only" />
-                  {option === 'percent' ? `${d.percent} (%)` : `${d.amount} (₪)`}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          {scope && (
+            <>
+              <div>
+                <label htmlFor={`${id}-target`} className={LABEL_CLASS}>{`${d.appliesTo} *`}</label>
+                <SearchableField
+                  id={`${id}-target`}
+                  label={d.appliesTo}
+                  value={ruleTarget}
+                  onChange={(next) => setRuleTarget(next)}
+                  options={scope.targets}
+                  strict
+                  className="mt-2"
+                  inputClassName={INPUT_CLASS}
+                  aria-required
+                  {...described('target', `${id}-target-hint`)}
+                />
+                <p id={`${id}-target-hint`} className="mt-1 text-xs text-brand-charcoal-muted">
+                  {d.appliesToHint}
+                </p>
+                {fieldError('target')}
+              </div>
+
+              <div>
+                <Segmented
+                  name={`${id}-customers`}
+                  legend={d.customers}
+                  options={[
+                    { value: 'all', label: d.allCustomers },
+                    { value: 'one', label: d.oneCustomer },
+                  ]}
+                  value={oneCustomer ? 'one' : 'all'}
+                  onChange={(next) => setOneCustomer(next === 'one')}
+                />
+                {oneCustomer && (
+                  <div className="mt-3">
+                    <label htmlFor={`${id}-customer`} className={LABEL_CLASS}>{`${d.customer} *`}</label>
+                    <SearchableField
+                      id={`${id}-customer`}
+                      label={d.customer}
+                      value={customerId}
+                      onChange={(next) => setCustomerId(next)}
+                      options={scope.customers}
+                      strict
+                      className="mt-2"
+                      inputClassName={INPUT_CLASS}
+                      aria-required
+                      {...described('customer')}
+                    />
+                    {fieldError('customer')}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          <Segmented
+            name={`${id}-type`}
+            legend={d.type}
+            options={[
+              { value: 'percent', label: `${d.percent} (%)` },
+              { value: 'amount', label: `${d.amount} (₪)` },
+            ]}
+            value={type}
+            onChange={(next) => setType(next)}
+          />
 
           <div>
             <label htmlFor={`${id}-value`} className={LABEL_CLASS}>{`${d.value} *`}</label>
@@ -365,5 +467,45 @@ function DiscountForm({
         </DialogFooter>
       </form>
     </>
+  )
+}
+
+/**
+ * A two-way (or more) switch of radio buttons drawn as one segmented bar: the chosen part is dark.
+ * @param props.name - The radio group's name (unique on the page).
+ * @param props.legend - The group's visible name.
+ * @param props.options - The choices, in order: value and visible label.
+ * @param props.value - The chosen value.
+ * @param props.onChange - Called with the newly chosen value.
+ * @returns The fieldset.
+ */
+function Segmented<Value extends string>({
+  name,
+  legend,
+  options,
+  value,
+  onChange,
+}: {
+  name: string
+  legend: string
+  options: { value: Value; label: string }[]
+  value: Value
+  onChange: (value: Value) => void
+}) {
+  return (
+    <fieldset>
+      <legend className={LABEL_CLASS}>{legend}</legend>
+      <div className="mt-2 grid auto-cols-fr grid-flow-col border border-neutral-300">
+        {options.map((option) => (
+          <label
+            key={option.value}
+            className="flex cursor-pointer items-center justify-center py-2.5 text-sm font-medium text-brand-charcoal transition-colors has-checked:bg-brand-charcoal has-checked:text-white has-focus-visible:outline-2 has-focus-visible:-outline-offset-2 has-focus-visible:outline-brand-red"
+          >
+            <input type="radio" name={name} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} className="sr-only" />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   )
 }

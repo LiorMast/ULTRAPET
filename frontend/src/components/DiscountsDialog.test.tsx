@@ -53,7 +53,7 @@ describe('/admin/categories', () => {
     await renderPage('/en/admin/categories', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'Categories' })).toBeInTheDocument()
     const menu = screen.getByRole('navigation', { name: 'Admin' })
-    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Products', 'Categories', 'Brands'])
+    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Products', 'Categories', 'Discounts', 'Brands'])
     expect(within(menu).getByRole('link', { name: 'Categories' })).toHaveAttribute('aria-current', 'page')
     const table = screen.getByRole('table', { name: 'Categories' })
     expect(within(table).getAllByRole('row')).toHaveLength(categories.length + 1)
@@ -237,7 +237,7 @@ describe('/admin/products', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(bodies(fetchSpy, 'POST')).toEqual([{ name: { he: 'חטיף חדש', en: 'New Treat' }, categoryId: FIRST_CATEGORY_ID, isActive: true }])
     const saved = (await (await fakeFetch('/api/staff/products')).json()) as { slug: string; sortOrder: number }[]
-    expect(saved.at(-1)).toMatchObject({ slug: 'new-treat', sortOrder: 400 })
+    expect(saved.at(-1)).toMatchObject({ slug: 'new-treat', sortOrder: products.length })
   })
 
   it('adds a discount to a product', async () => {

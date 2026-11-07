@@ -3,36 +3,84 @@
   "slug": "ultra-pet",
   "name": "Ultra Pet",
   "accent": "#BE1E24",
-  "tagline": { "he": "תזונה פרמיום מלאה", "en": "Premium Complete Nutrition" }
+  "tagline": { "he": "תזונה פרמיום מלאה", "en": "Premium Complete Nutrition" },
+  "active": true
  },
  {
   "slug": "internutri",
   "name": "Internutri",
   "accent": "#1C4E80",
-  "tagline": { "he": "פורמולות מדעיות", "en": "Science-Based Formulas" }
+  "tagline": { "he": "פורמולות מדעיות", "en": "Science-Based Formulas" },
+  "active": true
  },
  {
   "slug": "greenheart",
   "name": "Greenheart Premiums",
   "accent": "#2D6A4F",
-  "tagline": { "he": "טבעי ואורגני", "en": "Natural & Organic" }
+  "tagline": { "he": "טבעי ואורגני", "en": "Natural & Organic" },
+  "active": true
  },
  {
   "slug": "paw",
   "name": "Paw",
   "accent": "#C97D30",
-  "tagline": { "he": "מצוינות יומיומית", "en": "Everyday Excellence" }
+  "tagline": { "he": "מצוינות יומיומית", "en": "Everyday Excellence" },
+  "active": true
  },
  {
   "slug": "jr-farm",
   "name": "JR Farm",
   "accent": "#4A7C42",
-  "tagline": { "he": "מומחי בעלי חיים קטנים", "en": "Small Animal Specialists" }
+  "tagline": { "he": "מומחי בעלי חיים קטנים", "en": "Small Animal Specialists" },
+  "active": true
  },
  {
   "slug": "ultra-clean",
   "name": "Ultra Clean",
   "accent": "#4A4A6A",
-  "tagline": { "he": "היגיינת חתולים פרמיום", "en": "Premium Cat Hygiene" }
+  "tagline": { "he": "היגיינת חתולים פרמיום", "en": "Premium Cat Hygiene" },
+  "active": true
+ },
+ {
+  "slug": "lino",
+  "name": "LINO",
+  "accent": "#3D5A80",
+  "tagline": { "he": "רתמות וקולרים מעוצבים", "en": "Designer Harnesses & Collars" },
+  "active": false
+ },
+ {
+  "slug": "yagu",
+  "name": "YAGU",
+  "accent": "#6B4F3A",
+  "tagline": { "he": "מיטות ובתים לחיות מחמד", "en": "Pet Beds & Houses" },
+  "active": false
+ },
+ {
+  "slug": "pet-fan",
+  "name": "Pet Fan",
+  "accent": "#5A7D9A",
+  "tagline": { "he": "חול מתגבש בניחוחות", "en": "Scented Clumping Litter" },
+  "active": false
+ },
+ {
+  "slug": "lizi",
+  "name": "Lizi",
+  "accent": "#A0522D",
+  "tagline": { "he": "שימורים לחתולים", "en": "Wet Food for Cats" },
+  "active": false
+ },
+ {
+  "slug": "specialcan",
+  "name": "Specialcan",
+  "accent": "#2E6F6F",
+  "tagline": { "he": "טיפוח והיגיינה", "en": "Grooming & Hygiene" },
+  "active": false
+ },
+ {
+  "slug": "petpall",
+  "name": "Petpall",
+  "accent": "#5C5C7A",
+  "tagline": { "he": "כלי טיפוח", "en": "Grooming Tools" },
+  "active": false
  }
 ]

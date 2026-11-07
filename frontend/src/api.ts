@@ -512,6 +512,16 @@ export type StaffPriceRule = StaffRowBase & {
   note: string | null
 }
 
+/** A business customer as GET /api/staff/customers lists it (read-only; never the sign-in fields). */
+export type StaffCustomer = { id: string; companyName: string; fullName: string; email: string; city: string | null; isActive: boolean }
+
+/**
+ * Every business customer, active or not, by company name (to pick one, e.g. for a customer's own discount).
+ * @param signal - Aborts the request.
+ * @returns The customers; throws ApiError 401/403 without a staff sign-in.
+ */
+export const fetchStaffCustomers = (signal?: AbortSignal) => apiFetch<StaffCustomer[]>('/api/staff/customers', { signal })
+
 /**
  * Every row of a staff resource, active or not, in display order.
  * @param resource - The table, e.g. "brands".

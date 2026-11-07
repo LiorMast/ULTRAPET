@@ -6,7 +6,9 @@
  * category field (SearchableField: keyboard picking, Escape closing only its list, a screenshot of the open list),
  * no axe violations (tables, the discounts dialog, the discount form, the open suggestion list), no horizontal
  * page overflow on a phone, and screenshots of the categories page (Hebrew, English). Plus a category picture
- * uploaded in the edit form (ImageUploadField) that then shows on the home page carousel.
+ * uploaded in the edit form (ImageUploadField) that then shows on the home page carousel. The Discounts page
+ * (/admin/discounts): a discount added there with its "applies to" fields is saved, listed, and deleted, with axe
+ * scans of the page and its form.
  *
  * The upload goes to the real backend (its S3 stub stores the file under backend/media, which nothing else reads),
  * but the category save (PATCH /api/staff/categories/<id>) is answered in the browser and laid over the reads that
@@ -159,12 +161,66 @@ test("picks a product's category by typing, with the keyboard", async ({ page },
   await expect(dialog).toBeHidden()
 })
 
+/** How the Discounts page names the rows of the test discount (17.5% off the test product, every customer). */
+const PAGE_DISCOUNT = new RegExp(`^Delete Product: ${PRODUCT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}, All customers: ⁦17\\.5%⁩ off$`)
+
+/**
+ * Deletes every test discount of the Discounts page (left over by an interrupted run, or made by the test).
+ * @param page - The Playwright page, signed in as staff.
+ */
+async function deletePageDiscounts(page: Page) {
+  await page.goto('/en/admin/discounts')
+  await page.getByRole('table', { name: 'Discounts' }).waitFor()
+  for (const remove of await page.getByRole('button', { name: PAGE_DISCOUNT }).all()) {
+    await remove.click()
+    const confirm = page.getByRole('alertdialog')
+    await settled(confirm)
+    await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(confirm).toBeHidden()
+  }
+  await expect(page.getByRole('button', { name: PAGE_DISCOUNT })).toHaveCount(0)
+}
+
+test('adds a discount on the Discounts page, then deletes it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'one project edits the shared database, so runs never collide')
+  test.slow() // loads the 400 products for the "applies to" list and runs two axe scans
+  await signInStaff(page, '/en/admin/discounts')
+  await deletePageDiscounts(page)
+  try {
+    await expect(page.getByRole('heading', { level: 1, name: 'Discounts' })).toBeVisible()
+    expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+
+    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    const form = page.getByRole('dialog', { name: 'New discount' })
+    await settled(form)
+    const target = form.getByRole('combobox', { name: 'Applies to *' })
+    await target.fill(PRODUCT)
+    await target.press('ArrowDown')
+    await expect(page.getByRole('listbox', { name: 'Applies to' })).toBeVisible()
+    expect((await new AxeBuilder({ page }).include('[role=dialog]').analyze()).violations).toEqual([])
+    await target.press('Enter')
+    await expect(target).toHaveValue(`Product: ${PRODUCT}`)
+    await form.getByLabel('Value *').fill('17.5')
+    await form.getByLabel('Value *').press('Enter')
+    await expect(form).toBeHidden()
+    await expect(page.getByRole('button', { name: PAGE_DISCOUNT })).toBeVisible()
+    // Saved on the server: still there after a reload.
+    await page.reload()
+    await expect(page.getByRole('button', { name: PAGE_DISCOUNT })).toBeVisible()
+  } finally {
+    await deletePageDiscounts(page)
+  }
+})
+
 test('the catalog pages do not scroll sideways on a phone', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'phone layout')
   await signInStaff(page, '/en/admin/products')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('link', { name: 'Categories' }).click()
   await page.getByRole('table', { name: 'Categories' }).waitFor()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('link', { name: 'Discounts' }).click()
+  await page.getByRole('table', { name: 'Discounts' }).waitFor()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 

@@ -7,7 +7,9 @@
  * sorting see, and the edit form (RecordDialog). Editing is our own Radix dialog, not the paid DataTables
  * Editor. Each handler left out hides its action, so a table with none is read-only. `rowActions` add buttons of
  * the caller's own (e.g. "Discounts") that open the caller's dialog for the row. `onReorder` adds "Change order",
- * which opens ReorderDialog (drag the rows into order) for a table whose rows have a display order. Used by the
+ * which opens ReorderDialog (drag the rows into order) for a table whose rows have a display order. A page whose
+ * form is not one field per column (e.g. the Discounts page) passes `formDialog`, its own dialog for Add and Edit,
+ * in place of RecordDialog; `canEdit` hides Edit on rows that form cannot edit. Used by the
  * /admin pages (e.g. routes/admin.brands.tsx), one column config per resource.
  *
  * How it talks to DataTables: the options, columns and cell renderers are read once, when the table mounts
@@ -107,7 +109,16 @@ export type DataTableProps<Row> = {
   onDelete?: (key: string) => Promise<unknown>
   onReorder?: (keys: string[]) => Promise<unknown>
   rowActions?: RowAction<Row>[]
+  formDialog?: (row: Row | undefined, props: FormDialogProps) => ReactNode
+  canEdit?: (row: Row) => boolean
 }
+
+/**
+ * What DataTable hands a `formDialog`: `onSave` creates the row (Add) or saves its changes (Edit) through
+ * onCreate / onUpdate, then closes the dialog and announces it (rejects with the handler's error, so the dialog can
+ * show it and stay open); `onClose` closes without saving; `onCloseAutoFocus` goes to the dialog's DialogContent.
+ */
+export type FormDialogProps = { onSave: (values: RowValues) => Promise<void>; onClose: () => void; onCloseAutoFocus: (event: Event) => void }
 
 /**
  * What is open: the form for a new row, the form for a row, the delete confirmation for a row, the dialog of
@@ -222,12 +233,12 @@ function focusSettled(root: HTMLElement | null, selector: string, frames = FOCUS
  */
 function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: DataTableProps<Row> }; onOpen: (dialog: OpenDialog<Row>) => void }) {
   const { t } = useI18n()
-  const { onUpdate, onDelete, rowKey, rowLabel, rowActions = [] } = table.current
+  const { onUpdate, onDelete, rowKey, rowLabel, rowActions = [], canEdit } = table.current
   const name = rowLabel(row)
   const key = rowKey(row)
   return (
     <span className="flex gap-2">
-      {onUpdate && (
+      {onUpdate && (canEdit?.(row) ?? true) && (
         <Button variant="action" size="action" data-row={key} data-action="edit" aria-label={t.admin.editRow.replace('{name}', name)} onClick={() => onOpen({ mode: 'edit', row })}>
           <Pencil aria-hidden />
           {t.admin.edit}
@@ -265,6 +276,9 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
  * @param props.onReorder - Saves a new order: every row's key, first to last (the caller gives `rows` in their display
  *   order, which the table keeps until staff sort a column); omit to hide "Change order".
  * @param props.rowActions - Buttons of the caller's own on every row, each opening its dialog (see RowAction).
+ * @param props.formDialog - The caller's own Add/Edit dialog in place of RecordDialog: gets the edited row (undefined
+ *   for Add) and FormDialogProps; omit to use the column-driven form.
+ * @param props.canEdit - Whether a row shows Edit (with onUpdate); default every row.
  * @returns The table section.
  */
 export function DataTable<Row>(props: DataTableProps<Row>) {
@@ -399,7 +413,16 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
       </div>
       <div className="overflow-x-auto">{memoTable}</div>
 
-      {(open?.mode === 'create' || open?.mode === 'edit') && (
+      {(open?.mode === 'create' || open?.mode === 'edit') && props.formDialog && (
+        <FormDialog
+          render={props.formDialog}
+          row={open.mode === 'edit' ? open.row : undefined}
+          onSave={handleSave}
+          onClose={() => setOpen(null)}
+          onCloseAutoFocus={handleCloseFocus}
+        />
+      )}
+      {(open?.mode === 'create' || open?.mode === 'edit') && !props.formDialog && (
         <RecordDialog
           columns={props.columns}
           row={open.mode === 'edit' ? (open.row as RowValues) : undefined}
@@ -453,6 +476,19 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
  */
 function ActionDialog<Row>({ action, row, onClose, onCloseAutoFocus }: { action: RowAction<Row>; row: Row; onClose: () => void; onCloseAutoFocus: (event: Event) => void }) {
   return action.dialog(row, { onClose, onCloseAutoFocus })
+}
+
+/**
+ * The caller's own Add/Edit dialog (DataTable's `formDialog`).
+ * @param props.render - The caller's `formDialog`.
+ * @param props.row - The edited row; undefined for Add.
+ * @param props.onSave - Creates or updates the row through the table's handlers (see FormDialogProps).
+ * @param props.onClose - Closes the dialog.
+ * @param props.onCloseAutoFocus - Where the focus goes after closing (the row's Edit button, or Add).
+ * @returns What `render` returns.
+ */
+function FormDialog<Row>({ render, row, ...props }: FormDialogProps & { render: NonNullable<DataTableProps<Row>['formDialog']>; row: Row | undefined }) {
+  return render(row, props)
 }
 
 /**

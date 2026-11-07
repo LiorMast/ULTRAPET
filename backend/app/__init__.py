@@ -26,6 +26,7 @@ from app.database import models  # noqa: F401  (registers every model on db.meta
 from app.database.db import db
 from app.database.legacy_media import import_media_command
 from app.database.seed import reset_db_command, seed_command
+from app.database.wordpress import export_wordpress_command
 from app.staff.routes import bp as staff_bp
 
 # The largest request body Flask reads (uploads are refused above 5 MB by the upload route; this cap is the backstop
@@ -110,6 +111,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     app.cli.add_command(reset_db_command)
     app.cli.add_command(seed_command)
     app.cli.add_command(import_media_command)
+    app.cli.add_command(export_wordpress_command)
     app.register_error_handler(HTTPException, http_error)
     app.register_blueprint(customers_bp)
     app.register_blueprint(staff_bp)

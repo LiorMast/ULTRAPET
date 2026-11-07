@@ -14,7 +14,8 @@
  * the server's slug and last place), with the
  * server's errors (401 signed out, 403 for a customer, 400 required / a failed check / an unknown reference or id, 405 PUT on
  * another table, 409 duplicate or in use, 404) and its cascade (a deleted category's or product's price rules go with
- * it). POST /api/staff/uploads fakes the S3-stub upload (staff only; folder "categories" or "brands"; JPEG/PNG/WebP/AVIF by the
+ * it). GET /api/staff/customers lists STAFF_CUSTOMERS (staff only, read-only, like the server's list_customers).
+ * POST /api/staff/uploads fakes the S3-stub upload (staff only; folder "categories" or "brands"; JPEG/PNG/WebP/AVIF by the
  * file's type, at most 5 MB; answers `/api/media/<folder>/fake-<n>.<ext>`, nothing is stored; the server names it
  * `<folder>/<UTC timestamp>_<uuid>.<ext>`). A picture field
  * (`media`, e.g. a category's imageUrl) takes only one of our objects, like the server's media_key: an object key or
@@ -24,7 +25,7 @@
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
-import type { Brand, Branch, ContactDetails, ProductCategory, ProductImage, ProductPage, Stat, User } from '@/api'
+import type { Brand, Branch, ContactDetails, ProductCategory, ProductImage, ProductPage, Stat, StaffCustomer, User } from '@/api'
 import type { Localized } from '@/config'
 import articles from '@/stubs/articles.json'
 import branches from '@/stubs/branches.json'
@@ -39,6 +40,12 @@ export const WRONG_PASSWORD = 'wrong-password'
 /** The customer the fake sign-in returns (with the typed email). */
 export const TEST_USER: User = { kind: 'business', email: 'shop@example.com', fullName: 'Demo Customer', companyName: 'Demo Pet Shop' }
 
+/** The business customers GET /api/staff/customers lists: the test customer, plus an inactive one. */
+export const STAFF_CUSTOMERS: StaffCustomer[] = [
+  { id: '00000000-0000-4000-8000-000000000001', companyName: TEST_USER.companyName ?? '', fullName: TEST_USER.fullName, email: TEST_USER.email, city: 'Tel Aviv', isActive: true },
+  { id: '00000000-0000-4000-8000-000000000002', companyName: 'Zoo Haifa', fullName: 'Noa Levi', email: 'zoo@example.com', city: 'Haifa', isActive: false },
+]
+
 /** The home page figures the fake serves (the values `flask seed` takes from the legacy CMS). */
 export const STATS: Stat[] = [
   { id: 'retail', value: 350, suffix: '+' },
@@ -47,15 +54,24 @@ export const STATS: Stat[] = [
   { id: 'years', value: 12, suffix: '+' },
 ]
 
-/** A product as stored in stubs/products.json. */
+/** A product photo as stored in stubs/products.json: object keys (thumbnail and srcset may be missing) and its alt text. */
+type StubImage = { src: string; thumbnail: string | null; srcSet: string | null; alt: Partial<Record<string, string>> | null }
+
+/** A product as stored in stubs/products.json (description = sanitized HTML; brand = a brands.json slug). */
 type StubProduct = {
   id: string
   slug: string
   name: Localized<string>
   description: Partial<Record<string, string>>
   category: string
-  image: ProductImage | null
+  brand: string | null
+  sku: string | null
+  barcode: string | null
+  images: StubImage[]
 }
+
+/** The brands the public API shows: the stub's active ones (a brand found only in product names is inactive). */
+const activeBrands = brands.filter((brand) => brand.active !== false)
 
 /** Products per catalog page, and the most a request may ask for (as on the server). */
 const PAGE_SIZE = 24
@@ -211,7 +227,7 @@ const STAFF_TABLES: Record<string, FakeTable> = {
         accentColor: brand.accent,
         logoUrl: null,
         sortOrder: index + 1,
-        isActive: true,
+        isActive: brand.active !== false,
         createdAt: SEEDED,
         updatedAt: SEEDED,
       })),
@@ -257,26 +273,30 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     createDefaults: newRowDefaults('product'),
     defaults: { woocommerceId: null, sku: null, barcode: null, description: null, brandId: null, listPrice: null, sortOrder: 0, isActive: true, legacyPath: null, images: [] },
     seed: async () => {
-      const [{ default: products }, { default: prices }, categoryRows] = await Promise.all([
+      const [{ default: products }, { default: prices }, categoryRows, brandRows] = await Promise.all([
         import('@/stubs/products.json') as Promise<{ default: StubProduct[] }>,
         import('@/stubs/prices.json') as Promise<{ default: { prices: Record<string, number> } }>,
         tableRows('categories'),
+        tableRows('brands'),
       ])
       return products.map((product, index) => ({
         id: seedId(2, index),
         woocommerceId: Number(product.id),
         slug: product.slug,
-        sku: null,
-        barcode: null,
+        sku: product.sku,
+        barcode: product.barcode,
         name: product.name,
         description: product.description.he ? product.description : null,
         categoryId: categoryRows.find((category) => category.slug === product.category)?.id,
-        brandId: null,
+        brandId: brandRows.find((brand) => brand.slug === product.brand)?.id ?? null,
         listPrice: prices.prices[product.id] ?? null,
         sortOrder: index,
         isActive: true,
         legacyPath: null,
-        images: product.image ? [mediaImage(product.image)].map(({ src, thumbnail, srcSet }) => ({ url: src, thumbnailUrl: thumbnail, srcset: srcSet, alt: null })) : [],
+        images: product.images.map((image) => {
+          const { src, thumbnail, srcSet } = mediaImage(image)
+          return { url: src, thumbnailUrl: thumbnail, srcset: srcSet, alt: image.alt }
+        }),
         createdAt: SEEDED,
         updatedAt: SEEDED,
       }))
@@ -381,16 +401,17 @@ const OBJECT_KEY = /^[a-z0-9-]+\/[A-Za-z0-9_-]+\.[a-z0-9]+$/
 /**
  * A stub product photo (object keys) as the server answers it: every key turned into its URL.
  * @param image - The photo from stubs/products.json.
- * @returns The photo with `/api/media/<key>` URLs (the srcset's entries too).
+ * @returns The photo with `/api/media/<key>` URLs (the srcset's entries too; a missing thumbnail = the photo, a
+ * missing srcset = "").
  */
-function mediaImage(image: ProductImage): ProductImage {
-  const srcSet = image.srcSet
+function mediaImage(image: StubImage): ProductImage {
+  const srcSet = (image.srcSet ?? '')
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => `${MEDIA_URL}${entry}`)
     .join(', ')
-  return { src: `${MEDIA_URL}${image.src}`, thumbnail: `${MEDIA_URL}${image.thumbnail}`, srcSet }
+  return { src: `${MEDIA_URL}${image.src}`, thumbnail: `${MEDIA_URL}${image.thumbnail ?? image.src}`, srcSet }
 }
 
 /**
@@ -574,7 +595,9 @@ async function productPage(params: URLSearchParams): Promise<ProductPage> {
   const { default: products } = (await import('@/stubs/products.json')) as { default: StubProduct[] }
   const words = (params.get('q') ?? '').toLowerCase().split(/\s+/).filter(Boolean)
   const matching = products.filter((product) => {
-    const text = [...Object.values(product.name), ...Object.values(product.description)].join(' ').toLowerCase()
+    // The description is HTML: search its text, not its tags (as the server does).
+    const description = Object.values(product.description).map((html) => (html ?? '').replace(/<[^>]+>/g, ' '))
+    const text = [...Object.values(product.name), ...description].join(' ').toLowerCase()
     return words.every((word) => text.includes(word))
   })
   const categoryCounts = Object.fromEntries(categories.map((c) => [c.slug, matching.filter((p) => p.category === c.slug).length]))
@@ -584,7 +607,7 @@ async function productPage(params: URLSearchParams): Promise<ProductPage> {
   const pageSize = Math.min(Math.max(Number(params.get('pageSize')) || PAGE_SIZE, 1), MAX_PAGE_SIZE)
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const page = Math.min(Math.max(Math.trunc(Number(params.get('page'))) || 1, 1), pageCount)
-  const items = shown.slice((page - 1) * pageSize, page * pageSize).map(({ id, slug, name, category, image }) => ({ id, slug, name, category, image: image && mediaImage(image) }))
+  const items = shown.slice((page - 1) * pageSize, page * pageSize).map(({ id, slug, name, category, images }) => ({ id, slug, name, category, image: images[0] ? mediaImage(images[0]) : null }))
   return { items, page, pageSize, pageCount, total: shown.length, category: applied, categoryCounts }
 }
 
@@ -593,7 +616,7 @@ async function productPage(params: URLSearchParams): Promise<ProductPage> {
  * @param brand - The brand from stubs/brands.json.
  * @returns The API brand.
  */
-function brandJson(brand: (typeof brands)[number]): Brand {
+function brandJson({ active: _active, ...brand }: (typeof brands)[number]): Brand {
   return { ...brand, description: null, logoUrl: null }
 }
 
@@ -619,6 +642,10 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
   const slug = (prefix: string) => (path.startsWith(prefix) ? decodeURIComponent(path.slice(prefix.length)) : null)
 
   if (path === '/api/staff/uploads' && method === 'POST') return uploadAnswer(init.body)
+  if (path === '/api/staff/customers') {
+    if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+    return method === 'GET' ? json(STAFF_CUSTOMERS) : json({ error: 'method_not_allowed' }, 405)
+  }
   const staff = /^\/api\/staff\/([a-z-]+)(?:\/(.+))?$/.exec(path)
   if (staff) return staffAnswer(staff[1], method, staff[2] ? decodeURIComponent(staff[2]) : null, init.body)
 
@@ -629,8 +656,8 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
       return json(rows.map(({ slug, name, legacyPath, imageUrl }) => ({ slug, name, legacyPath, imageUrl })) as ProductCategory[])
     }
     if (path === '/api/products') return json(await productPage(url.searchParams))
-    if (path === '/api/brands') return json(brands.map(brandJson))
-    const brand = brands.find((b) => b.slug === slug('/api/brands/'))
+    if (path === '/api/brands') return json(activeBrands.map(brandJson))
+    const brand = activeBrands.find((b) => b.slug === slug('/api/brands/'))
     if (brand) return json(brandJson(brand))
     if (path === '/api/stats' || path === '/api/contact') {
       const values = new Map((await tableRows('settings')).map((row) => [String(row.key), row.value]))

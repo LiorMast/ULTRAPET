@@ -242,6 +242,7 @@ export const HEADER_CTA = {
 export const ADMIN_NAV: NavLink[] = [
   { id: 'products', label: (t: Dictionary) => t.admin.navProducts, link: linkOptions({ to: '/admin/products' }) },
   { id: 'categories', label: (t: Dictionary) => t.admin.navCategories, link: linkOptions({ to: '/admin/categories' }) },
+  { id: 'discounts', label: (t: Dictionary) => t.admin.navDiscounts, link: linkOptions({ to: '/admin/discounts' }) },
   { id: 'brands', label: (t: Dictionary) => t.admin.navBrands, link: linkOptions({ to: '/admin/brands' }) },
 ]
 

@@ -135,7 +135,8 @@ The catalog, brands, stats, articles and resellers live in the database. Until t
 them through the staff API (`/api/staff/...`, see `backend/app/staff/routes.py`). A fresh database is filled from
 the files in `frontend/src/stubs/` by `flask seed`:
 
-- **Catalog:** `products.json` and `product-categories.json` (exported from the WooCommerce store). Every product's
+- **Catalog:** `products.json` and `product-categories.json` (exported from the WooCommerce store by
+  `flask export-wordpress`; [WORDPRESS.md](WORDPRESS.md) documents the old site and the import). Every product's
   name and description has a Hebrew and an English translation (`{ he, en }`). `prices.json` holds **placeholder**
   prices, shown only to signed-in customers.
 - **Articles:** `articles.json`; each article's photo is bundled with the site in `frontend/src/assets/articles/`,

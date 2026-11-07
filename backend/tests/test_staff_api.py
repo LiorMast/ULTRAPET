@@ -179,6 +179,42 @@ def test_invalid_price_rules_are_refused(api, database, body, error):
     assert (response.status_code, response.get_json()) == (400, error)
 
 
+def test_staff_list_the_business_customers_without_their_sign_in_fields(api, database, customer):
+    other = BusinessUser(email="a@example.com", full_name="Avi", company_name="Aquarium Plus", city="Haifa",
+                         password_hash="x", is_active=False)
+    database.add(other)
+    database.commit()
+    assert api("GET", "/customers").get_json() == [
+        {"id": str(other.id), "companyName": "Aquarium Plus", "fullName": "Avi", "email": "a@example.com",
+         "city": "Haifa", "isActive": False},
+        {"id": str(customer.id), "companyName": "Pet Corner", "fullName": "Dana Cohen", "email": customer.email,
+         "city": None, "isActive": True},
+    ]
+    assert api("POST", "/customers", {}).status_code == 405  # read-only
+
+
+def test_only_staff_list_the_customers(client):
+    assert client.get("/api/staff/customers").status_code == 401
+
+
+def test_customers_cannot_list_the_customers(customer_client):
+    assert customer_client.get("/api/staff/customers").status_code == 403
+
+
+def test_a_discount_can_be_for_one_customer(api, database, customer):
+    category = Category(slug="fish", name={"he": "דגים"})
+    database.add(category)
+    database.commit()
+    response = api("POST", "/price-rules", {"categoryId": str(category.id), "businessUserId": str(customer.id),
+                                            "kind": "percent", "value": 7})
+    assert (response.status_code, response.get_json()["businessUserId"]) == (201, str(customer.id))
+    general = api("PATCH", f"/price-rules/{response.get_json()['id']}", {"businessUserId": None}).get_json()
+    assert general["businessUserId"] is None
+    unknown = api("POST", "/price-rules", {"categoryId": str(category.id), "businessUserId": str(uuid.uuid4()),
+                                           "kind": "percent", "value": 7})
+    assert (unknown.status_code, unknown.get_json()["error"]) == (400, "invalid_reference")
+
+
 def test_bulk_discounts_store_their_minimum_quantity(api, database):
     category = Category(slug="dogs", name={"he": "כלבים"})
     product = Product(slug="bones", name={"he": "עצמות"}, category=category)

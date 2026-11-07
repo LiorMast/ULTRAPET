@@ -3,13 +3,16 @@
 reset-db rebuilds the schema by running drop-tables.sql and then create-tables.sql. seed fills an empty database
 from the stub files in frontend/src/stubs/ (the data the frontend showed before the API existed; its unit tests
 still use them as fixtures):
-- categories, products (in stub order, with their WooCommerce ids in woocommerce_id, and images: object keys in the
-  file storage, see app/storage.py), placeholder prices and brands;
+- categories, brands (those found only in product names are inactive) and products (in stub order, with their
+  WooCommerce ids in woocommerce_id, their brand, item code (sku) and barcode, the sanitized HTML description and every
+  photo of the gallery in order: object keys in the file storage, see app/storage.py), plus placeholder prices; the
+  product stubs come from the old site (`flask export-wordpress`, app/database/wordpress.py);
 - the articles (with their WordPress dates) and the resellers of the Where to Buy page;
 - the questions of the home page FAQ section (stubs/faq.json, in file order);
 - the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order, the currency and the
   PDF catalog's object key;
-- the contact details of the Contact section and the WhatsApp button (stubs/contact.json: settings contact_<field>);
+- the contact details of the Contact section and the WhatsApp button, and the opening hours (stubs/contact.json:
+  settings contact_<field>);
 - the three payment methods;
 - a staff admin, when SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are set, and a demo business customer (to see
   prices in the catalog), when SEED_CUSTOMER_EMAIL and SEED_CUSTOMER_PASSWORD are set.
@@ -55,6 +58,7 @@ CONTACT_DESCRIPTIONS = {
     "phone": "Customer-service phone number, as shown (the tel: link uses its digits)",
     "whatsapp": "Customer-service WhatsApp number, as shown, international (the wa.me link uses its digits)",
     "email": "Customer-service email address (the Contact form sends to it)",
+    "hours": "Customer-service opening hours, {he, en} (from the old site's footer)",
 }
 
 # Payment methods offered at checkout: (code, Hebrew name, English name).
@@ -113,36 +117,44 @@ def seed_database() -> dict[str, int]:
     db.session.add_all(categories.values())
 
     brands = read_json(STUBS_DIR / "brands.json")
+    brand_rows = {}
     for order, item in enumerate(brands):
-        db.session.add(
-            Brand(
-                slug=item["slug"],
-                name=item["name"],
-                tagline=item.get("tagline"),
-                accent_color=item.get("accent"),
-                sort_order=order,
-            )
+        brand_rows[item["slug"]] = Brand(
+            slug=item["slug"],
+            name=item["name"],
+            tagline=item.get("tagline"),
+            accent_color=item.get("accent"),
+            sort_order=order,
+            is_active=item.get("active", True),
         )
+    db.session.add_all(brand_rows.values())
 
     prices = read_json(STUBS_DIR / "prices.json")["prices"]
     products = read_json(STUBS_DIR / "products.json")
     for order, item in enumerate(products):
-        image = item.get("image")
         db.session.add(
             Product(
                 woocommerce_id=int(item["id"]),
                 slug=item["slug"],
+                sku=item.get("sku"),
+                barcode=item.get("barcode"),
                 name=item["name"],
                 description=item["description"] if item["description"].get("he") else None,
                 category=categories[item["category"]],
+                brand=brand_rows[item["brand"]] if item.get("brand") else None,
                 list_price=Decimal(str(prices[item["id"]])) if item["id"] in prices else None,
                 sort_order=order,
                 legacy_path=item.get("legacyPath"),
                 images=[
-                    ProductImage(url=image["src"], thumbnail_url=image.get("thumbnail"), srcset=image.get("srcSet") or None)
-                ]
-                if image
-                else [],
+                    ProductImage(
+                        url=image["src"],
+                        thumbnail_url=image.get("thumbnail"),
+                        srcset=image.get("srcSet") or None,
+                        alt=image.get("alt") or None,
+                        sort_order=index,
+                    )
+                    for index, image in enumerate(item.get("images", []))
+                ],
             )
         )
 

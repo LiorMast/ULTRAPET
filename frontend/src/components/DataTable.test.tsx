@@ -3,13 +3,15 @@
  * against the fake staff API (src/test/api.ts): the staff sign-in gate, listing, search and sorting, editing
  * (only the changed fields are sent), adding without a URL name or order (the server fills them), "Change order",
  * deleting with confirmation, server and client errors shown on their field (a table of its own for patterns and
- * duplicates), Hebrew/RTL and English texts, and a read-only table without action buttons.
+ * duplicates), Hebrew/RTL and English texts, a caller's own Add/Edit dialog (formDialog) with Edit hidden on some
+ * rows (canEdit), and a read-only table without action buttons.
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api'
-import { DataTable, type DataColumn } from '@/components/DataTable'
+import { DataTable, type DataColumn, type FormDialogProps } from '@/components/DataTable'
 import brands from '@/stubs/brands.json'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { fakeFetch, TEST_STAFF } from '@/test/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
@@ -186,6 +188,66 @@ describe('DataTable with a column config of its own', () => {
     expect(code).toHaveAccessibleDescription(/Another record already has this value/)
     expect(onUpdate).toHaveBeenCalledWith('1', { code: 'BBB' })
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+})
+
+describe('DataTable with a form dialog of its own', () => {
+  type Item = { id: string; name: string; locked: boolean }
+  const columns: DataColumn<Item>[] = [{ key: 'name', label: 'Name' }]
+
+  /**
+   * A minimal caller's dialog: one button that saves a fixed value.
+   * @param props.row - The edited row, or undefined for Add.
+   * @param props.onSave - DataTable's save.
+   * @param props.onClose - Closes it.
+   * @param props.onCloseAutoFocus - DataTable's focus return.
+   * @returns The dialog.
+   */
+  function NameDialog({ row, onSave, onClose, onCloseAutoFocus }: FormDialogProps & { row?: Item }) {
+    return (
+      <Dialog open onOpenChange={(isOpen) => !isOpen && onClose()}>
+        <DialogContent closeLabel="Close" onCloseAutoFocus={onCloseAutoFocus} aria-describedby={undefined}>
+          <DialogTitle>{row ? `Rename ${row.name}` : 'Make one'}</DialogTitle>
+          <button type="button" onClick={() => onSave({ name: row ? `${row.name}!` : 'New' })}>
+            Go
+          </button>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  it('opens it for Add and Edit, saves through the handlers, and hides Edit where canEdit says no', async () => {
+    const onCreate = vi.fn(() => Promise.resolve())
+    const onUpdate = vi.fn(() => Promise.resolve())
+    const { user } = renderComponent(
+      <DataTable<Item>
+        rows={[
+          { id: '1', name: 'Alpha', locked: false },
+          { id: '2', name: 'Beta', locked: true },
+        ]}
+        columns={columns}
+        caption="Items"
+        rowKey={(item) => item.id}
+        rowLabel={(item) => item.name}
+        onCreate={onCreate}
+        onUpdate={onUpdate}
+        canEdit={(item) => !item.locked}
+        formDialog={(row, props) => <NameDialog row={row} {...props} />}
+      />,
+      'en',
+    )
+    await user.click(await screen.findByRole('button', { name: 'Add' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Make one' })).getByRole('button', { name: 'Go' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(onCreate).toHaveBeenCalledWith({ name: 'New' })
+    expect(screen.getByText('Record added.')).toHaveAttribute('role', 'status')
+
+    expect(screen.queryByRole('button', { name: 'Edit Beta' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Edit Alpha' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Rename Alpha' })).getByRole('button', { name: 'Go' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(onUpdate).toHaveBeenCalledWith('1', { name: 'Alpha!' })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Alpha' })).toHaveFocus())
   })
 })
 

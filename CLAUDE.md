@@ -27,6 +27,7 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
 
 ```
 README.md  CLAUDE.md
+WORDPRESS.md            audit of the old WordPress site: what it holds, what was imported (and how), what was not
 compose.yaml            dev services: postgres + backend (project `ultrapet`)
 .env.example            template of the git-ignored .env (database password, secrets)
 legacy/                 reference only (old site; supabase-export/ = seed data and media)
@@ -47,7 +48,8 @@ frontend/
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
     routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404;
                         admin.tsx = staff panel layout (shows the shared login form to non-staff), admin.<resource>.tsx = one table each
-                        (admin.products / admin.categories also manage their discounts through DiscountsDialog)
+                        (admin.products / admin.categories also manage their discounts through DiscountsDialog;
+                        admin.discounts = every price rule in one table, general or for one customer)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
                         Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, InlineEditor,
                         EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
@@ -77,7 +79,8 @@ backend/
                         `replaceable` resources: faq-items); PUT /<resource>/order sets the order from every row's id
                         (`orderable`: categories, brands, products); `create_defaults` (new_row_defaults) fill a new
                         row of these three (slug from its English / brand name, last place); DB constraint errors -> 400/409; POST /uploads stores a
-                        picture (multipart file + folder) through storage.py and returns its URL
+                        picture (multipart file + folder) through storage.py and returns its URL; GET /customers
+                        lists the business customers read-only (to pick one, e.g. for a customer's discount)
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
     storage.py          the S3 stub for every stored file: put_object / delete_object / object_exists write and serve
                         backend/media (MEDIA_ROOT, git-ignored); rows store object keys, public_url / url_of / srcset_urls
@@ -89,6 +92,8 @@ backend/
       db.py               `db`, the declarative base (naming convention, column types), TimestampMixin
       seed.py             `flask reset-db --yes`, `flask seed` (from the frontend stubs)
       legacy_media.py     `flask import-media`: copies the WordPress files of stubs/legacy-media.json into the storage
+      wordpress.py        `flask export-wordpress`: refreshes the product / price / media / page stubs from the old
+                          site's public APIs (galleries, sanitized HTML descriptions, variations split, sku, barcode, brand)
       models/             the SQLAlchemy models, one module per area (importing the package registers them all):
         users.py            AppUser -> StaffUser / BusinessUser (joined-table inheritance), BusinessLead
         catalog.py          Supplier, Brand, Category, Product, ProductImage, ProductSupplier (junction)
@@ -121,6 +126,9 @@ backend/
   1,370 files, 215 MB) into the storage (backend/media); skips what is there, so rerun it after a failure. Once the
   WordPress site is gone, copy the bucket / backend/media instead.
 - `docker compose exec backend flask reset-db --yes` — drop and recreate every table (all data is lost); then `seed`.
+- `docker compose exec backend flask export-wordpress --out /tmp/wp` — re-read the old site's public APIs into the stubs
+  (GET only; the container mounts the stubs read-only, so copy /tmp/wp/*.json over; see WORDPRESS.md). It keeps the
+  English of unchanged texts and prints the ids whose English must be translated again; then `import-media`.
 - A fresh volume runs `create-tables.sql` by itself; after a schema change run `reset-db` (there are no migrations).
 
 ## Working rules (mandatory)
@@ -260,7 +268,9 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   staff API's camelCase field, `type`, `required`, `pattern`, `ltr`, `inTable`/`inForm`). The same config drives the
   cells, sorting/search and the generated edit form; editing is our Radix dialog (not the paid DataTables Editor);
   omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons that open its dialog
-  (e.g. "Discounts"); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
+  (e.g. "Discounts"); `formDialog` replaces the column-driven form for Add and Edit with the page's own dialog (it
+  gets the row and `FormDialogProps`: `onSave` goes through `onCreate`/`onUpdate`), and `canEdit(row)` hides Edit on
+  rows that form cannot edit (the Discounts page: DiscountDialog with `scope`, Edit hidden on fixed prices); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
   plus up/down buttons; Save sends every row key in order, e.g. `reorderStaffRows`). Technical fields staff need not
   see (slugs, legacy paths, sort orders) stay out of the config: the server fills them (`create_defaults`) and the
   order comes from `onReorder` (the categories, brands and products tables). Columns and options are read once at mount (DataTables' rule); `deferRender` builds only the
@@ -288,7 +298,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   start date, end date or "no end date". It returns a `DiscountValue` ({ type, value, minQuantity: null = regular,
   startsOn, endsOn: null = open-ended }) and the caller stores it. `DiscountsDialog`
   lists one target's discounts (add/edit/delete) and is the "Discounts" row action of the products and categories
-  tables. A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0,
+  tables. The Discounts page (`/admin/discounts`, `routes/admin.discounts.tsx`) lists every rule (general and per
+  customer, with its state: `ruleState` = active / upcoming / ended / paused) and adds/edits them with
+  `DiscountDialog scope` (the "applies to" fields: a category or product, all customers or one; `scopeFields` turns
+  the `RuleScope` into `categoryId` / `productId` / `businessUserId`). A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0,
   `min_quantity` = the bulk threshold (NULL = a regular discount; never on a fixed price).
   **Not yet stored:** `payment_methods.discount_percent` has no amounts or dates (schema change with its page).
 - **Inline section editing** (`InlineEditor.tsx`): a section that staff may edit in place calls
@@ -492,12 +505,20 @@ content exists in each language, and the layout flips direction automatically.
 - **Ids**: every table's primary key is a UUID generated by the database (`gen_random_uuid()`, helper `uuid_pk()` in
   `app/database/db.py`); only `settings` and `payment_methods` use a text key. The API returns the UUIDs (prices are
   keyed by product UUID); the stubs' product `id` is the WooCommerce id, kept in `products.woocommerce_id`.
-- **Products**: the 400 products of the WooCommerce Store API (`/wp-json/wc/store/v1/products`) are in
-  `stubs/products.json`; their photos are object keys (`products/<yyyy>-<mm>-<WordPress file name>.<ext>`) of the
-  files `flask import-media` copied into the storage. Each product's
-  `name` / `description` holds one translation per language (`{ he, en }`, the DB's product translations; Hebrew from
-  the store, English translated for all 400; add `ru` / `ar` the same way); catalog search matches every language. The store
-  publishes no prices: `stubs/prices.json` holds **placeholder** prices until real ones come from Rivhit/the admin.
+- **Products**: the 400 products of the WooCommerce Store API (`/wp-json/wc/store/v1/products`), exported by
+  `flask export-wordpress` (see WORDPRESS.md), are the **408** of `stubs/products.json`: each variation of the 8
+  variable products with two variations (Greenheart 3/12 kg, scratching posts grey/beige) is its own product (the
+  first keeps the parent's WooCommerce id, slug and old URL). Every gallery photo is in `images[]` (order = WordPress
+  order, `alt`), as object keys (`products/<yyyy>-<mm>-<file name>.<ext>`) of the files `flask import-media` copied
+  into the storage. `description` is the full **sanitized HTML** (p, h2–h4, lists, tables, strong/em, br; composition,
+  analytical constituents, feeding tables); render it as HTML, and search strips the tags. `sku` = the item code in
+  the WordPress name (201; to confirm against Rivhit), `barcode` = the EAN in the description (106), `brand` = a
+  brands.json slug read from the name (YAGU, LINO, Pet Fan, Lizi, Specialcan, Petpall are `active: false` until the
+  owner confirms them). Each product's `name` / `description` holds one translation per language (`{ he, en }`;
+  Hebrew from the store, English translated for all; add `ru` / `ar` the same way); catalog search matches every
+  language. The store publishes no prices (all 0): `stubs/prices.json` holds **placeholder** prices until real ones
+  come from Rivhit/the admin. `stubs/pages.json` holds the old about / terms / accessibility / refund / privacy pages
+  (Hebrew HTML, not seeded yet: for the legal pages); `contact.json` `hours` = setting `contact_hours` (the footer).
 - **SEO migration**: 301-redirect the old WordPress URLs (Hebrew slugs such as `/אודות/`, `/משווקים/`, `/מאמרים/`,
   `/צור-קשר/`, `/product-category/<slug>/`, `/product/<slug>/`, `/shop/`) to the new routes.
 
@@ -565,8 +586,9 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Picture uploads (S3 stub `storage.py`, `ImageUploadField`, upload-only): the categories' home carousel pictures,
       the brands' logos
 - [ ] Product images in the admin; tables for settings, articles, resellers (a column config + route each)
-- [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API; [ ] customer and payment-method
-      discount pages
+- [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API
+- [x] `/admin/discounts`: every discount in one table (general and per customer; `GET /api/staff/customers`);
+      [ ] the customer edit screen and payment-method discounts
 
 **Phase 4 — B2B portal**: auth, price catalog, per-customer/category discounts, cart + checkout (minimum ₪2,000;
 card / Bit / bank transfer), Rivhit sync, generated PDF catalog.

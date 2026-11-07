@@ -35,7 +35,7 @@ describe('Catalog page', () => {
   it("loads the product photos from the site's own file storage, never from the old WordPress store", async () => {
     await renderPage('/catalog')
     const photo = cards()[0].querySelector('img')!
-    expect(photo).toHaveAttribute('src', `/api/media/${products[0].image.thumbnail}`)
+    expect(photo).toHaveAttribute('src', `/api/media/${products[0].images[0].thumbnail}`)
     for (const card of cards()) {
       const img = card.querySelector('img')!
       for (const url of [img.getAttribute('src'), ...(img.getAttribute('srcset') ?? '').split(',').map((entry) => entry.trim().split(' ')[0])]) {

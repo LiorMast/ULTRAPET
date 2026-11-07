@@ -85,8 +85,9 @@ def test_the_manifest_lists_every_stored_file_of_the_stubs():
     products = read_json(MANIFEST.parent / "products.json")
     keys = set()
     for product in products:
-        image = product["image"]
-        keys |= {image["src"], image["thumbnail"], *(entry.split()[0] for entry in image["srcSet"].split(",") if entry.strip())}
+        for image in product["images"]:
+            srcset = image["srcSet"] or ""
+            keys |= {image["src"], image["thumbnail"] or image["src"], *(entry.split()[0] for entry in srcset.split(",") if entry.strip())}
     assert keys <= set(manifest)
     assert "catalog/ultrapetcatalog.pdf" in manifest
     assert all(storage.KEY_PATTERN.fullmatch(key) for key in manifest)

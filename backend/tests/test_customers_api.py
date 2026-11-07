@@ -20,7 +20,7 @@ def catalog(database) -> SimpleNamespace:
     """A small catalog: two visible categories and a hidden one, four visible products and two hidden ones.
 
     Catalog order (sort_order): treat (dogs), salmon cat food (cats), beef (dogs), chew (dogs). "salmon" is in the
-    cat food's name and in the treat's English description only.
+    cat food's name and in the treat's English description only (HTML, as the WordPress export stores it).
 
     Args:
         database: The test database session.
@@ -34,7 +34,7 @@ def catalog(database) -> SimpleNamespace:
     treat = Product(
         slug="dog-treat",
         name={"he": "חטיף לכלבים", "en": "Dog Treat"},
-        description={"he": "חטיף טעים", "en": "With salmon oil, 100% natural"},
+        description={"he": "<p>חטיף טעים</p>", "en": "<p>With <strong>salmon</strong> oil, 100% natural</p>"},
         category=dogs,
         list_price=Decimal("10.00"),
         sort_order=0,
@@ -109,6 +109,7 @@ def test_products_ignores_an_unknown_or_hidden_category(client, catalog, categor
         ("100%", ["dog-treat"]),  # % is a literal character, not a wildcard
         ("D_g", []),  # so is _
         ("zzzz", []),
+        ("strong", []),  # the description is HTML: its tags are not searched
     ],
 )
 def test_products_searches_every_language(client, catalog, q, expected):

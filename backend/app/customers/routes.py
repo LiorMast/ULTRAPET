@@ -98,15 +98,17 @@ def escape_like(word: str) -> str:
 def search_conditions(q: str) -> list[ColumnElement[bool]]:
     """Builds the catalog search: every word must appear in the product's name or description, in any language.
 
+    The description is HTML (sanitized, see app/database/wordpress.py): its tags are replaced by spaces, so a word
+    matches the text and never a tag name such as "strong" or "table".
+
     Args:
         q: The search text; words are separated by whitespace. Case is ignored.
 
     Returns:
         One condition per word (none for an empty text).
     """
-    text = func.concat_ws(
-        " ", *(Product.name[locale].astext for locale in LOCALES), *(Product.description[locale].astext for locale in LOCALES)
-    )
+    descriptions = (func.regexp_replace(Product.description[locale].astext, "<[^>]*>", " ", "g") for locale in LOCALES)
+    text = func.concat_ws(" ", *(Product.name[locale].astext for locale in LOCALES), *descriptions)
     return [text.ilike(f"%{escape_like(word)}%", escape="\\") for word in q.split()]
 
 

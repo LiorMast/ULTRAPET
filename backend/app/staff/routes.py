@@ -14,6 +14,7 @@ resource in RESOURCES:
                                  list: `faq-items`, see replace_rows)
     PUT /<resource>/order        set the display order from a list of every row's id (only `orderable` resources:
                                  categories, brands, products; see reorder_rows)
+Read-only: GET /customers lists the business customers (to pick one for a customer's discount; see list_customers).
 JSON keys are camelCase (column `sort_order` -> `sortOrder`); a row also carries `id`, `createdAt`, `updatedAt`.
 A new category, brand or product may leave out `slug` and `sortOrder` (the staff panel does not show them): the server
 names it after its (English) name and puts it last (new_row_defaults).
@@ -49,6 +50,7 @@ from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.price_rules import PriceRule
 from app.database.models.settings import Setting
+from app.database.models.users import BusinessUser
 from app.pricing import ISRAEL
 
 bp = Blueprint("staff", __name__, url_prefix="/api/staff")
@@ -687,6 +689,23 @@ def require_staff() -> None:
         401 without a valid access token, 403 with a customer's token (see app.auth.require_user).
     """
     require_user("staff")
+
+
+@bp.get("/customers")
+def list_customers() -> list[dict[str, Any]]:
+    """Every business customer, active or not, by company name: what the staff panel needs to pick a customer (e.g. for
+    a customer's own discount on the Discounts page). Read-only, and never the sign-in fields (password hash, last
+    login); customers are created and edited elsewhere (their admin page comes later).
+
+    Returns:
+        [{id, companyName, fullName, email, city, isActive}].
+    """
+    customers = db.session.scalars(select(BusinessUser).order_by(BusinessUser.company_name, BusinessUser.email))
+    return [
+        {"id": customer.id, "companyName": customer.company_name, "fullName": customer.full_name,
+         "email": customer.email, "city": customer.city, "isActive": customer.is_active}
+        for customer in customers
+    ]
 
 
 @bp.get(f"/{RESOURCE_PATH}")

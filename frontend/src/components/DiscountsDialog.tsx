@@ -47,20 +47,35 @@ export function discountFields(discount: DiscountValue) {
   return { kind: discount.type, value: discount.value, minQuantity: discount.minQuantity, startsOn: discount.startsOn, endsOn: discount.endsOn }
 }
 
+/** Where a rule stands today: in effect, not started yet, past its end date, or switched off (isActive false). */
+export type RuleState = 'active' | 'upcoming' | 'ended' | 'paused'
+
+/**
+ * Tells where a rule stands on a day (as backend/app/pricing.py applies it: both ends inclusive).
+ * @param rule - The rule.
+ * @param today - The Israel date ("2026-11-03", see israelToday).
+ * @returns "paused" when switched off, else "ended", "upcoming" or "active" by its dates.
+ */
+export function ruleState(rule: StaffPriceRule, today: string): RuleState {
+  if (!rule.isActive) return 'paused'
+  if (rule.endsOn !== null && rule.endsOn < today) return 'ended'
+  if (rule.startsOn !== null && rule.startsOn > today) return 'upcoming'
+  return 'active'
+}
+
 /**
  * Words a rule with its state.
  * @param rule - The rule.
  * @param t - The dictionary.
  * @param locale - The page language.
  * @param today - Today's Israel date ("2026-11-03").
- * @returns E.g. "10% off, from 1 Nov 2026 to 30 Nov 2026 (ended)", and whether it has ended.
+ * @returns E.g. "10% off, from 1 Nov 2026 to 30 Nov 2026 (ended)", and whether it no longer applies (ended or paused).
  */
 function ruleLabel(rule: StaffPriceRule, t: Dictionary, locale: Locale, today: string): { text: string; ended: boolean } {
-  const ended = rule.endsOn !== null && rule.endsOn < today
-  const upcoming = rule.startsOn !== null && rule.startsOn > today
-  const state = ended ? t.admin.discounts.ended : upcoming ? t.admin.discounts.upcoming : ''
+  const state = ruleState(rule, today)
+  const word = state === 'active' ? '' : t.admin.discounts[state]
   const text = describeDiscount(ruleDiscount(rule), t, locale)
-  return { text: state ? `${text} (${state})` : text, ended }
+  return { text: word ? `${text} (${word})` : text, ended: state === 'ended' || state === 'paused' }
 }
 
 /**
