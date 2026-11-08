@@ -17,7 +17,7 @@ import { createFileRoute, Link, linkOptions } from '@tanstack/react-router'
 import { RotateCcw, Truck, type LucideIcon } from 'lucide-react'
 import { fetchProduct, rethrowNotFound, type ProductDetail } from '@/api'
 import { useCustomerPrices } from '@/auth'
-import { AddToCartButton } from '@/components/AddToCartButton'
+import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { CatalogCard, PriceSlot, priceFor } from '@/components/CatalogCard'
 import { ProductGallery } from '@/components/ProductGallery'
@@ -176,7 +176,8 @@ function ProductPage() {
           ]}
         />
 
-        <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
+        {/* The gallery's large photo is the one that flies to the cart. */}
+        <div {...{ [CART_FLY_SOURCE_ATTR]: '' }} className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
           <ProductGallery images={product.images} name={name} />
 
           <div className="flex flex-col">

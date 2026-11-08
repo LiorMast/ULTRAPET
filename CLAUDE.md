@@ -60,12 +60,13 @@ frontend/
                         (stored sanitized HTML, styled by `.rich-text` in index.css),
                         EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
                         ImageUploadField (picture upload of the admin forms), ReorderDialog (drag a list into order),
-                        Offcanvas (the reusable side panel on ui/sheet: title, close, scrolling body, footer; logical side),
+                        Offcanvas (the reusable side panel on ui/sheet: title, close, `notice` strip, scrolling body, footer;
+                        logical side; optional trigger `tooltip`),
                         CartDrawer (the business customers' header cart icon + badge and its Offcanvas: lines, subtotal,
                         minimum order), AddToCartButton (adds to the cart, "✓ Added" morph), QuantityStepper (− n +),
                         PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button), ...)
                         + their tests
-    components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet), restyled for the brand
+    components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet, tooltip), restyled for the brand
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
                         imports them (oxlint no-restricted-imports); legacy-media.json = object key -> WordPress URL
                         of every file `flask import-media` copies into the storage
@@ -372,9 +373,15 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   "Add to cart" button appears only where their price is shown (`priceFor(...).status === 'shown'`): +1 on a
   `CatalogCard` (above its stretched link), a `QuantityStepper` + the button on the product page. A line keeps a
   snapshot (id, slug, name, thumbnail, unit price); bulk discounts and the final price come at checkout (Phase 4).
-  Feedback on add: the button cross-fades to "✓ Added" for `ADDED_MS` (with a polite status line) and the header
-  badge pops (`animate-cart-pop` / `animate-cart-nudge` in index.css, replayed through `addedTick`; a fade with reduced
-  motion). Money is formatted with `formatPrice` (CatalogCard.tsx). Checkout stays disabled until Phase 4.
+  Feedback on add: the button cross-fades to "✓ Added" for `ADDED_MS` (with a polite status line), a copy of the
+  product photo flies into the header cart icon (`flyToCart`, Web Animations: the first <img> inside the nearest
+  `CART_FLY_SOURCE_ATTR` element, landing on the `CART_TARGET_ATTR` icon; from the button when the photo is scrolled
+  away; none with reduced motion), and the badge pops when it lands (`add(..., { pop: false })` then `pop()`;
+  `animate-cart-pop` / `animate-cart-nudge` in index.css, replayed through `addedTick`; a fade with reduced motion).
+  Hovering the cart icon shows a tooltip with the units and subtotal (`Offcanvas tooltip`, on `ui/tooltip`).
+  In the cart panel a line's `QuantityStepper min={0}` removes the line at 0 (the minus shows a trash icon at 1; the
+  focus moves to the next line), and the minimum-order banner with its progress bar sits in the `Offcanvas notice`
+  strip (under the header, never scrolls away). Money is formatted with `formatPrice` (CatalogCard.tsx). Checkout stays disabled until Phase 4.
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
 - **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
@@ -431,7 +438,7 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
 - **Type**: Inter with optical sizing (`opsz`); sizes from `text-xl` up carry size-specific negative tracking
   (`--text-*--letter-spacing`, milder in Hebrew); `tracking-display` for the hero headline; headings balance.
 - **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,
-  short language label "EN"/"עב"); English menu labels use 0.1em tracking (not `tracking-widest`) so they fit; the header row spans the full window (logo at the start edge, language + login at the end edge, the menu centered with the business customers' cart icon right after it). Re-run the e2e overflow test
+  short language label "EN"/"עב"); English menu labels use 0.1em tracking (not `tracking-widest`) so they fit; the header row spans the full window (logo at the start edge; the business customers' cart icon, language and login at the end edge; the menu centered). Re-run the e2e overflow test
   after adding menu items.
 - **Look and feel**: like Royal Canin / Purina / Hill's / Hamilton — a large international distributor, **not a pet
   shop**. Clean, minimal and premium; large typography, high-end photography, elegant animations; beautiful and

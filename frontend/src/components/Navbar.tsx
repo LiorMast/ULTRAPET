@@ -13,8 +13,8 @@
  *   pages of ADMIN_NAV) down out of the header and back up; the header grows with it, over the page.
  * - The header spans the full window: the logo sits at the start edge, the language switcher and login/logout
  *   at the end edge, and the menu in the middle.
- * - Signed-in business customers get a cart icon (<CartDrawer>) right after the menu items; below xl, next to the
- *   language toggle and the hamburger.
+ * - Signed-in business customers get a cart icon (<CartDrawer>) at the end edge, beside the language button (at
+ *   every width).
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
  *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
  */
@@ -67,24 +67,25 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
           <Logo className="h-8 sm:h-14" />
         </Link>
 
-        {/* The menu and the cart icon right after it, centered; below xl only the cart, at the end. */}
-        <div className="flex flex-1 items-center justify-end gap-2 xl:justify-center xl:gap-4 2xl:gap-7">
-          <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden items-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
-            {items.map((item) => (
-              <DesktopNavItem key={item.id} item={item} />
-            ))}
-          </nav>
+        <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
+          {items.map((item) => (
+            <DesktopNavItem key={item.id} item={item} />
+          ))}
+        </nav>
+
+        {/* The end edge: the cart icon beside the language button, then login/logout (desktop) or the menu. */}
+        <div className="flex shrink-0 items-center gap-1 xl:gap-2">
           {user?.kind === 'business' && <CartDrawer />}
-        </div>
 
-        <div className="hidden shrink-0 items-center gap-2 xl:flex">
-          <LanguageSwitcher variant="dropdown" />
-          <LoginPopover adminToggle={adminDrawer.trigger} />
-        </div>
+          <div className="hidden items-center gap-2 xl:flex">
+            <LanguageSwitcher variant="dropdown" />
+            <LoginPopover adminToggle={adminDrawer.trigger} />
+          </div>
 
-        <div className="flex shrink-0 items-center gap-1 xl:hidden">
-          <LanguageSwitcher variant="toggle" />
-          <MobileMenu items={items} />
+          <div className="flex items-center gap-1 xl:hidden">
+            <LanguageSwitcher variant="toggle" />
+            <MobileMenu items={items} />
+          </div>
         </div>
       </div>
 

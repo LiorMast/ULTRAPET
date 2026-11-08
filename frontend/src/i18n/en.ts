@@ -191,7 +191,9 @@ export const en: Dictionary = {
   },
   cart: {
     open: 'Shopping cart',
-    openWithCount: 'Shopping cart, {n} items',
+    openWithCount: 'Shopping cart, {items}',
+    itemOne: '1 item',
+    itemMany: '{n} items',
     title: 'Shopping cart',
     minimumOrder: 'Minimum order {amount}',
     empty: 'Your cart is empty',
@@ -206,12 +208,15 @@ export const en: Dictionary = {
     subtotal: 'Subtotal',
     exVat: 'Before VAT',
     minimumRemaining: 'Add {amount} more to reach the {minimum} minimum order',
+    tooltipSummary: '{items} · {amount} before VAT',
+    minimumProgress: 'Progress to the minimum order',
     minimumReached: 'Minimum order reached',
   },
   quantity: {
     label: 'Quantity',
     labelFor: 'Quantity of {name}',
     decrease: 'Decrease quantity',
+    decreaseToRemove: 'Decrease to 0 (remove)',
     increase: 'Increase quantity',
   },
   hero: {

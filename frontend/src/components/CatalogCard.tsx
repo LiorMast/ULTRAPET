@@ -12,7 +12,7 @@ import { Link } from '@tanstack/react-router'
 import { Lock } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from 'cn'
-import { AddToCartButton } from '@/components/AddToCartButton'
+import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
 import type { Product } from '@/api'
 import type { CustomerPrices } from '@/auth'
 import { localized } from '@/config'
@@ -128,7 +128,7 @@ export function CatalogCard({
 } & VariantProps<typeof cardVariants>) {
   const { locale } = useI18n()
   return (
-    <article className={cn(cardVariants({ variant }), className)}>
+    <article {...{ [CART_FLY_SOURCE_ATTR]: '' }} className={cn(cardVariants({ variant }), className)}>
       <div className={photoVariants({ variant })}>
         {product.image && (
           <img
@@ -156,12 +156,12 @@ export function CatalogCard({
             {localized(product.name, locale)}
           </Link>
         </Heading>
-        <div className="flex flex-col gap-3 border-t border-neutral-150 pt-3">
+        <div className="border-t border-neutral-150 pt-3">
           <PriceSlot state={price} />
           {price.status === 'shown' && (
             <AddToCartButton
               product={{ id: product.id, slug: product.slug, name: product.name, image: product.image?.thumbnail ?? null, unitPrice: price.price }}
-              className="z-10"
+              className="z-10 mt-3"
             />
           )}
         </div>

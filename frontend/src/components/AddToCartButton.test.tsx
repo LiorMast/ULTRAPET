@@ -2,7 +2,8 @@
  * AddToCartButton.test.tsx — Tests for adding products to the cart (AddToCartButton, the cart state in src/cart.tsx,
  * QuantityStepper) inside the real app: who gets the buttons (customers only, where a price is shown), adding from a
  * catalog card (the "Added" morph and its status line, the header badge, merging, no navigation), adding a quantity
- * from the product page, and the cart being saved per customer in browser storage.
+ * from the product page, the product photo flying to the cart icon (the badge pops when it lands; no flight with
+ * reduced motion), and the cart being saved per customer in browser storage.
  */
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -50,7 +51,7 @@ describe('Add to cart', () => {
     expect(screen.getByText(`Added to cart: ${name}`)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/catalog')
 
-    const cart = screen.getByRole('button', { name: 'Shopping cart, 1 items' })
+    const cart = screen.getByRole('button', { name: 'Shopping cart, 1 item' })
     expect(within(cart).getByTestId('cart-badge')).toHaveTextContent('1')
     expect(within(cart).getByTestId('cart-badge')).toHaveClass('animate-cart-pop')
 
@@ -107,11 +108,48 @@ describe('Add to cart', () => {
 
     // The same customer comes back: the cart is still there.
     const again = await renderPage('/en', { user: TEST_USER })
-    expect(screen.getByRole('button', { name: 'Shopping cart, 1 items' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Shopping cart, 1 item' })).toBeInTheDocument()
     again.unmount()
 
     // Another customer on the same browser starts with an empty cart.
     await renderPage('/en', { user: { ...TEST_USER, email: 'other@example.com' } })
     await waitFor(() => expect(screen.getByRole('button', { name: 'Shopping cart' })).toBeInTheDocument())
+  })
+
+  it('flies the card photo to the cart icon, and pops the badge only when it lands', async () => {
+    const { user } = await renderPage('/en/catalog', { user: TEST_USER })
+    const { button, card } = await firstCard()
+    // jsdom has no layout or Web Animations: give boxes a size and control when the flight finishes.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 400, right: 300, bottom: 600, width: 200, height: 200 } as DOMRect)
+    let land!: () => void
+    const finished = new Promise<void>((resolve) => (land = resolve))
+    const animate = vi.fn(() => ({ finished }) as unknown as Animation)
+    HTMLElement.prototype.animate = animate
+
+    await user.click(button)
+    const flyer = document.querySelector<HTMLImageElement>('body > div[aria-hidden="true"] > img')
+    expect(flyer?.src).toBe(card.querySelector('img')!.src)
+    expect(animate).toHaveBeenCalledTimes(2)
+    const cart = screen.getByRole('button', { name: 'Shopping cart, 1 item' })
+    expect(within(cart).getByTestId('cart-badge')).not.toHaveClass('animate-cart-pop')
+
+    await act(async () => land())
+    expect(within(cart).getByTestId('cart-badge')).toHaveClass('animate-cart-pop')
+    expect(document.querySelector('body > div[aria-hidden="true"] > img')).toBeNull()
+    delete (HTMLElement.prototype as Partial<HTMLElement>).animate
+  })
+
+  it('does not fly with reduced motion: the badge pops at once', async () => {
+    const { user } = await renderPage('/en/catalog', { user: TEST_USER })
+    const { button } = await firstCard()
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 400, right: 300, bottom: 600, width: 200, height: 200 } as DOMRect)
+    const animate = vi.fn()
+    HTMLElement.prototype.animate = animate
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+
+    await user.click(button)
+    expect(animate).not.toHaveBeenCalled()
+    expect(within(screen.getByRole('button', { name: 'Shopping cart, 1 item' })).getByTestId('cart-badge')).toHaveClass('animate-cart-pop')
+    delete (HTMLElement.prototype as Partial<HTMLElement>).animate
   })
 })

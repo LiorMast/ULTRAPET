@@ -3,17 +3,23 @@
  * the Offcanvas panel it opens. Rendered by the Navbar for signed-in business customers only (the public site and
  * staff have no cart). The lines come from useCart() (src/cart.tsx); AddToCartButton fills them.
  *
+ * Hovering or focusing the icon shows the Offcanvas tooltip with the cart's summary: units and subtotal, or "empty".
+ * The icon carries CART_TARGET_ATTR: AddToCartButton's flying product photo lands on it.
+ *
+ * Under the panel's header, a banner (the Offcanvas notice, it doesn't scroll) shows how far the cart is from the
+ * minimum order (MIN_ORDER_AMOUNT), with a progress bar, until it is reached. A line's stepper goes down to 0, which
+ * removes the product, like its trash button; the focus then moves to the next line (or the empty state's link).
+ *
  * Every add replays a short pop of the badge and a nudge of the icon (`animate-cart-pop` / `animate-cart-nudge`
  * in index.css; a fade with reduced motion). The panel lists the lines (photo, name linking to the product, unit
  * price, a QuantityStepper, remove, line total), or an empty state with a link to the catalog; its footer shows
- * the subtotal before VAT, how far the cart is from the minimum order (MIN_ORDER_AMOUNT), and Checkout, which
- * stays disabled until checkout exists (Phase 4).
+ * the subtotal before VAT and Checkout, which stays disabled until checkout exists (Phase 4).
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ShoppingCart, Trash2 } from 'lucide-react'
+import { CircleAlert, CircleCheck, ShoppingCart, Trash2 } from 'lucide-react'
 import { cn } from 'cn'
-import { useCart, type CartLine } from '@/cart'
+import { CART_TARGET_ATTR, useCart, type CartLine } from '@/cart'
 import { formatPrice } from '@/components/CatalogCard'
 import { Offcanvas } from '@/components/Offcanvas'
 import { QuantityStepper } from '@/components/QuantityStepper'
@@ -31,24 +37,49 @@ const BADGE_MAX = 99
  */
 export function CartDrawer({ className }: { className?: string }) {
   const { t, locale } = useI18n()
-  const { lines, count, subtotal, addedTick } = useCart()
+  const { lines, count, subtotal, addedTick, remove } = useCart()
   const [open, setOpen] = useState(false)
   const minimum = formatPrice(locale, MIN_ORDER_AMOUNT, { whole: true })
-  const label = count > 0 ? t.cart.openWithCount.replace('{n}', String(count)) : t.cart.open
-  const remaining = MIN_ORDER_AMOUNT - subtotal
+  const items = count === 1 ? t.cart.itemOne : t.cart.itemMany.replace('{n}', String(count))
+  const label = count > 0 ? t.cart.openWithCount.replace('{items}', items) : t.cart.open
   // Each add gets new keys (distinct for the icon and the badge: they are siblings), so the animations replay;
   // nothing animates before the first add.
   const popKey = addedTick > 0 ? addedTick : undefined
+
+  /**
+   * Removes a line and moves the focus to the next line's name (else the previous one's, else the empty state's
+   * catalog link), so the focus is never lost inside the panel.
+   * @param id - The product id of the line.
+   */
+  const removeLine = (id: string) => {
+    const index = lines.findIndex((line) => line.id === id)
+    const next = lines[index + 1] ?? lines[index - 1]
+    remove(id)
+    requestAnimationFrame(() => {
+      const selector = next ? `[data-cart-line="${CSS.escape(next.id)}"] a` : '[data-cart-empty-action]'
+      document.querySelector<HTMLElement>(selector)?.focus()
+    })
+  }
 
   return (
     <Offcanvas
       open={open}
       onOpenChange={setOpen}
       title={t.cart.title}
+      tooltip={
+        <>
+          <span className="block font-semibold">{t.cart.title}</span>
+          <span className="block text-white/80">
+            {count > 0 ? t.cart.tooltipSummary.replace('{items}', items).replace('{amount}', formatPrice(locale, subtotal)) : t.cart.empty}
+          </span>
+        </>
+      }
       description={t.cart.minimumOrder.replace('{amount}', minimum)}
+      notice={lines.length > 0 && <MinimumOrderBanner subtotal={subtotal} />}
       trigger={
         <button
           type="button"
+          {...{ [CART_TARGET_ATTR]: '' }}
           aria-label={label}
           className={cn(
             'relative p-2 text-brand-charcoal sm:p-3 transition-[color,scale] outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.97] active:duration-100',
@@ -82,11 +113,6 @@ export function CartDrawer({ className }: { className?: string }) {
                   <span className="text-2xs text-brand-charcoal-muted">{t.cart.exVat}</span>
                 </span>
               </div>
-              <p className={cn('text-xs', remaining > 0 ? 'text-brand-charcoal-muted' : 'font-semibold text-brand-charcoal')}>
-                {remaining > 0
-                  ? t.cart.minimumRemaining.replace('{amount}', formatPrice(locale, remaining)).replace('{minimum}', minimum)
-                  : t.cart.minimumReached}
-              </p>
             </>
           )}
           <Button disabled className="w-full">
@@ -98,7 +124,7 @@ export function CartDrawer({ className }: { className?: string }) {
       {lines.length > 0 ? (
         <ul className="divide-y divide-neutral-150">
           {lines.map((line) => (
-            <CartLineItem key={line.id} line={line} onNavigate={() => setOpen(false)} />
+            <CartLineItem key={line.id} line={line} onNavigate={() => setOpen(false)} onRemove={() => removeLine(line.id)} />
           ))}
         </ul>
       ) : (
@@ -107,7 +133,7 @@ export function CartDrawer({ className }: { className?: string }) {
           <p className="font-heading text-sm font-semibold text-brand-charcoal">{t.cart.empty}</p>
           <p className="max-w-xs text-xs text-brand-charcoal-muted">{t.cart.emptyHint}</p>
           <Button asChild size="sm" className="mt-3">
-            <Link to="/catalog" onClick={() => setOpen(false)}>
+            <Link to="/catalog" data-cart-empty-action onClick={() => setOpen(false)}>
               {t.cart.browse}
             </Link>
           </Button>
@@ -118,18 +144,59 @@ export function CartDrawer({ className }: { className?: string }) {
 }
 
 /**
- * One line of the cart panel: photo, name (a link to the product), unit price, quantity, remove, line total.
+ * The banner at the top of the cart: how much is missing to reach the minimum order, with a progress bar, or
+ * (once reached) a confirmation.
+ * @param props.subtotal - The cart's subtotal before VAT, in shekels.
+ * @returns The banner.
+ */
+function MinimumOrderBanner({ subtotal }: { subtotal: number }) {
+  const { t, locale } = useI18n()
+  const minimum = formatPrice(locale, MIN_ORDER_AMOUNT, { whole: true })
+  const remaining = MIN_ORDER_AMOUNT - subtotal
+  const reached = remaining <= 0
+  const message = reached
+    ? t.cart.minimumReached
+    : t.cart.minimumRemaining.replace('{amount}', formatPrice(locale, remaining)).replace('{minimum}', minimum)
+  const Icon = reached ? CircleCheck : CircleAlert
+
+  return (
+    <div className={cn('flex gap-3 p-4', reached ? 'bg-neutral-50 text-brand-charcoal' : 'bg-brand-red-muted text-brand-red-dark')}>
+      <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+        <p className="text-sm font-semibold leading-snug">{message}</p>
+        {!reached && (
+          <div
+            role="progressbar"
+            aria-label={t.cart.minimumProgress}
+            aria-valuemin={0}
+            aria-valuemax={MIN_ORDER_AMOUNT}
+            aria-valuenow={Math.round(subtotal)}
+            aria-valuetext={`${formatPrice(locale, subtotal)} / ${minimum}`}
+            className="h-1.5 overflow-hidden bg-white"
+          >
+            <div className="h-full bg-brand-red transition-[width] duration-500" style={{ width: `${(subtotal / MIN_ORDER_AMOUNT) * 100}%` }} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * One line of the cart panel: photo, name (a link to the product), unit price, quantity (down to 0 = remove),
+ * remove, line total.
  * @param props.line - The cart line.
  * @param props.onNavigate - Called when the name link is followed (the panel closes).
+ * @param props.onRemove - Removes the line (its trash button, or the stepper reaching 0).
  * @returns The <li>.
  */
-function CartLineItem({ line, onNavigate }: { line: CartLine; onNavigate: () => void }) {
+function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNavigate: () => void; onRemove: () => void }) {
   const { t, locale } = useI18n()
-  const { setQuantity, remove } = useCart()
+  const { setQuantity } = useCart()
   const name = localized(line.name, locale)
 
   return (
-    <li className="flex gap-4 py-4 first:pt-0">
+    <li data-cart-line={line.id} className="flex gap-4 py-4 first:pt-0">
       <div className="size-20 shrink-0 border border-neutral-150 bg-neutral-50">
         {line.image && <img src={line.image} alt="" width={80} height={80} loading="lazy" className="size-full object-contain p-1.5 mix-blend-multiply" />}
       </div>
@@ -146,7 +213,7 @@ function CartLineItem({ line, onNavigate }: { line: CartLine; onNavigate: () => 
           <button
             type="button"
             aria-label={t.cart.remove.replace('{name}', name)}
-            onClick={() => remove(line.id)}
+            onClick={onRemove}
             className="-me-1 shrink-0 p-1 text-neutral-500 transition-[color,scale] outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.97] active:duration-100"
           >
             <Trash2 aria-hidden="true" className="size-4" />
@@ -154,7 +221,14 @@ function CartLineItem({ line, onNavigate }: { line: CartLine; onNavigate: () => 
         </div>
         <p className="text-xs text-brand-charcoal-muted">{t.cart.unitPrice.replace('{price}', formatPrice(locale, line.unitPrice))}</p>
         <div className="flex items-center justify-between gap-2">
-          <QuantityStepper size="sm" value={line.quantity} onChange={(quantity) => setQuantity(line.id, quantity)} label={t.quantity.labelFor.replace('{name}', name)} />
+          <QuantityStepper
+            size="sm"
+            min={0}
+            value={line.quantity}
+            onChange={(quantity) => (quantity === 0 ? onRemove() : setQuantity(line.id, quantity))}
+            label={t.quantity.labelFor.replace('{name}', name)}
+            removeLabel={t.quantity.decreaseToRemove}
+          />
           <span className="font-semibold tabular-nums text-brand-charcoal">{formatPrice(locale, line.unitPrice * line.quantity)}</span>
         </div>
       </div>

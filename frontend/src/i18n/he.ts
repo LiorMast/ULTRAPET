@@ -191,7 +191,9 @@ export const he = {
   },
   cart: {
     open: 'סל קניות',
-    openWithCount: 'סל קניות, {n} פריטים',
+    openWithCount: 'סל קניות, {items}',
+    itemOne: 'פריט אחד',
+    itemMany: '{n} פריטים',
     title: 'סל קניות',
     minimumOrder: 'מינימום הזמנה {amount}',
     empty: 'הסל שלך ריק',
@@ -206,12 +208,15 @@ export const he = {
     subtotal: 'סכום ביניים',
     exVat: 'לפני מע״מ',
     minimumRemaining: 'עוד {amount} להשלמת מינימום ההזמנה ({minimum})',
+    tooltipSummary: '{items} · {amount} לפני מע״מ',
+    minimumProgress: 'התקדמות למינימום ההזמנה',
     minimumReached: 'הגעתם למינימום ההזמנה',
   },
   quantity: {
     label: 'כמות',
     labelFor: 'כמות של {name}',
     decrease: 'הפחתת כמות',
+    decreaseToRemove: 'הפחתה ל-0 (הסרה)',
     increase: 'הוספת כמות',
   },
   hero: {

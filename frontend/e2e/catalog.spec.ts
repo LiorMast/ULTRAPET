@@ -9,9 +9,7 @@
 import { readFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-
-/** The demo customer `flask seed` creates from .env (loaded by playwright.config.ts). */
-const CUSTOMER = { email: process.env.SEED_CUSTOMER_EMAIL ?? '', password: process.env.SEED_CUSTOMER_PASSWORD ?? '' }
+import { signInCustomer } from './utils.ts'
 
 /** Stand-in for every product photo. */
 const PHOTO = readFileSync(new URL('../src/assets/brands/ultra-pet.png', import.meta.url))
@@ -31,32 +29,6 @@ async function open(page: Page, path: string) {
     await Promise.all(imgs.map((img) => (img as HTMLImageElement).decode().catch(() => undefined)))
   })
   await page.waitForFunction(() => [...document.querySelectorAll('main img')].every((img) => (img as HTMLImageElement).naturalWidth > 0))
-}
-
-/**
- * Signs in as the demo customer: the header popover on desktop, the /login page on phones.
- * @param page - The Playwright page.
- * @param isMobile - Whether the test runs in the phone project.
- */
-async function signIn(page: Page, isMobile: boolean) {
-  if (!CUSTOMER.email || !CUSTOMER.password) {
-    throw new Error('Set SEED_CUSTOMER_EMAIL and SEED_CUSTOMER_PASSWORD in .env, then run `flask reset-db --yes` and `flask seed`.')
-  }
-  if (isMobile) {
-    await page.goto('/en/login')
-    await page.getByLabel('Email').fill(CUSTOMER.email)
-    await page.getByLabel('Password', { exact: true }).fill(CUSTOMER.password)
-    await page.getByRole('button', { name: 'Log in' }).click()
-    await page.getByRole('link', { name: 'Go to the product catalog' }).click()
-  } else {
-    await page.getByRole('button', { name: 'Login' }).click()
-    const dialog = page.getByRole('dialog')
-    await dialog.getByLabel('Email').fill(CUSTOMER.email)
-    await dialog.getByLabel('Password', { exact: true }).fill(CUSTOMER.password)
-    await dialog.getByRole('button', { name: 'Log in' }).click()
-    // Wait for the server's answer (it sets the sign-in cookies): the login button turns into Log out.
-    await expect(page.getByRole('banner').getByRole('button', { name: 'Sign out' })).toBeVisible()
-  }
 }
 
 test('pages through the catalog and filters by category', async ({ page }) => {
@@ -87,7 +59,7 @@ test('hides prices from visitors and shows them after signing in', async ({ page
   await expect(firstCard).toContainText('Log in to see the price')
   await expect(page.getByRole('main')).not.toContainText('₪')
 
-  await signIn(page, isMobile)
+  await signInCustomer(page, isMobile)
   await expect(page).toHaveURL(/\/en\/catalog$/)
   await expect(firstCard).toContainText('₪')
   await expect(firstCard).toContainText('excl. VAT')
@@ -121,7 +93,7 @@ for (const [name, prefix] of [['he', ''], ['en', '/en']] as const) {
     await open(page, `${prefix}/catalog`)
     await expect(page.locator('main')).toHaveScreenshot(`catalog-${name}.png`)
     if (name === 'en') {
-      await signIn(page, isMobile)
+      await signInCustomer(page, isMobile)
       await open(page, `${prefix}/catalog`)
       await expect(page.getByRole('list', { name: 'Products' }).getByRole('article').first()).toContainText('₪')
       await expect(page.locator('main')).toHaveScreenshot(`catalog-${name}-signed-in.png`)

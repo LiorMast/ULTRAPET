@@ -5,10 +5,13 @@
  *
  * The box accepts typing (digits only); a valid number is sent at once, clamped to `min`..`max`, and an empty or
  * invalid box shows the current value again when it loses the focus. The buttons are disabled at the limits.
+ *
+ * With `min={0}` (a cart line), going below 1 means removing the item: at 1 the minus button shows a trash icon
+ * and is named `removeLabel`; the caller removes the line when it receives 0.
  */
 import { useState } from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { Minus, Plus } from 'lucide-react'
+import { Minus, Plus, Trash2 } from 'lucide-react'
 import { cn } from 'cn'
 import { MAX_QUANTITY, MIN_QUANTITY } from '@/cart'
 import { useI18n } from '@/i18n'
@@ -32,7 +35,8 @@ const BUTTON_CLASS =
  * @param props.value - The current quantity.
  * @param props.onChange - Called with the new quantity (already clamped to min..max).
  * @param props.label - The box's accessible name; defaults to the dictionary's "Quantity" (give a line's name in a list).
- * @param props.min - The smallest quantity (default MIN_QUANTITY, 1).
+ * @param props.min - The smallest quantity (default MIN_QUANTITY, 1); 0 lets the minus button remove the item.
+ * @param props.removeLabel - With min 0: the minus button's name at quantity 1 (e.g. "Remove <name>").
  * @param props.max - The largest quantity (default MAX_QUANTITY, 9999).
  * @param props.size - 'md' (default, the product page) or 'sm' (cart lines).
  * @param props.className - Extra classes for the group.
@@ -42,6 +46,7 @@ export function QuantityStepper({
   value,
   onChange,
   label,
+  removeLabel,
   min = MIN_QUANTITY,
   max = MAX_QUANTITY,
   size,
@@ -50,6 +55,7 @@ export function QuantityStepper({
   value: number
   onChange: (quantity: number) => void
   label?: string
+  removeLabel?: string
   min?: number
   max?: number
   className?: string
@@ -57,6 +63,8 @@ export function QuantityStepper({
   const { t } = useI18n()
   // What the box shows while typing; null = the value itself.
   const [draft, setDraft] = useState<string | null>(null)
+  // The next step down removes the item (min 0, at 1).
+  const removes = min === 0 && value === 1
 
   /**
    * Sends a quantity, clamped to the limits.
@@ -76,8 +84,14 @@ export function QuantityStepper({
 
   return (
     <div role="group" aria-label={label ?? t.quantity.label} className={cn(stepperVariants({ size }), className)}>
-      <button type="button" aria-label={t.quantity.decrease} disabled={value <= min} onClick={() => send(value - 1)} className={BUTTON_CLASS}>
-        <Minus aria-hidden="true" className="size-4" />
+      <button
+        type="button"
+        aria-label={removes ? (removeLabel ?? t.quantity.decrease) : t.quantity.decrease}
+        disabled={value <= min}
+        onClick={() => send(value - 1)}
+        className={cn(BUTTON_CLASS, removes && 'hover:text-brand-red-dark')}
+      >
+        {removes ? <Trash2 aria-hidden="true" className="size-4" /> : <Minus aria-hidden="true" className="size-4" />}
       </button>
       <input
         type="text"

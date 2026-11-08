@@ -2,7 +2,8 @@
  * cart.tsx — The signed-in business customer's shopping cart: the cart state for the whole site.
  *
  * CartProvider (inside AuthProvider) holds the lines and useCart() gives components the lines, totals and the
- * actions (add, setQuantity, remove). Used by AddToCartButton (the catalog cards and the product page) and
+ * actions (add, setQuantity, remove, pop). `addedTick` grows when the header badge should pop: at once on a plain
+ * add, or when AddToCartButton's photo lands on the cart icon (marked with CART_TARGET_ATTR) after its fly animation. Used by AddToCartButton (the catalog cards and the product page) and
  * CartDrawer (the header's cart icon and panel).
  *
  * Until the server cart and checkout (Phase 4) exist, the cart lives in localStorage, one per customer
@@ -27,6 +28,9 @@ export type CartLine = {
 /** What AddToCartButton gives the cart: a line without its quantity. */
 export type CartProduct = Omit<CartLine, 'quantity'>
 
+/** The attribute that marks the header's cart icon: the fly-to-cart animation lands on it. */
+export const CART_TARGET_ATTR = 'data-cart-target'
+
 /** The fewest and the most units one line may hold. */
 export const MIN_QUANTITY = 1
 export const MAX_QUANTITY = 9999
@@ -36,7 +40,8 @@ type CartValue = {
   count: number
   subtotal: number
   addedTick: number
-  add: (product: CartProduct, quantity?: number) => void
+  add: (product: CartProduct, quantity?: number, options?: { pop?: boolean }) => void
+  pop: () => void
   setQuantity: (id: string, quantity: number) => void
   remove: (id: string) => void
 }
@@ -127,19 +132,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
    * Adds units of a product; a product already in the cart gets the units added to its line.
    * @param product - The product snapshot (id, slug, name, photo, unit price).
    * @param quantity - Units to add (default 1).
+   * @param options.pop - false = don't pop the header badge now (the caller calls pop() when its animation lands).
    */
   const add = useCallback(
-    (product: CartProduct, quantity = 1) => {
+    (product: CartProduct, quantity = 1, { pop = true }: { pop?: boolean } = {}) => {
       if (!owner) return
       update((current) => {
         const existing = current.find((line) => line.id === product.id)
         if (!existing) return [...current, { ...product, quantity: clampQuantity(quantity) }]
         return current.map((line) => (line.id === product.id ? { ...line, ...product, quantity: clampQuantity(line.quantity + quantity) } : line))
       })
-      setAddedTick((tick) => tick + 1)
+      if (pop) setAddedTick((tick) => tick + 1)
     },
     [owner, update],
   )
+
+  /** Pops the header's cart badge (bumps addedTick), e.g. when a flying product photo reaches the cart icon. */
+  const pop = useCallback(() => setAddedTick((tick) => tick + 1), [])
 
   /**
    * Sets a line's quantity (clamped to MIN_QUANTITY..MAX_QUANTITY).
@@ -161,15 +170,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const count = lines.reduce((sum, line) => sum + line.quantity, 0)
     // Rounded to agorot once, like the server's prices.
     const subtotal = Math.round(lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0) * 100) / 100
-    return { lines, count, subtotal, addedTick, add, setQuantity, remove }
-  }, [lines, addedTick, add, setQuantity, remove])
+    return { lines, count, subtotal, addedTick, add, pop, setQuantity, remove }
+  }, [lines, addedTick, add, pop, setQuantity, remove])
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }
 
 /**
  * Gives a component the cart.
- * @returns The lines, `count` (units), `subtotal` (shekels before VAT), `addedTick` (grows on every add) and the
- *   actions `add`, `setQuantity`, `remove`.
+ * @returns The lines, `count` (units), `subtotal` (shekels before VAT), `addedTick` (grows when the badge should
+ *   pop) and the actions `add`, `pop`, `setQuantity`, `remove`.
  */
 export function useCart(): CartValue {
   const value = useContext(CartContext)

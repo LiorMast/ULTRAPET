@@ -1,7 +1,7 @@
 /**
  * utils.ts — Helpers shared by the Playwright specs.
  */
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /**
  * Scrolls a page section into view once it shows its final layout. Pages render when their API data arrives,
@@ -43,4 +43,34 @@ export async function signInStaff(page: Page, path = '/en/admin/brands') {
   await page.getByLabel(english ? 'Password' : 'סיסמה', { exact: true }).fill(STAFF.password)
   await page.getByRole('main').getByRole('button', { name: english ? 'Log in' : 'התחברות' }).click()
   await page.getByRole('table').waitFor()
+}
+
+/** The demo customer `flask seed` creates from .env (loaded by playwright.config.ts). */
+const CUSTOMER = { email: process.env.SEED_CUSTOMER_EMAIL ?? '', password: process.env.SEED_CUSTOMER_PASSWORD ?? '' }
+
+/**
+ * Signs in as the demo customer: the header popover on desktop (on the current page), the /login page on phones
+ * (then on to the English catalog).
+ * @param page - The Playwright page.
+ * @param isMobile - Whether the test runs in the phone project.
+ */
+export async function signInCustomer(page: Page, isMobile: boolean) {
+  if (!CUSTOMER.email || !CUSTOMER.password) {
+    throw new Error('Set SEED_CUSTOMER_EMAIL and SEED_CUSTOMER_PASSWORD in .env, then run `flask reset-db --yes` and `flask seed`.')
+  }
+  if (isMobile) {
+    await page.goto('/en/login')
+    await page.getByLabel('Email').fill(CUSTOMER.email)
+    await page.getByLabel('Password', { exact: true }).fill(CUSTOMER.password)
+    await page.getByRole('button', { name: 'Log in' }).click()
+    await page.getByRole('link', { name: 'Go to the product catalog' }).click()
+  } else {
+    await page.getByRole('button', { name: 'Login' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByLabel('Email').fill(CUSTOMER.email)
+    await dialog.getByLabel('Password', { exact: true }).fill(CUSTOMER.password)
+    await dialog.getByRole('button', { name: 'Log in' }).click()
+    // Wait for the server's answer (it sets the sign-in cookies): the login button turns into Log out.
+    await expect(page.getByRole('banner').getByRole('button', { name: 'Sign out' })).toBeVisible()
+  }
 }
