@@ -1,5 +1,5 @@
 /**
- * WhatsAppButton.test.tsx — Tests that the floating WhatsApp circle appears on every page with a
+ * WhatsAppButton.test.tsx — Tests that the floating WhatsApp squircle appears on every page with a
  * translated accessible name and a link to the customer-service chat, except on the staff panel (/admin/...).
  */
 import { screen } from '@testing-library/react'
