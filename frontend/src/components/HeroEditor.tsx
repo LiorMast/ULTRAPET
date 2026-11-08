@@ -48,12 +48,16 @@ function toDraft(content: HeroContent | null): Draft {
 /**
  * Turns the form's values into the content to save; empty texts are left out, so the built-in ones show.
  * @param draft - The form's values.
+ * @param from - The saved content the form started from (its widths are kept).
  * @returns The hero content.
  */
-function fromDraft(draft: Draft): HeroContent {
+function fromDraft(draft: Draft, from: HeroContent | null): HeroContent {
   const content: HeroContent = {}
   for (const block of BLOCKS) {
     const saved: SectionText & { accent?: Partial<Record<Locale, string>> } = { text: {}, font: {}, size: {} }
+    // The dialog does not edit widths (they are dragged on the page): the saved ones are kept as they are.
+    const width = from?.[block]?.width
+    if (width && Object.keys(width).length > 0) saved.width = width
     if (block === 'title') saved.accent = {}
     for (const locale of ENABLED_LOCALES) {
       const value = draft[block][locale]!
@@ -150,7 +154,7 @@ function HeroEditForm({ content, onSave, onCancel }: { content: HeroContent | nu
     setFormError('')
     setPending(true)
     try {
-      await onSave(fromDraft(draft))
+      await onSave(fromDraft(draft, content))
     } catch (error) {
       setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
       setPending(false)

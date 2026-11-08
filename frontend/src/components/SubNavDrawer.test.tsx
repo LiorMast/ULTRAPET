@@ -50,6 +50,7 @@ describe('Admin drawer', () => {
       ['Products', '/en/admin/products'],
       ['Categories', '/en/admin/categories'],
       ['Discounts', '/en/admin/discounts'],
+      ['Customers', '/en/admin/customers'],
       ['Brands', '/en/admin/brands'],
     ])
   })
@@ -86,7 +87,7 @@ describe('Admin drawer', () => {
     const { toggle, drawer } = await findAdminDrawer('לוח ניהול')
     await user.click(toggle)
     const nav = within(drawer).getByRole('navigation', { name: 'לוח ניהול' })
-    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['מוצרים', 'קטגוריות', 'הנחות', 'מותגים'])
+    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual(['מוצרים', 'קטגוריות', 'הנחות', 'לקוחות', 'מותגים'])
   })
 
   it('is not there for business customers', async () => {

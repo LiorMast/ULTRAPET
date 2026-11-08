@@ -39,10 +39,11 @@ registerLibrary(DT)
 /**
  * How a column's value is shown and edited: plain or multiline `text`, `localized` text ({ he, en }),
  * `integer`, `number` (decimal), `money` (shekels), `boolean`, `select` (one of `options`), `color` ('#RRGGBB'),
- * `url`, `datetime` (an ISO timestamp) or `image` (a stored picture's URL: a thumbnail cell, and an upload-only
- * field into the column's `folder`).
+ * `url`, `datetime` (an ISO timestamp), `image` (a stored picture's URL: a thumbnail cell, and an upload-only
+ * field into the column's `folder`) or `password` (write-only: never a cell, a form field that starts empty with a
+ * Generate button; `required` then means only when adding, and an edit that leaves it empty keeps the password).
  */
-export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 'boolean' | 'select' | 'color' | 'url' | 'datetime' | 'image'
+export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 'boolean' | 'select' | 'color' | 'url' | 'datetime' | 'image' | 'password'
 
 /**
  * One column of a DataTable and one field of its edit form.
@@ -295,7 +296,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
 
   // Built once: DataTables reads its options, columns and renderers only when it mounts.
   const [{ columns, slots, options }] = useState(() => {
-    const shown = props.columns.filter((column) => column.inTable !== false)
+    const shown = props.columns.filter((column) => column.inTable !== false && column.type !== 'password')
     const hasActions = Boolean(props.onUpdate || props.onDelete || props.rowActions?.length)
     const columns: ColumnOptions[] = shown.map((column) => ({
       data: column.key,

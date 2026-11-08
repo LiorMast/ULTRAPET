@@ -60,6 +60,28 @@ export type ProductPage = {
   categoryCounts: Record<string, number>
 }
 
+/**
+ * A product as its own page receives it (GET /api/products/<slug>): still no price. `description` holds the full
+ * description per language as HTML the server sanitized (p, h2–h4, lists, tables, strong/em, br; show it with
+ * RichText); a language without text is absent. `brand` is null when there is none or it is not shown on the site.
+ * `images` is the whole gallery in order (`alt` per language, null = none); `related` are other products of the
+ * category, as the catalog list shapes them.
+ */
+export type ProductDetail = {
+  id: string
+  slug: string
+  name: Localized<string>
+  description: Partial<Localized<string>>
+  sku: string | null
+  barcode: string | null
+  legacyPath: string | null
+  updatedAt: string
+  category: { slug: string; name: Localized<string> }
+  brand: { slug: string; name: string } | null
+  images: (ProductImage & { alt: Partial<Localized<string>> | null })[]
+  related: Product[]
+}
+
 /** The URL state of the catalog: absent = page 1, every category, no search. */
 export type CatalogSearch = { page?: number; category?: string; q?: string }
 
@@ -130,13 +152,15 @@ export type FontKey = 'default' | 'heebo' | 'rubik' | 'assistant' | 'frank-ruhl-
 export type SizeStep = 'sm' | 'md' | 'lg' | 'xl'
 
 /**
- * One editable text of a section: its words, font and size per language. Every part is optional: a missing or
- * empty text shows the dictionary's, a missing font the site's own, a missing size "md".
+ * One editable text of a section: its words, font, size and width per language. Every part is optional: a missing or
+ * empty text shows the dictionary's, a missing font the site's own, a missing size "md", a missing width the full
+ * width. `width` = the text's width in percent of its parent's (20-99), set by staff dragging the box's edge.
  */
 export type SectionText = {
   text?: Partial<Record<Locale, string>>
   font?: Partial<Record<Locale, FontKey>>
   size?: Partial<Record<Locale, SizeStep>>
+  width?: Partial<Record<Locale, number>>
 }
 
 /**
@@ -334,6 +358,14 @@ export function fetchProducts({ category, q, page }: CatalogSearch, signal?: Abo
 }
 
 /**
+ * One product, for its page.
+ * @param slug - The product's URL name.
+ * @param signal - Aborts the request (the router passes its loader's signal).
+ * @returns The product; throws ApiError 404 when it is unknown or not shown.
+ */
+export const fetchProduct = (slug: string, signal?: AbortSignal) => apiFetch<ProductDetail>(`/api/products/${encodeURIComponent(slug)}`, { signal })
+
+/**
  * The signed-in customer's prices.
  * @returns The prices by product id; throws ApiError 401/403 when no customer is signed in.
  */
@@ -434,7 +466,7 @@ export async function postSignIn(credentials: { email: string; password: string;
 export const postSignOut = () => apiFetch<void>('/api/auth/logout', { method: 'POST' })
 
 /** The tables the staff API edits (RESOURCES in backend/app/staff/routes.py). */
-export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections' | 'faq-items'
+export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections' | 'faq-items' | 'customers'
 
 /** The staff resources edited as one ordered list, which replaceStaffRows saves whole (`replaceable` on the server). */
 export type StaffListResource = 'faq-items'
@@ -512,15 +544,26 @@ export type StaffPriceRule = StaffRowBase & {
   note: string | null
 }
 
-/** A business customer as GET /api/staff/customers lists it (read-only; never the sign-in fields). */
-export type StaffCustomer = { id: string; companyName: string; fullName: string; email: string; city: string | null; isActive: boolean }
-
 /**
- * Every business customer, active or not, by company name (to pick one, e.g. for a customer's own discount).
- * @param signal - Aborts the request.
- * @returns The customers; throws ApiError 401/403 without a staff sign-in.
+ * A business customer as the staff API returns it (resource "customers"; every account, active or not). Only staff
+ * open accounts: customers cannot register. A new one is created with a `password` (write-only: sent to set or
+ * reset it, never returned); `lastLoginAt` is read-only (null = never signed in). Customers are never deleted:
+ * `isActive` false blocks the sign-in.
  */
-export const fetchStaffCustomers = (signal?: AbortSignal) => apiFetch<StaffCustomer[]>('/api/staff/customers', { signal })
+export type StaffCustomer = StaffRowBase & {
+  id: string
+  email: string
+  fullName: string
+  phone: string | null
+  companyName: string
+  businessNumber: string | null
+  city: string | null
+  address: string | null
+  rivhitCustomerId: string | null
+  notes: string | null
+  isActive: boolean
+  lastLoginAt: string | null
+}
 
 /**
  * Every row of a staff resource, active or not, in display order.

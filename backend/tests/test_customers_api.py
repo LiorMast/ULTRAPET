@@ -1,6 +1,7 @@
 """test_customers_api.py — The public and customer routes of the `customers` blueprint (app/customers/routes.py).
 
-Catalog categories and products (search in any language, category filter, chip counts, paging), brands, stats,
+Catalog categories and products (search in any language, category filter, chip counts, paging), the product page,
+brands, stats,
 the saved home page sections and FAQ, articles, resellers, the sitemap, and the signed-in customer's prices. Sign-in itself is in test_auth.py.
 """
 from datetime import UTC, datetime, timedelta
@@ -133,6 +134,61 @@ def test_products_pages_and_clamps_the_page(client, catalog):
 def test_an_empty_search_has_one_empty_page(client, catalog):
     data = client.get("/api/products?q=zzzz").get_json()
     assert (data["items"], data["total"], data["page"], data["pageCount"]) == ([], 0, 1, 1)
+
+
+def test_a_product_page_has_the_full_product_and_its_related_ones(client, catalog, database):
+    brand = Brand(slug="paw", name="Paw")
+    catalog.beef.brand = brand
+    catalog.beef.sku = "08396"
+    catalog.beef.barcode = "7290011072026"
+    catalog.beef.legacy_path = "/product/בקר/"
+    catalog.beef.description = {"he": "<h2>מרכיבים</h2><ul><li>בקר 28%</li></ul>", "en": ""}
+    catalog.beef.images = [
+        ProductImage(url="products/beef.jpg", thumbnail_url="products/beef-300x300.jpg", srcset="products/beef-768x768.jpg 768w",
+                     alt={"he": "שק בקר"}, sort_order=0),
+        ProductImage(url="products/beef-back.jpg", sort_order=1),
+    ]
+    database.commit()
+    data = client.get("/api/products/beef-dog-food").get_json()
+    assert {k: data[k] for k in ("id", "slug", "name", "sku", "barcode", "legacyPath", "category", "brand")} == {
+        "id": str(catalog.beef.id),
+        "slug": "beef-dog-food",
+        "name": {"he": "מזון בקר לכלבים", "en": "Beef Dog Food"},
+        "sku": "08396",
+        "barcode": "7290011072026",
+        "legacyPath": "/product/בקר/",
+        "category": {"slug": "dogs", "name": {"he": "כלבים", "en": "Dogs"}},
+        "brand": {"slug": "paw", "name": "Paw"},
+    }
+    # An empty translation is left out.
+    assert data["description"] == {"he": "<h2>מרכיבים</h2>\n<ul><li>בקר 28%</li></ul>"}
+    assert data["images"] == [
+        {"src": "/api/media/products/beef.jpg", "thumbnail": "/api/media/products/beef-300x300.jpg",
+         "srcSet": "/api/media/products/beef-768x768.jpg 768w", "alt": {"he": "שק בקר"}},
+        {"src": "/api/media/products/beef-back.jpg", "thumbnail": "/api/media/products/beef-back.jpg", "srcSet": "", "alt": None},
+    ]
+    # The next products of the category in catalog order, wrapping round; never itself, never a hidden one.
+    assert [item["slug"] for item in data["related"]] == ["dog-chew", "dog-treat"]
+    assert data["related"][1]["image"]["src"] == "/api/media/products/treat.jpg"
+    assert data["updatedAt"].endswith(("+02:00", "+03:00"))
+    assert "price" not in str(data).lower()
+
+
+def test_a_product_page_sanitizes_the_description(client, catalog, database):
+    catalog.treat.description = {"he": '<p onclick="x()">טעים<script>alert(1)</script></p><img src=x onerror=alert(1)><a href="javascript:x">קישור</a>'}
+    database.commit()
+    assert client.get("/api/products/dog-treat").get_json()["description"] == {"he": "<p>טעים</p>\n<p>קישור</p>"}
+
+
+def test_a_product_page_hides_an_inactive_brand(client, catalog, database):
+    catalog.chew.brand = Brand(slug="lino", name="LINO", is_active=False)
+    database.commit()
+    assert client.get("/api/products/dog-chew").get_json()["brand"] is None
+
+
+@pytest.mark.parametrize("slug", ["no-such-product", "old-salmon", "hidden-salmon"])
+def test_a_product_page_is_404_when_unknown_inactive_or_in_a_hidden_category(client, catalog, slug):
+    assert client.get(f"/api/products/{slug}").status_code == 404
 
 
 def test_brands_lists_the_active_ones_and_finds_one(client, database):
@@ -287,6 +343,16 @@ def test_the_sitemap_lists_the_pages_and_published_articles_in_each_language(cli
     assert '<xhtml:link rel="alternate" hreflang="en" href="https://www.ultrapet.co.il/en/articles/older"/>' in xml
     assert "<lastmod>2024-03-18</lastmod>" in xml  # the update date in Israel
     assert "draft" not in xml and "scheduled" not in xml
+
+
+def test_the_sitemap_lists_the_visible_product_pages(client, catalog, database):
+    catalog.chew.slug = "עצם-dog-chew"
+    database.commit()
+    xml = client.get("/api/sitemap.xml").get_data(as_text=True)
+    assert "<loc>https://www.ultrapet.co.il/products/dog-treat</loc>" in xml
+    assert "<loc>https://www.ultrapet.co.il/en/products/beef-dog-food</loc>" in xml
+    assert "<loc>https://www.ultrapet.co.il/products/%D7%A2%D7%A6%D7%9D-dog-chew</loc>" in xml  # percent-encoded
+    assert "old-salmon" not in xml and "hidden-salmon" not in xml
 
 
 def test_the_catalog_pdf_redirects_to_the_stored_file(client, database):

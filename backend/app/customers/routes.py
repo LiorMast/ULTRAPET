@@ -1,7 +1,7 @@
 """routes.py — Blueprint `customers` (prefix /api): everything the public site and the business customers call.
 
 Public, no sign-in:
-    GET /categories, /products, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
+    GET /categories, /products, /products/<slug>, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
     /articles, /articles/<slug>, /resellers, /sitemap.xml, /media/<key> (stored files: the S3 stub's objects),
     /catalog.pdf (redirects to the PDF catalog in the file storage)
 Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
@@ -16,6 +16,7 @@ the signed-in customer by app.pricing.
 """
 import math
 from typing import Any
+from urllib.parse import quote
 from xml.sax.saxutils import escape
 
 from flask import Blueprint, Response, abort, current_app, jsonify, redirect, request
@@ -30,6 +31,7 @@ from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.settings import Setting, get_setting
 from app.database.models.users import AppUser, BusinessUser
+from app.database.wordpress import sanitize_html
 from app.pricing import ISRAEL, customer_prices
 
 bp = Blueprint("customers", __name__, url_prefix="/api")
@@ -43,6 +45,8 @@ MAX_PAGE_SIZE = 100
 STAT_IDS = ("retail", "partners", "products", "years")
 # The contact details, each read from the setting contact_<field>.
 CONTACT_FIELDS = ("phone", "whatsapp", "email")
+# Product page: how many other products of its category it suggests ("You may also like").
+RELATED_COUNT = 4
 # Sitemap: the URL prefix of each served language (Hebrew, the default, has none) and the pages always listed.
 SITEMAP_LOCALES = {"he": "", "en": "/en"}
 SITEMAP_PAGES = ("/", "/where-to-buy", "/catalog", "/articles")
@@ -178,6 +182,82 @@ def list_products() -> dict[str, Any]:
         "category": category,
         "categoryCounts": counts,
     }
+
+
+def related_products(product: Product) -> list[Product]:
+    """The products a product page suggests: the next active ones of its category in catalog order, wrapping round.
+
+    Args:
+        product: The product of the page (its category is active).
+
+    Returns:
+        Up to RELATED_COUNT other active products of the same category, with their category and images loaded.
+    """
+    siblings = list(
+        db.session.scalars(
+            select(Product)
+            .where(Product.category_id == product.category_id, Product.is_active)
+            .options(selectinload(Product.category), selectinload(Product.images))
+            .order_by(Product.sort_order, Product.id)
+        )
+    )
+    index = next(i for i, sibling in enumerate(siblings) if sibling.id == product.id)
+    return (siblings[index + 1:] + siblings[:index])[:RELATED_COUNT]
+
+
+def product_detail_json(product: Product) -> dict[str, Any]:
+    """Shapes a product for its own page (still no price: prices come only from /prices).
+
+    Args:
+        product: An active product of an active category, with its category, brand and images loaded.
+
+    Returns:
+        {id, slug, name, description, sku, barcode, legacyPath, updatedAt, category {slug, name}, brand {slug, name} or
+        null (none, or an inactive brand), images [{src, thumbnail, srcSet, alt}] in gallery order, related (catalog
+        list items, see product_json)}. Each description is sanitized again on the way out (sanitize_html), so HTML
+        typed in the admin can only use the small safe subset; an empty text is left out.
+    """
+    description = {
+        locale: clean
+        for locale, html in (product.description or {}).items()
+        if html and (clean := sanitize_html(html))
+    }
+    brand = product.brand
+    return {
+        "id": product.id,
+        "slug": product.slug,
+        "name": product.name,
+        "description": description,
+        "sku": product.sku,
+        "barcode": product.barcode,
+        "legacyPath": product.legacy_path,
+        "updatedAt": product.updated_at.astimezone(ISRAEL).isoformat(),
+        "category": {"slug": product.category.slug, "name": product.category.name},
+        "brand": {"slug": brand.slug, "name": brand.name} if brand and brand.is_active else None,
+        "images": [{**image_json(image), "alt": image.alt} for image in product.images],
+        "related": [product_json(other) for other in related_products(product)],
+    }
+
+
+@bp.get("/products/<slug>")
+def get_product(slug: str) -> dict[str, Any]:
+    """One product, for its page.
+
+    Args:
+        slug: The product's URL name.
+
+    Returns:
+        The product (see product_detail_json); 404 when it is unknown, inactive or in an inactive category.
+    """
+    product = db.session.scalar(
+        select(Product)
+        .join(Product.category)
+        .where(Product.slug == slug, Product.is_active, Category.is_active)
+        .options(contains_eager(Product.category), selectinload(Product.brand), selectinload(Product.images))
+    )
+    if product is None:
+        abort(404)
+    return product_detail_json(product)
 
 
 def brand_json(brand: Brand) -> dict[str, Any]:
@@ -410,7 +490,7 @@ def catalog_pdf() -> Response:
 
 @bp.get("/sitemap.xml")
 def sitemap() -> Response:
-    """The sitemap for search engines: every public page and published article in each language, with hreflang
+    """The sitemap for search engines: every public page, published article and product page in each language, with hreflang
     alternates. Served at /sitemap.xml (the Vite dev proxy, and the production server, forward it here).
 
     Returns:
@@ -420,9 +500,18 @@ def sitemap() -> Response:
     articles = db.session.execute(
         select(Article.slug, Article.updated_at).where(is_published()).order_by(Article.published_at.desc())
     )
-    pages = [(page, None) for page in SITEMAP_PAGES] + [
-        (f"/articles/{slug}", updated_at.astimezone(ISRAEL).date().isoformat()) for slug, updated_at in articles
-    ]
+    products = db.session.execute(
+        select(Product.slug, Product.updated_at)
+        .join(Product.category)
+        .where(Product.is_active, Category.is_active)
+        .order_by(Category.sort_order, Product.sort_order, Product.id)
+    )
+    pages = (
+        [(page, None) for page in SITEMAP_PAGES]
+        + [(f"/articles/{slug}", updated_at.astimezone(ISRAEL).date().isoformat()) for slug, updated_at in articles]
+        # Product slugs keep the old store's Hebrew words: percent-encoded, as a URL in a sitemap must be.
+        + [(f"/products/{quote(slug)}", updated_at.astimezone(ISRAEL).date().isoformat()) for slug, updated_at in products]
+    )
 
     def url(page: str, prefix: str) -> str:
         """The absolute URL of a page in one language (the prefixed home page has no trailing slash).

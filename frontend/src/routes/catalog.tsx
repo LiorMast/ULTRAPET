@@ -4,18 +4,17 @@
  * fetches the categories and the matching page from the API (the server filters, searches and pages), and runs
  * again whenever the URL state changes; the previous results stay on screen until the new ones arrive.
  *
- * Prices: the product data never contains prices. For a signed-in business customer (useAuth) the page loads
- * the customer's prices separately (fetchPrices) and passes them to <Catalog>; signed-out visitors get "log in
+ * Prices: the product data never contains prices. For a signed-in business customer (useCustomerPrices) the page loads
+ * the customer's prices separately and passes them to <Catalog>; signed-out visitors get "log in
  * to see the price" on every card.
  *
  * SEO: title, description, canonical (keeps category and page, drops the search text), hreflang and
  * CollectionPage + BreadcrumbList JSON-LD. No price ever appears in the head tags.
  */
-import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { fetchCategories, fetchPrices, fetchProducts, type CatalogSearch } from '@/api'
-import { useAuth } from '@/auth'
-import { Catalog, type CatalogPrices } from '@/components/Catalog'
+import { fetchCategories, fetchProducts, type CatalogSearch } from '@/api'
+import { useCustomerPrices } from '@/auth'
+import { Catalog } from '@/components/Catalog'
 import { dictionaryFor, localizePath } from '@/i18n'
 import { absoluteUrl, breadcrumbJsonLd, pageHead } from '@/seo'
 
@@ -86,31 +85,7 @@ export const Route = createFileRoute('/catalog')({
 function CatalogPage() {
   const search = Route.useSearch()
   const { categories, results } = Route.useLoaderData()
-  const { user: signedIn } = useAuth()
-  const user = signedIn?.kind === 'business' ? signedIn : null // staff have no customer prices
-  const [loaded, setLoaded] = useState<{ email: string; prices: Record<string, number> } | null>(null)
-
-  useEffect(() => {
-    if (!user) return
-    let cancelled = false
-    fetchPrices().then(
-      ({ prices }) => {
-        if (!cancelled) setLoaded({ email: user.email, prices })
-      },
-      // A lost sign-in signs the visitor out (api.ts); other failures leave the prices loading.
-      () => undefined,
-    )
-    return () => {
-      cancelled = true
-    }
-  }, [user])
-
-  // Prices belong to the customer they were loaded for; anything else is still loading (or signed out).
-  const prices: CatalogPrices | undefined = !user
-    ? undefined
-    : loaded?.email === user.email
-      ? { status: 'loaded', prices: loaded.prices }
-      : { status: 'loading' }
+  const prices = useCustomerPrices()
 
   return <Catalog results={results} categories={categories} search={search} prices={prices} />
 }

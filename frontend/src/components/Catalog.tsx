@@ -10,28 +10,13 @@ import { useState } from 'react'
 import { Link, linkOptions, useNavigate } from '@tanstack/react-router'
 import { Download, Lock, Search } from 'lucide-react'
 import { cn } from 'cn'
-import { CatalogCard, type PriceState } from '@/components/CatalogCard'
+import { CatalogCard, priceFor } from '@/components/CatalogCard'
 import { Pagination } from '@/components/Pagination'
 import { Button } from '@/components/ui/button'
 import type { CatalogSearch, ProductCategory, ProductPage } from '@/api'
+import type { CustomerPrices } from '@/auth'
 import { CATALOG_PDF_URL, localized } from '@/config'
 import { useI18n } from '@/i18n'
-
-/** Prices for signed-in customers: `loading` while they arrive, then a map of product id → price in shekels. */
-export type CatalogPrices = { status: 'loading' } | { status: 'loaded'; prices: Record<string, number> }
-
-/**
- * The price slot of one product.
- * @param prices - The prices (undefined = signed out).
- * @param id - The product id.
- * @returns The PriceState for its card; a product without a price stays hidden.
- */
-function priceFor(prices: CatalogPrices | undefined, id: string): PriceState {
-  if (!prices) return { status: 'hidden' }
-  if (prices.status === 'loading') return { status: 'loading' }
-  const price = prices.prices[id]
-  return price === undefined ? { status: 'hidden' } : { status: 'shown', price }
-}
 
 /**
  * One category filter chip: a link that keeps the search text and goes back to page 1. Its accessible
@@ -105,7 +90,7 @@ export function Catalog({
   results: ProductPage
   categories: ProductCategory[]
   search: CatalogSearch
-  prices?: CatalogPrices
+  prices?: CustomerPrices
 }) {
   const { t, locale } = useI18n()
   const navigate = useNavigate()

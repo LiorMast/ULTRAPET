@@ -13,6 +13,7 @@
  *   transition (--ease-spring), size-specific letter-spacing on large text, a translucent header
  *   material (material-bar), and a reduced-motion mode that keeps fades but drops movement.
  * - Restyles the DataTables tables of the admin panel (DataTable.tsx) to the brand, under `.data-table`.
+ * - Styles stored HTML text (RichText.tsx, e.g. a product description) under `.rich-text`.
  */
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -111,6 +112,30 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+
+  /* Added to cart: the header cart badge pops and the cart icon nudges (CartDrawer, replayed on every add). */
+  --animate-cart-pop: cart-pop 0.45s var(--ease-spring) both;
+  @keyframes cart-pop {
+    0%,
+    100% {
+      scale: 1;
+    }
+    35% {
+      scale: 1.4;
+    }
+  }
+  --animate-cart-nudge: cart-nudge 0.45s var(--ease-spring) both;
+  @keyframes cart-nudge {
+    0%,
+    100% {
+      scale: 1;
+      rotate: 0deg;
+    }
+    35% {
+      scale: 1.12;
+      rotate: -8deg;
     }
   }
 
@@ -431,6 +456,40 @@ html:lang(he) {
 }
 
 /*
+ * Stored HTML text (RichText.tsx): the sanitized subset p, h2-h4, ul/ol/li, table, strong/em, br. Headings are small
+ * uppercase labels in the brand red, like the section eyebrows; a wide table scrolls sideways instead of
+ * widening the page.
+ */
+.rich-text {
+  @apply space-y-4 text-base leading-relaxed text-brand-charcoal;
+}
+.rich-text :is(h2, h3, h4) {
+  @apply pt-4 font-heading text-xs font-bold uppercase tracking-widest text-brand-red-dark;
+}
+.rich-text > :first-child {
+  @apply pt-0;
+}
+.rich-text strong {
+  @apply font-semibold;
+}
+.rich-text ul {
+  @apply list-disc space-y-1.5 ps-6 marker:text-brand-red;
+}
+.rich-text ol {
+  @apply list-decimal space-y-1.5 ps-6 marker:font-bold marker:text-brand-red;
+}
+.rich-text table {
+  @apply block max-w-full overflow-x-auto border-collapse text-sm;
+}
+.rich-text :is(th, td) {
+  @apply border border-neutral-200 px-3 py-2 text-start align-top;
+}
+.rich-text th,
+.rich-text tr:first-child > td {
+  @apply bg-neutral-50 font-semibold;
+}
+
+/*
  * Reduced motion keeps feedback but drops movement (Apple: a gentler, non-vestibular equivalent, not "no
  * animation"). Colors, shadows and opacity still fade, so photos and panels cross-fade instead of
  * jumping; anything that moves, zooms or resizes changes at once; looping hints stop.
@@ -456,6 +515,13 @@ html:lang(he) {
   }
   .animate-hero-rise {
     animation-name: hero-fade;
+  }
+  /* The cart badge fades in instead of popping; the icon stays still. */
+  .animate-cart-pop {
+    animation-name: hero-fade;
+  }
+  .animate-cart-nudge {
+    animation: none;
   }
   .animate-hint-down,
   .animate-bounce {

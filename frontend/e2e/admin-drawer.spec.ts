@@ -44,7 +44,7 @@ test('the Admin panel button slides the drawer down and back up', async ({ page 
   await settle(drawer)
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
   const nav = drawer.getByRole('navigation', { name: 'לוח ניהול' })
-  await expect(nav.getByRole('link')).toHaveText(['מוצרים', 'קטגוריות', 'הנחות', 'מותגים'])
+  await expect(nav.getByRole('link')).toHaveText(['מוצרים', 'קטגוריות', 'הנחות', 'לקוחות', 'מותגים'])
   expect((await drawer.boundingBox())!.height).toBeGreaterThan(40)
   await expect(page.getByRole('banner')).toHaveScreenshot('header-he-admin-drawer.png')
 

@@ -243,8 +243,12 @@ export const ADMIN_NAV: NavLink[] = [
   { id: 'products', label: (t: Dictionary) => t.admin.navProducts, link: linkOptions({ to: '/admin/products' }) },
   { id: 'categories', label: (t: Dictionary) => t.admin.navCategories, link: linkOptions({ to: '/admin/categories' }) },
   { id: 'discounts', label: (t: Dictionary) => t.admin.navDiscounts, link: linkOptions({ to: '/admin/discounts' }) },
+  { id: 'customers', label: (t: Dictionary) => t.admin.navCustomers, link: linkOptions({ to: '/admin/customers' }) },
   { id: 'brands', label: (t: Dictionary) => t.admin.navBrands, link: linkOptions({ to: '/admin/brands' }) },
 ]
+
+/** The smallest order a business customer can place, in shekels (shown in the cart; checked at checkout). */
+export const MIN_ORDER_AMOUNT = 2000
 
 /** The header's login link (the B2B customer portal). */
 export const HEADER_LOGIN = {

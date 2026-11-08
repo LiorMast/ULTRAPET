@@ -13,11 +13,14 @@
  *
  * Given `scope` (the Discounts page, routes/admin.discounts.tsx), the form also asks what the discount applies to:
  * a category or a product (one searchable list of both) and all customers or one customer (a searchable list), and
- * hands that back as a RuleScope; scopeFields turns it into a price rule's target fields.
+ * hands that back as a RuleScope; scopeFields turns it into a price rule's target fields. Without `scope.customers`
+ * (a customer's own discounts, routes/admin.customers.tsx) it asks only for the category or product, and the
+ * caller sets the customer. discountTargets builds the category and product choices for both pages.
  */
 import { useId, useState, type FormEvent } from 'react'
 import { cn } from 'cn'
-import { ApiError } from '@/api'
+import { ApiError, type StaffCategory, type StaffProduct } from '@/api'
+import { localized } from '@/config'
 import { errorMessage, INPUT_CLASS, LABEL_CLASS } from '@/components/RecordDialog'
 import { SearchableField, type SearchOption } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
@@ -41,9 +44,11 @@ export type RuleScope = { target: string; customerId: string | null }
 
 /**
  * The choices of the "applies to" fields: `targets` = the categories and products (values "category:<id>" /
- * "product:<id>", see scopeTarget), `customers` = the business customers (value = id); `initial` = the edited rule's.
+ * "product:<id>", see scopeTarget), `customers` = the business customers (value = id; omit when the caller fixes the
+ * customer: the form then asks only for the target and hands back `initial.customerId`, else null); `initial` = the
+ * edited rule's.
  */
-export type ScopeChoices = { targets: SearchOption[]; customers: SearchOption[]; initial?: RuleScope }
+export type ScopeChoices = { targets: SearchOption[]; customers?: SearchOption[]; initial?: RuleScope }
 
 /**
  * The value of a category or product among the scope's targets.
@@ -52,6 +57,22 @@ export type ScopeChoices = { targets: SearchOption[]; customers: SearchOption[];
  * @returns E.g. "category:3f2a…".
  */
 export const scopeTarget = (kind: 'category' | 'product', id: string) => `${kind}:${id}`
+
+/**
+ * The "applies to" choices: every category ("Category: …") and every product ("Product: …", with its SKU).
+ * @param categories - The categories.
+ * @param products - The products.
+ * @param t - The dictionary.
+ * @param locale - The page language (the names shown).
+ * @returns The options, categories first (values from scopeTarget).
+ */
+export function discountTargets(categories: StaffCategory[], products: StaffProduct[], t: Dictionary, locale: Locale): SearchOption[] {
+  const f = t.admin.discountFields
+  return [
+    ...categories.map((category) => ({ value: scopeTarget('category', category.id), label: f.category.replace('{name}', localized(category.name, locale)) })),
+    ...products.map((product) => ({ value: scopeTarget('product', product.id), label: f.product.replace('{name}', localized(product.name, locale)), detail: product.sku ?? undefined })),
+  ]
+}
 
 /**
  * A price rule's target fields for the staff API (createStaffRow / updateStaffRow 'price-rules'); the target not
@@ -245,7 +266,7 @@ function DiscountForm({
     event.preventDefault()
     const found: Partial<Record<FieldName, string>> = {}
     if (scope && !ruleTarget) found.target = t.admin.errors.required
-    if (scope && oneCustomer && !customerId) found.customer = t.admin.errors.required
+    if (scope?.customers && oneCustomer && !customerId) found.customer = t.admin.errors.required
     if (!value.trim()) found.value = t.admin.errors.required
     else if (!/^-?\d+(\.\d{1,2})?$/.test(value.trim())) found.value = d.errorNumber
     else if (number <= 0) found.value = d.errorPositive
@@ -264,7 +285,7 @@ function DiscountForm({
     }
     setPending(true)
     try {
-      const chosen = scope ? { target: ruleTarget, customerId: oneCustomer ? customerId : null } : undefined
+      const chosen = scope ? { target: ruleTarget, customerId: scope.customers ? (oneCustomer ? customerId : null) : (scope.initial?.customerId ?? null) } : undefined
       await onSave({ type, value: number, minQuantity: bulk ? quantity : null, startsOn, endsOn: noEnd ? null : endsOn }, chosen)
     } catch (error) {
       setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
@@ -323,36 +344,38 @@ function DiscountForm({
                 {fieldError('target')}
               </div>
 
-              <div>
-                <Segmented
-                  name={`${id}-customers`}
-                  legend={d.customers}
-                  options={[
-                    { value: 'all', label: d.allCustomers },
-                    { value: 'one', label: d.oneCustomer },
-                  ]}
-                  value={oneCustomer ? 'one' : 'all'}
-                  onChange={(next) => setOneCustomer(next === 'one')}
-                />
-                {oneCustomer && (
-                  <div className="mt-3">
-                    <label htmlFor={`${id}-customer`} className={LABEL_CLASS}>{`${d.customer} *`}</label>
-                    <SearchableField
-                      id={`${id}-customer`}
-                      label={d.customer}
-                      value={customerId}
-                      onChange={(next) => setCustomerId(next)}
-                      options={scope.customers}
-                      strict
-                      className="mt-2"
-                      inputClassName={INPUT_CLASS}
-                      aria-required
-                      {...described('customer')}
-                    />
-                    {fieldError('customer')}
-                  </div>
-                )}
-              </div>
+              {scope.customers && (
+                <div>
+                  <Segmented
+                    name={`${id}-customers`}
+                    legend={d.customers}
+                    options={[
+                      { value: 'all', label: d.allCustomers },
+                      { value: 'one', label: d.oneCustomer },
+                    ]}
+                    value={oneCustomer ? 'one' : 'all'}
+                    onChange={(next) => setOneCustomer(next === 'one')}
+                  />
+                  {oneCustomer && (
+                    <div className="mt-3">
+                      <label htmlFor={`${id}-customer`} className={LABEL_CLASS}>{`${d.customer} *`}</label>
+                      <SearchableField
+                        id={`${id}-customer`}
+                        label={d.customer}
+                        value={customerId}
+                        onChange={(next) => setCustomerId(next)}
+                        options={scope.customers}
+                        strict
+                        className="mt-2"
+                        inputClassName={INPUT_CLASS}
+                        aria-required
+                        {...described('customer')}
+                      />
+                      {fieldError('customer')}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
 

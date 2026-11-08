@@ -14,7 +14,9 @@ resource in RESOURCES:
                                  list: `faq-items`, see replace_rows)
     PUT /<resource>/order        set the display order from a list of every row's id (only `orderable` resources:
                                  categories, brands, products; see reorder_rows)
-Read-only: GET /customers lists the business customers (to pick one for a customer's discount; see list_customers).
+`customers` are the business customers: only staff open accounts (customers cannot register). Their `password` is
+write-only (set on create, changed by sending a new one, never answered), `lastLoginAt` is read-only, and they are
+never deleted (DELETE is 405): `isActive` false blocks the sign-in.
 JSON keys are camelCase (column `sort_order` -> `sortOrder`); a row also carries `id`, `createdAt`, `updatedAt`.
 A new category, brand or product may leave out `slug` and `sortOrder` (the staff panel does not show them): the server
 names it after its (English) name and puts it last (new_row_defaults).
@@ -94,6 +96,49 @@ def text(value: Any) -> str | None:
     if value is None or isinstance(value, str):
         return value
     raise Invalid
+
+
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# The shortest password staff may give a customer (the staff panel's generator makes longer ones), and the longest.
+MIN_PASSWORD_LENGTH = 8
+MAX_PASSWORD_LENGTH = 128
+
+
+def email(value: Any) -> str | None:
+    """A sign-in email: trimmed and lowercased (app_users stores emails lowercase, so sign-in ignores case).
+
+    Args:
+        value: The JSON value.
+
+    Returns:
+        The lowercase address, or None.
+
+    Raises:
+        Invalid: Not a string, or not shaped like name@domain.tld.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str) or not EMAIL_PATTERN.match(value.strip()):
+        raise Invalid
+    return value.strip().lower()
+
+
+def password(value: Any) -> str:
+    """A new sign-in password (write-only: the model stores its hash, see AppUser.password).
+
+    Args:
+        value: The JSON value.
+
+    Returns:
+        The password, unchanged.
+
+    Raises:
+        Invalid: Not a string of MIN_PASSWORD_LENGTH to MAX_PASSWORD_LENGTH characters (null too: an account always
+            has a password; leave the field out to keep it).
+    """
+    if not isinstance(value, str) or not MIN_PASSWORD_LENGTH <= len(value) <= MAX_PASSWORD_LENGTH:
+        raise Invalid
+    return value
 
 
 def media_key(value: Any) -> str | None:
@@ -462,6 +507,23 @@ def new_row_defaults(model: type[db.Model], fallback: str, name_of: Callable[[di
     return fill
 
 
+def require_password(values: dict[str, Any]) -> dict[str, Any]:
+    """The create_defaults of the customers: a new account needs a password (an edit may leave it out to keep it).
+
+    Args:
+        values: The converted fields of the new customer.
+
+    Returns:
+        The values, unchanged.
+
+    Raises:
+        400 {"error": "required", "field": "password"} when there is none.
+    """
+    if "password" not in values:
+        fail(400, error="required", field="password")
+    return values
+
+
 @dataclass(frozen=True)
 class Resource:
     """A table staff edit: its model, its editable columns (name -> converter), list order and key column.
@@ -471,7 +533,10 @@ class Resource:
     `replaceable` allows PUT of the whole list (replace_rows): for a resource staff edit as one ordered list, keyed by
     a generated id and ordered by a `sort_order` column. `orderable` allows PUT /<resource>/order (reorder_rows): for a
     resource with a generated id and a `sort_order` column whose order staff set by dragging the rows.
-    `create_defaults` fills a new row's missing values (e.g. new_row_defaults) before it is saved.
+    `create_defaults` fills a new row's missing values (e.g. new_row_defaults) before it is saved, or refuses the row.
+    `write_only` fields are accepted but never answered (a customer's password); `read_only` columns are answered but
+    never accepted (a customer's last sign-in). `deletable` False refuses DELETE with 405 (customers are switched off
+    with isActive instead, so their orders and history stay).
     """
 
     model: type[db.Model]
@@ -484,6 +549,9 @@ class Resource:
     replaceable: bool = False
     orderable: bool = False
     create_defaults: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+    write_only: tuple[str, ...] = ()
+    read_only: tuple[str, ...] = ()
+    deletable: bool = True
 
 
 RESOURCES: dict[str, Resource] = {
@@ -543,6 +611,19 @@ RESOURCES: dict[str, Resource] = {
         stamp_editor=True,
         replaceable=True,
     ),
+    # The business customers: only staff open accounts (customers cannot register). Never deleted: isActive false
+    # blocks the sign-in. The password is write-only; the hash is never answered.
+    "customers": Resource(
+        BusinessUser,
+        {"email": email, "password": password, "full_name": text, "phone": text, "company_name": text,
+         "business_number": text, "city": text, "address": text, "rivhit_customer_id": text, "notes": text,
+         "is_active": boolean},
+        (BusinessUser.company_name, BusinessUser.email),
+        create_defaults=require_password,
+        write_only=("password",),
+        read_only=("last_login_at",),
+        deletable=False,
+    ),
 }
 
 # URL part matching the resource names only, so any other name is a 404 (quoted: "price-rules" has a hyphen).
@@ -569,17 +650,21 @@ def row_json(resource: Resource, row: Any) -> dict[str, Any]:
         row: The model instance.
 
     Returns:
-        `id` (tables with a generated id), every editable field (a stored picture key as its URL), `updatedById`
-        (resources that stamp the editor) and `createdAt` / `updatedAt`.
+        `id` (tables with a generated id), every editable field except the write-only ones (a stored picture key as
+        its URL), the read-only columns, `updatedById` (resources that stamp the editor) and `createdAt` / `updatedAt`.
     """
     data: dict[str, Any] = {"id": row.id} if resource.key == "id" else {}
     for column, converter in resource.fields.items():
+        if column in resource.write_only:
+            continue
         value = getattr(row, column)
         if column == "images":
             value = [image_json(image) for image in value]
         elif converter is media_key:
             value = storage.url_of(value)
         data[camel(column)] = value
+    for column in resource.read_only:
+        data[camel(column)] = getattr(row, column)
     if resource.stamp_editor:
         data["updatedById"] = row.updated_by_id
     return {**data, "createdAt": row.created_at, "updatedAt": row.updated_at}
@@ -691,23 +776,6 @@ def require_staff() -> None:
     require_user("staff")
 
 
-@bp.get("/customers")
-def list_customers() -> list[dict[str, Any]]:
-    """Every business customer, active or not, by company name: what the staff panel needs to pick a customer (e.g. for
-    a customer's own discount on the Discounts page). Read-only, and never the sign-in fields (password hash, last
-    login); customers are created and edited elsewhere (their admin page comes later).
-
-    Returns:
-        [{id, companyName, fullName, email, city, isActive}].
-    """
-    customers = db.session.scalars(select(BusinessUser).order_by(BusinessUser.company_name, BusinessUser.email))
-    return [
-        {"id": customer.id, "companyName": customer.company_name, "fullName": customer.full_name,
-         "email": customer.email, "city": customer.city, "isActive": customer.is_active}
-        for customer in customers
-    ]
-
-
 @bp.get(f"/{RESOURCE_PATH}")
 def list_rows(resource: str) -> list[dict[str, Any]]:
     """Every row of a resource, active or not, in display order.
@@ -791,9 +859,12 @@ def delete_row(resource: str, key: str) -> Response:
         key: The row's id (the key text for settings).
 
     Returns:
-        204; 404 when it does not exist, 409 {"error": "in_use"} when other rows still need it.
+        204; 404 when it does not exist, 409 {"error": "in_use"} when other rows still need it, 405 for a resource
+        that is never deleted (customers).
     """
     spec = RESOURCES[resource]
+    if not spec.deletable:
+        abort(405)
     db.session.delete(find_row(spec, key))
     commit()
     return Response(status=204)

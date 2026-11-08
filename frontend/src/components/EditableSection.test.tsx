@@ -113,6 +113,22 @@ describe('home page sections edited in place', () => {
     expect(saved.closing.text).toEqual({ he: 'סיום בעברית', en: 'We look forward to working with you.' })
   })
 
+  it('saves a dragged width of a section text in the page language, and gives the data texts no handle', async () => {
+    const { user } = await renderPage('/en', { staff: TEST_STAFF })
+    const about = sectionOf('about')
+    await user.click(about.getByRole('button', { name: 'Edit on page: About Ultra Pet' }))
+    about.getByRole('slider', { name: 'Width: Closing paragraph' }).focus()
+    await user.keyboard('{ArrowLeft}{ArrowLeft}')
+    await user.click(about.getByRole('button', { name: 'Save' }))
+    await waitFor(async () => expect((await servedSection('about')).closing).toEqual({ text: {}, width: { en: 90 } }))
+
+    const contact = sectionOf('contact')
+    await user.click(contact.getByRole('button', { name: /^Edit on page/ }))
+    const handles = contact.getAllByRole('slider').map((slider) => slider.getAttribute('aria-label'))
+    expect(handles).toContain('Width: Title')
+    expect(handles.some((name) => /phone|email|whatsapp/i.test(name ?? '') && !/label|sub/i.test(name ?? ''))).toBe(false)
+  })
+
   it('cancels without saving and keeps the old texts', async () => {
     const { user } = await renderPage('/en', { staff: TEST_STAFF })
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
@@ -217,6 +233,30 @@ describe('sectionDraft and mergeSection', () => {
       number: { text: '350', font: 'default', size: 'md' },
     })
     expect(sectionDraft(options, 'en').text.text).toBe('')
+  })
+
+  it('reads, writes and removes the widths of every text in one language, never of the data texts', () => {
+    const sized: SectionOptions<'title' | 'text' | 'number'> = {
+      ...options,
+      content: { title: { text: { he: 'כותרת' }, width: { he: 60, en: 70 } }, text: { width: { he: 150 } } },
+    }
+    // A width outside 20-99 is ignored (full width).
+    expect(sectionDraft(sized, 'he')).toEqual({
+      title: { text: 'כותרת', font: 'default', size: 'md', width: 60 },
+      text: { text: '', font: 'default', size: 'md' },
+      number: { text: '350', font: 'default', size: 'md' },
+    })
+    const merged = mergeSection(sized, 'he', {
+      title: { text: 'כותרת', font: 'default', size: 'md' },
+      text: { text: 'טקסט', font: 'default', size: 'md', width: 45 },
+      number: { text: '400', font: 'default', size: 'md', width: 30 },
+    })
+    // The title's Hebrew width is removed (full width), its English one kept; the words-only text stores a width too.
+    expect(merged.title?.width).toEqual({ en: 70 })
+    expect(merged.text).toEqual({ text: { he: 'טקסט' }, width: { he: 45 } })
+    expect(merged.number).toBeUndefined()
+    // The last width removed: no width map is left.
+    expect(mergeSection(sized, 'he', { text: { text: '', font: 'default', size: 'md' } }).text).toEqual({ text: {} })
   })
 
   it('writes one language back, styles for styled texts only, and leaves out the data texts', () => {

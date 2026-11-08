@@ -222,8 +222,9 @@ unchanged, and prints the ids of the products whose English must be translated a
 
 ## 9. Ideas for the new site, from the old one
 
-- **Product page** (roadmap): port the anatomy in section 5, with the sanitized description sections, the shipping
-  and returns notes, related products, and Product + Breadcrumb JSON-LD.
+- **Product page** (done: `/products/$slug`): the anatomy in section 5, with the sanitized description sections, the
+  shipping and returns notes, related products, and Product + Breadcrumb JSON-LD. The old `/product/<slug>/` URLs
+  still need their 301s (`legacyPath`, Phase 5).
 - **Home**: a "featured products" strip (the old site had 4 hand-picked ones). Category teaser texts.
 - **Footer** (roadmap): hours (`contact_hours`), the three link groups, the catalog PDF, and the legal pages. Real
   social links are needed; the old ones are placeholders.

@@ -45,14 +45,14 @@ async function signIn(page: Page, isMobile: boolean) {
   if (isMobile) {
     await page.goto('/en/login')
     await page.getByLabel('Email').fill(CUSTOMER.email)
-    await page.getByLabel('Password').fill(CUSTOMER.password)
+    await page.getByLabel('Password', { exact: true }).fill(CUSTOMER.password)
     await page.getByRole('button', { name: 'Log in' }).click()
     await page.getByRole('link', { name: 'Go to the product catalog' }).click()
   } else {
     await page.getByRole('button', { name: 'Login' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByLabel('Email').fill(CUSTOMER.email)
-    await dialog.getByLabel('Password').fill(CUSTOMER.password)
+    await dialog.getByLabel('Password', { exact: true }).fill(CUSTOMER.password)
     await dialog.getByRole('button', { name: 'Log in' }).click()
     // Wait for the server's answer (it sets the sign-in cookies): the login button turns into Log out.
     await expect(page.getByRole('banner').getByRole('button', { name: 'Sign out' })).toBeVisible()

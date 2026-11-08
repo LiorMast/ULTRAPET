@@ -301,7 +301,12 @@ export function SearchableField({
                 <Check aria-hidden className={cn('mt-0.5 size-4 shrink-0 text-brand-red', (strict ? option.value === value : option.label === value) ? 'visible' : 'invisible')} />
                 <span className="min-w-0">
                   <span className="block truncate">{option.label}</span>
-                  {option.detail && <span className="block truncate text-xs text-brand-charcoal-muted">{option.detail}</span>}
+                  {/* The muted grey is under 4.5:1 on the highlighted row's pink, so that row's detail is darker. */}
+                  {option.detail && (
+                    <span className={cn('block truncate text-xs', index === activeIndex ? 'text-brand-charcoal-3' : 'text-brand-charcoal-muted')}>
+                      {option.detail}
+                    </span>
+                  )}
                 </span>
               </div>
             ))}

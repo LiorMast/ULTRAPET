@@ -5,7 +5,8 @@
  * every text, Cancel and Escape, a refused save, where the keyboard focus goes, and moving the PropBar (drag and
  * arrow keys, kept inside its section). A second test section is a list (like the FAQ): adding and removing texts
  * and where the focus goes then, a refusal by the section itself (InlineEditError), the light bar named after its
- * section, and the wrapping one-line box.
+ * section, and the wrapping one-line box. The body text is resizable: its width handle (drag and slider keys, also
+ * right to left), the width saved with the draft and applied in read mode.
  */
 import { fireEvent, screen } from '@testing-library/react'
 import { useRef } from 'react'
@@ -75,6 +76,7 @@ function TestSection({ onSave }: { onSave: (draft: Record<'heading' | 'accent' |
           multiline
           placeholder="Built-in words"
           sizeClass={(size) => SIZES[size]}
+          resizable
         />
       </form>
     </section>
@@ -283,6 +285,79 @@ function TestList({ onSave }: { onSave: (draft: Record<string, TextValue>) => Pr
     </section>
   )
 }
+
+describe('resizing a text box', () => {
+  it('drags or steps the width of a resizable box and saves it with the draft', async () => {
+    // jsdom has no layout: the form (the box's parent) is 800px wide, the body box 400px.
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.tagName === 'FORM' ? 800 : 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => DOMRect.fromRect({ width: 400 }))
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    const { user } = renderComponent(<TestSection onSave={onSave} />, 'en')
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Edit on page' }))
+
+    // Only the resizable text has a handle; it starts at the full width.
+    expect(screen.getAllByRole('slider')).toHaveLength(1)
+    const handle = screen.getByRole('slider', { name: 'Width: Body' })
+    expect(handle).toHaveAttribute('aria-valuenow', '100')
+    const box = screen.getByRole('textbox', { name: 'Body' }).parentElement!
+
+    // Dragging 200px towards the start: 400 - 200 = 200px of 800 = 25%.
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 500 })
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 300 })
+    fireEvent.pointerUp(handle, { pointerId: 1 })
+    expect(handle).toHaveAttribute('aria-valuenow', '25')
+    expect(handle).toHaveAttribute('aria-valuetext', '25%')
+    expect(box.style.inlineSize).toBe('25%')
+    // Focusing the handle selects its text for the style bar.
+    expect(screen.getByRole('toolbar')).toHaveTextContent('Editing: Body')
+    // Far past the start edge: the narrowest width.
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 500 })
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: -5000 })
+    fireEvent.pointerUp(handle, { pointerId: 1 })
+    expect(handle).toHaveAttribute('aria-valuenow', '20')
+
+    // The slider keys: the inline-end arrow (right, left to right) widens, End = the full width (nothing stored).
+    await user.keyboard('{ArrowRight}{ArrowUp}')
+    expect(handle).toHaveAttribute('aria-valuenow', '30')
+    await user.keyboard('{End}')
+    expect(box.style.inlineSize).toBe('')
+    await user.keyboard('{ArrowLeft}{ArrowDown}')
+    expect(handle).toHaveAttribute('aria-valuenow', '90')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ body: { text: 'Some words', font: 'default', size: 'md', width: 90 } }))
+  })
+
+  it('applies a saved width in read mode, and widens with the left arrow right to left', async () => {
+    const onChange = vi.fn()
+    /**
+     * One resizable text.
+     * @param props.editing - Edit mode.
+     * @returns The text inside a right-to-left block.
+     */
+    const Text = ({ editing }: { editing: boolean }) => (
+      <div dir="rtl">
+        <EditableText value={{ text: 'שלום', font: 'default', size: 'md', width: 60 }} editing={editing} onChange={onChange} label="Body" locale="he" resizable />
+      </div>
+    )
+    const { user } = renderComponent(
+      <>
+        <Text editing={false} />
+        <Text editing />
+      </>,
+      'en',
+    )
+    expect((await screen.findByText('שלום')).style.inlineSize).toBe('60%')
+    expect(screen.getByRole('textbox', { name: 'Body' }).parentElement!.style.inlineSize).toBe('60%')
+    screen.getByRole('slider', { name: 'Width: Body' }).focus()
+    await user.keyboard('{ArrowLeft}')
+    expect(onChange).toHaveBeenLastCalledWith({ width: 65 })
+    await user.keyboard('{ArrowRight}')
+    expect(onChange).toHaveBeenLastCalledWith({ width: 55 })
+  })
+})
 
 describe('inline editing of a list', () => {
   it('names the edit button after its section and gives a light section an outlined Cancel', async () => {

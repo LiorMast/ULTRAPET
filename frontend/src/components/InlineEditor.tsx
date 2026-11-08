@@ -23,7 +23,9 @@
  * - EditableText: one text of the section. Read mode renders the plain element (exactly what visitors get); edit
  *   mode renders a text box with the text's own classes, size and font, so the box looks like the result: one line
  *   (growing sideways), one line that wraps (`wrap`, e.g. a question) or several lines (`multiline`). Its focus
- *   selects it for the PropBar; the selected box has a solid frame, the others a dashed one.
+ *   selects it for the PropBar; the selected box has a solid frame, the others a dashed one. A `resizable` box has a
+ *   width handle on its inline-end edge (WidthHandle: drag it, or a slider's arrow keys): the text's width in percent
+ *   of its parent's, applied in read mode too (the words wrap at it); dragged to the full width = no width stored.
  *
  * Fonts and sizes come from FONTS / SIZE_STEPS in src/config.ts; the section supplies its size classes. The
  * section decides what saving means (the hero merges the draft into its page_sections content, the FAQ turns it
@@ -38,8 +40,24 @@ import { Button } from '@/components/ui/button'
 import { FONTS, fontsFor, SIZE_STEPS } from '@/config'
 import { useI18n, type Locale } from '@/i18n'
 
-/** One editable text: its words, font and size step. */
-export type TextValue = { text: string; font: FontKey; size: SizeStep }
+/**
+ * One editable text: its words, font, size step and width (percent of its parent's width, MIN_WIDTH-99; undefined =
+ * the full width, the design).
+ */
+export type TextValue = { text: string; font: FontKey; size: SizeStep; width?: number }
+
+/** The narrowest a text box can be dragged, in percent of its parent's width. */
+export const MIN_WIDTH = 20
+
+/** How much one arrow-key press on a width handle changes the width, in percent. */
+const WIDTH_STEP = 5
+
+/**
+ * The inline style that applies a dragged width.
+ * @param width - The width in percent, or undefined for the full width.
+ * @returns The style, or undefined for the full width.
+ */
+export const widthStyle = (width: number | undefined) => (width === undefined ? undefined : { inlineSize: `${width}%` })
 
 /**
  * The inline style that applies a picked font (it beats the font tokens, also the Hebrew swap in index.css).
@@ -509,6 +527,8 @@ const BOX_CLASS =
  * @param props.id - The element's id (on the box's wrapper while editing), e.g. a section title's for aria-labelledby.
  * @param props.dir - The text direction, e.g. "ltr" for numbers, phone numbers and addresses; omitted = the page's.
  * @param props.inputMode - The on-screen keyboard of the box, e.g. "numeric", "tel" or "email".
+ * @param props.resizable - Staff can drag the box's width (a handle on its inline-end edge); the width is part of the
+ *   value. Ignored with `controls={false}`. A width already in the value applies in read mode either way.
  * @returns The element, or the box.
  */
 export function EditableText({
@@ -531,6 +551,7 @@ export function EditableText({
   id,
   dir,
   inputMode,
+  resizable = false,
 }: {
   as?: 'h1' | 'h2' | 'h3' | 'h4' | 'p' | 'span'
   value: TextValue
@@ -551,9 +572,11 @@ export function EditableText({
   id?: string
   dir?: 'ltr' | 'rtl' | 'auto'
   inputMode?: 'text' | 'numeric' | 'tel' | 'email'
+  resizable?: boolean
 }) {
+  const { t } = useI18n()
   const look = cn(controls && sizeClass?.(value.size), className)
-  const style = controls ? fontStyle(value.font) : undefined
+  const style = controls ? { ...fontStyle(value.font), ...widthStyle(value.width) } : undefined
 
   // Downloads a picked font that the page does not load by itself.
   useEffect(() => {
@@ -594,10 +617,123 @@ export function EditableText({
   if (!controls) return <span id={id} className={look}>{field}</span>
 
   return (
-    <div id={id} className={look} style={style}>
+    <div id={id} className={cn(look, resizable && 'group/box relative')} style={style}>
       {before}
       {field}
       {after}
+      {resizable && (
+        <WidthHandle
+          width={value.width}
+          label={t.inlineEdit.widthOf.replace('{label}', label)}
+          selected={selected}
+          onFocus={onSelect}
+          onChange={(width) => onChange({ width })}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Clamps and rounds a wanted width.
+ * @param percent - The wanted width in percent of the parent's.
+ * @returns MIN_WIDTH-99, or undefined for 100 and more (the full width: nothing stored).
+ */
+const toWidth = (percent: number) => {
+  const rounded = Math.round(Math.min(Math.max(percent, MIN_WIDTH), 100))
+  return rounded >= 100 ? undefined : rounded
+}
+
+/**
+ * The width handle of a resizable text box, on its inline-end edge: drag it (mouse, finger or pen), or use it as a
+ * slider (arrow keys: the inline-end arrow and Up widen, the other two narrow; Home = narrowest, End = full width).
+ * It shows while its box is selected, hovered or the handle has the focus.
+ * @param props.width - The box's width in percent, or undefined for the full width.
+ * @param props.label - The handle's accessible name, e.g. "Width: Title".
+ * @param props.selected - Its text is the selected one (the handle shows).
+ * @param props.onFocus - Called when the handle gets the focus (selects its text).
+ * @param props.onChange - Called with the new width (undefined = the full width).
+ * @returns The handle.
+ */
+function WidthHandle({ width, label, selected, onFocus, onChange }: { width: number | undefined; label: string; selected: boolean; onFocus?: () => void; onChange: (width: number | undefined) => void }) {
+  /** The drag in progress: where the pointer started, the box's width then (px), the room (px) and the direction. */
+  const drag = useRef<{ pointerX: number; startPx: number; room: number; sign: 1 | -1 } | null>(null)
+  const shown = width ?? 100
+
+  /**
+   * Whether the box lies right to left (its inline-end edge, where the handle is, is on the left).
+   * @param handle - The handle element.
+   * @returns True in a right-to-left context.
+   */
+  const isRtl = (handle: HTMLElement) => handle.parentElement?.closest('[dir]')?.getAttribute('dir') === 'rtl'
+
+  /**
+   * Starts a drag: measures the box and the width its percent refers to (the parent's content box).
+   * @param event - The pointer press on the handle.
+   */
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    const handle = event.currentTarget
+    const box = handle.parentElement
+    const parent = box?.parentElement
+    if (event.button !== 0 || !box || !parent) return
+    event.preventDefault()
+    handle.focus()
+    handle.setPointerCapture?.(event.pointerId)
+    const padding = getComputedStyle(parent)
+    const room = parent.clientWidth - parseFloat(padding.paddingLeft || '0') - parseFloat(padding.paddingRight || '0')
+    if (room > 0) drag.current = { pointerX: event.clientX, startPx: box.getBoundingClientRect().width, room, sign: isRtl(handle) ? -1 : 1 }
+  }
+
+  /**
+   * Follows the pointer while dragging.
+   * @param event - The pointer move.
+   */
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const from = drag.current
+    if (from) onChange(toWidth(((from.startPx + (event.clientX - from.pointerX) * from.sign) / from.room) * 100))
+  }
+
+  /** Ends the drag (pointer released or cancelled). */
+  const handlePointerUp = () => {
+    drag.current = null
+  }
+
+  /**
+   * The slider's keys (see the component's comment).
+   * @param event - The key press on the handle.
+   */
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const wider = isRtl(event.currentTarget) ? 'ArrowLeft' : 'ArrowRight'
+    const narrower = wider === 'ArrowLeft' ? 'ArrowRight' : 'ArrowLeft'
+    const next: Record<string, number> = { [wider]: shown + WIDTH_STEP, ArrowUp: shown + WIDTH_STEP, [narrower]: shown - WIDTH_STEP, ArrowDown: shown - WIDTH_STEP, Home: MIN_WIDTH, End: 100 }
+    if (next[event.key] === undefined) return
+    event.preventDefault()
+    onChange(toWidth(next[event.key]))
+  }
+
+  return (
+    <div
+      role="slider"
+      tabIndex={0}
+      aria-label={label}
+      aria-orientation="horizontal"
+      aria-valuemin={MIN_WIDTH}
+      aria-valuemax={100}
+      aria-valuenow={shown}
+      aria-valuetext={`${shown}%`}
+      title={label}
+      onFocus={onFocus}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        'absolute inset-y-0 -end-4 flex w-6 cursor-ew-resize touch-none items-center justify-center outline-none transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-current',
+        selected ? 'opacity-100' : 'opacity-0 group-hover/box:opacity-100',
+      )}
+    >
+      <span aria-hidden="true" className="h-8 max-h-full w-1 bg-current" />
     </div>
   )
 }

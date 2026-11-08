@@ -120,6 +120,29 @@ describe('HeroEditor', () => {
     expect(sent(fetchSpy, 'PATCH').map(([path]) => path)).toEqual(['/api/staff/page-sections/hero'])
   })
 
+  it('keeps the widths dragged on the page when saving the dialog, and lets staff drag the hero texts', async () => {
+    signInFakeUser(TEST_STAFF)
+    await createStaffRow('page-sections', { key: 'hero', content: { tagline: { text: { he: 'שורה' }, width: { he: 55 } } } })
+    const { user } = await renderPage('/en', { staff: TEST_STAFF })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    await user.click(screen.getByRole('button', { name: 'Edit both languages' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit the hero' })
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const [[, body]] = sent(fetchSpy, 'PATCH')
+    expect(body.content.tagline.width).toEqual({ he: 55 })
+    expect(body.content.title).not.toHaveProperty('width')
+
+    // In place: the title, tagline and description have a width handle; the red word follows the title.
+    await user.click(screen.getByRole('button', { name: 'Edit on page: Hero' }))
+    expect(screen.getAllByRole('slider').map((slider) => slider.getAttribute('aria-label'))).toEqual(['Width: Title words', 'Width: Tagline', 'Width: Description'])
+    screen.getByRole('slider', { name: 'Width: Tagline' }).focus()
+    await user.keyboard('{Home}')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(sent(fetchSpy, 'PATCH')).toHaveLength(2))
+    expect(sent(fetchSpy, 'PATCH')[1][1].content.tagline.width).toEqual({ he: 55, en: 20 })
+  })
+
   it('shows what staff saved before to every visitor', async () => {
     signInFakeUser(TEST_STAFF)
     await createStaffRow('page-sections', { key: 'hero', content: { tagline: { text: { he: 'שורה חדשה' }, size: { he: 'xl' } } } })

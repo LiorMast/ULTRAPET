@@ -136,6 +136,21 @@ describe('Hero saved content', () => {
     }).title?.text).toEqual({ en: 'A' })
   })
 
+  it('shows a saved width and keeps the widths when merging an inline edit', async () => {
+    const sized: HeroContent = { ...CONTENT, tagline: { text: { en: 'Wide' }, width: { he: 50, en: 40 } } }
+    renderComponent(<Hero images={[]} content={sized} />, 'en')
+    expect((await screen.findByText('Wide')).style.inlineSize).toBe('40%')
+    const merged = mergeHero(sized, 'he', {
+      title: { text: 'שלום', font: 'default', size: 'md', width: 70 },
+      accent: { text: '', font: 'default', size: 'md' },
+      tagline: { text: '', font: 'default', size: 'md' },
+      description: { text: '', font: 'default', size: 'md' },
+    })
+    expect(merged.title?.width).toEqual({ he: 70 })
+    expect(merged.tagline?.width).toEqual({ en: 40 })
+    expect(merged.description).not.toHaveProperty('width')
+  })
+
   it('has no inline editing without onSave', async () => {
     renderComponent(<Hero images={[]} content={CONTENT} />, 'en')
     await screen.findByRole('heading', { level: 1 })

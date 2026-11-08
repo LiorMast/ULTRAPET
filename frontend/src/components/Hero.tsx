@@ -13,7 +13,7 @@
  * - 0 photos: a plain charcoal gradient. 1 photo: no controls. 2 or more: slideshow with controls.
  * - The scroll-down arrow is a real link to the next home section (#stats); it nudges downwards three
  *   times after the text has risen, then stays still.
- * - Staff can change the title, tagline and description, and their font and size per language (`content`, saved in
+ * - Staff can change the title, tagline and description, and their font, size and width (dragged on the box edge) per language (`content`, saved in
  *   page_sections, see resolveHero). An empty or missing part shows the dictionary's text in the site's font at
  *   size "md", which is the original design. With `onSave`, staff edit the texts in place (InlineEditor: "Edit on
  *   page", one PropBar in the top corner for the font and size of the selected text, one Save for all of them, the
@@ -26,7 +26,7 @@ import { ArrowRight, ChevronDown, Pause, Play } from 'lucide-react'
 import { cva } from 'class-variance-authority'
 import { cn } from 'cn'
 import type { HeroContent, SectionText } from '@/api'
-import { putLocale, resolveText } from '@/components/EditableSection'
+import { putLocale, putWidth, resolveText } from '@/components/EditableSection'
 import { EditableText, InlineEditBar, PropBar, useInlineDraft, type TextValue } from '@/components/InlineEditor'
 import { useReducedMotion } from '@/components/useReducedMotion'
 import { Button } from '@/components/ui/button'
@@ -95,10 +95,10 @@ function heroDraft(content: HeroContent | null | undefined, locale: Locale): Her
   /**
    * One text's starting values.
    * @param words - The saved words in this language, if any.
-   * @param style - The font and size shown now.
+   * @param style - The font, size and width shown now.
    * @returns The text's draft.
    */
-  const draftOf = (words: string | undefined, style: TextValue): TextValue => ({ text: words ?? '', font: style.font, size: style.size })
+  const draftOf = (words: string | undefined, style: TextValue): TextValue => ({ text: words ?? '', font: style.font, size: style.size, ...(style.width !== undefined && { width: style.width }) })
   return {
     title: draftOf(content?.title?.text?.[locale], shown.title),
     accent: draftOf(content?.title?.accent?.[locale], shown.title),
@@ -128,12 +128,8 @@ export function mergeHero(content: HeroContent | null | undefined, locale: Local
    * @param value - Its edited value.
    * @returns Its new content.
    */
-  const text = (saved: SectionText | undefined, value: TextValue): SectionText => ({
-    ...saved,
-    text: put(saved?.text, value.text.trim()),
-    font: put(saved?.font, value.font),
-    size: put(saved?.size, value.size),
-  })
+  const text = (saved: SectionText | undefined, value: TextValue): SectionText =>
+    putWidth({ ...saved, text: put(saved?.text, value.text.trim()), font: put(saved?.font, value.font), size: put(saved?.size, value.size) }, locale, value.width)
   return {
     ...content,
     title: { ...text(content?.title, draft.title), accent: put(content?.title?.accent, draft.accent.text.trim()) },
@@ -277,6 +273,7 @@ export function Hero({
             label={e.titleMain}
             locale={locale}
             placeholder={builtIn.title}
+            resizable
             sizeClass={(size) => titleSize({ size })}
             className={cn('mb-5 font-display leading-[1.05] font-bold tracking-display text-white [animation-delay:350ms]', rise)}
             before={
@@ -316,6 +313,7 @@ export function Hero({
             label={e.tagline}
             locale={locale}
             placeholder={builtIn.tagline}
+            resizable
             sizeClass={(size) => taglineSize({ size })}
             className={cn('mb-4 max-w-2xl font-heading leading-snug font-medium text-white/90 [animation-delay:500ms]', rise)}
           />
@@ -328,6 +326,7 @@ export function Hero({
             label={e.descriptionText}
             locale={locale}
             placeholder={builtIn.description.trim()}
+            resizable
             multiline
             sizeClass={(size) => descriptionSize({ size })}
             className={cn('mb-10 max-w-xl leading-relaxed text-white/80 [animation-delay:600ms]', rise)}

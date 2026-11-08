@@ -16,7 +16,7 @@ test('signed out, shows the staff sign-in and refuses a wrong password', async (
   await expect(page).toHaveURL(/\/en\/admin\/brands$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Staff sign-in' })).toBeVisible()
   await page.getByLabel('Email').fill('nobody@example.com')
-  await page.getByLabel('Password').fill('not-the-password')
+  await page.getByLabel('Password', { exact: true }).fill('not-the-password')
   await page.getByRole('button', { name: 'Log in' }).click()
   await expect(page.getByRole('alert')).toHaveText('Wrong email or password.')
   await expect(page.getByRole('table')).toHaveCount(0)

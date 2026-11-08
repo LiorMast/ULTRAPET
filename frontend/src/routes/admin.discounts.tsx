@@ -2,7 +2,7 @@
  * routes/admin.discounts.tsx — Staff panel: every discount in one table (/admin/discounts). Lists every price rule
  * (table price_rules), general or for one business customer, on a category or a product, with where it stands today
  * (active, upcoming, ended, paused), and lets staff add, edit and delete them through the staff API
- * (backend/app/staff/routes.py: resource "price-rules", plus GET /customers for the customer choices). A change shows
+ * (backend/app/staff/routes.py: resource "price-rules", plus "customers" for the customer choices). A change shows
  * in the customers' prices at once (backend/app/pricing.py).
  *
  * The page is a DataTable whose Add and Edit open DiscountDialog with its "applies to" fields (`scope`: a category
@@ -16,7 +16,6 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import {
   createStaffRow,
   deleteStaffRow,
-  fetchStaffCustomers,
   fetchStaffRows,
   updateStaffRow,
   type StaffCategory,
@@ -24,10 +23,9 @@ import {
   type StaffPriceRule,
   type StaffProduct,
 } from '@/api'
-import { localized } from '@/config'
 import { DataTable, type DataColumn } from '@/components/DataTable'
-import { DiscountDialog, describeDiscount, formatDate, formatValue, israelToday, scopeFields, scopeTarget, type RuleScope } from '@/components/DiscountDialog'
-import { discountFields, ruleDiscount, ruleState, type RuleState } from '@/components/DiscountsDialog'
+import { DiscountDialog, describeDiscount, discountTargets, formatDate, formatValue, israelToday, scopeFields } from '@/components/DiscountDialog'
+import { discountFields, ruleDiscount, ruleScope, ruleState, type RuleState } from '@/components/DiscountsDialog'
 import type { SearchOption } from '@/components/SearchableField'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
@@ -40,7 +38,7 @@ export const Route = createFileRoute('/admin/discounts')({
       fetchStaffRows<StaffPriceRule>('price-rules', signal),
       fetchStaffRows<StaffCategory>('categories', signal),
       fetchStaffRows<StaffProduct>('products', signal),
-      fetchStaffCustomers(signal),
+      fetchStaffRows<StaffCustomer>('customers', signal),
     ])
     return { rules, categories, products, customers }
   },
@@ -96,16 +94,6 @@ function discountRows(
 }
 
 /**
- * What a rule applies to, as DiscountDialog's scope fields read it.
- * @param rule - The rule.
- * @returns Its category or product and its customer.
- */
-function ruleScope(rule: StaffPriceRule): RuleScope {
-  const target = rule.categoryId !== null ? scopeTarget('category', rule.categoryId) : scopeTarget('product', rule.productId ?? '')
-  return { target, customerId: rule.businessUserId }
-}
-
-/**
  * The discounts page: its title and the table of every discount.
  * @returns The page.
  */
@@ -117,17 +105,14 @@ function AdminDiscounts() {
 
   // The "applies to" choices and the names the rows show, from the same lists.
   const choices = useMemo(() => {
-    const targets: SearchOption[] = [
-      ...categories.map((category) => ({ value: scopeTarget('category', category.id), label: f.category.replace('{name}', localized(category.name, locale)) })),
-      ...products.map((product) => ({ value: scopeTarget('product', product.id), label: f.product.replace('{name}', localized(product.name, locale)), detail: product.sku ?? undefined })),
-    ]
+    const targets = discountTargets(categories, products, t, locale)
     const customerOptions: SearchOption[] = customers.map((customer: StaffCustomer) => ({
       value: customer.id,
       label: customer.companyName,
       detail: [customer.city, customer.email].filter(Boolean).join(' · '),
     }))
     return { targets, customers: customerOptions }
-  }, [categories, products, customers, f, locale])
+  }, [categories, products, customers, t, locale])
 
   const rows = useMemo(() => {
     const targets = new Map(choices.targets.map((option) => [option.value.slice(option.value.indexOf(':') + 1), option.label]))

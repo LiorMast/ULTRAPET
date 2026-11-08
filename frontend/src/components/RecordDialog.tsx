@@ -4,7 +4,9 @@
  *
  * Each column type has its input (text or textarea, a Hebrew + English pair for localized text, number, money,
  * checkbox, select, colour, URL, date and time; a `searchable` select or text column gets a SearchableField; an
- * "image" column an upload-only ImageUploadField, which uploads the file at once and holds Save until it is stored). The form
+ * "image" column an upload-only ImageUploadField, which uploads the file at once and holds Save until it is stored; a
+ * "password" column a GeneratedPasswordInput, never filled in: required only when adding, and left out of an edit
+ * when it stays empty, so the password is kept). The form
  * checks required fields, patterns and numbers before sending; on an edit it sends only the fields that changed. When the server refuses the change, its error lands
  * on the field it names (`field`, or the column in a constraint name such as "brands_slug_key"), or above the
  * buttons when it names none. Used only by DataTable.
@@ -12,6 +14,7 @@
 import { useId, useState, type FormEvent } from 'react'
 import { ApiError } from '@/api'
 import type { DataColumn, RowValues } from '@/components/DataTable'
+import { GeneratedPasswordInput, MIN_PASSWORD_LENGTH } from '@/components/GeneratedPasswordInput'
 import { ImageUploadField } from '@/components/ImageUploadField'
 import { SearchableField } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
@@ -30,7 +33,8 @@ export const LABEL_CLASS = 'block font-heading text-2xs font-semibold uppercase 
 
 /**
  * The message for a server error code.
- * @param code - The API error code (ApiError.code), e.g. "duplicate"; undefined for a failed connection.
+ * @param code - The API error code (ApiError.code), e.g. "duplicate", or the form's own "too_short" (a password);
+ *   undefined for a failed connection.
  * @param t - The dictionary.
  * @returns The translated message.
  */
@@ -43,6 +47,8 @@ export function errorMessage(code: string | undefined, t: Dictionary): string {
       return t.admin.errors.invalid
     case 'duplicate':
       return t.admin.errors.duplicate
+    case 'too_short':
+      return t.admin.errors.passwordShort
     case 'in_use':
       return t.admin.errors.inUse
     case 'invalid_reference':
@@ -64,7 +70,8 @@ function toForm<Row>(column: DataColumn<Row>, value: unknown): FormValue {
     const text = (value ?? {}) as Partial<Record<'he' | 'en', string>>
     return { he: text.he ?? '', en: text.en ?? '' }
   }
-  if (value === null || value === undefined) return ''
+  // A stored password is never sent to the browser, and a new one starts empty.
+  if (value === null || value === undefined || column.type === 'password') return ''
   if (column.type === 'datetime') {
     // <input type="datetime-local"> edits local time without a zone: "2026-11-03T09:30".
     const date = new Date(String(value))
@@ -74,13 +81,29 @@ function toForm<Row>(column: DataColumn<Row>, value: unknown): FormValue {
 }
 
 /**
+ * Whether a field must be filled in: a required column, except a password on an edit (empty = keep it).
+ * @param column - The column.
+ * @param creating - True in the Add form.
+ * @returns True when the form refuses it empty.
+ */
+const isRequired = <Row,>(column: DataColumn<Row>, creating: boolean) => Boolean(column.required) && (column.type !== 'password' || creating)
+
+/**
  * Turns an input's value into the JSON the API takes, checking it on the way.
  * @param column - The column.
  * @param value - The input's value.
- * @returns `{ value }` (null = empty), or `{ error }` naming what is wrong ("required" or "invalid").
+ * @param creating - True in the Add form (a password is then required when its column is).
+ * @returns `{ value }` (null = empty), or `{ error }` naming what is wrong ("required", "invalid", or "too_short" for
+ *   a password under MIN_PASSWORD_LENGTH characters).
  */
-function fromForm<Row>(column: DataColumn<Row>, value: FormValue): { value: unknown } | { error: 'required' | 'invalid' } {
+function fromForm<Row>(column: DataColumn<Row>, value: FormValue, creating: boolean): { value: unknown } | { error: 'required' | 'invalid' | 'too_short' } {
   if (column.type === 'boolean') return { value }
+  if (column.type === 'password') {
+    // Never trimmed: spaces are part of a password.
+    const password = String(value)
+    if (!password) return isRequired(column, creating) ? { error: 'required' } : { value: null }
+    return password.length < MIN_PASSWORD_LENGTH ? { error: 'too_short' } : { value: password }
+  }
   if (typeof value === 'object') {
     const he = value.he.trim()
     const en = value.en.trim()
@@ -169,7 +192,7 @@ export function RecordDialog<Row>({
     for (const column of fields) {
       if (column.readOnly) continue
       const changed = JSON.stringify(values[column.key]) !== JSON.stringify(start[column.key])
-      const result = fromForm(column, values[column.key])
+      const result = fromForm(column, values[column.key], !row)
       if ('error' in result) found[column.key] = errorMessage(result.error, t)
       else if (row ? changed : result.value !== null) payload[column.key] = result.value
     }
@@ -209,6 +232,7 @@ export function RecordDialog<Row>({
                 column={column}
                 value={values[column.key]}
                 error={errors[column.key]}
+                creating={!row}
                 onChange={(value) => setValues((current) => ({ ...current, [column.key]: value }))}
                 onBusyChange={(busy) => setUploads((count) => count + (busy ? 1 : -1))}
               />
@@ -239,6 +263,7 @@ export function RecordDialog<Row>({
  * @param props.column - The column.
  * @param props.value - The input's value.
  * @param props.error - The error message to show, if any.
+ * @param props.creating - True in the Add form (a password is required only there, and its hint differs).
  * @param props.onChange - Called with the new value.
  * @param props.onBusyChange - An "image" field tells when an upload starts (true) and ends (false).
  * @returns The field.
@@ -248,6 +273,7 @@ function Field<Row>({
   column,
   value,
   error,
+  creating,
   onChange,
   onBusyChange,
 }: {
@@ -255,21 +281,25 @@ function Field<Row>({
   column: DataColumn<Row>
   value: FormValue
   error?: string
+  creating: boolean
   onChange: (value: FormValue) => void
   onBusyChange: (busy: boolean) => void
 }) {
   const { t } = useI18n()
-  const described = [column.hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined
-  const label = `${column.label}${column.required ? ' *' : ''}`
+  const required = isRequired(column, creating)
+  // An edited password field explains that empty keeps the password.
+  const hint = column.type === 'password' && !creating ? t.admin.passwordKeep : column.hint
+  const described = [hint && `${id}-hint`, error && `${id}-error`].filter(Boolean).join(' ') || undefined
+  const label = `${column.label}${required ? ' *' : ''}`
   const common = {
     disabled: column.readOnly,
     'aria-invalid': Boolean(error),
     'aria-describedby': described,
-    'aria-required': column.required || undefined,
+    'aria-required': required || undefined,
   }
   const footer = (
     <>
-      {column.hint && <p id={`${id}-hint`} className="mt-1 text-xs text-brand-charcoal-muted">{column.hint}</p>}
+      {hint && <p id={`${id}-hint`} className="mt-1 text-xs text-brand-charcoal-muted">{hint}</p>}
       {error && <p id={`${id}-error`} className="mt-1 text-xs font-medium text-brand-red-dark">{error}</p>}
     </>
   )
@@ -325,7 +355,19 @@ function Field<Row>({
   }
 
   let input
-  if (column.searchable) {
+  if (column.type === 'password') {
+    input = (
+      <GeneratedPasswordInput
+        id={id}
+        autoComplete="new-password"
+        value={text}
+        onChange={(e) => onChange(e.target.value)}
+        onGenerate={onChange}
+        inputClassName={INPUT_CLASS}
+        {...common}
+      />
+    )
+  } else if (column.searchable) {
     input = (
       <SearchableField
         id={id}

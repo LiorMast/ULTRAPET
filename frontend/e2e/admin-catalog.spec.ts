@@ -287,7 +287,7 @@ test('uploads a category picture that shows on the home page carousel', async ({
   await picture.locator('input[type="file"]').setInputFiles({ name: 'category.png', mimeType: 'image/png', buffer: PICTURE })
   await expect(picture.getByRole('status')).toHaveText('Picture uploaded. Save to keep it.')
   const preview = picture.getByRole('img', { name: 'Current picture' })
-  await expect(preview).toHaveAttribute('src', /^\/api\/media\/categories\/[0-9a-f]{32}\.png$/)
+  await expect(preview).toHaveAttribute('src', /^\/api\/media\/categories\/\d{8}T\d{6}Z_[0-9a-f]{32}\.png$/)
   await expect.poll(() => loadedWidth(preview)).toBe(1)
   const url = await preview.getAttribute('src')
   expect((await new AxeBuilder({ page }).include('[role="dialog"]').analyze()).violations).toEqual([])

@@ -44,16 +44,26 @@ frontend/
     config.ts           menu (mainNav: Products dropdown = the API categories), the article pages' marketing categories, stat labels, header buttons, external links,
                         bundled photos (brandLogo, articleImage), the fonts and size steps of editable texts (FONTS, SIZE_STEPS)
     seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
-    auth.tsx            AuthProvider/useAuth: the session of a business customer or a staff member (one sign-in through the API, JWT cookies)
+    auth.tsx            AuthProvider/useAuth: the session of a business customer or a staff member (one sign-in through the API, JWT cookies);
+                        useCustomerPrices (the signed-in customer's prices, for the catalog and product pages)
+    cart.tsx            CartProvider/useCart: the signed-in business customer's cart (lines, count, subtotal, add /
+                        setQuantity / remove, addedTick), kept in localStorage per customer until the Phase 4 server cart
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
     routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404;
                         admin.tsx = staff panel layout (shows the shared login form to non-staff), admin.<resource>.tsx = one table each
                         (admin.products / admin.categories also manage their discounts through DiscountsDialog;
-                        admin.discounts = every price rule in one table, general or for one customer)
+                        admin.discounts = every price rule in one table, general or for one customer;
+                        admin.customers = the business customers' accounts + each one's own discounts)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
                         Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, InlineEditor,
+                        CatalogCard (links to its product page; PriceSlot, priceFor), ProductGallery, RichText
+                        (stored sanitized HTML, styled by `.rich-text` in index.css),
                         EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
-                        ImageUploadField (picture upload of the admin forms), ReorderDialog (drag a list into order), ...)
+                        ImageUploadField (picture upload of the admin forms), ReorderDialog (drag a list into order),
+                        Offcanvas (the reusable side panel on ui/sheet: title, close, scrolling body, footer; logical side),
+                        CartDrawer (the business customers' header cart icon + badge and its Offcanvas: lines, subtotal,
+                        minimum order), AddToCartButton (adds to the cart, "✓ Added" morph), QuantityStepper (− n +),
+                        PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button), ...)
                         + their tests
     components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet), restyled for the brand
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
@@ -68,19 +78,20 @@ backend/
     __init__.py         create_app(): config from the environment, JWT, JSON errors, CLI commands, blueprints, /api/health
     auth.py             JWT sign-in in HttpOnly cookies (CSRF double-submit, 15 min access + 30 day refresh): authenticate,
                         issue_tokens, refresh_access, clear_tokens, require_user(kind)
-    customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), brands, stats,
+    customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), products/<slug>
+                        (one product's page: gallery, sanitized description, up to 4 related), brands, stats,
                         contact (the contact_* settings), sections + sections/<key> (saved home page section content),
                         faq, articles, resellers, sitemap.xml, media/<key> (the S3 stub's files), catalog.pdf
                         (redirect to the stored PDF catalog, setting `catalog_pdf`), the shared auth
                         (login/refresh/logout/me: customers AND staff), prices
     staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
                         products+images, price-rules, settings, articles, resellers, page-sections, faq-items (these two
-                        stamp updated_by_id)); PUT /<resource> replaces a whole ordered list in one transaction (only
+                        stamp updated_by_id), customers (the business users: `write_only` password, `read_only`
+                        last_login_at, `deletable=False`: DELETE is 405, switch isActive off instead)); PUT /<resource> replaces a whole ordered list in one transaction (only
                         `replaceable` resources: faq-items); PUT /<resource>/order sets the order from every row's id
                         (`orderable`: categories, brands, products); `create_defaults` (new_row_defaults) fill a new
                         row of these three (slug from its English / brand name, last place); DB constraint errors -> 400/409; POST /uploads stores a
-                        picture (multipart file + folder) through storage.py and returns its URL; GET /customers
-                        lists the business customers read-only (to pick one, e.g. for a customer's discount)
+                        picture (multipart file + folder) through storage.py and returns its URL
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
     storage.py          the S3 stub for every stored file: put_object / delete_object / object_exists write and serve
                         backend/media (MEDIA_ROOT, git-ignored); rows store object keys, public_url / url_of / srcset_urls
@@ -271,7 +282,9 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   (e.g. "Discounts"); `formDialog` replaces the column-driven form for Add and Edit with the page's own dialog (it
   gets the row and `FormDialogProps`: `onSave` goes through `onCreate`/`onUpdate`), and `canEdit(row)` hides Edit on
   rows that form cannot edit (the Discounts page: DiscountDialog with `scope`, Edit hidden on fixed prices); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
-  plus up/down buttons; Save sends every row key in order, e.g. `reorderStaffRows`). Technical fields staff need not
+  plus up/down buttons; Save sends every row key in order, e.g. `reorderStaffRows`). A `type: 'password'` column is
+  write-only: never a cell, a `GeneratedPasswordInput` in the form that starts empty, at least 8 characters,
+  `required` only when adding, and left out of an edit when empty (the password is kept). Technical fields staff need not
   see (slugs, legacy paths, sort orders) stay out of the config: the server fills them (`create_defaults`) and the
   order comes from `onReorder` (the categories, brands and products tables). Columns and options are read once at mount (DataTables' rule); `deferRender` builds only the
   shown page's cells.
@@ -298,7 +311,9 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   start date, end date or "no end date". It returns a `DiscountValue` ({ type, value, minQuantity: null = regular,
   startsOn, endsOn: null = open-ended }) and the caller stores it. `DiscountsDialog`
   lists one target's discounts (add/edit/delete) and is the "Discounts" row action of the products and categories
-  tables. The Discounts page (`/admin/discounts`, `routes/admin.discounts.tsx`) lists every rule (general and per
+  tables (their general rules) and of the customers table (`withDiscounts(..., 'businessUserId')`: the customer's own
+  rules; `targets` from `discountTargets` make DiscountDialog ask what each applies to, without the customer
+  choice, and `describeTarget` names it on each line; a fixed price is listed and deletable, never editable). The Discounts page (`/admin/discounts`, `routes/admin.discounts.tsx`) lists every rule (general and per
   customer, with its state: `ruleState` = active / upcoming / ended / paused) and adds/edits them with
   `DiscountDialog scope` (the "applies to" fields: a category or product, all customers or one; `scopeFields` turns
   the `RuleScope` into `categoryId` / `productId` / `businessUserId`). A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0,
@@ -313,6 +328,11 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   last had the focus; a part without its own style (`controls={false}`, e.g. the hero's red word) selects its owner.
   Staff can drag the PropBar by its grip (pointer, or arrow keys on the grip); it stays inside its `<section>` and
   the window, and keeps its spot until edit mode ends.
+  **Width**: an `EditableText resizable` box has a width handle on its inline-end edge (`WidthHandle`, a `role="slider"`:
+  drag by pointer, or the arrow keys / Home / End); `TextValue.width` = percent of the parent's width (20–99,
+  undefined = full), stored per language as `SectionText.width` (`putWidth`) and applied in read mode (`inline-size`).
+  Every text stored in `page_sections` is resizable (`sectionFields` sets it; the hero's title, tagline, description);
+  `data` texts, `controls={false}` parts and the FAQ's list entries are not. The hero dialog keeps the saved widths.
   The section supplies its cva size steps and decides how the draft is saved (the hero: `mergeHero` into its
   `page_sections` content).
   **Lists** (a section whose entries staff add and delete, e.g. the FAQ): each entry owns a few draft keys
@@ -348,6 +368,13 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   (rules in `index.css`). The FAQ (`Faq.tsx`, questions from the table `faq_items` via `GET /api/faq`, heading from
   `t.faq`) uses it, and the home head carries the shown questions as FAQPage JSON-LD (`shownFaq` + `faqJsonLd` in
   `seo.ts`), since closed answers are not in the DOM.
+- **Cart** (`src/cart.tsx`, `AddToCartButton`, `CartDrawer`): only signed-in business customers have one, and an
+  "Add to cart" button appears only where their price is shown (`priceFor(...).status === 'shown'`): +1 on a
+  `CatalogCard` (above its stretched link), a `QuantityStepper` + the button on the product page. A line keeps a
+  snapshot (id, slug, name, thumbnail, unit price); bulk discounts and the final price come at checkout (Phase 4).
+  Feedback on add: the button cross-fades to "✓ Added" for `ADDED_MS` (with a polite status line) and the header
+  badge pops (`animate-cart-pop` / `animate-cart-nudge` in index.css, replayed through `addedTick`; a fade with reduced
+  motion). Money is formatted with `formatPrice` (CatalogCard.tsx). Checkout stays disabled until Phase 4.
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
 - **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
@@ -370,7 +397,8 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   (like legacy `cms_text_blocks`).
 - SEO: routes set their head tags with `pageHead()` (`src/seo.ts`) in their `head` option (from `loaderData`) — title,
   description, canonical, hreflang alternates, Open Graph, JSON-LD; the root route sets the defaults. `sitemap.xml` is
-  built by the backend from the database (`/api/sitemap.xml`; add new public pages to `SITEMAP_PAGES` in
+  built by the backend from the database (`/api/sitemap.xml`: the pages, articles and product pages, slugs
+  percent-encoded; add new public pages to `SITEMAP_PAGES` in
   `backend/app/customers/routes.py`); Vite proxies `/sitemap.xml` to it, and the production server must too. The site is still a client-rendered SPA:
   prerendering the public pages is the next big SEO step.
 
@@ -391,7 +419,7 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   `size="sm"` for the header.
 - **Logo**: `<Logo className="h-14" />` — horizontal lockup traced from `legacy/public/UltraPet_Logo.pdf`.
 - **Header**: a translucent white material (`material-bar` in `index.css`: 85% white + backdrop blur; solid white
-  for reduced transparency / more contrast), 88px tall (`py-4` + 56px logo); pages use `pt-22` to clear it. No
+  for reduced transparency / more contrast), 88px tall (`py-4` + 56px logo; below `sm` the logo shrinks to h-8 so the cart, language and menu buttons fit at 360px); pages use `pt-22` to clear it. No
   transparent or scroll-driven states. On the home page the menu is a scrollspy (`useScrollSpy` in `Navbar.tsx`): the URL
   hash follows the `<section id>` being read (history replace; none on the hero), so `includeHash` links light up.
 - **Motion** (Apple fluid-interface rules): every transition uses `--ease-spring` (a critically damped spring as CSS
@@ -403,7 +431,7 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
 - **Type**: Inter with optical sizing (`opsz`); sizes from `text-xl` up carry size-specific negative tracking
   (`--text-*--letter-spacing`, milder in Hebrew); `tracking-display` for the hero headline; headings balance.
 - **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,
-  short language label "EN"/"עב"); English menu labels use 0.1em tracking (not `tracking-widest`) so they fit; the header container is `max-w-screen-2xl`. Re-run the e2e overflow test
+  short language label "EN"/"עב"); English menu labels use 0.1em tracking (not `tracking-widest`) so they fit; the header row spans the full window (logo at the start edge, language + login at the end edge, the menu centered with the business customers' cart icon right after it). Re-run the e2e overflow test
   after adding menu items.
 - **Look and feel**: like Royal Canin / Purina / Hill's / Hamilton — a large international distributor, **not a pet
   shop**. Clean, minimal and premium; large typography, high-end photography, elegant animations; beautiful and
@@ -511,7 +539,8 @@ content exists in each language, and the layout flips direction automatically.
   first keeps the parent's WooCommerce id, slug and old URL). Every gallery photo is in `images[]` (order = WordPress
   order, `alt`), as object keys (`products/<yyyy>-<mm>-<file name>.<ext>`) of the files `flask import-media` copied
   into the storage. `description` is the full **sanitized HTML** (p, h2–h4, lists, tables, strong/em, br; composition,
-  analytical constituents, feeding tables); render it as HTML, and search strips the tags. `sku` = the item code in
+  analytical constituents, feeding tables); `GET /api/products/<slug>` sanitizes it again on the way out
+  (`sanitize_html`, so admin-typed HTML is safe) and the product page renders it with `RichText`; search strips the tags. `sku` = the item code in
   the WordPress name (201; to confirm against Rivhit), `barcode` = the EAN in the description (106), `brand` = a
   brands.json slug read from the name (YAGU, LINO, Pet Fan, Lizi, Specialcan, Petpall are `active: false` until the
   owner confirms them). Each product's `name` / `description` holds one translation per language (`{ he, en }`;
@@ -560,7 +589,10 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Catalog (`/catalog`; `Catalog`, `CatalogCard`, `Pagination`, `AccountPanel`, `src/auth.tsx`): 400 store products,
       category chips, search (on the server, every language), 24 per page, all state in the URL; prices only for
       signed-in customers (real sign-in, placeholder prices from the price API), "log in to see the price" for visitors
-- [ ] Pages: brand, category, product, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
+- [x] Product pages (`/products/$slug`, `routes/products.$slug.tsx`; `ProductGallery`, `RichText`): the old store's
+      anatomy (breadcrumbs, gallery, details, shipping/returns notes, the sanitized description, "You may also like"),
+      the customer's price when signed in, Product + Breadcrumb JSON-LD, in the sitemap; every catalog card links to one
+- [ ] Pages: brand, category, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
 **Phase 2 — Backend**
 - [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 19 tables: users with staff and
@@ -574,7 +606,8 @@ content exists in each language, and the layout flips direction automatically.
 - [x] staff API (blueprint `staff`): CRUD of brands, categories, products + images, settings, articles, resellers,
       page sections, FAQ items (+ PUT that replaces the FAQ list at once)
 - [x] staff API for price rules (`price-rules`: positive percent/amount discounts, dated)
-- [ ] staff API for customers, leads, payment methods and orders (with the admin UI, Phase 3)
+- [x] staff API for customers (`customers`: create with a password, edit, reset the password, deactivate; never deleted)
+- [ ] staff API for leads, payment methods and orders (with the admin UI, Phase 3)
 - [ ] lead/contact endpoints (`business_leads`)
 - [x] serve the PDF catalog (`/api/catalog.pdf`) and every product photo from the storage (`flask import-media`)
 
@@ -587,10 +620,13 @@ content exists in each language, and the layout flips direction automatically.
       the brands' logos
 - [ ] Product images in the admin; tables for settings, articles, resellers (a column config + route each)
 - [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API
-- [x] `/admin/discounts`: every discount in one table (general and per customer; `GET /api/staff/customers`);
-      [ ] the customer edit screen and payment-method discounts
+- [x] `/admin/discounts`: every discount in one table (general and per customer; the `customers` resource)
+- [x] `/admin/customers`: staff open and edit the business accounts (customers cannot register), set or generate the
+      password (`PasswordInput` / `GeneratedPasswordInput`), deactivate (never delete), and set each customer's own
+      discounts (row action "Discounts"); [ ] editing a customer's fixed prices; [ ] payment-method discounts
 
-**Phase 4 — B2B portal**: auth, price catalog, per-customer/category discounts, cart + checkout (minimum ₪2,000;
+**Phase 4 — B2B portal**: [x] cart in the browser (add from cards and product pages, edit in the header panel);
+auth, price catalog, per-customer/category discounts, cart + checkout (minimum ₪2,000;
 card / Bit / bank transfer), Rivhit sync, generated PDF catalog.
 
 **Phase 5**: Russian + Arabic, branch map, image API, performance and SEO hardening, WordPress 301 redirects.

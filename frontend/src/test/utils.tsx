@@ -3,7 +3,7 @@
  * renderPage() renders the real app (routes, layout, Navbar) at a URL, the way a browser loads it, and waits
  * until the page's data has loaded (from the fake API in test/api.ts), so tests exercise the same wiring
  * users get (`staff` signs a staff user in, for the /admin pages). renderComponent() renders one component on its own
- * (with the router, language and session providers) so a test can give it custom props. Both start signed
+ * (with the router, language, session and cart providers) so a test can give it custom props. Both start signed
  * out unless a test passes a user, so a session saved by one test never leaks into the next.
  */
 import { render, screen, waitFor } from '@testing-library/react'
@@ -12,6 +12,7 @@ import type { ReactNode } from 'react'
 import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from '@tanstack/react-router'
 import type { User } from '@/api'
 import { AuthProvider } from '@/auth'
+import { CartProvider } from '@/cart'
 import { applyDocumentLocale, detectLocale, LocaleProvider, type Locale } from '@/i18n'
 import { createAppRouter, localeRewrite } from '@/router'
 import { signInFakeUser } from '@/test/api'
@@ -33,7 +34,9 @@ export async function renderPage(url: string, { user = null, staff = null }: { u
   const result = render(
     <LocaleProvider locale={locale}>
       <AuthProvider initialUser={staff ?? user}>
-        <RouterProvider router={router} />
+        <CartProvider>
+          <RouterProvider router={router} />
+        </CartProvider>
       </AuthProvider>
     </LocaleProvider>,
   )
@@ -61,7 +64,9 @@ export function renderComponent(ui: ReactNode, locale: Locale = 'he') {
   const result = render(
     <LocaleProvider locale={locale}>
       <AuthProvider initialUser={null}>
-        <RouterProvider router={router} />
+        <CartProvider>
+          <RouterProvider router={router} />
+        </CartProvider>
       </AuthProvider>
     </LocaleProvider>,
   )

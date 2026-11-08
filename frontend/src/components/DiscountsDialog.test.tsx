@@ -53,7 +53,7 @@ describe('/admin/categories', () => {
     await renderPage('/en/admin/categories', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'Categories' })).toBeInTheDocument()
     const menu = screen.getByRole('navigation', { name: 'Admin' })
-    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Products', 'Categories', 'Discounts', 'Brands'])
+    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Products', 'Categories', 'Discounts', 'Customers', 'Brands'])
     expect(within(menu).getByRole('link', { name: 'Categories' })).toHaveAttribute('aria-current', 'page')
     const table = screen.getByRole('table', { name: 'Categories' })
     expect(within(table).getAllByRole('row')).toHaveLength(categories.length + 1)

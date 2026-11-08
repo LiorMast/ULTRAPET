@@ -1,6 +1,7 @@
 /**
  * LoginForm.tsx — The customer login form (email, password, "remember me"). Used by LoginPopover (the
- * header's login popover) and by the /login page, so both stay identical.
+ * header's login popover) and by the /login page, so both stay identical. The password field is PasswordInput (an eye
+ * button shows what was typed).
  *
  * A valid submit signs the customer in on the server through useAuth() (see src/auth.tsx) and confirms it, or
  * shows "wrong email or password" (or a retry message when the server cannot be reached); a caller can pass
@@ -10,6 +11,7 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '@/api'
 import { useAuth, type Credentials } from '@/auth'
+import { PasswordInput } from '@/components/PasswordInput'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 
@@ -95,16 +97,15 @@ export function LoginForm({
       </div>
       <div>
         <label htmlFor={`${idPrefix}-password`} className={LABEL_CLASS}>{t.login.password}</label>
-        <input
+        <PasswordInput
           id={`${idPrefix}-password`}
-          type="password"
           autoComplete="current-password"
           value={values.password}
           onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
           aria-required
           aria-invalid={!!errors.password}
           aria-describedby={errors.password ? `${idPrefix}-password-error` : undefined}
-          className={INPUT_CLASS}
+          inputClassName={INPUT_CLASS}
         />
         {errors.password && <p id={`${idPrefix}-password-error`} className="mt-1 text-xs font-medium text-brand-red-dark">{errors.password}</p>}
       </div>

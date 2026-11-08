@@ -11,12 +11,17 @@
  * - From the xl breakpoint the full menu is shown; below it, <MobileMenu> (a drawer) takes over.
  * - Staff get an Admin panel button (in LoginPopover) that slides the admin drawer (<SubNavDrawer>, the
  *   pages of ADMIN_NAV) down out of the header and back up; the header grows with it, over the page.
+ * - The header spans the full window: the logo sits at the start edge, the language switcher and login/logout
+ *   at the end edge, and the menu in the middle.
+ * - Signed-in business customers get a cart icon (<CartDrawer>) right after the menu items; below xl, next to the
+ *   language toggle and the hamburger.
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
  *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
  */
 import { Fragment, useEffect, useRef } from 'react'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { ChevronDown } from 'lucide-react'
+import { CartDrawer } from '@/components/CartDrawer'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LoginPopover } from '@/components/LoginPopover'
 import { Logo } from '@/components/Logo'
@@ -52,28 +57,32 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
 
   return (
     <header className="material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]">
-      <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-6 px-6 lg:px-10 xl:px-6 2xl:px-10">
+      <div className="flex w-full items-center justify-between gap-1 px-4 sm:px-6 lg:px-10 xl:gap-6 xl:px-6 2xl:px-10">
         <Link
           to="/"
           aria-label={t.header.home}
           onClick={() => window.scrollTo({ top: 0 })}
           className="shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-4"
         >
-          <Logo className="h-14" />
+          <Logo className="h-8 sm:h-14" />
         </Link>
 
-        <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
-          {items.map((item) => (
-            <DesktopNavItem key={item.id} item={item} />
-          ))}
-        </nav>
+        {/* The menu and the cart icon right after it, centered; below xl only the cart, at the end. */}
+        <div className="flex flex-1 items-center justify-end gap-2 xl:justify-center xl:gap-4 2xl:gap-7">
+          <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden items-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
+            {items.map((item) => (
+              <DesktopNavItem key={item.id} item={item} />
+            ))}
+          </nav>
+          {user?.kind === 'business' && <CartDrawer />}
+        </div>
 
         <div className="hidden shrink-0 items-center gap-2 xl:flex">
           <LanguageSwitcher variant="dropdown" />
           <LoginPopover adminToggle={adminDrawer.trigger} />
         </div>
 
-        <div className="flex items-center gap-1 xl:hidden">
+        <div className="flex shrink-0 items-center gap-1 xl:hidden">
           <LanguageSwitcher variant="toggle" />
           <MobileMenu items={items} />
         </div>

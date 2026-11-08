@@ -40,7 +40,7 @@ export async function signInStaff(page: Page, path = '/en/admin/brands') {
   await page.goto(path)
   const english = path.startsWith('/en')
   await page.getByLabel(english ? 'Email' : 'דוא"ל').fill(STAFF.email)
-  await page.getByLabel(english ? 'Password' : 'סיסמה').fill(STAFF.password)
+  await page.getByLabel(english ? 'Password' : 'סיסמה', { exact: true }).fill(STAFF.password)
   await page.getByRole('main').getByRole('button', { name: english ? 'Log in' : 'התחברות' }).click()
   await page.getByRole('table').waitFor()
 }

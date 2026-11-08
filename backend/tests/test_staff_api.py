@@ -5,6 +5,8 @@ import uuid
 
 import pytest
 
+from tests.conftest import CUSTOMER
+
 from app.database.models.catalog import Category, Product
 from app.database.models.content import FaqItem
 from app.database.models.price_rules import PriceRule
@@ -179,18 +181,75 @@ def test_invalid_price_rules_are_refused(api, database, body, error):
     assert (response.status_code, response.get_json()) == (400, error)
 
 
-def test_staff_list_the_business_customers_without_their_sign_in_fields(api, database, customer):
+def test_staff_list_the_business_customers_without_their_password(api, database, customer):
     other = BusinessUser(email="a@example.com", full_name="Avi", company_name="Aquarium Plus", city="Haifa",
                          password_hash="x", is_active=False)
     database.add(other)
     database.commit()
-    assert api("GET", "/customers").get_json() == [
-        {"id": str(other.id), "companyName": "Aquarium Plus", "fullName": "Avi", "email": "a@example.com",
-         "city": "Haifa", "isActive": False},
-        {"id": str(customer.id), "companyName": "Pet Corner", "fullName": "Dana Cohen", "email": customer.email,
-         "city": None, "isActive": True},
-    ]
-    assert api("POST", "/customers", {}).status_code == 405  # read-only
+    rows = api("GET", "/customers").get_json()
+    assert [(row["companyName"], row["isActive"]) for row in rows] == [("Aquarium Plus", False), ("Pet Corner", True)]
+    assert set(rows[0]) == {"id", "email", "fullName", "phone", "companyName", "businessNumber", "city", "address",
+                            "rivhitCustomerId", "notes", "isActive", "lastLoginAt", "createdAt", "updatedAt"}
+    assert rows[0]["city"] == "Haifa" and rows[0]["lastLoginAt"] is None
+
+
+NEW_CUSTOMER = {"email": " New@Shop.co.il ", "password": "first-pass", "fullName": "Yossi", "companyName": "Pet Land",
+                "businessNumber": "512345678", "city": "Ashdod"}
+
+
+def test_staff_open_a_customer_account_that_can_sign_in(api, client):
+    response = api("POST", "/customers", NEW_CUSTOMER)
+    assert response.status_code == 201
+    created = response.get_json()
+    assert (created["email"], created["isActive"], created["businessNumber"]) == ("new@shop.co.il", True, "512345678")
+    assert "password" not in created and "passwordHash" not in created
+    signed_in = client.post("/api/auth/login", json={"email": "new@shop.co.il", "password": "first-pass"})
+    assert signed_in.status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("body", "error"),
+    [
+        ({k: v for k, v in NEW_CUSTOMER.items() if k != "password"}, {"error": "required", "field": "password"}),
+        ({**NEW_CUSTOMER, "password": "short"}, {"error": "invalid", "field": "password"}),
+        ({**NEW_CUSTOMER, "password": None}, {"error": "invalid", "field": "password"}),
+        ({**NEW_CUSTOMER, "email": "not-an-email"}, {"error": "invalid", "field": "email"}),
+        ({**NEW_CUSTOMER, "businessNumber": "12"}, {"error": "invalid", "constraint": "business_users_business_number_check"}),
+        ({**NEW_CUSTOMER, "passwordHash": "x"}, {"error": "unknown_field", "field": "passwordHash"}),
+        ({**NEW_CUSTOMER, "lastLoginAt": None}, {"error": "unknown_field", "field": "lastLoginAt"}),
+    ],
+)
+def test_invalid_customers_are_refused(api, body, error):
+    response = api("POST", "/customers", body)
+    assert (response.status_code, response.get_json()) == (400, error)
+
+
+def test_a_customer_email_is_unique_across_every_user(api, staff, customer):
+    for taken in (customer.email.upper(), staff.email):
+        response = api("POST", "/customers", {**NEW_CUSTOMER, "email": taken})
+        assert (response.status_code, response.get_json()) == (409, {"error": "duplicate", "constraint": "app_users_email_key"})
+
+
+def test_staff_reset_a_password_and_an_edit_without_one_keeps_it(api, app, customer):
+    shop = app.test_client()  # the customer's own browser (the staff client keeps its sign-in)
+    assert api("PATCH", f"/customers/{customer.id}", {"city": "Eilat"}).get_json()["city"] == "Eilat"
+    assert shop.post("/api/auth/login", json=CUSTOMER).status_code == 200
+    assert api("PATCH", f"/customers/{customer.id}", {"password": "brand-new-pass"}).status_code == 200
+    assert shop.post("/api/auth/login", json=CUSTOMER).status_code == 401
+    assert shop.post("/api/auth/login", json={**CUSTOMER, "password": "brand-new-pass"}).status_code == 200
+
+
+def test_a_switched_off_customer_cannot_sign_in_until_switched_on(api, app, customer):
+    shop = app.test_client()
+    assert api("PATCH", f"/customers/{customer.id}", {"isActive": False}).get_json()["isActive"] is False
+    assert shop.post("/api/auth/login", json=CUSTOMER).status_code == 401
+    assert api("PATCH", f"/customers/{customer.id}", {"isActive": True}).status_code == 200
+    assert shop.post("/api/auth/login", json=CUSTOMER).status_code == 200
+
+
+def test_customers_are_never_deleted(api, customer):
+    assert api("DELETE", f"/customers/{customer.id}").status_code == 405
+    assert api("GET", f"/customers/{customer.id}").get_json()["email"] == customer.email
 
 
 def test_only_staff_list_the_customers(client):

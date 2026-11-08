@@ -3,10 +3,11 @@
  *
  * It answers every /api call the site makes (src/api.ts) from the stub fixtures in src/stubs/ — the same files
  * `flask seed` loads into the database — with the server's semantics (backend/app/customers/routes.py): catalog
- * search in every language, category filter, chip counts and paging; brands and articles by slug; sign-in that
+ * search in every language, category filter, chip counts and paging; a product page by slug (its gallery, related
+ * products of the category, 404 for an unknown slug); brands and articles by slug; sign-in that
  * accepts any credentials except the password WRONG_PASSWORD (the email admin@example.com signs in as the staff
  * user TEST_STAFF, anyone else as the customer TEST_USER). The staff API (backend/app/staff/routes.py) is
- * faked for brands, categories, products, price rules, settings, page sections and FAQ items: list/create/update/delete
+ * faked for brands, categories, products, price rules, settings, page sections, FAQ items and customers: list/create/update/delete
  * on in-memory copies of the stubs (no price rules or page sections at first; GET /api/sections and
  * /api/sections/<key> read the latter, GET /api/faq the FAQ items, GET /api/stats and /api/contact the settings, seeded
  * with STATS and stubs/contact.json), the FAQ's PUT that replaces the whole list at once (all or nothing), the categories'
@@ -14,7 +15,8 @@
  * the server's slug and last place), with the
  * server's errors (401 signed out, 403 for a customer, 400 required / a failed check / an unknown reference or id, 405 PUT on
  * another table, 409 duplicate or in use, 404) and its cascade (a deleted category's or product's price rules go with
- * it). GET /api/staff/customers lists STAFF_CUSTOMERS (staff only, read-only, like the server's list_customers).
+ * it). The customers table starts with STAFF_CUSTOMERS: a new one needs a password (8+ characters, write-only: never
+ * stored nor answered), the email is lowercased and unique, and DELETE is 405 (customers are never deleted).
  * POST /api/staff/uploads fakes the S3-stub upload (staff only; folder "categories" or "brands"; JPEG/PNG/WebP/AVIF by the
  * file's type, at most 5 MB; answers `/api/media/<folder>/fake-<n>.<ext>`, nothing is stored; the server names it
  * `<folder>/<UTC timestamp>_<uuid>.<ext>`). A picture field
@@ -25,7 +27,7 @@
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
-import type { Brand, Branch, ContactDetails, ProductCategory, ProductImage, ProductPage, Stat, StaffCustomer, User } from '@/api'
+import type { Brand, Branch, ContactDetails, ProductCategory, ProductDetail, ProductImage, ProductPage, Stat, StaffCustomer, User } from '@/api'
 import type { Localized } from '@/config'
 import articles from '@/stubs/articles.json'
 import branches from '@/stubs/branches.json'
@@ -40,10 +42,18 @@ export const WRONG_PASSWORD = 'wrong-password'
 /** The customer the fake sign-in returns (with the typed email). */
 export const TEST_USER: User = { kind: 'business', email: 'shop@example.com', fullName: 'Demo Customer', companyName: 'Demo Pet Shop' }
 
-/** The business customers GET /api/staff/customers lists: the test customer, plus an inactive one. */
+/** The business customers the staff table "customers" starts with: the test customer, plus an inactive one. */
 export const STAFF_CUSTOMERS: StaffCustomer[] = [
-  { id: '00000000-0000-4000-8000-000000000001', companyName: TEST_USER.companyName ?? '', fullName: TEST_USER.fullName, email: TEST_USER.email, city: 'Tel Aviv', isActive: true },
-  { id: '00000000-0000-4000-8000-000000000002', companyName: 'Zoo Haifa', fullName: 'Noa Levi', email: 'zoo@example.com', city: 'Haifa', isActive: false },
+  {
+    id: '00000000-0000-4000-8000-000000000001', companyName: TEST_USER.companyName ?? '', fullName: TEST_USER.fullName, email: TEST_USER.email,
+    phone: '03-5551234', businessNumber: '512345678', city: 'Tel Aviv', address: null, rivhitCustomerId: null, notes: null, isActive: true,
+    lastLoginAt: '2026-11-01T08:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000002', companyName: 'Zoo Haifa', fullName: 'Noa Levi', email: 'zoo@example.com',
+    phone: null, businessNumber: null, city: 'Haifa', address: null, rivhitCustomerId: null, notes: null, isActive: false,
+    lastLoginAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  },
 ]
 
 /** The home page figures the fake serves (the values `flask seed` takes from the legacy CMS). */
@@ -67,11 +77,15 @@ type StubProduct = {
   brand: string | null
   sku: string | null
   barcode: string | null
+  legacyPath: string | null
   images: StubImage[]
 }
 
 /** The brands the public API shows: the stub's active ones (a brand found only in product names is inactive). */
 const activeBrands = brands.filter((brand) => brand.active !== false)
+
+/** How many related products a product page suggests (as on the server). */
+const RELATED_COUNT = 4
 
 /** Products per catalog page, and the most a request may ask for (as on the server). */
 const PAGE_SIZE = 24
@@ -131,9 +145,15 @@ function seedId(table: number, index: number): string {
  * - `orderable`: PUT /order sets the order from a list of ids (`orderable` on the server; a sortOrder field).
  * - `createDefaults`: fills a new row's missing values from the table (`create_defaults` on the server).
  * - `media`: picture fields (the server's media_key converter), see mediaUrl.
+ * - `convert`: the server's own field converters (e.g. a customer's email and password), run on the request's values
+ *   before anything else: changes them in place, or answers the error. `writeOnly`: fields accepted but never stored
+ *   nor answered (a password). `deletable` false: DELETE is 405 (customers are switched off, never deleted).
  */
 type FakeTable = {
   key?: string
+  convert?: (values: Record<string, unknown>, creating: boolean) => Response | null
+  writeOnly?: string[]
+  deletable?: boolean
   replaceable?: boolean
   orderable?: boolean
   createDefaults?: (values: Record<string, unknown>, rows: StaffRow[]) => Record<string, unknown>
@@ -206,6 +226,25 @@ const newRowDefaults = (fallback: string) => (values: Record<string, unknown>, r
     filled.sortOrder = rows.length ? Math.max(...rows.map((row) => Number(row.sortOrder))) + 1 : 0
   }
   return filled
+}
+
+/**
+ * The server's email and password converters and its require_password (backend/app/staff/routes.py): the email
+ * trimmed and lowercased, a password of 8 to 128 characters, required on a new customer.
+ * @param values - The request's values (the email is changed in place).
+ * @param creating - True for POST.
+ * @returns The 400 answer, or null when the values are fine.
+ */
+function customerFields(values: Record<string, unknown>, creating: boolean): Response | null {
+  if ('email' in values && values.email !== null) {
+    if (typeof values.email !== 'string' || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(values.email.trim())) return json({ error: 'invalid', field: 'email' }, 400)
+    values.email = values.email.trim().toLowerCase()
+  }
+  if ('password' in values && (typeof values.password !== 'string' || values.password.length < 8 || values.password.length > 128)) {
+    return json({ error: 'invalid', field: 'password' }, 400)
+  }
+  if (creating && !('password' in values)) return json({ error: 'required', field: 'password' }, 400)
+  return null
 }
 
 /** The staff tables the fake serves, by their URL name. */
@@ -390,6 +429,20 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     },
     order: (a, b) => Number(a.sortOrder) - Number(b.sortOrder) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
   },
+  customers: {
+    fields: ['email', 'password', 'fullName', 'phone', 'companyName', 'businessNumber', 'city', 'address', 'rivhitCustomerId', 'notes', 'isActive'],
+    required: ['email', 'fullName', 'companyName', 'isActive'],
+    defaults: { phone: null, businessNumber: null, city: null, address: null, rivhitCustomerId: null, notes: null, isActive: true, lastLoginAt: null },
+    convert: customerFields,
+    writeOnly: ['password'],
+    deletable: false,
+    seed: () => STAFF_CUSTOMERS.map((customer) => ({ ...customer })),
+    check: (customer, others) => {
+      if (customer.businessNumber !== null && !/^[0-9]{9}$/.test(String(customer.businessNumber))) return invalid('business_users_business_number_check')
+      return duplicate(customer, others, 'email', 'app_users_email_key') ?? duplicate(customer, others, 'businessNumber', 'business_users_business_number_key')
+    },
+    order: (a, b) => String(a.companyName).localeCompare(String(b.companyName)) || String(a.email).localeCompare(String(b.email)),
+  },
 }
 
 /** Where the server's S3 stub serves its objects (storage.MEDIA_URL; no bucket is configured in tests). */
@@ -535,6 +588,9 @@ async function staffAnswer(resource: string, method: string, id: string | null, 
   const values = body && method !== 'PUT' ? (JSON.parse(String(body)) as Record<string, unknown>) : {}
   const unknown = Object.keys(values).find((key) => !table.fields.includes(key))
   if (unknown) return json({ error: 'unknown_field', field: unknown }, 400)
+  const converted = table.convert?.(values, id === null && method === 'POST')
+  if (converted) return converted
+  for (const key of table.writeOnly ?? []) delete values[key]
   for (const key of table.numeric ?? []) if (typeof values[key] === 'string') values[key] = Number(values[key])
   for (const key of table.media ?? []) {
     if (!(key in values)) continue
@@ -559,6 +615,7 @@ async function staffAnswer(resource: string, method: string, id: string | null, 
   if (index < 0) return json({ error: 'not_found' }, 404)
   if (method === 'GET') return json(rows[index])
   if (method === 'DELETE') {
+    if (table.deletable === false) return json({ error: 'method_not_allowed' }, 405)
     const constraint = await table.inUse?.(rows[index])
     if (constraint) return json({ error: 'in_use', constraint }, 409)
     rows.splice(index, 1)
@@ -612,6 +669,38 @@ async function productPage(params: URLSearchParams): Promise<ProductPage> {
 }
 
 /**
+ * One product for its page, like the server's product_detail_json: the gallery, the category, the brand when it is
+ * shown, and the next products of the category in catalog order (wrapping round). Empty translations are left out.
+ * @param slug - The product's URL name.
+ * @returns The product, or null for an unknown slug.
+ */
+async function productDetail(slug: string): Promise<ProductDetail | null> {
+  const { default: products } = (await import('@/stubs/products.json')) as { default: StubProduct[] }
+  const index = products.findIndex((p) => p.slug === slug)
+  if (index < 0) return null
+  const product = products[index]
+  const category = categories.find((c) => c.slug === product.category)!
+  const brand = activeBrands.find((b) => b.slug === product.brand)
+  const siblings = products.filter((p) => p.category === product.category)
+  const at = siblings.indexOf(product)
+  const related = [...siblings.slice(at + 1), ...siblings.slice(0, at)].slice(0, RELATED_COUNT)
+  return {
+    id: product.id,
+    slug: product.slug,
+    name: product.name,
+    description: Object.fromEntries(Object.entries(product.description).filter(([, html]) => html)),
+    sku: product.sku,
+    barcode: product.barcode,
+    legacyPath: product.legacyPath,
+    updatedAt: '2026-11-01T12:00:00+02:00',
+    category: { slug: category.slug, name: category.name },
+    brand: brand ? { slug: brand.slug, name: brand.name } : null,
+    images: product.images.map((image) => ({ ...mediaImage(image), alt: image.alt })),
+    related: related.map(({ id, slug, name, category, images }) => ({ id, slug, name, category, image: images[0] ? mediaImage(images[0]) : null })),
+  }
+}
+
+/**
  * Shapes a stub brand the way the server returns it.
  * @param brand - The brand from stubs/brands.json.
  * @returns The API brand.
@@ -642,10 +731,6 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
   const slug = (prefix: string) => (path.startsWith(prefix) ? decodeURIComponent(path.slice(prefix.length)) : null)
 
   if (path === '/api/staff/uploads' && method === 'POST') return uploadAnswer(init.body)
-  if (path === '/api/staff/customers') {
-    if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
-    return method === 'GET' ? json(STAFF_CUSTOMERS) : json({ error: 'method_not_allowed' }, 405)
-  }
   const staff = /^\/api\/staff\/([a-z-]+)(?:\/(.+))?$/.exec(path)
   if (staff) return staffAnswer(staff[1], method, staff[2] ? decodeURIComponent(staff[2]) : null, init.body)
 
@@ -656,6 +741,11 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
       return json(rows.map(({ slug, name, legacyPath, imageUrl }) => ({ slug, name, legacyPath, imageUrl })) as ProductCategory[])
     }
     if (path === '/api/products') return json(await productPage(url.searchParams))
+    const productSlug = slug('/api/products/')
+    if (productSlug) {
+      const product = await productDetail(productSlug)
+      if (product) return json(product)
+    }
     if (path === '/api/brands') return json(activeBrands.map(brandJson))
     const brand = activeBrands.find((b) => b.slug === slug('/api/brands/'))
     if (brand) return json(brandJson(brand))
