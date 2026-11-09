@@ -1,6 +1,6 @@
 """routes.py — Blueprint `customers` (prefix /api): everything the public site and the business customers call.
 
-Public, no sign-in:
+Public, no sign-in (/products also reads an optional customer sign-in for its price sorts and price range):
     GET /categories, /products, /products/<slug>, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
     /articles, /articles/<slug>, /resellers, /sitemap.xml, /media/<key> (stored files: the S3 stub's objects),
     /catalog.pdf (redirects to the PDF catalog in the file storage)
@@ -15,12 +15,13 @@ storage.srcset_urls). The public routes never return a price: prices come only f
 the signed-in customer by app.pricing.
 """
 import math
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import quote
 from xml.sax.saxutils import escape
 
 from flask import Blueprint, Response, abort, current_app, jsonify, redirect, request
-from flask_jwt_extended import current_user, verify_jwt_in_request
+from flask_jwt_extended import current_user, get_jwt, verify_jwt_in_request
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -41,6 +42,9 @@ LOCALES = ("he", "en", "ru", "ar")
 # Products per catalog page: the default and the most a client may ask for.
 PAGE_SIZE = 24
 MAX_PAGE_SIZE = 100
+# The catalog's sort orders (absent = the staff order); the price ones need a signed-in business customer.
+SORTS = ("name-asc", "name-desc", "newest", "price-asc", "price-desc")
+PRICE_SORTS = ("price-asc", "price-desc")
 # The home page figures, in display order; each reads the settings stat_<id>_value and stat_<id>_suffix.
 STAT_IDS = ("retail", "partners", "products", "years")
 # The contact details, each read from the setting contact_<field>.
@@ -129,58 +133,174 @@ def list_categories() -> list[dict[str, Any]]:
     return [{"slug": c.slug, "name": c.name, "legacyPath": c.legacy_path, "imageUrl": storage.url_of(c.image_url)} for c in categories]
 
 
-@bp.get("/products")
-def list_products() -> dict[str, Any]:
-    """One page of the catalog, filtered by category and search text.
-
-    Query args: `category` (a category slug; unknown slugs are ignored), `q` (search text), `page` (from 1; clamped
-    to the last page), `pageSize` (1-100, default 24).
+def signed_in_customer() -> BusinessUser | None:
+    """Reads the optional sign-in of a public route: the business customer whose valid access token came along.
 
     Returns:
-        {items, page, pageSize, pageCount, total, category, categoryCounts}: `items` is the page in catalog order
-        (sort_order); `total` counts every match of the category and text; `category` is the applied slug or null;
-        `categoryCounts` maps every active category slug to its matches of the text alone (the chip numbers).
+        The signed-in business customer, or None for a visitor or a staff member. An expired or invalid token is
+        still answered 401 (the client refreshes it and asks again).
+    """
+    verify_jwt_in_request(optional=True)
+    return current_user if get_jwt().get("user_type") == "business" else None
+
+
+def read_amount(name: str) -> Decimal | None:
+    """Reads a shekel amount from the query string (the catalog's price range).
+
+    Args:
+        name: The query arg, "min" or "max".
+
+    Returns:
+        The amount, or None when it is absent, not a number, negative or not finite.
+    """
+    try:
+        amount = Decimal(request.args.get(name, ""))
+    except InvalidOperation:
+        return None
+    return amount if amount.is_finite() and amount >= 0 else None
+
+
+def count_matches(column: Any, conditions: list[ColumnElement[bool]]) -> dict[Any, int]:
+    """Counts the catalog matches per value of a column (the numbers of the category chips and brand filter).
+
+    Args:
+        column: What to group by, e.g. Category.slug or Brand.slug (products without a brand count under None).
+        conditions: The filters to count under.
+
+    Returns:
+        Column value -> number of matching products.
+    """
+    query = (
+        select(column, func.count(Product.id))
+        .select_from(Product)
+        .join(Product.category)
+        .outerjoin(Product.brand)
+        .where(*conditions)
+        .group_by(column)
+    )
+    return dict(db.session.execute(query).all())
+
+
+def catalog_order(sort: str | None, lang: str) -> tuple[Any, ...]:
+    """The ORDER BY of a catalog sort that the database can do (every sort but the price ones).
+
+    Args:
+        sort: One of SORTS without the price sorts, or None for the staff order.
+        lang: The language whose names the name sorts compare (falls back to Hebrew, which every product has).
+
+    Returns:
+        The order clauses, ending with the id so equal values keep a stable order.
+    """
+    name = func.lower(func.coalesce(Product.name[lang].astext, Product.name["he"].astext))
+    if sort == "name-asc":
+        return name, Product.id
+    if sort == "name-desc":
+        return name.desc(), Product.id
+    if sort == "newest":
+        # Seeded rows share one timestamp: their WooCommerce id keeps the old store's order of creation.
+        return Product.created_at.desc(), Product.woocommerce_id.desc().nulls_last(), Product.id
+    return Product.sort_order, Product.id
+
+
+@bp.get("/products")
+def list_products() -> dict[str, Any]:
+    """One page of the catalog, filtered, searched and sorted.
+
+    Query args: `category` (a category slug; unknown slugs are ignored), `brand` (comma-separated brand slugs, any of
+    them; unknown or inactive ones are ignored), `q` (search text), `sort` (one of SORTS; absent or unknown = the staff
+    order), `lang` (the language of the name sorts, default he), `min` / `max` (a price range in shekels), `page` (from
+    1; clamped to the last page), `pageSize` (1-100, default 24). The price sorts and the price range apply only for a
+    signed-in business customer (their own prices, see app.pricing); for anyone else they are ignored, so the order
+    and the matches never reveal a price.
+
+    Returns:
+        {items, page, pageSize, pageCount, total, category, brands, sort, priceRange, priceBounds, categoryCounts,
+        brandCounts}: `items` is the page in the applied order (a price sort puts the products without a price last);
+        `total` counts every match; `category`, `brands`, `sort` and `priceRange` ({min, max}, either may be null) are
+        what was applied (null / [] = none); `priceBounds` is {min, max} of the customer's prices among the matches
+        before the price range (null for visitors, or when none has a price); `categoryCounts` maps every active
+        category slug to its matches of every filter but the category, `brandCounts` every active brand slug to its
+        matches of every filter but the brand.
     """
     page_size = min(max(request.args.get("pageSize", PAGE_SIZE, type=int), 1), MAX_PAGE_SIZE)
-    conditions = [Product.is_active, Category.is_active, *search_conditions(request.args.get("q", ""))]
+    customer = signed_in_customer()
+    prices = customer_prices(customer.id) if customer else None
+    base = [Product.is_active, Category.is_active, *search_conditions(request.args.get("q", ""))]
 
-    slugs = db.session.scalars(select(Category.slug).where(Category.is_active).order_by(Category.sort_order, Category.slug))
-    counts = dict.fromkeys(slugs, 0)
-    counts.update(
-        db.session.execute(
-            select(Category.slug, func.count(Product.id))
-            .select_from(Product)
-            .join(Product.category)
-            .where(*conditions)
-            .group_by(Category.slug)
-        ).all()
-    )
+    category_slugs = db.session.scalars(select(Category.slug).where(Category.is_active).order_by(Category.sort_order, Category.slug))
+    brand_slugs = db.session.scalars(select(Brand.slug).where(Brand.is_active).order_by(Brand.sort_order, Brand.name))
+    category_counts = dict.fromkeys(category_slugs, 0)
+    brand_counts = dict.fromkeys(brand_slugs, 0)
+
     category = request.args.get("category")
-    if category not in counts:
+    if category not in category_counts:
         category = None
-    total = counts[category] if category else sum(counts.values())
+    brands = [slug for slug in brand_counts if slug in request.args.get("brand", "").split(",")]
+    category_condition = [Category.slug == category] if category else []
+    brand_condition = [Brand.slug.in_(brands)] if brands else []
+
+    price_range = None
+    price_condition: list[ColumnElement[bool]] = []
+    price_bounds = None
+    if prices is not None:
+        low, high = read_amount("min"), read_amount("max")
+        if low is not None and high is not None and low > high:
+            low, high = high, low
+        if low is not None or high is not None:
+            price_range = {"min": low, "max": high}
+            in_range = [pid for pid, price in prices.items() if (low is None or price >= low) and (high is None or price <= high)]
+            price_condition = [Product.id.in_(in_range)]
+        matched = db.session.scalars(
+            select(Product.id).join(Product.category).outerjoin(Product.brand).where(*base, *category_condition, *brand_condition)
+        )
+        matched_prices = [prices[pid] for pid in matched if pid in prices]
+        if matched_prices:
+            price_bounds = {"min": min(matched_prices), "max": max(matched_prices)}
+
+    category_counts.update(count_matches(Category.slug, [*base, *brand_condition, *price_condition]))
+    brand_counts.update(
+        (slug, n) for slug, n in count_matches(Brand.slug, [*base, *category_condition, *price_condition]).items() if slug in brand_counts
+    )
+    total = category_counts[category] if category else sum(category_counts.values())
     page_count = max(1, math.ceil(total / page_size))
     page = min(max(request.args.get("page", 1, type=int), 1), page_count)
+    offset = (page - 1) * page_size
 
+    sort = request.args.get("sort")
+    if sort not in SORTS or (sort in PRICE_SORTS and prices is None):
+        sort = None
+    lang = request.args.get("lang", "he")
+    if lang not in LOCALES:
+        lang = "he"
+    conditions = [*base, *category_condition, *brand_condition, *price_condition]
     query = (
         select(Product)
         .join(Product.category)
-        .where(*conditions)
+        .outerjoin(Product.brand)
         .options(contains_eager(Product.category), selectinload(Product.images))
-        .order_by(Product.sort_order, Product.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
     )
-    if category:
-        query = query.where(Category.slug == category)
+    if sort in PRICE_SORTS:
+        # The prices are computed in Python (app.pricing): sort the matching ids here, then load one page of them.
+        ids = db.session.scalars(select(Product.id).join(Product.category).outerjoin(Product.brand).where(*conditions).order_by(*catalog_order(None, lang))).all()
+        priced = sorted((pid for pid in ids if pid in prices), key=lambda pid: prices[pid], reverse=sort == "price-desc")
+        page_ids = (priced + [pid for pid in ids if pid not in prices])[offset:offset + page_size]
+        loaded = {product.id: product for product in db.session.scalars(query.where(Product.id.in_(page_ids)))}
+        products = [loaded[pid] for pid in page_ids]
+    else:
+        products = list(db.session.scalars(query.where(*conditions).order_by(*catalog_order(sort, lang)).offset(offset).limit(page_size)))
     return {
-        "items": [product_json(product) for product in db.session.scalars(query)],
+        "items": [product_json(product) for product in products],
         "page": page,
         "pageSize": page_size,
         "pageCount": page_count,
         "total": total,
         "category": category,
-        "categoryCounts": counts,
+        "brands": brands,
+        "sort": sort,
+        "priceRange": price_range,
+        "priceBounds": price_bounds,
+        "categoryCounts": category_counts,
+        "brandCounts": brand_counts,
     }
 
 

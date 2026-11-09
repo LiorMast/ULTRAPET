@@ -4,20 +4,28 @@
  *
  * It asks for the type (a percentage or an amount in shekels before VAT, as a switch), the value, whether it is a
  * bulk discount (with its minimum quantity: it applies from that many units of one product, on top of the regular
- * discounts), a start date and an end date or "no end date". The value is always positive: the percent or the
- * shekels taken off. A live summary reads the result back in words ("10% off for 12 units or more, from 3 Nov 2026,
- * with no end date"). The
+ * discounts), a start date and time and an end date and time or "no end date" (Israel time; the times default to
+ * 00:00 and 23:59, so a period covers whole days unless staff pick otherwise). The value is always positive: the
+ * percent or the shekels taken off. A live summary reads the result back in words ("10% off for 12 units or more,
+ * from 3 Nov 2026, with no end date"; a time shows only when it is not the default). The
  * dialog knows nothing about storage: it hands the caller a DiscountValue, and the caller saves it for its
  * target (e.g. a price rule); when the save is refused, the dialog shows why and stays open. describeDiscount
  * words a discount the same way for lists (DiscountsDialog, the Discounts page).
  *
  * Given `scope` (the Discounts page, routes/admin.discounts.tsx), the form also asks what the discount applies to:
- * a category or a product (one searchable list of both) and all customers or one customer (a searchable list), and
- * hands that back as a RuleScope; scopeFields turns it into a price rule's target fields. Without `scope.customers`
- * (a customer's own discounts, routes/admin.customers.tsx) it asks only for the category or product, and the
- * caller sets the customer. discountTargets builds the category and product choices for both pages.
+ * all products, or a category or a product (one searchable list of both), and all customers or one customer (a
+ * searchable list), and hands that back as a RuleScope; scopeFields turns it into a price rule's target fields. A
+ * discount on all products is always for one customer (a store-wide discount for every customer would just lower the
+ * list prices), so choosing it asks for the customer directly. Without `scope.customers` (a customer's own discounts,
+ * routes/admin.customers.tsx) it asks only what it applies to, and the caller sets the customer. discountTargets
+ * builds the category and product choices for both pages.
+ *
+ * Editing a discount that has not ended offers "End discount now": it saves the discount at once, unchanged except
+ * that it ends at this moment (the end is exclusive, as backend/app/pricing.py applies it: it stops applying at
+ * once), and closes.
  */
 import { useId, useState, type FormEvent } from 'react'
+import { CalendarX2 } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type StaffCategory, type StaffProduct } from '@/api'
 import { localized } from '@/config'
@@ -30,15 +38,16 @@ import type { Dictionary } from '@/i18n/he'
 
 /**
  * One discount. `value` > 0 is what is taken off: percent for "percent", shekels before VAT for
- * "amount". `startsOn` / `endsOn` are Israel dates ("2026-11-03", inclusive); `endsOn` null = no end date.
+ * "amount". `startsAt` / `endsAt` are Israel times ("2026-11-03T08:30:00", see israelTime; the start inclusive, the
+ * end exclusive); `startsAt` '' = in effect since the rule was made, `endsAt` null = no end.
  * `minQuantity` (a whole number >= 2) makes it a bulk discount: it applies when one product is ordered in at least
  * that many units; null = a regular discount (any quantity).
  */
-export type DiscountValue = { type: 'percent' | 'amount'; value: number; minQuantity: number | null; startsOn: string; endsOn: string | null }
+export type DiscountValue = { type: 'percent' | 'amount'; value: number; minQuantity: number | null; startsAt: string; endsAt: string | null }
 
 /**
- * What a discount applies to (the Discounts page): `target` = "category:<id>" or "product:<id>" ('' = not chosen
- * yet); `customerId` = one business customer, or null for every customer.
+ * What a discount applies to: `target` = "category:<id>", "product:<id>" or ALL_PRODUCTS ('' = not chosen yet);
+ * `customerId` = one business customer, or null for every customer (never with ALL_PRODUCTS).
  */
 export type RuleScope = { target: string; customerId: string | null }
 
@@ -49,6 +58,9 @@ export type RuleScope = { target: string; customerId: string | null }
  * edited rule's.
  */
 export type ScopeChoices = { targets: SearchOption[]; customers?: SearchOption[]; initial?: RuleScope }
+
+/** The RuleScope target of a customer's discount on every product (a price rule with no category and no product). */
+export const ALL_PRODUCTS = 'all'
 
 /**
  * The value of a category or product among the scope's targets.
@@ -76,7 +88,8 @@ export function discountTargets(categories: StaffCategory[], products: StaffProd
 
 /**
  * A price rule's target fields for the staff API (createStaffRow / updateStaffRow 'price-rules'); the target not
- * chosen is set to null, so an edit that moves a rule from a category to a product keeps exactly one target.
+ * chosen is set to null, so an edit that moves a rule from a category to a product keeps exactly one target, and
+ * ALL_PRODUCTS sets both to null.
  * @param scope - The scope from DiscountDialog.
  * @returns { categoryId, productId, businessUserId }.
  */
@@ -94,12 +107,57 @@ const CHECKBOX_CLASS = 'size-4 accent-brand-red focus-visible:outline-2 focus-vi
 /** The field a message belongs to. */
 type FieldName = 'target' | 'customer' | 'value' | 'minQuantity' | 'startsOn' | 'endsOn'
 
+/** The time a new period starts and ends at, so that by default it covers whole days. */
+export const START_TIME = '00:00'
+export const END_TIME = '23:59'
+
+/** Reads a moment on the Israel clock, with the parts named. */
+const ISRAEL_CLOCK = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Jerusalem',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
 /**
- * Today's date in Israel, the day discount periods are counted in (as backend/app/pricing.py does).
+ * A moment as Israel time, the form discount periods are edited and compared in.
+ * @param moment - The moment.
+ * @returns E.g. "2026-11-03T08:30:00".
+ */
+function israelClock(moment: Date): string {
+  const part = Object.fromEntries(ISRAEL_CLOCK.formatToParts(moment).map(({ type, value }) => [type, value]))
+  return `${part.year}-${part.month}-${part.day}T${part.hour}:${part.minute}:${part.second}`
+}
+
+/**
+ * The current Israel time (the server reads a time without a UTC offset as Israel time).
+ * @returns E.g. "2026-11-03T14:32:07".
+ */
+export function israelNow(): string {
+  return israelClock(new Date())
+}
+
+/**
+ * Today's date in Israel.
  * @returns E.g. "2026-11-03".
  */
 export function israelToday(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date())
+  return israelNow().slice(0, 10)
+}
+
+/**
+ * A stored time as Israel time: the staff API answers with a UTC offset ("2026-11-03T06:30:00+00:00"); a time without
+ * one is already Israel time (what the form sends).
+ * @param value - The stored time.
+ * @returns E.g. "2026-11-03T08:30:00", comparable as text with israelNow.
+ */
+export function israelTime(value: string): string {
+  if (/(Z|[+-]\d\d:?\d\d)$/i.test(value)) return israelClock(new Date(value.replace(/(\.\d{3})\d+/, '$1')))
+  return value.length === 16 ? `${value}:00` : value
 }
 
 /**
@@ -129,22 +187,35 @@ export function formatDate(date: string, locale: Locale): string {
 }
 
 /**
+ * Formats an Israel time for people: its date, and its time unless it is the default one.
+ * @param value - The time ("2026-11-03T08:30:00", see israelTime).
+ * @param locale - The page language.
+ * @param defaultTime - The time not worth showing ("00:00" for a start, "23:59" for an end); omit to always show it.
+ * @returns E.g. "3 Nov 2026" or "3 Nov 2026, 08:30" (the time isolated left to right).
+ */
+export function formatMoment(value: string, locale: Locale, defaultTime?: string): string {
+  const date = formatDate(value.slice(0, 10), locale)
+  const time = value.slice(11, 16)
+  return time && time !== defaultTime ? `${date}, \u2066${time}\u2069` : date
+}
+
+/**
  * Words a discount for people: its value, its minimum quantity (a bulk discount) and its period.
- * @param discount - The discount; an empty `startsOn` leaves the period out.
+ * @param discount - The discount; an empty `startsAt` leaves the period out.
  * @param t - The dictionary.
  * @param locale - The page language.
  * @returns E.g. "10% off, from 3 Nov 2026, with no end date" or "₪20.00 off for 12 units or more, from 1 Nov 2026 to
  *   30 Nov 2026".
  */
-export function describeDiscount({ type, value, minQuantity, startsOn, endsOn }: DiscountValue, t: Dictionary, locale: Locale): string {
+export function describeDiscount({ type, value, minQuantity, startsAt, endsAt }: DiscountValue, t: Dictionary, locale: Locale): string {
   const d = t.admin.discount
   const off = d.summaryDiscount.replace('{value}', formatValue(type, value, locale))
   return [
     minQuantity === null ? off : `${off} ${d.summaryBulk.replace('{quantity}', `\u2066${minQuantity.toLocaleString(locale)}\u2069`)}`,
-    startsOn &&
-      (endsOn ? d.summaryPeriod : d.summaryOpen)
-        .replace('{start}', formatDate(startsOn, locale))
-        .replace('{end}', endsOn ? formatDate(endsOn, locale) : ''),
+    startsAt &&
+      (endsAt ? d.summaryPeriod : d.summaryOpen)
+        .replace('{start}', formatMoment(startsAt, locale, START_TIME))
+        .replace('{end}', endsAt ? formatMoment(endsAt, locale, END_TIME) : ''),
   ]
     .filter(Boolean)
     .join(', ')
@@ -154,13 +225,13 @@ export function describeDiscount({ type, value, minQuantity, startsOn, endsOn }:
  * The create/edit discount dialog.
  * @param props.open - Whether the dialog is open.
  * @param props.onOpenChange - Called to open or close it (Cancel, Escape, the X, a click outside, after saving).
- * @param props.onSave - Saves the discount; rejects with ApiError to show the server's reason and keep the
- *   dialog open.
- * @param props.initial - The discount being edited (an empty start date starts from today); omit to create one (a
- *   percentage, from today, no end date).
+ * @param props.onSave - Saves the discount (also "End discount now", with the edited rule's `scope.initial`); rejects
+ *   with ApiError to show the server's reason and keep the dialog open.
+ * @param props.initial - The discount being edited (an empty start starts from today at 00:00; one that has not
+ *   ended gets "End discount now"); omit to create one (a percentage, from today at 00:00, no end date).
  * @param props.title - The title; defaults to "New discount", or "Edit discount" when `initial` is given.
  * @param props.target - What the discount applies to, shown under the title (e.g. "Dry dog food — Demo Pet Shop").
- * @param props.scope - Adds the "applies to" fields (a category or product, all customers or one); `onSave` then
+ * @param props.scope - Adds the "applies to" fields (all products, or a category or product; all customers or one); `onSave` then
  *   also gets the chosen RuleScope. Omit when the caller already knows the target.
  * @param props.onCloseAutoFocus - Where the focus goes after closing (the button that opened it); without it, the
  *   focus is left on the page.
@@ -208,7 +279,7 @@ export function DiscountDialog({
 
 /**
  * The dialog's form: the "applies to" fields (with `scope`), the type switch, value, bulk minimum quantity, dates,
- * summary and buttons.
+ * summary and buttons (with "End discount now" when editing a discount that has not ended).
  * @param props.initial - The discount being edited, if any.
  * @param props.title - The dialog title.
  * @param props.target - What the discount applies to, if given.
@@ -239,10 +310,13 @@ function DiscountForm({
   const [value, setValue] = useState(initial ? String(initial.value) : '')
   const [bulk, setBulk] = useState(initial ? initial.minQuantity !== null : false)
   const [minQuantity, setMinQuantity] = useState(initial?.minQuantity != null ? String(initial.minQuantity) : '')
-  const [startsOn, setStartsOn] = useState(initial?.startsOn || israelToday())
-  const [endsOn, setEndsOn] = useState(initial?.endsOn ?? '')
-  const [noEnd, setNoEnd] = useState(initial ? initial.endsOn === null : true)
-  const [ruleTarget, setRuleTarget] = useState(scope?.initial?.target ?? '')
+  const [startsOn, setStartsOn] = useState(initial?.startsAt ? initial.startsAt.slice(0, 10) : israelToday())
+  const [startTime, setStartTime] = useState(initial?.startsAt ? initial.startsAt.slice(11, 16) : START_TIME)
+  const [endsOn, setEndsOn] = useState(initial?.endsAt?.slice(0, 10) ?? '')
+  const [endTime, setEndTime] = useState(initial?.endsAt ? initial.endsAt.slice(11, 16) : END_TIME)
+  const [noEnd, setNoEnd] = useState(initial ? initial.endsAt === null : true)
+  const [everyProduct, setEveryProduct] = useState(scope?.initial?.target === ALL_PRODUCTS)
+  const [ruleTarget, setRuleTarget] = useState(scope?.initial?.target === ALL_PRODUCTS ? '' : (scope?.initial?.target ?? ''))
   const [oneCustomer, setOneCustomer] = useState(Boolean(scope?.initial?.customerId))
   const [customerId, setCustomerId] = useState(scope?.initial?.customerId ?? '')
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({})
@@ -253,9 +327,15 @@ function DiscountForm({
   const valid = /^-?\d+(\.\d{1,2})?$/.test(value.trim()) && number > 0
   const quantity = /^\d+$/.test(minQuantity.trim()) ? Number(minQuantity.trim()) : NaN
   const quantityValid = !bulk || quantity >= 2
+  // A discount on every product is always for one customer.
+  const askCustomer = Boolean(scope?.customers) && (oneCustomer || everyProduct)
+  // The period as Israel times; an emptied time box falls back to the default time.
+  const startsAt = `${startsOn}T${startTime || START_TIME}:00`
+  const endsAt = noEnd || !endsOn ? null : `${endsOn}T${endTime || END_TIME}:00`
+  const canEnd = initial !== undefined && (initial.endsAt === null || initial.endsAt > israelNow())
   const summary =
     valid && quantityValid
-      ? describeDiscount({ type, value: number, minQuantity: bulk ? quantity : null, startsOn, endsOn: noEnd || !endsOn ? null : endsOn }, t, locale)
+      ? describeDiscount({ type, value: number, minQuantity: bulk ? quantity : null, startsAt: startsOn && startsAt, endsAt }, t, locale)
       : ''
 
   /**
@@ -265,8 +345,8 @@ function DiscountForm({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const found: Partial<Record<FieldName, string>> = {}
-    if (scope && !ruleTarget) found.target = t.admin.errors.required
-    if (scope?.customers && oneCustomer && !customerId) found.customer = t.admin.errors.required
+    if (scope && !everyProduct && !ruleTarget) found.target = t.admin.errors.required
+    if (askCustomer && !customerId) found.customer = t.admin.errors.required
     if (!value.trim()) found.value = t.admin.errors.required
     else if (!/^-?\d+(\.\d{1,2})?$/.test(value.trim())) found.value = d.errorNumber
     else if (number <= 0) found.value = d.errorPositive
@@ -275,7 +355,7 @@ function DiscountForm({
     else if (!quantityValid) found.minQuantity = d.errorQuantity
     if (!startsOn) found.startsOn = t.admin.errors.required
     if (!noEnd && !endsOn) found.endsOn = t.admin.errors.required
-    else if (!noEnd && startsOn && endsOn < startsOn) found.endsOn = d.errorEnd
+    else if (startsOn && endsAt !== null && endsAt < startsAt) found.endsOn = d.errorEnd
     setErrors(found)
     setFormError('')
     const first = (['target', 'customer', 'value', 'minQuantity', 'startsOn', 'endsOn'] as const).find((name) => found[name])
@@ -285,8 +365,28 @@ function DiscountForm({
     }
     setPending(true)
     try {
-      const chosen = scope ? { target: ruleTarget, customerId: scope.customers ? (oneCustomer ? customerId : null) : (scope.initial?.customerId ?? null) } : undefined
-      await onSave({ type, value: number, minQuantity: bulk ? quantity : null, startsOn, endsOn: noEnd ? null : endsOn }, chosen)
+      const chosen = scope
+        ? { target: everyProduct ? ALL_PRODUCTS : ruleTarget, customerId: scope.customers ? (askCustomer ? customerId : null) : (scope.initial?.customerId ?? null) }
+        : undefined
+      await onSave({ type, value: number, minQuantity: bulk ? quantity : null, startsAt, endsAt }, chosen)
+    } catch (error) {
+      setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
+      setPending(false)
+    }
+  }
+
+  /**
+   * "End discount now": saves the edited discount as it was stored (unsaved changes in the form are dropped), ending
+   * at this moment (to the second; the end is exclusive, so it stops applying at once); a discount that has not
+   * started yet also starts now (an empty period), so its period stays valid. Shows the server's refusal like Save does.
+   */
+  const handleEndNow = async () => {
+    if (!initial) return
+    const now = israelNow()
+    setPending(true)
+    setFormError('')
+    try {
+      await onSave({ ...initial, startsAt: initial.startsAt && initial.startsAt > now ? now : initial.startsAt, endsAt: now }, scope?.initial)
     } catch (error) {
       setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
       setPending(false)
@@ -325,39 +425,57 @@ function DiscountForm({
           {scope && (
             <>
               <div>
-                <label htmlFor={`${id}-target`} className={LABEL_CLASS}>{`${d.appliesTo} *`}</label>
-                <SearchableField
-                  id={`${id}-target`}
-                  label={d.appliesTo}
-                  value={ruleTarget}
-                  onChange={(next) => setRuleTarget(next)}
-                  options={scope.targets}
-                  strict
-                  className="mt-2"
-                  inputClassName={INPUT_CLASS}
-                  aria-required
-                  {...described('target', `${id}-target-hint`)}
+                <Segmented
+                  name={`${id}-products`}
+                  legend={d.products}
+                  options={[
+                    { value: 'some', label: d.someProducts },
+                    { value: 'all', label: d.allProducts },
+                  ]}
+                  value={everyProduct ? 'all' : 'some'}
+                  onChange={(next) => setEveryProduct(next === 'all')}
                 />
-                <p id={`${id}-target-hint`} className="mt-1 text-xs text-brand-charcoal-muted">
-                  {d.appliesToHint}
-                </p>
-                {fieldError('target')}
+                {everyProduct && <p className="mt-1 text-xs text-brand-charcoal-muted">{d.allProductsHint}</p>}
               </div>
+
+              {!everyProduct && (
+                <div>
+                  <label htmlFor={`${id}-target`} className={LABEL_CLASS}>{`${d.appliesTo} *`}</label>
+                  <SearchableField
+                    id={`${id}-target`}
+                    label={d.appliesTo}
+                    value={ruleTarget}
+                    onChange={(next) => setRuleTarget(next)}
+                    options={scope.targets}
+                    strict
+                    className="mt-2"
+                    inputClassName={INPUT_CLASS}
+                    aria-required
+                    {...described('target', `${id}-target-hint`)}
+                  />
+                  <p id={`${id}-target-hint`} className="mt-1 text-xs text-brand-charcoal-muted">
+                    {d.appliesToHint}
+                  </p>
+                  {fieldError('target')}
+                </div>
+              )}
 
               {scope.customers && (
                 <div>
-                  <Segmented
-                    name={`${id}-customers`}
-                    legend={d.customers}
-                    options={[
-                      { value: 'all', label: d.allCustomers },
-                      { value: 'one', label: d.oneCustomer },
-                    ]}
-                    value={oneCustomer ? 'one' : 'all'}
-                    onChange={(next) => setOneCustomer(next === 'one')}
-                  />
-                  {oneCustomer && (
-                    <div className="mt-3">
+                  {!everyProduct && (
+                    <Segmented
+                      name={`${id}-customers`}
+                      legend={d.customers}
+                      options={[
+                        { value: 'all', label: d.allCustomers },
+                        { value: 'one', label: d.oneCustomer },
+                      ]}
+                      value={oneCustomer ? 'one' : 'all'}
+                      onChange={(next) => setOneCustomer(next === 'one')}
+                    />
+                  )}
+                  {askCustomer && (
+                    <div className={everyProduct ? undefined : 'mt-3'}>
                       <label htmlFor={`${id}-customer`} className={LABEL_CLASS}>{`${d.customer} *`}</label>
                       <SearchableField
                         id={`${id}-customer`}
@@ -450,6 +568,8 @@ function DiscountForm({
               <label htmlFor={`${id}-startsOn`} className={LABEL_CLASS}>{`${d.startsOn} *`}</label>
               <input id={`${id}-startsOn`} type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} aria-required className={INPUT_CLASS} {...described('startsOn')} />
               {fieldError('startsOn')}
+              <label htmlFor={`${id}-startTime`} className={cn(LABEL_CLASS, 'mt-3')}>{d.startTime}</label>
+              <input id={`${id}-startTime`} type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={INPUT_CLASS} />
             </div>
             <div>
               <label htmlFor={`${id}-endsOn`} className={LABEL_CLASS}>{d.endsOn}</label>
@@ -464,6 +584,15 @@ function DiscountForm({
                 {...described('endsOn')}
               />
               {fieldError('endsOn')}
+              <label htmlFor={`${id}-endTime`} className={cn(LABEL_CLASS, 'mt-3')}>{d.endTime}</label>
+              <input
+                id={`${id}-endTime`}
+                type="time"
+                value={noEnd ? '' : endTime}
+                disabled={noEnd}
+                onChange={(e) => setEndTime(e.target.value)}
+                className={INPUT_CLASS}
+              />
               <label htmlFor={`${id}-noEnd`} className={cn(CHECKBOX_LABEL_CLASS, 'mt-3')}>
                 <input id={`${id}-noEnd`} type="checkbox" checked={noEnd} onChange={(e) => setNoEnd(e.target.checked)} className={CHECKBOX_CLASS} />
                 {d.noEnd}
@@ -481,6 +610,12 @@ function DiscountForm({
           </p>
         )}
         <DialogFooter>
+          {canEnd && (
+            <Button type="button" variant="outline" size="sm" className="sm:me-auto" disabled={pending} onClick={handleEndNow}>
+              <CalendarX2 aria-hidden />
+              {d.endNow}
+            </Button>
+          )}
           <Button type="button" variant="outline" size="sm" onClick={onCancel}>
             {t.admin.cancel}
           </Button>

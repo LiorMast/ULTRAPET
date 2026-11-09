@@ -35,7 +35,7 @@ import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, NoReturn
 
@@ -322,26 +322,6 @@ def timestamp(value: Any) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=ISRAEL)
 
 
-def day(value: Any) -> date | None:
-    """A calendar date in ISO form, e.g. "2026-11-03" (price rule periods, counted in Israel dates).
-
-    Args:
-        value: The JSON value.
-
-    Returns:
-        The date, or None.
-
-    Raises:
-        Invalid: The value has another type or form.
-    """
-    if value is None:
-        return None
-    try:
-        return date.fromisoformat(value)
-    except (TypeError, ValueError) as error:
-        raise Invalid from error
-
-
 def json_value(value: Any) -> Any:
     """Any JSON value (setting values).
 
@@ -584,7 +564,7 @@ RESOURCES: dict[str, Resource] = {
     "price-rules": Resource(
         PriceRule,
         {"business_user_id": reference, "category_id": reference, "product_id": reference, "kind": text,
-         "value": money, "starts_on": day, "ends_on": day, "min_quantity": integer, "is_active": boolean, "note": text},
+         "value": money, "starts_at": timestamp, "ends_at": timestamp, "min_quantity": integer, "is_active": boolean, "note": text},
         (PriceRule.created_at, PriceRule.id),
         stamp_creator=True,
     ),

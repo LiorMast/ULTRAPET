@@ -45,10 +45,16 @@ export type Product = { id: string; slug: string; name: Localized<string>; categ
  */
 export type ProductCategory = { slug: string; name: Localized<string>; legacyPath: string | null; imageUrl: string | null }
 
+/** A price range in shekels before VAT; either end may be open (null). */
+export type PriceRange = { min: number | null; max: number | null }
+
 /**
- * One page of catalog results. `total` counts every product matching the category and search; `category` is
- * the filter the server applied (null when the URL's slug is unknown); `categoryCounts` gives, per category
- * slug, the products matching the search alone (the numbers on the category chips; "All" is their sum).
+ * One page of catalog results. `total` counts every product matching all the filters; `category`, `brands`,
+ * `sort` and `priceRange` are what the server applied (null / [] = none: unknown slugs are ignored, and the price
+ * sorts and range apply only for a signed-in business customer). `priceBounds` is the customer's cheapest and
+ * dearest price among the matches before the price range (null for visitors). `categoryCounts` gives, per category
+ * slug, the matches of every filter but the category (the numbers on the chips; "All" is their sum), and
+ * `brandCounts`, per active brand slug, the matches of every filter but the brand.
  */
 export type ProductPage = {
   items: Product[]
@@ -57,7 +63,12 @@ export type ProductPage = {
   pageCount: number
   total: number
   category: string | null
+  brands: string[]
+  sort: CatalogSort | null
+  priceRange: PriceRange | null
+  priceBounds: { min: number; max: number } | null
   categoryCounts: Record<string, number>
+  brandCounts: Record<string, number>
 }
 
 /**
@@ -82,8 +93,18 @@ export type ProductDetail = {
   related: Product[]
 }
 
-/** The URL state of the catalog: absent = page 1, every category, no search. */
-export type CatalogSearch = { page?: number; category?: string; q?: string }
+/** The catalog's sort orders (absent = the staff order); the price ones are for signed-in business customers. */
+export const CATALOG_SORTS = ['name-asc', 'name-desc', 'newest', 'price-asc', 'price-desc'] as const
+
+/** One of CATALOG_SORTS. */
+export type CatalogSort = (typeof CATALOG_SORTS)[number]
+
+/**
+ * The URL state of the catalog: absent = page 1, every category and brand, no search, the staff order, any price.
+ * `brand` holds brand slugs, comma-separated ("paw,jr-farm"; a plain string keeps the URL readable); `min` / `max`
+ * are shekels (customers only).
+ */
+export type CatalogSearch = { page?: number; category?: string; q?: string; sort?: CatalogSort; brand?: string; min?: number; max?: number }
 
 /** A signed-in customer's prices: product id → unit price in shekels before VAT. */
 export type Prices = { currency: string; prices: Record<string, number> }
@@ -343,15 +364,22 @@ export function rethrowNotFound(error: unknown): never {
 export const fetchCategories = (signal?: AbortSignal) => apiFetch<ProductCategory[]>('/api/categories', { signal })
 
 /**
- * One page of the catalog; filtering, search and paging happen on the server.
- * @param search - The catalog URL state (category slug, search text, page).
+ * One page of the catalog; filtering, search, sorting and paging happen on the server (the cookies carry a
+ * customer's sign-in, which the price sorts and range need).
+ * @param search - The catalog URL state (category, brands, search text, sort, price range, page).
+ * @param locale - The page's language, whose names the name sorts compare; omit for Hebrew.
  * @param signal - Aborts the request (a newer search replaces it).
- * @returns The page of products with its totals and chip counts.
+ * @returns The page of products with its totals and filter counts.
  */
-export function fetchProducts({ category, q, page }: CatalogSearch, signal?: AbortSignal) {
+export function fetchProducts({ category, q, page, sort, brand, min, max }: CatalogSearch, locale?: Locale, signal?: AbortSignal) {
   const params = new URLSearchParams()
   if (category) params.set('category', category)
+  if (brand) params.set('brand', brand)
   if (q) params.set('q', q)
+  if (sort) params.set('sort', sort)
+  if (sort?.startsWith('name') && locale && locale !== 'he') params.set('lang', locale)
+  if (min !== undefined) params.set('min', String(min))
+  if (max !== undefined) params.set('max', String(max))
   if (page && page > 1) params.set('page', String(page))
   const query = params.toString()
   return apiFetch<ProductPage>(`/api/products${query ? `?${query}` : ''}`, { signal })
@@ -526,7 +554,8 @@ export type StaffProduct = StaffRowBase & {
  * A price rule (table price_rules): a discount on one category or one product, for every customer
  * (`businessUserId` null) or one customer. `kind` "percent" / "amount" (shekels before VAT): `value` (> 0) is
  * what is taken off; "fixed_price" (one customer, one product): the price itself.
- * `startsOn` / `endsOn` are Israel dates ("2026-11-03", inclusive); null = no limit.
+ * `startsAt` / `endsAt` are times with a UTC offset (sent without one = Israel time; the start inclusive, the end
+ * exclusive); null = no limit.
  * `minQuantity` (>= 2): a bulk discount, applied when an order line has at least that many units of one product, on
  * top of the regular discounts; null = a regular rule.
  */
@@ -537,8 +566,8 @@ export type StaffPriceRule = StaffRowBase & {
   productId: string | null
   kind: 'percent' | 'amount' | 'fixed_price'
   value: number
-  startsOn: string | null
-  endsOn: string | null
+  startsAt: string | null
+  endsAt: string | null
   minQuantity: number | null
   isActive: boolean
   note: string | null

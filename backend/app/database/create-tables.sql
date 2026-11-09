@@ -189,12 +189,13 @@ CREATE INDEX ON product_suppliers (supplier_id);
 -- price_rules — Every discount and special price, general or per customer, for a set period or
 -- open-ended, and the bulk discounts that apply from a minimum quantity. Written by staff (the staff panel's discount
 -- dialogs). How a customer's price is computed (backend/app/pricing.py):
---   1. Rules count only while active: is_active and starts_on <= today <= ends_on (a NULL date = no limit), where
---      today is the date in Israel.
+--   1. Rules count only while active: is_active and starts_at <= now < ends_at (a NULL time = no limit; the end is
+--      exclusive, so a rule ended "now" stops applying at once).
 --   2. Four layers are picked separately: the customer's own regular rules, the general regular rules
 --      (business_user_id NULL), then the customer's bulk rules and the general bulk rules (min_quantity set). A bulk
 --      rule counts only when the order line has at least min_quantity units of the one product. In each layer a
---      product rule beats a category rule; among bulk rules on the same target the highest threshold reached wins;
+--      product rule beats a category rule, which beats a customer's rule on every product (no target); among bulk
+--      rules on the same target the highest threshold reached wins;
 --      then the rule that started last wins (NULL start = earliest), so a temporary deal overrides permanent terms.
 --   3. A customer fixed_price is the final price. Otherwise the layers stack in that order: each discount is taken
 --      off the price so far, starting from list_price (a percent: x (1 - value/100); an amount: - value), never
@@ -202,22 +203,22 @@ CREATE INDEX ON product_suppliers (supplier_id);
 CREATE TABLE price_rules (
   id               UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- rule id
   business_user_id UUID        REFERENCES business_users (id) ON DELETE CASCADE, -- the customer the rule is for; NULL = a general rule for all customers
-  category_id      UUID        REFERENCES categories (id) ON DELETE CASCADE,     -- target category (every product in it); NULL when the rule targets a product
-  product_id       UUID        REFERENCES products (id) ON DELETE CASCADE,       -- target product; NULL when the rule targets a category
+  category_id      UUID        REFERENCES categories (id) ON DELETE CASCADE,     -- target category (every product in it); NULL when the rule targets a product or every product
+  product_id       UUID        REFERENCES products (id) ON DELETE CASCADE,       -- target product; NULL when the rule targets a category or every product (both NULL = a customer's discount on every product)
   kind             TEXT          NOT NULL CHECK (kind IN ('percent', 'amount', 'fixed_price')), -- 'percent' = value percent off; 'amount' = value shekels before VAT off each unit; 'fixed_price' = the price is value shekels
   value            NUMERIC(10,2) NOT NULL CHECK (value > 0), -- percent or shekels before VAT (see kind); always positive: what is taken off, or the fixed price
-  starts_on        DATE,                                  -- first day the rule applies (Israel date, inclusive); NULL = already in effect
-  ends_on          DATE,                                  -- last day the rule applies (inclusive); NULL = no end date
+  starts_at        TIMESTAMPTZ,                           -- the moment the rule starts applying (inclusive; staff pick it in Israel time); NULL = already in effect
+  ends_at          TIMESTAMPTZ,                           -- the moment the rule stops applying (exclusive); NULL = no end
   min_quantity     INTEGER       CHECK (min_quantity IS NULL OR min_quantity >= 2), -- bulk discount: applies only when an order line has at least this many units of the product, on top of the regular discounts; NULL = a regular rule (any quantity)
   is_active        BOOLEAN       NOT NULL DEFAULT true,   -- false = paused: ignored without being deleted
   note             TEXT,                                  -- why the rule exists (e.g. 'November promotion', 'negotiated terms'); staff only
   created_by_id    UUID        REFERENCES staff_users (id) ON DELETE SET NULL, -- staff member who created the rule; NULL = unknown or since deleted
   created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),  -- when the rule was created
   updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),  -- last change
-  CONSTRAINT price_rules_one_target_check CHECK (num_nonnulls(category_id, product_id) = 1), -- exactly one target: a category or a product
+  CONSTRAINT price_rules_target_check CHECK (num_nonnulls(category_id, product_id) = 1 OR (num_nonnulls(category_id, product_id) = 0 AND business_user_id IS NOT NULL)), -- one target (a category or a product), or none = every product, which only a customer's rule may have
   CONSTRAINT price_rules_percent_max_check CHECK (kind <> 'percent' OR value <= 100), -- a percent discount is at most 100 percent
   CONSTRAINT price_rules_fixed_price_target_check CHECK (kind <> 'fixed_price' OR (product_id IS NOT NULL AND business_user_id IS NOT NULL)), -- a fixed price is set on one product for one customer
-  CONSTRAINT price_rules_dates_check CHECK (starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on), -- the period does not end before it starts
+  CONSTRAINT price_rules_dates_check CHECK (starts_at IS NULL OR ends_at IS NULL OR ends_at >= starts_at), -- the period does not end before it starts
   CONSTRAINT price_rules_fixed_price_bulk_check CHECK (kind <> 'fixed_price' OR min_quantity IS NULL) -- a fixed price is never a bulk rule
 );
 CREATE INDEX ON price_rules (business_user_id);

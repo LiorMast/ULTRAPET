@@ -1,6 +1,7 @@
 """test_customers_api.py — The public and customer routes of the `customers` blueprint (app/customers/routes.py).
 
-Catalog categories and products (search in any language, category filter, chip counts, paging), the product page,
+Catalog categories and products (search in any language, category and brand filters, chip and brand counts, the
+sorts, a customer's price sorts and price range, paging), the product page,
 brands, stats,
 the saved home page sections and FAQ, articles, resellers, the sitemap, and the signed-in customer's prices. Sign-in itself is in test_auth.py.
 """
@@ -86,7 +87,9 @@ def test_products_lists_the_visible_ones_in_catalog_order_without_prices(client,
         "image": {"src": "/api/media/products/treat.jpg", "thumbnail": "/api/media/products/treat.jpg", "srcSet": ""},
     }
     assert data["items"][1]["image"] is None
-    assert "price" not in str(data).lower()
+    assert "price" not in str(data["items"]).lower()
+    # The price fields of the answer exist for customers only; a visitor gets them empty.
+    assert (data["sort"], data["priceRange"], data["priceBounds"]) == (None, None, None)
 
 
 def test_products_filters_by_category(client, catalog):
@@ -129,6 +132,111 @@ def test_products_pages_and_clamps_the_page(client, catalog):
     assert client.get("/api/products?pageSize=3&page=99").get_json()["page"] == 2
     assert client.get("/api/products?page=abc").get_json()["page"] == 1
     assert client.get("/api/products?pageSize=1000").get_json()["pageSize"] == 100
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("sort=name-asc&lang=en", ["beef-dog-food", "dog-chew", "dog-treat", "salmon-cat-food"]),
+        ("sort=name-desc&lang=en", ["salmon-cat-food", "dog-treat", "dog-chew", "beef-dog-food"]),
+        ("sort=name-asc", ["dog-treat", "beef-dog-food", "salmon-cat-food", "dog-chew"]),  # Hebrew by default
+        ("sort=no-such-sort", ["dog-treat", "salmon-cat-food", "beef-dog-food", "dog-chew"]),
+        ("sort=name-asc&lang=xx", ["dog-treat", "beef-dog-food", "salmon-cat-food", "dog-chew"]),
+    ],
+)
+def test_products_sort_by_name(client, catalog, query, expected):
+    assert slugs(client.get(f"/api/products?{query}")) == expected
+
+
+def test_newest_first_follows_the_woocommerce_id_of_rows_added_together(client, catalog, database):
+    for product, woocommerce_id in ((catalog.treat, 1), (catalog.cat_food, 3), (catalog.beef, 2)):
+        product.woocommerce_id = woocommerce_id
+    database.commit()
+    data = client.get("/api/products?sort=newest").get_json()
+    assert data["sort"] == "newest"
+    # The chew has no WooCommerce id: like a product added later in the admin, but with the same timestamp here.
+    assert [item["slug"] for item in data["items"]] == ["salmon-cat-food", "beef-dog-food", "dog-treat", "dog-chew"]
+
+
+@pytest.fixture
+def branded(catalog, database) -> SimpleNamespace:
+    """Brands on the small catalog: Paw (treat, cat food), JR Farm (beef), an inactive brand (chew).
+
+    Args:
+        catalog: The small catalog.
+        database: The test database session.
+
+    Returns:
+        The catalog's rows.
+    """
+    paw = Brand(slug="paw", name="Paw", sort_order=0)
+    farm = Brand(slug="jr-farm", name="JR Farm", sort_order=1)
+    old = Brand(slug="old", name="Old", is_active=False)
+    catalog.treat.brand, catalog.cat_food.brand, catalog.beef.brand, catalog.chew.brand = paw, paw, farm, old
+    database.commit()
+    return catalog
+
+
+def test_products_filter_by_brands_with_counts(client, branded):
+    data = client.get("/api/products?brand=jr-farm,paw,old,nope").get_json()
+    assert data["brands"] == ["paw", "jr-farm"]  # active ones only, in brand order
+    assert [item["slug"] for item in data["items"]] == ["dog-treat", "salmon-cat-food", "beef-dog-food"]
+    assert data["brandCounts"] == {"paw": 2, "jr-farm": 1}
+    assert data["categoryCounts"] == {"dogs": 2, "cats": 1}  # the brand filter applies to the chips
+
+
+def test_brand_counts_follow_the_category_but_not_the_brand(client, branded):
+    data = client.get("/api/products?brand=jr-farm&category=dogs").get_json()
+    assert (data["total"], data["brandCounts"], data["categoryCounts"]) == (1, {"paw": 1, "jr-farm": 1}, {"dogs": 1, "cats": 0})
+
+
+@pytest.fixture
+def priced(catalog, database) -> SimpleNamespace:
+    """List prices on the small catalog: treat 10, beef 30, chew 20; the cat food has none.
+
+    Args:
+        catalog: The small catalog.
+        database: The test database session.
+
+    Returns:
+        The catalog's rows.
+    """
+    catalog.beef.list_price, catalog.chew.list_price = Decimal("30.00"), Decimal("20.00")
+    database.commit()
+    return catalog
+
+
+def test_a_customer_sorts_by_their_own_price(customer_client, customer, priced, database):
+    database.add(PriceRule(business_user=customer, product=priced.beef, kind="amount", value=Decimal("25")))  # beef: 5
+    database.commit()
+    data = customer_client.get("/api/products?sort=price-asc").get_json()
+    assert data["sort"] == "price-asc"
+    # The cat food has no price: last either way.
+    assert [item["slug"] for item in data["items"]] == ["beef-dog-food", "dog-treat", "dog-chew", "salmon-cat-food"]
+    assert data["priceBounds"] == {"min": 5.0, "max": 20.0}
+    assert slugs(customer_client.get("/api/products?sort=price-desc")) == ["dog-chew", "dog-treat", "beef-dog-food", "salmon-cat-food"]
+    paged = customer_client.get("/api/products?sort=price-asc&pageSize=3&page=2").get_json()
+    assert [item["slug"] for item in paged["items"]] == ["salmon-cat-food"]
+
+
+def test_a_customer_filters_by_a_price_range(customer_client, priced):
+    data = customer_client.get("/api/products?min=15&max=40").get_json()
+    assert [item["slug"] for item in data["items"]] == ["beef-dog-food", "dog-chew"]
+    assert data["priceRange"] == {"min": 15.0, "max": 40.0}
+    assert data["categoryCounts"] == {"dogs": 2, "cats": 0}
+    assert data["priceBounds"] == {"min": 10.0, "max": 30.0}  # before the range
+    swapped = customer_client.get("/api/products?min=25&max=5").get_json()
+    assert (swapped["priceRange"], [i["slug"] for i in swapped["items"]]) == ({"min": 5.0, "max": 25.0}, ["dog-treat", "dog-chew"])
+    only_min = customer_client.get("/api/products?min=abc&max=-3").get_json()
+    assert (only_min["priceRange"], only_min["total"]) == (None, 4)
+
+
+@pytest.mark.parametrize("who", ["client", "staff_client"])
+def test_price_sorts_and_ranges_are_ignored_without_a_customer(request, priced, who):
+    client = request.getfixturevalue(who)
+    data = client.get("/api/products?sort=price-desc&min=15&max=25").get_json()
+    assert (data["sort"], data["priceRange"], data["priceBounds"]) == (None, None, None)
+    assert [item["slug"] for item in data["items"]] == ["dog-treat", "salmon-cat-food", "beef-dog-food", "dog-chew"]
 
 
 def test_an_empty_search_has_one_empty_page(client, catalog):

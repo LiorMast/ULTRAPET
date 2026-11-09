@@ -26,7 +26,7 @@ const todayText = () => new Date(`${israelToday()}T12:00:00`).toLocaleDateString
  */
 async function seedCategoryDiscount() {
   signInFakeUser(TEST_STAFF)
-  await createStaffRow('price-rules', { categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 10, startsOn: israelToday(), endsOn: null })
+  await createStaffRow('price-rules', { categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 10, startsAt: `${israelToday()}T00:00:00`, endsAt: null })
 }
 
 /** How the seeded discount reads in the list. */
@@ -75,7 +75,7 @@ describe('/admin/categories', () => {
     await user.type(within(form).getByLabelText('Value *'), '10')
     await user.click(within(form).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New discount' })).not.toBeInTheDocument())
-    expect(bodies(fetchSpy, 'POST')).toEqual([{ categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 10, minQuantity: null, startsOn: israelToday(), endsOn: null }])
+    expect(bodies(fetchSpy, 'POST')).toEqual([{ categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 10, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null }])
     const added = `⁦10%⁩ off, from ${todayText()}, with no end date`
     expect(await within(dialog).findByText(added)).toBeInTheDocument()
     expect(within(dialog).getByRole('status')).toHaveTextContent('Discount saved.')
@@ -103,7 +103,7 @@ describe('/admin/categories', () => {
     await user.type(within(form).getByLabelText('Minimum quantity *'), '12')
     await user.click(within(form).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New discount' })).not.toBeInTheDocument())
-    expect(bodies(fetchSpy, 'POST')).toEqual([{ categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 5, minQuantity: 12, startsOn: israelToday(), endsOn: null }])
+    expect(bodies(fetchSpy, 'POST')).toEqual([{ categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 5, minQuantity: 12, startsAt: `${israelToday()}T00:00:00`, endsAt: null }])
     const added = `⁦5%⁩ off for ⁦12⁩ units or more, from ${todayText()}, with no end date`
     expect(await within(dialog).findByText(added)).toBeInTheDocument()
     await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
@@ -129,7 +129,7 @@ describe('/admin/categories', () => {
     const changed = `⁦₪20.00⁩ off, from ${todayText()}, with no end date`
     expect(await within(dialog).findByText(changed)).toBeInTheDocument()
     await waitFor(() => expect(within(dialog).getByRole('button', { name: `Edit: ${changed}` })).toHaveFocus())
-    expect(bodies(fetchSpy, 'PATCH')).toEqual([{ kind: 'amount', value: 20, minQuantity: null, startsOn: israelToday(), endsOn: null }])
+    expect(bodies(fetchSpy, 'PATCH')).toEqual([{ kind: 'amount', value: 20, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null }])
   })
 
   it('deletes a discount after a confirmation that can be cancelled', async () => {

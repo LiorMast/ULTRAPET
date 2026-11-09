@@ -3,7 +3,7 @@
  * the site: staff open every account here (company, contact person, the sign-in email and a password they type or
  * generate, and the business details), edit it, reset its password, and block it by marking it inactive. Customers
  * are never deleted (the page has no Delete, and the server refuses it), so their orders and history stay. Each
- * customer's own discounts (on a category or a product, on top of the general ones) are set in the row's
+ * customer's own discounts (on every product, a category or a product, on top of the general ones) are set in the row's
  * "Discounts" dialog (DiscountsDialog with the category and product choices).
  *
  * Everything goes through the staff API (backend/app/staff/routes.py, resources "customers" and "price-rules"): the
@@ -64,12 +64,14 @@ function AdminCustomers() {
   const router = useRouter()
   const f = t.admin.customerFields
 
-  // The categories and products a customer's discount can apply to, and each one's name by id for the rule lines.
+  // The categories and products a customer's discount can apply to, and each one's name by id for the rule lines
+  // (a rule with neither covers every product).
   const targets = useMemo(() => discountTargets(categories, products, t, locale), [categories, products, t, locale])
   const describeTarget = useMemo<DescribeTarget>(() => {
     const names = new Map(targets.map((option) => [option.value.slice(option.value.indexOf(':') + 1), option.label]))
-    return (rule) => names.get(rule.categoryId ?? rule.productId ?? '') ?? '—'
-  }, [targets])
+    return (rule) =>
+      rule.categoryId === null && rule.productId === null ? t.admin.discountFields.allProducts : (names.get(rule.categoryId ?? rule.productId ?? '') ?? '—')
+  }, [targets, t])
   const rows = useMemo(() => withDiscounts(customers, rules, 'businessUserId', t, locale, describeTarget), [customers, rules, t, locale, describeTarget])
 
   const columns = useMemo<DataColumn<CustomerRow>[]>(

@@ -27,6 +27,7 @@
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
+import { CATALOG_SORTS, type CatalogSort } from '@/api'
 import type { Brand, Branch, ContactDetails, ProductCategory, ProductDetail, ProductImage, ProductPage, Stat, StaffCustomer, User } from '@/api'
 import type { Localized } from '@/config'
 import articles from '@/stubs/articles.json'
@@ -114,8 +115,8 @@ export function resetFakeApi() {
 }
 
 /**
- * Signs a user in to the fake (renderPage's `staff` option).
- * @param user - The user, e.g. TEST_STAFF.
+ * Signs a user in to the fake (renderPage's `user` and `staff` options).
+ * @param user - The user, e.g. TEST_USER or TEST_STAFF.
  */
 export function signInFakeUser(user: User) {
   session = user
@@ -354,18 +355,20 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     order: (a, b) => Number(a.sortOrder) - Number(b.sortOrder) || a.id.localeCompare(b.id),
   },
   'price-rules': {
-    fields: ['businessUserId', 'categoryId', 'productId', 'kind', 'value', 'startsOn', 'endsOn', 'minQuantity', 'isActive', 'note'],
+    fields: ['businessUserId', 'categoryId', 'productId', 'kind', 'value', 'startsAt', 'endsAt', 'minQuantity', 'isActive', 'note'],
     required: ['kind', 'value', 'isActive'],
     numeric: ['value', 'minQuantity'],
-    defaults: { businessUserId: null, categoryId: null, productId: null, startsOn: null, endsOn: null, minQuantity: null, isActive: true, note: null },
+    defaults: { businessUserId: null, categoryId: null, productId: null, startsAt: null, endsAt: null, minQuantity: null, isActive: true, note: null },
     seed: () => [],
     check: (rule) => {
       if (!['percent', 'amount', 'fixed_price'].includes(String(rule.kind))) return invalid('price_rules_kind_check')
       if (Number(rule.value) <= 0) return invalid('price_rules_value_check')
-      if ((rule.categoryId === null) === (rule.productId === null)) return invalid('price_rules_one_target_check')
+      // One target, or none (every product) on a customer's rule only.
+      const targets = Number(rule.categoryId !== null) + Number(rule.productId !== null)
+      if (targets > 1 || (targets === 0 && rule.businessUserId === null)) return invalid('price_rules_target_check')
       if (rule.kind === 'percent' && Number(rule.value) > 100) return invalid('price_rules_percent_max_check')
       if (rule.kind === 'fixed_price' && (rule.productId === null || rule.businessUserId === null)) return invalid('price_rules_fixed_price_target_check')
-      if (rule.startsOn !== null && rule.endsOn !== null && String(rule.endsOn) < String(rule.startsOn)) return invalid('price_rules_dates_check')
+      if (rule.startsAt !== null && rule.endsAt !== null && String(rule.endsAt) < String(rule.startsAt)) return invalid('price_rules_dates_check')
       if (rule.minQuantity !== null && !(Number.isInteger(Number(rule.minQuantity)) && Number(rule.minQuantity) >= 2)) return invalid('price_rules_min_quantity_check')
       if (rule.kind === 'fixed_price' && rule.minQuantity !== null) return invalid('price_rules_fixed_price_bulk_check')
       return null
@@ -644,12 +647,16 @@ function json(body: unknown, status = 200) {
 
 /**
  * Answers /api/products like the server: search words must all appear in the name or description (any
- * language, any case), then the category filter, chip counts and a clamped page.
+ * language, any case), then the category, brand and (customers only) price filters, the faceted chip and brand
+ * counts, the sort (name in `lang`, newest = highest WooCommerce id, customers' price sorts with the unpriced last)
+ * and a clamped page.
  * @param params - The query string.
  * @returns One page of results.
  */
 async function productPage(params: URLSearchParams): Promise<ProductPage> {
   const { default: products } = (await import('@/stubs/products.json')) as { default: StubProduct[] }
+  // Like the server: the price sorts and range only for a signed-in business customer.
+  const prices = session?.kind === 'business' ? ((await import('@/stubs/prices.json')).default.prices as Record<string, number>) : null
   const words = (params.get('q') ?? '').toLowerCase().split(/\s+/).filter(Boolean)
   const matching = products.filter((product) => {
     // The description is HTML: search its text, not its tags (as the server does).
@@ -657,15 +664,55 @@ async function productPage(params: URLSearchParams): Promise<ProductPage> {
     const text = [...Object.values(product.name), ...description].join(' ').toLowerCase()
     return words.every((word) => text.includes(word))
   })
-  const categoryCounts = Object.fromEntries(categories.map((c) => [c.slug, matching.filter((p) => p.category === c.slug).length]))
   const requested = params.get('category')
-  const applied = requested && requested in categoryCounts ? requested : null
-  const shown = applied ? matching.filter((p) => p.category === applied) : matching
+  const applied = requested && categories.some((c) => c.slug === requested) ? requested : null
+  const wanted = (params.get('brand') ?? '').split(',')
+  const brands = activeBrands.map((b) => b.slug).filter((slug) => wanted.includes(slug))
+  /**
+   * Reads a shekel amount of the price range, as the server's read_amount.
+   * @param name - "min" or "max".
+   * @returns The amount, or null when absent, not a number or negative.
+   */
+  const amount = (name: string) => {
+    const raw = params.get(name)
+    const value = raw === null || raw.trim() === '' ? NaN : Number(raw)
+    return Number.isFinite(value) && value >= 0 ? value : null
+  }
+  let [low, high] = prices ? [amount('min'), amount('max')] : [null, null]
+  if (low !== null && high !== null && low > high) [low, high] = [high, low]
+  const priceRange = low !== null || high !== null ? { min: low, max: high } : null
+
+  /** @param p - A product. @returns Whether it is in the applied category (any, when none). */
+  const inCategory = (p: StubProduct) => !applied || p.category === applied
+  /** @param p - A product. @returns Whether it is of one of the applied brands (any, when none). */
+  const ofBrand = (p: StubProduct) => !brands.length || (p.brand !== null && brands.includes(p.brand))
+  /** @param p - A product. @returns Whether the customer's price is in the applied range (any, when none). */
+  const inRange = (p: StubProduct) => !priceRange || (p.id in prices! && (low === null || prices![p.id] >= low) && (high === null || prices![p.id] <= high))
+  const categoryCounts = Object.fromEntries(categories.map((c) => [c.slug, matching.filter((p) => p.category === c.slug && ofBrand(p) && inRange(p)).length]))
+  const brandCounts = Object.fromEntries(activeBrands.map((b) => [b.slug, matching.filter((p) => p.brand === b.slug && inCategory(p) && inRange(p)).length]))
+  const beforeRange = prices ? matching.filter((p) => inCategory(p) && ofBrand(p) && p.id in prices).map((p) => prices[p.id]) : []
+  const priceBounds = beforeRange.length ? { min: Math.min(...beforeRange), max: Math.max(...beforeRange) } : null
+
+  const shown = matching.filter((p) => inCategory(p) && ofBrand(p) && inRange(p))
+  const requestedSort = params.get('sort')
+  const sort = (CATALOG_SORTS as readonly string[]).includes(requestedSort ?? '') && (prices || !requestedSort!.startsWith('price')) ? (requestedSort as CatalogSort) : null
+  const lang = (params.get('lang') ?? 'he') as keyof Localized<string>
+  /** @param p - A product. @returns Its name in the sort's language (Hebrew when missing), lower case. */
+  const nameOf = (p: StubProduct) => (p.name[lang] ?? p.name.he).toLowerCase()
+  if (sort === 'name-asc' || sort === 'name-desc') shown.sort((a, b) => nameOf(a).localeCompare(nameOf(b)) * (sort === 'name-desc' ? -1 : 1))
+  if (sort === 'newest') shown.sort((a, b) => Number(b.id) - Number(a.id))
+  if (sort === 'price-asc' || sort === 'price-desc') {
+    // Products without a price go last either way.
+    /** @param p - A product. @returns Its price, or an infinity that sorts it last. */
+    const priceOf = (p: StubProduct) => prices![p.id] ?? (sort === 'price-asc' ? Infinity : -Infinity)
+    shown.sort((a, b) => (priceOf(a) - priceOf(b)) * (sort === 'price-desc' ? -1 : 1) || (a.id in prices! ? 0 : 1) - (b.id in prices! ? 0 : 1))
+  }
+
   const pageSize = Math.min(Math.max(Number(params.get('pageSize')) || PAGE_SIZE, 1), MAX_PAGE_SIZE)
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const page = Math.min(Math.max(Math.trunc(Number(params.get('page'))) || 1, 1), pageCount)
   const items = shown.slice((page - 1) * pageSize, page * pageSize).map(({ id, slug, name, category, images }) => ({ id, slug, name, category, image: images[0] ? mediaImage(images[0]) : null }))
-  return { items, page, pageSize, pageCount, total: shown.length, category: applied, categoryCounts }
+  return { items, page, pageSize, pageCount, total: shown.length, category: applied, brands, sort, priceRange, priceBounds, categoryCounts, brandCounts }
 }
 
 /**

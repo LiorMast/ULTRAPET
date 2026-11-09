@@ -3,7 +3,7 @@
 Covers the joined-table user inheritance, the cascades and restrictions on delete, and that the CHECK constraints
 reject invalid rows.
 """
-from datetime import date
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -132,8 +132,13 @@ def test_a_customer_with_orders_cannot_be_deleted(database):
 @pytest.mark.parametrize(
     ("fields", "constraint"),
     [
-        ({"kind": "percent", "value": 10}, "price_rules_one_target_check"),  # no target
-        ({"kind": "percent", "value": 10, "with_product": True, "with_category": True}, "price_rules_one_target_check"),
+        ({"kind": "percent", "value": 10}, "price_rules_target_check"),  # no target and no customer
+        ({"kind": "percent", "value": 10, "with_product": True, "with_category": True}, "price_rules_target_check"),
+        (
+            {"kind": "percent", "value": 10, "with_product": True, "with_category": True, "with_customer": True},
+            "price_rules_target_check",
+        ),
+        ({"kind": "fixed_price", "value": 50, "with_customer": True}, "price_rules_fixed_price_target_check"),
         ({"kind": "percent", "value": 120, "with_category": True}, "price_rules_percent_max_check"),
         ({"kind": "amount", "value": 0, "with_category": True}, "price_rules_value_check"),
         ({"kind": "percent", "value": -5, "with_category": True}, "price_rules_value_check"),  # no surcharges
@@ -141,7 +146,7 @@ def test_a_customer_with_orders_cannot_be_deleted(database):
         ({"kind": "fixed_price", "value": -5, "with_product": True, "with_customer": True}, "price_rules_value_check"),
         ({"kind": "rebate", "value": 5, "with_category": True, "with_customer": True}, "price_rules_kind_check"),
         (
-            {"kind": "percent", "value": 5, "with_category": True, "starts_on": date(2026, 12, 1), "ends_on": date(2026, 11, 1)},
+            {"kind": "percent", "value": 5, "with_category": True, "starts_at": datetime(2026, 12, 1, 9, tzinfo=UTC), "ends_at": datetime(2026, 12, 1, 8, tzinfo=UTC)},
             "price_rules_dates_check",
         ),
     ],
@@ -172,6 +177,13 @@ def test_general_percent_and_amount_discounts_are_valid(database, category):
             PriceRule(category=category, kind="amount", value=Decimal("12.50")),
         ]
     )
+    database.commit()
+
+
+def test_a_customer_discount_on_every_product_is_valid(database):
+    customer = make_customer()
+    database.add(customer)
+    database.add(PriceRule(business_user=customer, kind="percent", value=Decimal(5)))
     database.commit()
 
 

@@ -4,7 +4,7 @@
  * never deleted), opening an account with a generated password (what is sent, the password never shown in the
  * table), the password rules (required when adding, at least 8 characters, kept when an edit leaves it empty, reset
  * when one is typed), a taken email, switching an account off, the customer's own discounts (add on a category, edit
- * it into a product discount, delete, a fixed price listed but not editable), the sign-in form when signed out, and
+ * it into a product discount, a discount on all products, delete, a fixed price listed but not editable), the sign-in form when signed out, and
  * the Hebrew texts.
  */
 import { screen, waitFor, within } from '@testing-library/react'
@@ -205,7 +205,7 @@ describe('/admin/customers', { timeout: 20_000 }, () => {
     await user.click(within(form).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New discount' })).not.toBeInTheDocument())
     expect(bodies(fetchSpy, 'POST', '/api/staff/price-rules')).toEqual([
-      { categoryId: CATEGORY_ID, productId: null, businessUserId: CUSTOMER.id, kind: 'percent', value: 10, minQuantity: null, startsOn: israelToday(), endsOn: null },
+      { categoryId: CATEGORY_ID, productId: null, businessUserId: CUSTOMER.id, kind: 'percent', value: 10, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null },
     ])
     const line = `${CATEGORY}: ⁦10%⁩ off`
     await waitFor(() => expect(within(screen.getByRole('dialog', { name: 'Discounts' })).getByText(new RegExp(`^${line}`))).toBeInTheDocument())
@@ -221,7 +221,7 @@ describe('/admin/customers', { timeout: 20_000 }, () => {
     await user.click(within(edit).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit discount' })).not.toBeInTheDocument())
     expect(bodies(fetchSpy, 'PATCH', '/api/staff/price-rules')).toEqual([
-      { categoryId: null, productId: PRODUCT_ID, businessUserId: CUSTOMER.id, kind: 'percent', value: 10, minQuantity: null, startsOn: israelToday(), endsOn: null },
+      { categoryId: null, productId: PRODUCT_ID, businessUserId: CUSTOMER.id, kind: 'percent', value: 10, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null },
     ])
     await waitFor(() => expect(within(screen.getByRole('dialog', { name: 'Discounts' })).getByText(new RegExp(`^${PRODUCT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: `))).toBeInTheDocument())
 
@@ -229,6 +229,25 @@ describe('/admin/customers', { timeout: 20_000 }, () => {
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByRole('cell', { name: new RegExp(`^${PRODUCT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).closest('tr')).toHaveTextContent(CUSTOMER.companyName)
+  })
+
+  it("sets the customer's own discount on all products", async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { user } = await renderPage('/en/admin/customers', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: `Discounts: ${CUSTOMER.companyName}` }))
+    const list = await screen.findByRole('dialog', { name: 'Discounts' })
+    await user.click(within(list).getByRole('button', { name: 'Add discount' }))
+    const form = await screen.findByRole('dialog', { name: 'New discount' })
+    await user.click(within(form).getByRole('radio', { name: 'All products' }))
+    expect(within(form).queryByRole('combobox', { name: 'Applies to *' })).not.toBeInTheDocument()
+    expect(within(form).queryByRole('combobox', { name: 'Customer *' })).not.toBeInTheDocument()
+    await user.type(within(form).getByLabelText('Value *'), '3')
+    await user.click(within(form).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New discount' })).not.toBeInTheDocument())
+    expect(bodies(fetchSpy, 'POST', '/api/staff/price-rules')).toEqual([
+      { categoryId: null, productId: null, businessUserId: CUSTOMER.id, kind: 'percent', value: 3, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null },
+    ])
+    await waitFor(() => expect(within(screen.getByRole('dialog', { name: 'Discounts' })).getByText(/^All products: ⁦3%⁩ off/)).toBeInTheDocument())
   })
 
   it("lists the customer's fixed price, which can be deleted but not edited", async () => {

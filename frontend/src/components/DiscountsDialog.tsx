@@ -4,7 +4,7 @@
  * them. Adding and editing open DiscountDialog on top of it.
  *
  * A category's or product's discounts are its general price rules (table price_rules, `businessUserId` null: for
- * every business customer). A customer's are that customer's own rules on any category or product: the dialog then
+ * every business customer). A customer's are that customer's own rules on every product or any category or product: the dialog then
  * gets `scope` (DiscountDialog asks what each one applies to) and `describeTarget` (each line names its category or
  * product). A customer's fixed price is listed and can be deleted, not edited (DiscountDialog edits discounts only).
  * The dialog knows nothing about storage: the page saves through the staff API and reloads its rows, and the
@@ -16,7 +16,7 @@ import { useId, useRef, useState } from 'react'
 import { Pencil, Percent, Plus, Trash2 } from 'lucide-react'
 import { ApiError, type StaffPriceRule } from '@/api'
 import type { RowAction } from '@/components/DataTable'
-import { DiscountDialog, describeDiscount, formatValue, israelToday, scopeTarget, type DiscountValue, type RuleScope } from '@/components/DiscountDialog'
+import { ALL_PRODUCTS, DiscountDialog, describeDiscount, formatValue, israelNow, israelTime, scopeTarget, type DiscountValue, type RuleScope } from '@/components/DiscountDialog'
 import { errorMessage } from '@/components/RecordDialog'
 import type { SearchOption } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
@@ -33,50 +33,55 @@ export type DescribeTarget = (rule: StaffPriceRule) => string
 /**
  * Reads a price rule as the discount DiscountDialog edits.
  * @param rule - A percent or amount rule.
- * @returns The discount; a rule without a start date gets an empty `startsOn` (in effect since it was made).
+ * @returns The discount, its period as Israel times; a rule without a start gets an empty `startsAt` (in effect since
+ *   it was made).
  */
 export function ruleDiscount(rule: StaffPriceRule): DiscountValue {
   return {
     type: rule.kind === 'amount' ? 'amount' : 'percent',
     value: rule.value,
     minQuantity: rule.minQuantity,
-    startsOn: rule.startsOn ?? '',
-    endsOn: rule.endsOn,
+    startsAt: rule.startsAt === null ? '' : israelTime(rule.startsAt),
+    endsAt: rule.endsAt === null ? null : israelTime(rule.endsAt),
   }
 }
 
 /**
  * What a rule applies to, as DiscountDialog's scope fields read it.
  * @param rule - The rule.
- * @returns Its category or product and its customer.
+ * @returns Its category or product (ALL_PRODUCTS when it has neither) and its customer.
  */
 export function ruleScope(rule: StaffPriceRule): RuleScope {
-  const target = rule.categoryId !== null ? scopeTarget('category', rule.categoryId) : scopeTarget('product', rule.productId ?? '')
+  const target =
+    rule.categoryId !== null ? scopeTarget('category', rule.categoryId) : rule.productId !== null ? scopeTarget('product', rule.productId) : ALL_PRODUCTS
   return { target, customerId: rule.businessUserId }
 }
 
 /**
  * The price rule fields of a discount, for the staff API (createStaffRow / updateStaffRow 'price-rules').
  * @param discount - The discount from DiscountDialog.
- * @returns { kind, value, minQuantity, startsOn, endsOn }.
+ * @returns { kind, value, minQuantity, startsAt, endsAt } (Israel times, without a UTC offset: the server reads them as
+ *   Israel time); an empty start (a rule in effect since it was made,
+ *   ended with "End discount now") is sent as null.
  */
 export function discountFields(discount: DiscountValue) {
-  return { kind: discount.type, value: discount.value, minQuantity: discount.minQuantity, startsOn: discount.startsOn, endsOn: discount.endsOn }
+  return { kind: discount.type, value: discount.value, minQuantity: discount.minQuantity, startsAt: discount.startsAt || null, endsAt: discount.endsAt }
 }
 
-/** Where a rule stands today: in effect, not started yet, past its end date, or switched off (isActive false). */
+/** Where a rule stands now: in effect, not started yet, past its end, or switched off (isActive false). */
 export type RuleState = 'active' | 'upcoming' | 'ended' | 'paused'
 
 /**
  * Tells where a rule stands on a day (as backend/app/pricing.py applies it: both ends inclusive).
  * @param rule - The rule.
- * @param today - The Israel date ("2026-11-03", see israelToday).
+ * @param now - The current Israel time ("2026-11-03T14:32:07", see israelNow).
  * @returns "paused" when switched off, else "ended", "upcoming" or "active" by its dates.
  */
-export function ruleState(rule: StaffPriceRule, today: string): RuleState {
+export function ruleState(rule: StaffPriceRule, now: string): RuleState {
   if (!rule.isActive) return 'paused'
-  if (rule.endsOn !== null && rule.endsOn < today) return 'ended'
-  if (rule.startsOn !== null && rule.startsOn > today) return 'upcoming'
+  // The end is exclusive: a rule that ends now has ended.
+  if (rule.endsAt !== null && israelTime(rule.endsAt) <= now) return 'ended'
+  if (rule.startsAt !== null && israelTime(rule.startsAt) > now) return 'upcoming'
   return 'active'
 }
 
@@ -85,13 +90,13 @@ export function ruleState(rule: StaffPriceRule, today: string): RuleState {
  * @param rule - The rule.
  * @param t - The dictionary.
  * @param locale - The page language.
- * @param today - Today's Israel date ("2026-11-03").
+ * @param now - The current Israel time (see israelNow).
  * @param describeTarget - Names what the rule applies to, put first (a customer's discounts); omit for one target.
  * @returns E.g. "10% off, from 1 Nov 2026 to 30 Nov 2026 (ended)" (a fixed price: "Fixed price ₪80.00"), and whether
  *   it no longer applies (ended or paused).
  */
-function ruleLabel(rule: StaffPriceRule, t: Dictionary, locale: Locale, today: string, describeTarget?: DescribeTarget): { text: string; ended: boolean } {
-  const state = ruleState(rule, today)
+function ruleLabel(rule: StaffPriceRule, t: Dictionary, locale: Locale, now: string, describeTarget?: DescribeTarget): { text: string; ended: boolean } {
+  const state = ruleState(rule, now)
   const word = state === 'active' ? '' : t.admin.discounts[state]
   const words =
     rule.kind === 'fixed_price'
@@ -120,7 +125,7 @@ export function withDiscounts<Row extends { id: string }>(
   locale: Locale,
   describeTarget?: DescribeTarget,
 ): DiscountRow<Row>[] {
-  const today = israelToday()
+  const now = israelNow()
   const byRow = new Map<string, StaffPriceRule[]>()
   for (const rule of rules) {
     const id = rule[target]
@@ -128,7 +133,7 @@ export function withDiscounts<Row extends { id: string }>(
   }
   return rows.map((row) => {
     const discounts = byRow.get(row.id) ?? []
-    return { ...row, discounts, discountText: discounts.map((rule) => ruleLabel(rule, t, locale, today, describeTarget).text).join('; ') }
+    return { ...row, discounts, discountText: discounts.map((rule) => ruleLabel(rule, t, locale, now, describeTarget).text).join('; ') }
   })
 }
 
@@ -141,11 +146,11 @@ export function withDiscounts<Row extends { id: string }>(
 export function DiscountsCell({ rules, describeTarget }: { rules: StaffPriceRule[]; describeTarget?: DescribeTarget }) {
   const { t, locale } = useI18n()
   if (rules.length === 0) return <span className="text-brand-charcoal-muted">—</span>
-  const today = israelToday()
+  const now = israelNow()
   return (
     <>
       {rules.map((rule) => {
-        const { text, ended } = ruleLabel(rule, t, locale, today, describeTarget)
+        const { text, ended } = ruleLabel(rule, t, locale, now, describeTarget)
         return (
           <span key={rule.id} className={ended ? 'block text-brand-charcoal-muted' : 'block'}>
             {text}
@@ -245,7 +250,7 @@ export function DiscountsDialog({
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const addButton = useRef<HTMLButtonElement>(null)
-  const today = israelToday()
+  const now = israelNow()
 
   /**
    * Opens the discount form.
@@ -311,7 +316,7 @@ export function DiscountsDialog({
           ) : (
             <ul className="divide-y divide-neutral-150 border-y border-neutral-150">
               {rules.map((rule) => {
-                const { text, ended } = ruleLabel(rule, t, locale, today, describeTarget)
+                const { text, ended } = ruleLabel(rule, t, locale, now, describeTarget)
                 return (
                   <li key={rule.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
                     <span className={ended ? 'text-sm text-brand-charcoal-muted' : 'text-sm text-brand-charcoal'}>{text}</span>

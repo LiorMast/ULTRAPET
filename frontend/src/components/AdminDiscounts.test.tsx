@@ -2,13 +2,14 @@
  * AdminDiscounts.test.tsx — Tests for the staff panel's Discounts page (/admin/discounts, routes/admin.discounts.tsx)
  * against the fake staff API (src/test/api.ts): the menu link, the table of every discount (general and for one
  * customer, with its state), adding a discount for all customers or one customer through DiscountDialog's "applies
- * to" fields (what is sent, the required choices), editing one (moving it to a product), deleting one, a fixed price
+ * to" fields (what is sent, the required choices), a discount on all products (always for one customer), editing
+ * one (moving it to a product), ending one now, deleting one, a fixed price
  * (listed, deletable, not editable), the sign-in form when signed out, and the Hebrew texts.
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createStaffRow } from '@/api'
-import { israelToday } from '@/components/DiscountDialog'
+import { israelNow, israelToday } from '@/components/DiscountDialog'
 import categories from '@/stubs/product-categories.json'
 import products from '@/stubs/products.json'
 import { fakeFetch, signInFakeUser, STAFF_CUSTOMERS, TEST_STAFF } from '@/test/api'
@@ -70,9 +71,9 @@ const bodies = (spy: { mock: { calls: [RequestInfo | URL, RequestInit?][] } }, m
 describe('/admin/discounts', { timeout: 15_000 }, () => {
   it('lists every discount with its customers and state, active ones first', async () => {
     await seedRules(
-      { categoryId: CATEGORY_ID, kind: 'percent', value: 10, startsOn: dayFromToday(-30), endsOn: dayFromToday(-1) },
-      { productId: PRODUCT_ID, businessUserId: CUSTOMER.id, kind: 'amount', value: 5, startsOn: dayFromToday(-1), endsOn: null },
-      { categoryId: CATEGORY_ID, kind: 'percent', value: 3, minQuantity: 12, startsOn: dayFromToday(2), endsOn: null },
+      { categoryId: CATEGORY_ID, kind: 'percent', value: 10, startsAt: `${dayFromToday(-30)}T00:00:00`, endsAt: `${dayFromToday(-1)}T23:59:00` },
+      { productId: PRODUCT_ID, businessUserId: CUSTOMER.id, kind: 'amount', value: 5, startsAt: `${dayFromToday(-1)}T00:00:00`, endsAt: null },
+      { categoryId: CATEGORY_ID, kind: 'percent', value: 3, minQuantity: 12, startsAt: `${dayFromToday(2)}T00:00:00`, endsAt: null },
     )
     await renderPage('/en/admin/discounts', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'Discounts' })).toBeInTheDocument()
@@ -110,7 +111,7 @@ describe('/admin/discounts', { timeout: 15_000 }, () => {
     await user.click(within(form).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(bodies(fetchSpy, 'POST')).toEqual([
-      { categoryId: CATEGORY_ID, productId: null, businessUserId: null, kind: 'percent', value: 10, minQuantity: null, startsOn: israelToday(), endsOn: null },
+      { categoryId: CATEGORY_ID, productId: null, businessUserId: null, kind: 'percent', value: 10, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null },
     ])
     expect(await screen.findByRole('cell', { name: CATEGORY })).toBeInTheDocument()
     expect(tableCells()[0].slice(1, 6)).toEqual(['All customers', '⁦10%⁩ off', expect.any(String), 'No end date', 'Active'])
@@ -140,13 +141,59 @@ describe('/admin/discounts', { timeout: 15_000 }, () => {
     await user.click(within(form).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(bodies(fetchSpy, 'POST')).toEqual([
-      { categoryId: null, productId: PRODUCT_ID, businessUserId: CUSTOMER.id, kind: 'amount', value: 20, minQuantity: null, startsOn: israelToday(), endsOn: null },
+      { categoryId: null, productId: PRODUCT_ID, businessUserId: CUSTOMER.id, kind: 'amount', value: 20, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null },
     ])
     expect((await screen.findByRole('cell', { name: PRODUCT })).closest('tr')).toHaveTextContent(CUSTOMER.companyName)
   })
 
+  it("adds a customer's discount on all products, which always asks for the customer", async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { user } = await renderPage('/en/admin/discounts', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    const form = await screen.findByRole('dialog', { name: 'New discount' })
+    expect(within(form).getByRole('radio', { name: 'A category or product' })).toBeChecked()
+    await user.click(within(form).getByRole('radio', { name: 'All products' }))
+    // No category or product to choose, and no "All customers": the customer is asked at once.
+    expect(within(form).queryByRole('combobox', { name: 'Applies to *' })).not.toBeInTheDocument()
+    expect(within(form).queryByRole('radio', { name: 'All customers' })).not.toBeInTheDocument()
+    await user.type(within(form).getByLabelText('Value *'), '5')
+    await user.click(within(form).getByRole('button', { name: 'Save' }))
+    const customer = within(form).getByRole('combobox', { name: 'Customer *' })
+    expect(customer).toHaveFocus()
+    await user.type(customer, 'demo')
+    await user.keyboard('{Enter}')
+    await user.click(within(form).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(bodies(fetchSpy, 'POST')).toEqual([
+      { categoryId: null, productId: null, businessUserId: CUSTOMER.id, kind: 'percent', value: 5, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null },
+    ])
+    await waitFor(() => expect(tableCells()[0].slice(0, 3)).toEqual(['All products', CUSTOMER.companyName, '⁦5%⁩ off']))
+
+    // Editing it keeps "All products" and its customer.
+    await user.click(screen.getByRole('button', { name: `Edit All products, ${CUSTOMER.companyName}: ⁦5%⁩ off` }))
+    const edit = await screen.findByRole('dialog', { name: 'Edit discount' })
+    expect(within(edit).getByRole('radio', { name: 'All products' })).toBeChecked()
+    expect(within(edit).getByRole('combobox', { name: 'Customer *' })).toHaveValue(CUSTOMER.companyName)
+  })
+
+  it('ends a discount now', async () => {
+    await seedRules({ categoryId: CATEGORY_ID, kind: 'percent', value: 10, startsAt: `${dayFromToday(-7)}T00:00:00`, endsAt: null })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const { user } = await renderPage('/en/admin/discounts', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: `Edit ${CATEGORY}, All customers: ⁦10%⁩ off` }))
+    const form = await screen.findByRole('dialog', { name: 'Edit discount' })
+    const before = israelNow()
+    await user.click(within(form).getByRole('button', { name: 'End discount now' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const [body] = bodies(fetchSpy, 'PATCH')
+    expect(body).toEqual({ categoryId: CATEGORY_ID, productId: null, businessUserId: null, kind: 'percent', value: 10, minQuantity: null, startsAt: `${dayFromToday(-7)}T00:00:00`, endsAt: expect.any(String) })
+    // It ends at this moment, to the second.
+    expect(String(body.endsAt) >= before && String(body.endsAt) <= israelNow()).toBe(true)
+    await waitFor(() => expect(tableCells()[0][5]).toBe('Ended'))
+  })
+
   it('edits a discount, moving it from a category to a product', async () => {
-    await seedRules({ categoryId: CATEGORY_ID, kind: 'percent', value: 10, startsOn: israelToday(), endsOn: null })
+    await seedRules({ categoryId: CATEGORY_ID, kind: 'percent', value: 10, startsAt: `${israelToday()}T00:00:00`, endsAt: null })
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const { user } = await renderPage('/en/admin/discounts', { staff: TEST_STAFF })
     await user.click(screen.getByRole('button', { name: `Edit ${CATEGORY}, All customers: ⁦10%⁩ off` }))
@@ -163,14 +210,14 @@ describe('/admin/discounts', { timeout: 15_000 }, () => {
     await user.click(within(form).getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(bodies(fetchSpy, 'PATCH')).toEqual([
-      { categoryId: null, productId: PRODUCT_ID, businessUserId: null, kind: 'percent', value: 15, minQuantity: null, startsOn: israelToday(), endsOn: null },
+      { categoryId: null, productId: PRODUCT_ID, businessUserId: null, kind: 'percent', value: 15, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null },
     ])
     await waitFor(() => expect(tableCells()[0].slice(0, 3)).toEqual([PRODUCT, 'All customers', '⁦15%⁩ off']))
     expect(screen.getAllByRole('status').some((status) => status.textContent === 'Changes saved.')).toBe(true)
   })
 
   it('deletes a discount', async () => {
-    await seedRules({ categoryId: CATEGORY_ID, kind: 'percent', value: 10, startsOn: israelToday(), endsOn: null })
+    await seedRules({ categoryId: CATEGORY_ID, kind: 'percent', value: 10, startsAt: `${israelToday()}T00:00:00`, endsAt: null })
     const { user } = await renderPage('/en/admin/discounts', { staff: TEST_STAFF })
     await user.click(screen.getByRole('button', { name: `Delete ${CATEGORY}, All customers: ⁦10%⁩ off` }))
     const dialog = await screen.findByRole('alertdialog')
@@ -195,7 +242,7 @@ describe('/admin/discounts', { timeout: 15_000 }, () => {
   })
 
   it('reads in Hebrew', async () => {
-    await seedRules({ productId: PRODUCT_ID, businessUserId: CUSTOMER.id, kind: 'percent', value: 5, startsOn: israelToday(), endsOn: null })
+    await seedRules({ productId: PRODUCT_ID, businessUserId: CUSTOMER.id, kind: 'percent', value: 5, startsAt: `${israelToday()}T00:00:00`, endsAt: null })
     const { user } = await renderPage('/admin/discounts', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'הנחות' })).toBeInTheDocument()
     expect(tableCells('הנחות')[0].slice(0, 2)).toEqual([`מוצר: ${products[0].name.he}`, CUSTOMER.companyName])

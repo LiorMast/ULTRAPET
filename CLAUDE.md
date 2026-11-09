@@ -79,7 +79,9 @@ backend/
     __init__.py         create_app(): config from the environment, JWT, JSON errors, CLI commands, blueprints, /api/health
     auth.py             JWT sign-in in HttpOnly cookies (CSRF double-submit, 15 min access + 30 day refresh): authenticate,
                         issue_tokens, refresh_access, clear_tokens, require_user(kind)
-    customers/routes.py blueprint `customers` (/api): categories, products (server-side search + paging), products/<slug>
+    customers/routes.py blueprint `customers` (/api): categories, products (server-side search, category + brand filters
+                        with faceted counts, sorts, paging; the price sorts and price range only for a signed-in customer),
+                        products/<slug>
                         (one product's page: gallery, sanitized description, up to 4 related), brands, stats,
                         contact (the contact_* settings), sections + sections/<key> (saved home page section content),
                         faq, articles, resellers, sitemap.xml, media/<key> (the S3 stub's files), catalog.pdf
@@ -309,15 +311,18 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   only `storage.py`. Replaced files are not deleted yet.
 - **Discounts** (`DiscountDialog`): one dialog for every discount (category, product, customer, payment method):
   percent/amount switch, a positive value (no surcharges), "Bulk discount" + minimum quantity (whole number >= 2),
-  start date, end date or "no end date". It returns a `DiscountValue` ({ type, value, minQuantity: null = regular,
-  startsOn, endsOn: null = open-ended }) and the caller stores it. `DiscountsDialog`
+  start date + time, end date + time or "no end date" (Israel time; times default to 00:00 / 23:59). It returns a `DiscountValue` ({ type, value, minQuantity: null = regular,
+  startsAt, endsAt: null = open-ended; Israel times "2026-11-03T08:30:00", sent without a UTC offset, which the server
+  reads as Israel time }) and the caller stores it. Editing a discount that has not ended offers "End discount now"
+  (saves it as stored, ending at this moment; a later start moves to now too). `DiscountsDialog`
   lists one target's discounts (add/edit/delete) and is the "Discounts" row action of the products and categories
   tables (their general rules) and of the customers table (`withDiscounts(..., 'businessUserId')`: the customer's own
   rules; `targets` from `discountTargets` make DiscountDialog ask what each applies to, without the customer
   choice, and `describeTarget` names it on each line; a fixed price is listed and deletable, never editable). The Discounts page (`/admin/discounts`, `routes/admin.discounts.tsx`) lists every rule (general and per
   customer, with its state: `ruleState` = active / upcoming / ended / paused) and adds/edits them with
   `DiscountDialog scope` (the "applies to" fields: a category or product, all customers or one; `scopeFields` turns
-  the `RuleScope` into `categoryId` / `productId` / `businessUserId`). A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0,
+  the `RuleScope` into `categoryId` / `productId` / `businessUserId`). "All products" (`ALL_PRODUCTS`: no category and
+  no product) is a customer's store-wide discount, always for one customer (`price_rules_target_check`). A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0,
   `min_quantity` = the bulk threshold (NULL = a regular discount; never on a fixed price).
   **Not yet stored:** `payment_methods.discount_percent` has no amounts or dates (schema change with its page).
 - **Inline section editing** (`InlineEditor.tsx`): a section that staff may edit in place calls
@@ -487,8 +492,8 @@ statement (הצהרת נגישות), refund/returns policy, privacy policy.
 - **Minimum order ₪2,000.**
 - **Decided pricing rules** (table `price_rules`, logic in `backend/app/pricing.py`): staff set discounts (a percent or
   a shekel amount, always positive: there are no surcharges) on a category or a product, for all customers or one
-  customer, and (on a product, for one customer) a fixed price, each for a period or open-ended. In each layer (the
-  customer's rules, the general rules) a product rule beats a category rule and the rule that started last wins. The
+  customer, and (on a product, for one customer) a fixed price, each for a period (`starts_at` inclusive, `ends_at` exclusive: timestamps, to the second) or open-ended. In each layer (the
+  customer's rules, the general rules) a product rule beats a category rule, which beats a customer's rule on every product, and the rule that started last wins. The
   layers **stack**: the customer's discount, then the general discount, taken off the list price (percent:
   x (1 - v/100); amount: - v), never below 0, rounded half-up to agorot once; a customer fixed price is final.
   **Bulk discounts** (`price_rules.min_quantity`): apply when one order line has at least that many units of the
@@ -593,8 +598,10 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Articles (`/articles`, `/articles/$slug`; `ArticleCard`, `Breadcrumbs`): the 4 WordPress posts (table `articles`;
       Hebrew verbatim + English translation), head tags via `seo.ts` + `<HeadContent />`, BlogPosting/Breadcrumb
       JSON-LD, `sitemap.xml` (backend) + `robots.txt`; each post keeps its WordPress `legacyPath` for the 301s
-- [x] Catalog (`/catalog`; `Catalog`, `CatalogCard`, `Pagination`, `AccountPanel`, `src/auth.tsx`): 400 store products,
-      category chips, search (on the server, every language), 24 per page, all state in the URL; prices only for
+- [x] Catalog (`/catalog`; `Catalog`, `CatalogCard`, `CatalogToolbar`, `Pagination`, `AccountPanel`, `src/auth.tsx`): 400 store products,
+      category chips, search (on the server, every language), 24 per page, all state in the URL; `CatalogToolbar`: brand
+      filter (several, with counts), sort (staff order, name A–Z/Z–A, newest; price low/high and a price range only for
+      signed-in customers: the server ignores them for anyone else), removable filter pills; prices only for
       signed-in customers (real sign-in, placeholder prices from the price API), "log in to see the price" for visitors
 - [x] Product pages (`/products/$slug`, `routes/products.$slug.tsx`; `ProductGallery`, `RichText`): the old store's
       anatomy (breadcrumbs, gallery, details, shipping/returns notes, the sanitized description, "You may also like"),

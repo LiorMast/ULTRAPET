@@ -39,6 +39,18 @@ describe('api', () => {
     expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual(['/api/products?category=birds&q=seed+mix&page=2', '/api/products'])
   })
 
+  it('sends the brands, the sort, its language and the price range', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    await fetchProducts({ brand: 'paw,jr-farm', sort: 'name-desc', min: 0, max: 120.5 }, 'en')
+    await fetchProducts({ sort: 'name-asc' }, 'he')
+    await fetchProducts({ sort: 'newest' }, 'en')
+    expect(fetchSpy.mock.calls.map(([url]) => url)).toEqual([
+      '/api/products?brand=paw%2Cjr-farm&sort=name-desc&lang=en&min=0&max=120.5',
+      '/api/products?sort=name-asc',
+      '/api/products?sort=newest',
+    ])
+  })
+
   it('sends the CSRF cookie as a header on POST, never on GET', async () => {
     document.cookie = 'csrf_access_token=abc-123'
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(reply(204)).mockResolvedValueOnce(reply(200, PRICES))

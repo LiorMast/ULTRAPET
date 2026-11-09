@@ -1,7 +1,8 @@
 /**
- * Catalog.tsx — A product catalog: heading, search box, category chips, result count, a grid of
- * CatalogCards and Pagination. Generic: it shows whatever page of results, categories and prices it is
- * given (the server filters and pages, see fetchProducts), and keeps its state (page, category, search) in
+ * Catalog.tsx — A product catalog: heading, search box, category chips, the sort and filter toolbar
+ * (CatalogToolbar), result count, a grid of CatalogCards and Pagination. Generic: it shows whatever page of results,
+ * categories, brands and prices it is given (the server filters, sorts and pages, see fetchProducts), and keeps its
+ * state (page, category, brands, search, sort, price range) in
  * the URL of the route that renders it, so every filtered page is a real, shareable, crawlable link; the
  * route reloads the results when the URL changes. Prices are shown only when the caller passes `prices`
  * (routes/catalog.tsx does that for signed-in customers); otherwise every card shows "log in to see the price".
@@ -11,9 +12,10 @@ import { Link, linkOptions, useNavigate } from '@tanstack/react-router'
 import { Download, Lock, Search } from 'lucide-react'
 import { cn } from 'cn'
 import { CatalogCard, priceFor } from '@/components/CatalogCard'
+import { CatalogToolbar } from '@/components/CatalogToolbar'
 import { Pagination } from '@/components/Pagination'
 import { Button } from '@/components/ui/button'
-import type { CatalogSearch, ProductCategory, ProductPage } from '@/api'
+import type { Brand, CatalogSearch, ProductCategory, ProductPage } from '@/api'
 import type { CustomerPrices } from '@/auth'
 import { CATALOG_PDF_URL, localized } from '@/config'
 import { useI18n } from '@/i18n'
@@ -77,18 +79,21 @@ function PricesHiddenBanner() {
  * The catalog.
  * @param props.results - One page of matching products with the totals and chip counts (see ProductPage).
  * @param props.categories - The categories for the chips; products are labelled with their names.
- * @param props.search - The URL state (page, category, search text), as validated by the route.
+ * @param props.brands - The active brands (the brand filter).
+ * @param props.search - The URL state (page, category, brands, search text, sort, price range), as validated by the route.
  * @param props.prices - Prices for a signed-in customer; omit to hide every price.
  * @returns The catalog <section>.
  */
 export function Catalog({
   results,
   categories,
+  brands,
   search,
   prices,
 }: {
   results: ProductPage
   categories: ProductCategory[]
+  brands: Brand[]
   search: CatalogSearch
   prices?: CustomerPrices
 }) {
@@ -173,6 +178,8 @@ export function Catalog({
             ))}
           </ul>
         </nav>
+
+        <CatalogToolbar results={results} brands={brands} canUsePrices={prices !== undefined} />
       </div>
 
       <p role="status" className="mt-8 border-b border-neutral-150 pb-4 text-sm text-brand-charcoal-muted">

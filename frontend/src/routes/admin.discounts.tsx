@@ -1,12 +1,13 @@
 /**
  * routes/admin.discounts.tsx — Staff panel: every discount in one table (/admin/discounts). Lists every price rule
- * (table price_rules), general or for one business customer, on a category or a product, with where it stands today
+ * (table price_rules), general or for one business customer, on a category or a product (or a customer's on every
+ * product), with where it stands now
  * (active, upcoming, ended, paused), and lets staff add, edit and delete them through the staff API
  * (backend/app/staff/routes.py: resource "price-rules", plus "customers" for the customer choices). A change shows
  * in the customers' prices at once (backend/app/pricing.py).
  *
- * The page is a DataTable whose Add and Edit open DiscountDialog with its "applies to" fields (`scope`: a category
- * or product, all customers or one) instead of the column-driven form; a customer's fixed price (kind
+ * The page is a DataTable whose Add and Edit open DiscountDialog with its "applies to" fields (`scope`: all
+ * products or a category or product, all customers or one) instead of the column-driven form; a customer's fixed price (kind
  * "fixed_price", which that dialog does not edit) is listed and can be deleted, but not edited here. The same general
  * discounts also show on the products and categories pages (their "Discounts" row action). After every change the
  * page reloads the rules from the server. Loads nothing when signed out (the layout shows the sign-in form instead).
@@ -24,7 +25,7 @@ import {
   type StaffProduct,
 } from '@/api'
 import { DataTable, type DataColumn } from '@/components/DataTable'
-import { DiscountDialog, describeDiscount, discountTargets, formatDate, formatValue, israelToday, scopeFields } from '@/components/DiscountDialog'
+import { DiscountDialog, describeDiscount, discountTargets, END_TIME, formatMoment, formatValue, israelNow, israelTime, scopeFields, START_TIME } from '@/components/DiscountDialog'
 import { discountFields, ruleDiscount, ruleScope, ruleState, type RuleState } from '@/components/DiscountsDialog'
 import type { SearchOption } from '@/components/SearchableField'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
@@ -72,20 +73,20 @@ function discountRows(
   locale: Locale,
 ): DiscountRuleRow[] {
   const f = t.admin.discountFields
-  const today = israelToday()
+  const now = israelNow()
   return rules
     .map((rule) => {
-      const state = ruleState(rule, today)
+      const state = ruleState(rule, now)
       const discount = ruleDiscount(rule)
       return {
         ...rule,
-        targetText: names.targets.get(rule.categoryId ?? rule.productId ?? '') ?? '—',
+        targetText: rule.categoryId === null && rule.productId === null ? f.allProducts : (names.targets.get(rule.categoryId ?? rule.productId ?? '') ?? '—'),
         customerText: rule.businessUserId === null ? f.allCustomers : (names.customers.get(rule.businessUserId) ?? '—'),
         // The period has its own columns, so the words leave it out.
         discountText:
           rule.kind === 'fixed_price'
             ? f.fixedPrice.replace('{value}', formatValue('amount', rule.value, locale))
-            : describeDiscount({ ...discount, startsOn: '' }, t, locale),
+            : describeDiscount({ ...discount, startsAt: '' }, t, locale),
         state,
         statusText: f.states[state],
       }
@@ -125,8 +126,8 @@ function AdminDiscounts() {
       { key: 'targetText', label: f.appliesTo },
       { key: 'customerText', label: f.customers },
       { key: 'discountText', label: f.discount },
-      { key: 'startsOn', label: f.startsOn, render: (row) => (row.startsOn ? formatDate(row.startsOn, locale) : '—') },
-      { key: 'endsOn', label: f.endsOn, render: (row) => (row.endsOn ? formatDate(row.endsOn, locale) : f.noEnd) },
+      { key: 'startsAt', label: f.startsOn, render: (row) => (row.startsAt ? formatMoment(israelTime(row.startsAt), locale, START_TIME) : '—') },
+      { key: 'endsAt', label: f.endsOn, render: (row) => (row.endsAt ? formatMoment(israelTime(row.endsAt), locale, END_TIME) : f.noEnd) },
       {
         key: 'statusText',
         label: f.status,

@@ -2,6 +2,7 @@
 every resource (price rules included), with the field checks and the database constraints turned into 400/409 answers.
 """
 import uuid
+from datetime import datetime
 
 import pytest
 
@@ -11,6 +12,7 @@ from app.database.models.catalog import Category, Product
 from app.database.models.content import FaqItem
 from app.database.models.price_rules import PriceRule
 from app.database.models.users import BusinessUser
+from app.pricing import ISRAEL
 
 
 @pytest.fixture
@@ -143,20 +145,23 @@ def test_price_rules_are_discounts_on_a_category_or_product(api, database, staff
     database.commit()
 
     response = api("POST", "/price-rules", {"categoryId": str(category.id), "kind": "percent", "value": 10,
-                                            "startsOn": "2026-11-01", "endsOn": "2026-11-30"})
+                                            "startsAt": "2026-11-01T08:30", "endsAt": "2026-11-30T23:59"})
     assert response.status_code == 201
     rule = response.get_json()
-    assert {k: rule[k] for k in ("categoryId", "productId", "businessUserId", "kind", "value", "startsOn", "endsOn", "isActive")} == {
+    assert {k: rule[k] for k in ("categoryId", "productId", "businessUserId", "kind", "value", "isActive")} == {
         "categoryId": str(category.id), "productId": None, "businessUserId": None, "kind": "percent", "value": 10.0,
-        "startsOn": "2026-11-01", "endsOn": "2026-11-30", "isActive": True,
+        "isActive": True,
     }
+    # A time without a UTC offset is Israel time.
+    assert datetime.fromisoformat(rule["startsAt"]) == datetime(2026, 11, 1, 8, 30, tzinfo=ISRAEL)
+    assert datetime.fromisoformat(rule["endsAt"]) == datetime(2026, 11, 30, 23, 59, tzinfo=ISRAEL)
     assert database.get(PriceRule, uuid.UUID(rule["id"])).created_by_id == staff.id
 
     # A general discount by amount, open-ended.
-    amount = api("POST", "/price-rules", {"productId": str(product.id), "kind": "amount", "value": "12.50", "startsOn": "2026-11-03"})
+    amount = api("POST", "/price-rules", {"productId": str(product.id), "kind": "amount", "value": "12.50", "startsAt": "2026-11-03T10:00:00Z"})
     assert (amount.status_code, amount.get_json()["value"]) == (201, 12.5)
-    changed = api("PATCH", f"/price-rules/{rule['id']}", {"kind": "amount", "value": 5, "endsOn": None}).get_json()
-    assert (changed["kind"], changed["value"], changed["endsOn"]) == ("amount", 5.0, None)
+    changed = api("PATCH", f"/price-rules/{rule['id']}", {"kind": "amount", "value": 5, "endsAt": None}).get_json()
+    assert (changed["kind"], changed["value"], changed["endsAt"]) == ("amount", 5.0, None)
     assert [r["id"] for r in api("GET", "/price-rules").get_json()] == [rule["id"], amount.get_json()["id"]]
     assert api("DELETE", f"/price-rules/{rule['id']}").status_code == 204
 
@@ -167,8 +172,8 @@ def test_price_rules_are_discounts_on_a_category_or_product(api, database, staff
         ({"kind": "percent", "value": 0}, {"error": "invalid", "constraint": "price_rules_value_check"}),
         ({"kind": "amount", "value": -5}, {"error": "invalid", "constraint": "price_rules_value_check"}),
         ({"kind": "percent", "value": 101}, {"error": "invalid", "constraint": "price_rules_percent_max_check"}),
-        ({"kind": "percent", "value": 5, "startsOn": "2026-12-01", "endsOn": "2026-11-01"}, {"error": "invalid", "constraint": "price_rules_dates_check"}),
-        ({"kind": "percent", "value": 5, "startsOn": "1 Nov"}, {"error": "invalid", "field": "startsOn"}),
+        ({"kind": "percent", "value": 5, "startsAt": "2026-12-01T09:00", "endsAt": "2026-12-01T08:59"}, {"error": "invalid", "constraint": "price_rules_dates_check"}),
+        ({"kind": "percent", "value": 5, "startsAt": "1 Nov"}, {"error": "invalid", "field": "startsAt"}),
         ({"kind": "percent", "value": 5, "minQuantity": 1}, {"error": "invalid", "constraint": "price_rules_min_quantity_check"}),
         ({"kind": "percent"}, {"error": "required", "field": "value"}),
     ],
@@ -272,6 +277,15 @@ def test_a_discount_can_be_for_one_customer(api, database, customer):
     unknown = api("POST", "/price-rules", {"categoryId": str(category.id), "businessUserId": str(uuid.uuid4()),
                                            "kind": "percent", "value": 7})
     assert (unknown.status_code, unknown.get_json()["error"]) == (400, "invalid_reference")
+
+
+def test_a_customer_discount_can_cover_every_product(api, customer):
+    response = api("POST", "/price-rules", {"businessUserId": str(customer.id), "kind": "percent", "value": 5})
+    body = response.get_json()
+    assert (response.status_code, body["categoryId"], body["productId"]) == (201, None, None)
+    # Only a customer's discount may have no target: a general one is refused.
+    general = api("PATCH", f"/price-rules/{body['id']}", {"businessUserId": None})
+    assert (general.status_code, general.get_json()) == (400, {"error": "invalid", "constraint": "price_rules_target_check"})
 
 
 def test_bulk_discounts_store_their_minimum_quantity(api, database):
