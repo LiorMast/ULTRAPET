@@ -13,7 +13,7 @@ import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ChevronDown, LogOut, Menu, ShieldCheck, UserRound, X } from 'lucide-react'
 import { cn } from 'cn'
-import { useAuth } from '@/auth'
+import { useAuth, useSignOut } from '@/auth'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Logo } from '@/components/Logo'
 import { Button } from '@/components/ui/button'
@@ -36,7 +36,8 @@ const SUB_ENTRY_CLASS =
  */
 export function MobileMenu({ items }: { items: NavItem[] }) {
   const { t, isRtl } = useI18n()
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
+  const handleSignOut = useSignOut()
   const [open, setOpen] = useState(false)
   /** Closes the drawer; every link calls it, so choosing a destination also closes the menu. */
   const close = () => setOpen(false)
@@ -123,7 +124,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
                   type="button"
                   onClick={() => {
                     close()
-                    void signOut()
+                    handleSignOut()
                   }}
                   className={cn(ENTRY_CLASS, 'flex items-center gap-2')}
                 >

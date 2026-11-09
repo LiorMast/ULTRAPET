@@ -77,7 +77,8 @@ async function deleteTestDiscounts(page: Page) {
   for (const remove of await dialog.getByRole('button', { name: /^Delete: ⁦12\.5%⁩ off/ }).all()) {
     await remove.click()
     await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
-    await expect(dialog.getByRole('status')).toHaveText('Discount deleted.')
+    // The confirmation is a toast outside the dialog, still in the accessibility tree while the modal is open.
+    await expect(page.getByRole('status').filter({ hasText: 'Discount deleted.' })).toBeVisible()
   }
   await expect(dialog.getByText(/^⁦12\.5%⁩ off/)).toHaveCount(0)
   await page.keyboard.press('Escape')

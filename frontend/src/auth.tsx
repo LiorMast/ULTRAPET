@@ -2,7 +2,8 @@
  * auth.tsx — Who is signed in (a business customer or a staff member): the session for the whole site.
  *
  * AuthProvider holds the session and useAuth() gives components `user` (its `kind` tells a customer from a
- * staff member), `signIn` and `signOut`. Used by LoginForm (signs in), LoginPopover, MobileMenu and the /login
+ * staff member), `signIn` and `signOut`; useSignOut() is the Sign out buttons' action (signs out and confirms it in a
+ * toast). Used by LoginForm (signs in), LoginPopover, MobileMenu and the /login
  * page (log out, the admin link for staff), the catalog and product pages (useCustomerPrices: prices only for a
  * signed-in customer) and the /admin layout (the panel only for staff).
  *
@@ -15,6 +16,8 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { fetchPrices, fetchSession, postSignIn, postSignOut, setSignedOutHandler, type User } from '@/api'
+import { useI18n } from '@/i18n'
+import { useToast } from '@/toast'
 
 /** What signIn receives: the login form's values. */
 export type Credentials = { email: string; password: string; remember: boolean }
@@ -131,6 +134,21 @@ export function useAuth(): AuthValue {
   const value = useContext(AuthContext)
   if (!value) throw new Error('useAuth must be used inside <AuthProvider>')
   return value
+}
+
+/**
+ * The action of every Sign out button (header, mobile menu, /login): confirms in a toast, then signs out. The toast
+ * comes first, so a warning that signing out causes (an in-place edit's unsaved changes dropped) replaces it.
+ * @returns A function that signs the user out.
+ */
+export function useSignOut(): () => void {
+  const { signOut } = useAuth()
+  const toast = useToast()
+  const { t } = useI18n()
+  return useCallback(() => {
+    toast.success(t.login.signedOut)
+    void signOut()
+  }, [signOut, toast, t])
 }
 
 /**

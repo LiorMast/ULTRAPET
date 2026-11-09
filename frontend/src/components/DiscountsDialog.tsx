@@ -18,6 +18,7 @@ import { ApiError, type StaffPriceRule } from '@/api'
 import type { RowAction } from '@/components/DataTable'
 import { ALL_PRODUCTS, DiscountDialog, describeDiscount, formatValue, israelNow, israelTime, scopeTarget, type DiscountValue, type RuleScope } from '@/components/DiscountDialog'
 import { errorMessage } from '@/components/RecordDialog'
+import { useToast } from '@/toast'
 import type { SearchOption } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -246,7 +247,7 @@ export function DiscountsDialog({
   // The rule being edited stays set while the editor fades out, so its title does not change mid-close.
   const [editing, setEditing] = useState<StaffPriceRule | undefined>()
   const [confirming, setConfirming] = useState<string | null>(null)
-  const [status, setStatus] = useState('')
+  const toast = useToast()
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const addButton = useRef<HTMLButtonElement>(null)
@@ -282,7 +283,7 @@ export function DiscountsDialog({
     try {
       await onDelete(rule)
       setConfirming(null)
-      setStatus(d.deleted)
+      toast.success(d.deleted)
       addButton.current?.focus()
     } catch (caught) {
       setError(errorMessage(caught instanceof ApiError ? caught.code : undefined, t))
@@ -366,9 +367,6 @@ export function DiscountsDialog({
               {error}
             </p>
           )}
-          <p role="status" className="min-h-5 text-sm text-brand-charcoal-muted">
-            {status}
-          </p>
         </div>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>
@@ -388,7 +386,7 @@ export function DiscountsDialog({
           onCloseAutoFocus={handleEditorCloseFocus}
           onSave={async (discount, scope) => {
             await onSave(discount, editing, scope)
-            setStatus(d.saved)
+            toast.success(d.saved)
           }}
         />
       </DialogContent>

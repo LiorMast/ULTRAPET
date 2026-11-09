@@ -78,7 +78,10 @@ describe('/admin/categories', () => {
     expect(bodies(fetchSpy, 'POST')).toEqual([{ categoryId: FIRST_CATEGORY_ID, kind: 'percent', value: 10, minQuantity: null, startsAt: `${israelToday()}T00:00:00`, endsAt: null }])
     const added = `⁦10%⁩ off, from ${todayText()}, with no end date`
     expect(await within(dialog).findByText(added)).toBeInTheDocument()
-    expect(within(dialog).getByRole('status')).toHaveTextContent('Discount saved.')
+    // The confirmation is a toast, outside the dialog.
+    expect(screen.getByText('Discount saved.')).toHaveAttribute('data-slot', 'toast')
+    // Shown after the dialog opened, so the modal's aria-hidden on the rest of the page does not silence it.
+    expect(screen.getByText('Discount saved.')).not.toHaveAttribute('aria-hidden')
     // Radix puts the focus back on the button that opened the form.
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Add discount' })).toHaveFocus())
 
@@ -144,7 +147,8 @@ describe('/admin/categories', () => {
     await user.click(within(dialog).getByRole('button', { name: `Delete: ${SEEDED}` }))
     await user.click(within(dialog).getByRole('button', { name: /^Delete$/ }))
     expect(await within(dialog).findByText('No discounts yet.')).toBeInTheDocument()
-    expect(within(dialog).getByRole('status')).toHaveTextContent('Discount deleted.')
+    // The confirmation is a toast, outside the dialog.
+    expect(screen.getByText('Discount deleted.')).toHaveAttribute('data-slot', 'toast')
     expect(within(dialog).getByRole('button', { name: 'Add discount' })).toHaveFocus()
   })
 

@@ -37,6 +37,10 @@
   --color-brand-charcoal-3: #3a3a3a;
   --color-brand-charcoal-muted: #6b6b6b;
 
+  /* Status colors (Toast's success / warning; an error uses brand-red). White on success = 5.0:1, charcoal on warning = 8.3:1. */
+  --color-success: #15803d;
+  --color-warning: #f0a020;
+
   --color-neutral-50: #fafafa;
   --color-neutral-100: #f5f5f5;
   --color-neutral-150: #efefef;

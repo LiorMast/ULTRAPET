@@ -166,6 +166,7 @@ export const he = {
     errorCredentials: 'הדוא"ל או הסיסמה שגויים.',
     errorFailed: 'ההתחברות נכשלה. נסו שוב בעוד רגע.',
     signedIn: 'התחברת בהצלחה.',
+    signedOut: 'התנתקת בהצלחה.',
     signedInAs: 'מחובר/ת כ־',
     signOut: 'התנתקות',
     account: 'החשבון שלי',
@@ -259,6 +260,8 @@ export const he = {
     edit: 'עריכה בעמוד',
     // The accessible name of a section's edit button when a page has several, e.g. 'עריכה בעמוד: שאלות נפוצות'.
     editSection: 'עריכה בעמוד: {section}',
+    // Warning toast: signing out while editing a section dropped its unsaved texts.
+    discarded: 'התנתקת, ולכן השינויים שלא נשמרו בוטלו.',
     toolbar: 'עיצוב טקסט',
     move: 'הזזת סרגל העיצוב',
     editing: 'עריכה: {label}',

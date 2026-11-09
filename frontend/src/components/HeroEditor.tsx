@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FONTS, fontsFor, SIZE_STEPS } from '@/config'
 import { dictionaryFor, ENABLED_LOCALES, LOCALES, useI18n, type Locale } from '@/i18n'
+import { useToast } from '@/toast'
 
 /** The editable hero texts, in form order. */
 const BLOCKS = ['title', 'tagline', 'description'] as const
@@ -75,12 +76,12 @@ function fromDraft(draft: Draft, from: HeroContent | null): HeroContent {
  * The staff's Edit button of the hero and its dialog.
  * @param props.content - The saved hero content, or null when it was never edited.
  * @param props.onSave - Stores the new content; rejects with an ApiError when the server refuses it.
- * @returns The button, its dialog and a status line that announces the save.
+ * @returns The button and its dialog (a toast confirms the save).
  */
 export function HeroEditor({ content, onSave }: { content: HeroContent | null; onSave: (content: HeroContent) => Promise<unknown> }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
-  const [status, setStatus] = useState('')
+  const toast = useToast()
   const button = useRef<HTMLButtonElement>(null)
 
   /**
@@ -98,9 +99,6 @@ export function HeroEditor({ content, onSave }: { content: HeroContent | null; o
         <Pencil size={14} aria-hidden="true" />
         {t.hero.edit.button}
       </Button>
-      <p role="status" className="sr-only">
-        {status}
-      </p>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent closeLabel={t.admin.close} className="max-w-3xl" onCloseAutoFocus={handleCloseFocus}>
           {/* Mounted only while open, so every opening starts from the saved content. */}
@@ -110,7 +108,7 @@ export function HeroEditor({ content, onSave }: { content: HeroContent | null; o
               onSave={async (next) => {
                 await onSave(next)
                 setOpen(false)
-                setStatus(t.admin.saved)
+                toast.success(t.admin.saved)
               }}
               onCancel={() => setOpen(false)}
             />

@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ChevronDown, LogOut, ShieldCheck, UserRound } from 'lucide-react'
-import { useAuth } from '@/auth'
+import { useAuth, useSignOut } from '@/auth'
 import { LoginForm } from '@/components/LoginForm'
 import type { DrawerTriggerProps } from '@/components/SubNavDrawer'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -28,7 +28,8 @@ const PILL_CLASS =
  */
 export function LoginPopover({ adminToggle }: { adminToggle?: DrawerTriggerProps }) {
   const { t } = useI18n()
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
+  const handleSignOut = useSignOut()
   const [open, setOpen] = useState(false)
 
   if (user) {
@@ -47,7 +48,7 @@ export function LoginPopover({ adminToggle }: { adminToggle?: DrawerTriggerProps
               {t.nav.adminPanel}
             </Link>
           ))}
-        <button type="button" onClick={() => void signOut()} className={PILL_CLASS}>
+        <button type="button" onClick={handleSignOut} className={PILL_CLASS}>
           <LogOut size={18} aria-hidden="true" />
           {t.login.signOut}
         </button>

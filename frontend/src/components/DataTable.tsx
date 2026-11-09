@@ -28,6 +28,7 @@ import { localized, type Localized } from '@/config'
 import { RecordDialog, errorMessage } from '@/components/RecordDialog'
 import { ReorderDialog } from '@/components/ReorderDialog'
 import { Button } from '@/components/ui/button'
+import { useToast } from '@/toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n, type Locale } from '@/i18n'
 
@@ -116,7 +117,7 @@ export type DataTableProps<Row> = {
 
 /**
  * What DataTable hands a `formDialog`: `onSave` creates the row (Add) or saves its changes (Edit) through
- * onCreate / onUpdate, then closes the dialog and announces it (rejects with the handler's error, so the dialog can
+ * onCreate / onUpdate, then closes the dialog and confirms it in a toast (rejects with the handler's error, so the dialog can
  * show it and stay open); `onClose` closes without saving; `onCloseAutoFocus` goes to the dialog's DialogContent.
  */
 export type FormDialogProps = { onSave: (values: RowValues) => Promise<void>; onClose: () => void; onCloseAutoFocus: (event: Event) => void }
@@ -286,7 +287,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   const { rows, caption, rowLabel, onCreate, onDelete, onReorder } = props
   const { t, locale, dir } = useI18n()
   const [open, setOpen] = useState<OpenDialog<Row>>(null)
-  const [status, setStatus] = useState('')
+  const toast = useToast()
   const wrapper = useRef<HTMLDivElement>(null)
   /** The props of the latest render, for the cell renderers DataTables keeps from the first one. */
   const latest = useRef(props)
@@ -363,17 +364,17 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   }
 
   /**
-   * Saves the form: creates the row or sends the changed fields, then closes the dialog and announces it.
+   * Saves the form: creates the row or sends the changed fields, then closes the dialog and confirms it in a toast.
    * @param changes - The new row's values, or the edited row's changed fields.
    * @returns Resolves when saved; rejects with the handler's error so the form can show it.
    */
   const handleSave = async (changes: RowValues) => {
     if (open?.mode === 'edit') {
       if (Object.keys(changes).length > 0) await props.onUpdate?.(props.rowKey(open.row), changes)
-      setStatus(t.admin.saved)
+      toast.success(t.admin.saved)
     } else {
       await onCreate?.(changes)
-      setStatus(t.admin.created)
+      toast.success(t.admin.created)
     }
     setOpen(null)
   }
@@ -393,10 +394,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
 
   return (
     <div ref={wrapper} tabIndex={-1} dir={dir} className="data-table outline-none">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <p role="status" className="text-sm text-brand-charcoal-muted">
-          {status}
-        </p>
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-4">
         <div className="flex flex-wrap gap-2">
           {onReorder && rows.length > 1 && (
             <Button size="sm" variant="outline" data-action="reorder" onClick={() => setOpen({ mode: 'reorder' })}>
@@ -440,7 +438,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
           title={t.admin.reorder.title}
           onSave={async (keys) => {
             await onReorder(keys)
-            setStatus(t.admin.reorder.saved)
+            toast.success(t.admin.reorder.saved)
             setOpen(null)
           }}
           onClose={() => setOpen(null)}
@@ -453,7 +451,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
           name={rowLabel(open.row)}
           onConfirm={async () => {
             await onDelete(props.rowKey(open.row))
-            setStatus(t.admin.deleted)
+            toast.success(t.admin.deleted)
             setOpen(null)
           }}
           onClose={() => setOpen(null)}

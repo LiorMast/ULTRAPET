@@ -166,6 +166,7 @@ export const en: Dictionary = {
     errorCredentials: 'Wrong email or password.',
     errorFailed: 'Signing in failed. Please try again in a moment.',
     signedIn: 'You are signed in.',
+    signedOut: 'You are signed out.',
     signedInAs: 'Signed in as ',
     signOut: 'Sign out',
     account: 'My account',
@@ -252,6 +253,8 @@ export const en: Dictionary = {
     edit: 'Edit on page',
     // The accessible name of a section's edit button when a page has several, e.g. 'Edit on page: FAQ'.
     editSection: 'Edit on page: {section}',
+    // Warning toast: signing out while editing a section dropped its unsaved texts.
+    discarded: 'You signed out, so your unsaved changes were discarded.',
     toolbar: 'Text style',
     move: 'Move the style bar',
     editing: 'Editing: {label}',

@@ -53,7 +53,7 @@ describe('home page sections edited in place', () => {
     ])
   })
 
-  it('leaves edit mode in every section when staff sign out while editing', async () => {
+  it('leaves edit mode in every section when staff sign out while editing, and warns that the changes are gone', async () => {
     const { user } = await renderPage('/en', { staff: TEST_STAFF })
     await user.click(screen.getByRole('button', { name: 'Edit on page: Hero' }))
     await user.click(screen.getByRole('button', { name: 'Edit on page: About Ultra Pet' }))
@@ -69,6 +69,8 @@ describe('home page sections edited in place', () => {
     expect(screen.queryByRole('toolbar', { name: 'Text style' })).not.toBeInTheDocument()
     expect(screen.queryByText('Unsaved words')).not.toBeInTheDocument()
     expect(sectionOf('faq').getByRole('button', { name: 'Do you sell to private customers?' })).toBeInTheDocument()
+    // A warning toast says the unsaved changes are gone (it replaces the "signed out" confirmation).
+    expect(await screen.findByText('You signed out, so your unsaved changes were discarded.')).toHaveAttribute('data-kind', 'warning')
   })
 
   it('saves the Brands heading with its font and size, creating the section on the first save', async () => {

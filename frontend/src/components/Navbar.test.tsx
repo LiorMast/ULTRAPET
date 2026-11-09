@@ -174,7 +174,7 @@ describe('Mobile menu', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('turns Login into Log out when signed in, with an Admin panel entry for staff', async () => {
+  it('turns Login into Log out when signed in, with an Admin panel entry for staff, and confirms signing out', async () => {
     const { user } = await renderPage('/en', { staff: TEST_STAFF })
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
     const drawer = await screen.findByRole('dialog', { name: 'Main menu' })
@@ -182,6 +182,7 @@ describe('Mobile menu', () => {
     expect(within(drawer).queryByRole('link', { name: 'Login' })).not.toBeInTheDocument()
     await user.click(within(drawer).getByRole('button', { name: 'Sign out' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('You are signed out.')).toHaveAttribute('data-kind', 'success')
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
     expect(within(await screen.findByRole('dialog')).getByRole('link', { name: 'Login' })).toBeInTheDocument()
   })

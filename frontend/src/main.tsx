@@ -9,6 +9,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
 import { AuthProvider } from '@/auth'
 import { CartProvider } from '@/cart'
+import { ToastProvider } from '@/toast'
 import { applyDocumentLocale, detectLocale, LocaleProvider } from '@/i18n'
 import { createAppRouter } from '@/router'
 import './index.css'
@@ -21,11 +22,13 @@ const router = createAppRouter({ locale })
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <LocaleProvider locale={locale}>
-      <AuthProvider>
-        <CartProvider>
-          <RouterProvider router={router} />
-        </CartProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <CartProvider>
+            <RouterProvider router={router} />
+          </CartProvider>
+        </AuthProvider>
+      </ToastProvider>
     </LocaleProvider>
   </StrictMode>,
 )

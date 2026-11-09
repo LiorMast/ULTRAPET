@@ -11,9 +11,10 @@
  *     can read its entries' order from Object.keys(draft).
  *   A section may refuse a save itself before storing anything by throwing InlineEditError from onSave: the bar
  *   shows its message and the box it names gets the focus. Without onSave (a visitor, or staff who just signed out)
- *   the section cannot edit: an open draft is dropped, so signing out in edit mode leaves edit mode.
- * - InlineEditBar: "Edit on page", then Save (all the section's texts at once) and Cancel, the refusal message and
- *   a status line that announces the save. The keyboard focus returns to "Edit on page" afterwards. `tone` matches
+ *   the section cannot edit: an open draft is dropped, so signing out in edit mode leaves edit mode (a warning toast
+ *   says the unsaved changes were discarded).
+ * - InlineEditBar: "Edit on page", then Save (all the section's texts at once) and Cancel, and the refusal message; a success
+ *   toast confirms the save. The keyboard focus returns to "Edit on page" afterwards. `tone` matches
  *   the section's background (dark photo or white); `label` names the section in the button's accessible name
  *   ("Edit on page: FAQ"), since a page may have several editable sections.
  * - PropBar: the section's one font + size bar. It controls the selected text: the box that last had the focus
@@ -39,6 +40,7 @@ import { errorMessage } from '@/components/RecordDialog'
 import { Button } from '@/components/ui/button'
 import { FONTS, fontsFor, SIZE_STEPS } from '@/config'
 import { useI18n, type Locale } from '@/i18n'
+import { useToast } from '@/toast'
 
 /**
  * One editable text: its words, font, size step and width (percent of its parent's width, MIN_WIDTH-99; undefined =
@@ -102,7 +104,9 @@ export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, 
   const [active, setActive] = useState<Key | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-  const [status, setStatus] = useState('')
+  const toast = useToast()
+  /** Counts the drafts that signing out dropped; each new one makes the effect below warn once. */
+  const [discarded, setDiscarded] = useState(0)
   /** Set when edit mode ends, so the effect below focuses the Edit button once it is back. */
   const returnFocus = useRef(false)
   /** Set by requestFocus, so the effect below focuses the selected box once it is rendered. */
@@ -113,10 +117,17 @@ export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, 
   // The right to edit is gone (signed out while editing): leave edit mode right away, during this render (React's way
   // to adjust state to a changed prop), so the boxes never show to a visitor. The draft is not kept for later.
   if (!onSave && (draft !== null || active !== null || error)) {
+    if (draft !== null) setDiscarded((count) => count + 1)
     setDraft(null)
     setActive(null)
     setError('')
   }
+
+  // The toast is shown after the render that dropped the draft (a render must not update the ToastProvider).
+  useEffect(() => {
+    // `toast` is stable and `t` is fixed for a page load, so only a new drop shows the warning.
+    if (discarded > 0) toast.warning(t.inlineEdit.discarded)
+  }, [discarded, toast, t])
 
   useEffect(() => {
     if (returnFocus.current && !draft) {
@@ -151,7 +162,6 @@ export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, 
     setDraft(values)
     setActive(first ?? (Object.keys(values)[0] as Key | undefined) ?? null)
     setError('')
-    setStatus('')
     requestFocus()
   }
 
@@ -209,7 +219,7 @@ export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, 
       returnFocus.current = true
       setDraft(null)
       setActive(null)
-      setStatus(t.admin.saved)
+      toast.success(t.admin.saved)
     } catch (caught) {
       if (caught instanceof InlineEditError) {
         setError(caught.message)
@@ -268,7 +278,7 @@ export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, 
     change,
     cancel,
     formProps: { id: formId, onSubmit: handleSubmit, onKeyDown: handleKeyDown, noValidate: true },
-    bar: { editing: draft !== null, formId, pending, error, status, editButton, onCancel: cancel },
+    bar: { editing: draft !== null, formId, pending, error, editButton, onCancel: cancel },
     propBar,
   }
 }
@@ -282,7 +292,6 @@ type InlineEditBarProps = ReturnType<typeof useInlineDraft>['bar'] & { onEdit: (
  * @param props.formId - The id of the section's <form> (Save submits it).
  * @param props.pending - True while saving (Save is disabled).
  * @param props.error - Why the last save was refused; '' = none.
- * @param props.status - The announcement after a save; '' = none.
  * @param props.editButton - Ref of "Edit on page", focused again after saving or cancelling.
  * @param props.onEdit - Starts editing (the section calls start() with its current values).
  * @param props.onCancel - Leaves edit mode without saving.
@@ -293,7 +302,7 @@ type InlineEditBarProps = ReturnType<typeof useInlineDraft>['bar'] & { onEdit: (
  * @param props.className - Extra classes of the bar.
  * @returns The bar.
  */
-export function InlineEditBar({ editing, formId, pending, error, status, editButton, onEdit, onCancel, label, tone = 'dark', className }: InlineEditBarProps) {
+export function InlineEditBar({ editing, formId, pending, error, editButton, onEdit, onCancel, label, tone = 'dark', className }: InlineEditBarProps) {
   const { t } = useI18n()
   return (
     <div className={cn('flex flex-wrap items-center justify-end gap-3', className)}>
@@ -317,9 +326,6 @@ export function InlineEditBar({ editing, formId, pending, error, status, editBut
           {t.inlineEdit.edit}
         </Button>
       )}
-      <p role="status" className="sr-only">
-        {status}
-      </p>
     </div>
   )
 }

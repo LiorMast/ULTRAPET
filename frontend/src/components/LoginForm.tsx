@@ -3,7 +3,7 @@
  * header's login popover) and by the /login page, so both stay identical. The password field is PasswordInput (an eye
  * button shows what was typed).
  *
- * A valid submit signs the customer in on the server through useAuth() (see src/auth.tsx) and confirms it, or
+ * A valid submit signs the customer in on the server through useAuth() (see src/auth.tsx) and confirms it in a toast, or
  * shows "wrong email or password" (or a retry message when the server cannot be reached); a caller can pass
  * `onSubmit` to handle the values instead, or `signIn` to sign in somewhere else with the same error handling
  * (the /admin staff sign-in).
@@ -14,6 +14,7 @@ import { useAuth, type Credentials } from '@/auth'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
+import { useToast } from '@/toast'
 
 /** The values the form submits. */
 export type LoginValues = Credentials
@@ -44,12 +45,12 @@ export function LoginForm({
   const signIn = signInProp ?? auth.signIn
   const [values, setValues] = useState<LoginValues>({ email: '', password: '', remember: false })
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
-  const [submitted, setSubmitted] = useState(false)
+  const toast = useToast()
   const [formError, setFormError] = useState('')
   const [pending, setPending] = useState(false)
 
   /**
-   * Submit handler: validates, then calls `onSubmit`, or signs in and shows the confirmation or the error.
+   * Submit handler: validates, then calls `onSubmit`, or signs in and confirms it in a toast, or shows the error.
    * @param event - The form submit event.
    */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -59,7 +60,6 @@ export function LoginForm({
     else if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) found.email = t.login.errorEmail
     if (!values.password) found.password = t.login.errorRequired
     setErrors(found)
-    setSubmitted(false)
     setFormError('')
     if (Object.keys(found).length > 0) return
     if (onSubmit) {
@@ -69,7 +69,7 @@ export function LoginForm({
     setPending(true)
     try {
       await signIn(values)
-      setSubmitted(true)
+      toast.success(t.login.signedIn)
     } catch (error) {
       setFormError(error instanceof ApiError && error.status === 401 ? t.login.errorCredentials : t.login.errorFailed)
     } finally {
@@ -125,7 +125,6 @@ export function LoginForm({
         </p>
       )}
       <Button type="submit" disabled={pending} className="w-full">{t.login.submit}</Button>
-      {submitted && <p role="status" className="text-xs text-brand-charcoal-muted">{t.login.signedIn}</p>}
     </form>
   )
 }

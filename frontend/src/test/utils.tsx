@@ -13,6 +13,7 @@ import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } fr
 import type { User } from '@/api'
 import { AuthProvider } from '@/auth'
 import { CartProvider } from '@/cart'
+import { ToastProvider } from '@/toast'
 import { applyDocumentLocale, detectLocale, LocaleProvider, type Locale } from '@/i18n'
 import { createAppRouter, localeRewrite } from '@/router'
 import { signInFakeUser } from '@/test/api'
@@ -35,11 +36,13 @@ export async function renderPage(url: string, { user = null, staff = null }: { u
   const router = createAppRouter({ locale, history: createMemoryHistory({ initialEntries: [url] }) })
   const result = render(
     <LocaleProvider locale={locale}>
-      <AuthProvider initialUser={staff ?? user}>
-        <CartProvider>
-          <RouterProvider router={router} />
-        </CartProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider initialUser={staff ?? user}>
+          <CartProvider>
+            <RouterProvider router={router} />
+          </CartProvider>
+        </AuthProvider>
+      </ToastProvider>
     </LocaleProvider>,
   )
   await screen.findByRole('banner')
@@ -65,11 +68,13 @@ export function renderComponent(ui: ReactNode, locale: Locale = 'he') {
   })
   const result = render(
     <LocaleProvider locale={locale}>
-      <AuthProvider initialUser={null}>
-        <CartProvider>
-          <RouterProvider router={router} />
-        </CartProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider initialUser={null}>
+          <CartProvider>
+            <RouterProvider router={router} />
+          </CartProvider>
+        </AuthProvider>
+      </ToastProvider>
     </LocaleProvider>,
   )
   return { ...result, user: userEvent.setup() }

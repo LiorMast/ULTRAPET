@@ -6,7 +6,7 @@
 import { Link } from '@tanstack/react-router'
 import { LayoutGrid, LogOut, ShieldCheck } from 'lucide-react'
 import type { User } from '@/api'
-import { useAuth } from '@/auth'
+import { useSignOut } from '@/auth'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 
@@ -17,7 +17,7 @@ import { useI18n } from '@/i18n'
  */
 export function AccountPanel({ user }: { user: User }) {
   const { t } = useI18n()
-  const { signOut } = useAuth()
+  const handleSignOut = useSignOut()
   return (
     <div className="space-y-4">
       <p role="status" className="text-sm text-brand-charcoal">
@@ -38,7 +38,7 @@ export function AccountPanel({ user }: { user: User }) {
           </Link>
         </Button>
       )}
-      <Button type="button" variant="outline" className="w-full" onClick={() => void signOut()}>
+      <Button type="button" variant="outline" className="w-full" onClick={handleSignOut}>
         <LogOut aria-hidden="true" />
         {t.login.signOut}
       </Button>

@@ -48,6 +48,8 @@ frontend/
                         useCustomerPrices (the signed-in customer's prices, for the catalog and product pages)
     cart.tsx            CartProvider/useCart: the signed-in business customer's cart (lines, count, subtotal, add /
                         setQuantity / remove, addedTick), kept in localStorage per customer until the Phase 4 server cart
+    toast.tsx           ToastProvider/useToast: one Toast at a time (`success` / `error` / `warning`); useSignOut (auth.tsx)
+                        confirms signing out with it
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
     routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404;
                         admin.tsx = staff panel layout (shows the shared login form to non-staff), admin.<resource>.tsx = one table each
@@ -65,6 +67,8 @@ frontend/
                         CartDrawer (the business customers' header cart icon + badge and its Offcanvas: lines, subtotal,
                         minimum order), AddToCartButton (adds to the cart, "✓ Added" morph), QuantityStepper (− n +),
                         SegmentedSwitch (the multi-choice switch: a radio group drawn as one bar with a sliding thumb),
+                        Toast (a short notification at the top center: icon, message, color; `kind` success / error / warning
+                        presets them (TOAST_KINDS; tokens `success`, `warning`); shows 0.5 s, fades, then onDone),
                         PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button), ...)
                         + their tests
     components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet, switch, tooltip), restyled for the brand
@@ -388,6 +392,11 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   In the cart panel a line's `QuantityStepper min={0}` removes the line at 0 (the minus shows a trash icon at 1; the
   focus moves to the next line), and the minimum-order banner with its progress bar sits in the `Offcanvas notice`
   strip (under the header, never scrolls away). Money is formatted with `formatPrice` (CatalogCard.tsx). Checkout stays disabled until Phase 4.
+- **Toasts** (`src/toast.tsx`, `Toast`): a confirmation with no place of its own on the page is a toast:
+  `useToast().success(t...)` (the admin tables' add/save/delete/reorder, the discount dialogs, in-place and hero saves,
+  signing in and out), `.warning` (signing out dropped an in-place draft), `.error` (a failure with no form to show it
+  in). One at a time, top center; success stays 0.5 s, errors and warnings `TOAST_ALERT_MS` (5 s, readable). Form and
+  field errors stay inline next to their fields (`role="alert"`), not in toasts. Never add a hand-made "Saved" status line.
 - **Choices** (`SegmentedSwitch`): one choice among a few options (2+) is a `SegmentedSwitch` (`legend`, `options`
   { value, label, icon?, disabled? }, `value`, `onChange`; `tone` light/dark, `size` default/sm, `hideLegend`): native
   radios (arrow keys, one tab stop), never copied radio markup.
