@@ -126,19 +126,23 @@ test.describe('desktop', () => {
     })
   }
 
-  test('the Products menu works with the mouse and the keyboard', async ({ page }) => {
+  test('the Products menu opens on hover, its label links to the catalog, and the keyboard works', async ({ page }) => {
     await page.goto('/en')
-    const products = page.getByRole('banner').getByRole('button', { name: 'Products' })
+    const products = page.getByRole('banner').getByRole('link', { name: 'Products' })
     const menu = page.getByRole('menu')
 
-    await products.click()
+    await products.hover()
     await expect(menu.getByRole('menuitem')).toHaveCount(17)
     await expect(page.getByRole('banner')).toHaveScreenshot('header-en-products-open.png')
-    await page.keyboard.press('Escape')
+    await page.mouse.move(0, 400)
     await expect(menu).toBeHidden()
-    await expect(products).toBeFocused()
 
-    await page.keyboard.press('Enter')
+    await products.click()
+    await expect(page).toHaveURL('/en/catalog')
+
+    await page.goto('/en')
+    await products.focus()
+    await page.keyboard.press('ArrowDown')
     await expect(menu.getByRole('menuitem').first()).toBeFocused()
     await page.keyboard.press('ArrowDown')
     await expect(menu.getByRole('menuitem', { name: 'Dry Cat Food' })).toBeFocused()
@@ -200,7 +204,7 @@ test.describe('desktop', () => {
   test('has no accessibility violations, with menus closed and open', async ({ page }) => {
     await page.goto('/')
     await expectNoA11yViolations(page)
-    await page.getByRole('banner').getByRole('button', { name: 'מוצרים' }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'מוצרים' }).hover()
     await expect(page.getByRole('menu')).toBeVisible()
     await expectNoA11yViolations(page)
   })

@@ -1,6 +1,6 @@
 /**
  * toast.test.tsx — Tests for the site's toast provider (src/toast.tsx): useToast() shows a success, error or warning
- * toast, a new toast replaces the one on screen, success leaves after half a second while errors and warnings stay
+ * toast, a new toast replaces the one on screen, every toast leaves after 2 seconds
  * TOAST_ALERT_MS, and useToast() outside the provider is an error.
  */
 import { act, render, screen } from '@testing-library/react'
@@ -66,7 +66,7 @@ describe('ToastProvider', () => {
     expect(toast()).toHaveTextContent('Careful')
   })
 
-  it('removes a success toast after half a second and its fade', () => {
+  it('removes a success toast after 2 seconds and its fade', () => {
     vi.useFakeTimers()
     renderButtons()
     press('success')

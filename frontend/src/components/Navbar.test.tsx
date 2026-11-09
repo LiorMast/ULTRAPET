@@ -19,7 +19,7 @@ describe('Navbar links', () => {
     expect(within(nav).getByRole('link', { name: 'משווקים' })).toHaveAttribute('href', '/where-to-buy')
     expect(within(nav).getByRole('link', { name: 'אודות' })).toHaveAttribute('href', '/#about')
     expect(within(nav).getByRole('link', { name: 'צור קשר' })).toHaveAttribute('href', '/#contact')
-    expect(within(nav).getByRole('button', { name: 'מוצרים' })).toBeInTheDocument()
+    expect(within(nav).getByRole('link', { name: 'מוצרים' })).toHaveAttribute('href', '/catalog')
   })
 
   it('shows the English menu with /en links on English pages', async () => {
@@ -100,9 +100,9 @@ describe('Navbar background', () => {
 })
 
 describe('Products dropdown', () => {
-  it('lists the database categories, the product catalog and the PDF catalog', async () => {
+  it('opens on hover and lists the database categories, the product catalog and the PDF catalog', async () => {
     const { user } = await renderPage('/')
-    await user.click(screen.getByRole('button', { name: 'מוצרים' }))
+    await user.hover(screen.getByRole('link', { name: 'מוצרים' }))
     const menu = await screen.findByRole('menu')
 
     const items = within(menu).getAllByRole('menuitem')
@@ -118,9 +118,26 @@ describe('Products dropdown', () => {
     expect(catalog).toHaveAttribute('target', '_blank')
   })
 
+  it('links the Products label to the full catalog, and the dropdown closes when the pointer leaves', async () => {
+    const { user, router } = await renderPage('/en')
+    const products = screen.getByRole('link', { name: 'Products' })
+    expect(products).toHaveAttribute('href', '/en/catalog')
+    expect(products).toHaveAttribute('aria-expanded', 'false')
+
+    await user.hover(products)
+    expect(await screen.findByRole('menu')).toBeInTheDocument()
+    expect(products).toHaveAttribute('aria-expanded', 'true')
+
+    await user.unhover(products)
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+
+    await user.click(products)
+    await waitFor(() => expect(router.state.location.pathname).toBe('/catalog'))
+  })
+
   it('opens the catalog filtered by the chosen category', async () => {
     const { user, router } = await renderPage('/en')
-    await user.click(screen.getByRole('button', { name: 'Products' }))
+    await user.hover(screen.getByRole('link', { name: 'Products' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Cat Litter' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/catalog'))

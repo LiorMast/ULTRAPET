@@ -1,9 +1,9 @@
 /**
- * Toast.tsx — A short notification at the top center of the screen: an icon and a message on a brand color. It
- * drops in, stays for `duration` (TOAST_SHOW_MS, half a second, by default), fades away in TOAST_FADE_MS, then tells
+ * Toast.tsx — A short notification at the top center of the screen, just under the fixed header: a large icon and
+ * message on a brand color. It drops in, stays for `duration` (TOAST_SHOW_MS, 2 seconds, by default), fades away in TOAST_FADE_MS, then tells
  * its caller through `onDone` so the caller can unmount it. Screen readers hear the message from a live region
  * (polite; an error interrupts). Pages show toasts through useToast() (src/toast.tsx), which also sets how long each
- * kind stays. It is portalled to <body>, above the header, and never takes the pointer or the focus.
+ * kind stays. It is portalled to <body>, above everything on the page (z-[100], over the header and every dialog), and never takes the pointer or the focus.
  *
  * Three ready kinds (TOAST_KINDS): `kind="success"` (green, check), `kind="error"` (brand red, cross, announced at
  * once as an alert) and `kind="warning"` (amber, triangle); or any icon + color of your own.
@@ -18,13 +18,13 @@ import { CircleCheck, CircleX, TriangleAlert, type LucideIcon } from 'lucide-rea
 import { cn } from 'cn'
 
 /** How long the toast stays fully shown, in ms. */
-export const TOAST_SHOW_MS = 500
+export const TOAST_SHOW_MS = 2000
 
 /** How long the toast takes to fade away, in ms (matches `duration-300` below). */
 export const TOAST_FADE_MS = 300
 
 const toastVariants = cva(
-  'pointer-events-none fixed inset-x-0 top-4 z-60 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 px-5 py-3 text-sm font-medium shadow-premium-sm transition-opacity duration-300 animate-in fade-in slide-in-from-top-2',
+  'pointer-events-none fixed inset-x-0 top-20 z-[100] mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-3 px-6 py-4 text-base font-medium shadow-premium transition-opacity duration-300 animate-in fade-in slide-in-from-top-2 sm:top-[6.5rem]',
   {
     variants: {
       color: {
@@ -110,7 +110,7 @@ export function Toast({
       data-leaving={leaving || undefined}
       className={cn(toastVariants({ color: color ?? preset?.color }), leaving && 'opacity-0', className)}
     >
-      {Icon && <Icon aria-hidden="true" className="size-5 shrink-0" />}
+      {Icon && <Icon aria-hidden="true" className="size-6 shrink-0" />}
       {message}
     </div>,
     document.body,

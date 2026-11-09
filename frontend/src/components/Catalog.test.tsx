@@ -127,9 +127,10 @@ describe('Catalog page', () => {
     expect(types).toEqual(['CollectionPage', 'BreadcrumbList'])
   })
 
-  it('is linked from the Products menu', async () => {
+  it('is linked from the Products menu (its label and its first entry)', async () => {
     const { user } = await renderPage('/en')
-    await user.click(screen.getByRole('button', { name: 'Products' }))
+    expect(screen.getByRole('link', { name: 'Products' })).toHaveAttribute('href', '/en/catalog')
+    await user.hover(screen.getByRole('link', { name: 'Products' }))
     expect(await screen.findByRole('menuitem', { name: 'All products' })).toHaveAttribute('href', '/en/catalog')
   })
 })

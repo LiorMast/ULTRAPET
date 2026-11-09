@@ -5,14 +5,14 @@
  * deletions in the admin tables, discount dialogs and in-place editors, signing in and out, and a draft dropped on
  * sign-out. Mounted by main.tsx and the test helpers (src/test/utils.tsx), inside LocaleProvider.
  *
- * Success toasts stay for TOAST_SHOW_MS (half a second); errors and warnings stay for TOAST_ALERT_MS, long enough
+ * Every toast stays for TOAST_SHOW_MS (2 seconds); errors and warnings use TOAST_ALERT_MS (the same 2 seconds)
  * to read (WCAG 2.2.1, enough time).
  */
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Toast, TOAST_SHOW_MS, type ToastKind } from '@/components/Toast'
 
 /** How long an error or a warning toast stays, in ms: a message that matters must be readable. */
-export const TOAST_ALERT_MS = 5000
+export const TOAST_ALERT_MS = 2000
 
 /** How long each kind of toast stays before it fades, in ms. */
 const DURATIONS: Record<ToastKind, number> = { success: TOAST_SHOW_MS, error: TOAST_ALERT_MS, warning: TOAST_ALERT_MS }

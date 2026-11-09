@@ -7,7 +7,7 @@
  *   scrolling underneath shows through blurred) with a hairline and a soft shadow (both drawn as
  *   box-shadows, so they add no height). It is exactly 88px tall so the logo reads clearly; pages
  *   offset their content by the same amount.
- * - The menu is built by mainNav() in src/config.ts (the Products dropdown lists the categories passed in); an item with `children` opens a dropdown (Products).
+ * - The menu is built by mainNav() in src/config.ts (the Products dropdown lists the categories passed in); an item with `children` opens a dropdown (Products), on hover on desktop, and its label links to the full catalog.
  * - From the xl breakpoint the full menu is shown; below it, <MobileMenu> (a drawer) takes over.
  * - Staff get an Admin panel button (in LoginPopover) that slides the admin drawer (<SubNavDrawer>, the
  *   pages of ADMIN_NAV) down out of the header and back up; the header grows with it, over the page.
@@ -18,9 +18,10 @@
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
  *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
  */
-import { Fragment, useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { ChevronDown } from 'lucide-react'
+import { cn } from 'cn'
 import { CartDrawer } from '@/components/CartDrawer'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LoginPopover } from '@/components/LoginPopover'
@@ -151,13 +152,22 @@ function useScrollSpy() {
   }, [pathname, router])
 }
 
+/** How long a dropdown stays open after the pointer leaves it, so the pointer can cross the gap (ms). */
+const HOVER_CLOSE_MS = 150
+
 /**
- * One top-level menu entry: a link, or — for an item with `children` — a dropdown (Products).
+ * One top-level menu entry: a link, or — for an item with `children` — a dropdown (Products). On desktop the
+ * dropdown opens on a mouse hover (touch and keyboard open it with a tap or ArrowDown), and activating its label
+ * (click or Enter) goes to the dropdown's own link (the full catalog) and closes the menu.
  * @param props.item - The menu item (see mainNav in src/config.ts).
  * @returns The menu link or dropdown.
  */
 function DesktopNavItem({ item }: { item: NavItem }) {
   const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  const closeTimer = useRef<number | undefined>(undefined)
+
+  useEffect(() => () => window.clearTimeout(closeTimer.current), [])
 
   if (!('children' in item)) {
     return (
@@ -168,19 +178,80 @@ function DesktopNavItem({ item }: { item: NavItem }) {
     )
   }
 
+  /** Opens the dropdown now, cancelling a pending close. */
+  const openMenu = () => {
+    window.clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+
+  /**
+   * Closes the dropdown shortly, so the pointer can move from the label into the panel.
+   * @returns Nothing.
+   */
+  const closeSoon = () => {
+    window.clearTimeout(closeTimer.current)
+    closeTimer.current = window.setTimeout(() => setOpen(false), HOVER_CLOSE_MS)
+  }
+
+  /**
+   * Opens the dropdown on a mouse hover; touch and pen do not hover, so they only tap the link.
+   * @param event - The pointer event on the label.
+   * @returns Nothing.
+   */
+  const handleLabelEnter = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse') openMenu()
+  }
+
+  /**
+   * Closes the dropdown when the mouse leaves the label (the panel keeps it open while the pointer is in it).
+   * @param event - The pointer event on the label.
+   * @returns Nothing.
+   */
+  const handleLabelLeave = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse') closeSoon()
+  }
+
+  /**
+   * A click on the label goes to the full catalog (the link); the menu closes with it.
+   * @returns Nothing.
+   */
+  const handleLabelClick = () => setOpen(false)
+
+  /**
+   * Enter follows the link, as a click does (Radix would otherwise use Enter to open the menu). ArrowDown and
+   * Space keep opening the menu.
+   * @param event - The key event on the label.
+   * @returns Nothing.
+   */
+  const handleLabelKey = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      event.currentTarget.click()
+    }
+  }
+
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger
-        className={`${NAV_TEXT} flex items-center gap-1.5`}
-      >
-        {item.label(t)}
-        <ChevronDown size={15} aria-hidden="true" className="transition-transform duration-200 group-data-[state=open]:rotate-180" />
-        <Underline />
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Link
+          {...item.link}
+          className={`${NAV_TEXT} flex items-center gap-1.5`}
+          onPointerEnter={handleLabelEnter}
+          onPointerLeave={handleLabelLeave}
+          onClick={handleLabelClick}
+          onKeyDown={handleLabelKey}
+        >
+          {item.label(t)}
+          <ChevronDown size={15} aria-hidden="true" className={cn('transition-transform duration-200', open && 'rotate-180')} />
+          <Underline />
+        </Link>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
         sideOffset={14}
         className="w-auto min-w-64 rounded-none border border-neutral-200 p-0 py-2 shadow-premium-sm ring-0"
+        onPointerEnter={openMenu}
+        onPointerLeave={handleLabelLeave}
       >
         {item.children.map((child) => {
           const content = child.label(t)

@@ -68,7 +68,7 @@ frontend/
                         minimum order), AddToCartButton (adds to the cart, "✓ Added" morph), QuantityStepper (− n +),
                         SegmentedSwitch (the multi-choice switch: a radio group drawn as one bar with a sliding thumb),
                         Toast (a short notification at the top center: icon, message, color; `kind` success / error / warning
-                        presets them (TOAST_KINDS; tokens `success`, `warning`); shows 0.5 s, fades, then onDone),
+                        presets them (TOAST_KINDS; tokens `success`, `warning`); shows 2 s, fades, then onDone; above everything, z-[100]),
                         PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button), ...)
                         + their tests
     components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet, switch, tooltip), restyled for the brand
@@ -395,7 +395,7 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Toasts** (`src/toast.tsx`, `Toast`): a confirmation with no place of its own on the page is a toast:
   `useToast().success(t...)` (the admin tables' add/save/delete/reorder, the discount dialogs, in-place and hero saves,
   signing in and out), `.warning` (signing out dropped an in-place draft), `.error` (a failure with no form to show it
-  in). One at a time, top center; success stays 0.5 s, errors and warnings `TOAST_ALERT_MS` (5 s, readable). Form and
+  in). One at a time, top center just under the header (`top-20`, `sm:top-[6.5rem]`); every toast stays 2 s (`TOAST_SHOW_MS`; errors and warnings use `TOAST_ALERT_MS`, also 2 s), above everything (z-[100]). Form and
   field errors stay inline next to their fields (`role="alert"`), not in toasts. Never add a hand-made "Saved" status line.
 - **Choices** (`SegmentedSwitch`): one choice among a few options (2+) is a `SegmentedSwitch` (`legend`, `options`
   { value, label, icon?, disabled? }, `value`, `onChange`; `tone` light/dark, `size` default/sm, `hideLegend`): native

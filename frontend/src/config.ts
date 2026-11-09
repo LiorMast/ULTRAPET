@@ -31,8 +31,13 @@ export type NavChild = { id: string; label: Label; divider?: boolean } & (
 /** A plain menu link: an id (the React key), a translated label and an internal link. */
 export type NavLink = { id: string; label: Label; link: AppLink }
 
+/**
+ * A dropdown entry (Products): `children` open on hover; `link` is where a click on its label goes (the full catalog).
+ */
+export type NavDropdown = { id: string; label: Label; link: AppLink; children: NavChild[] }
+
 /** A top-level menu entry: a link, or a dropdown with `children`. */
-export type NavItem = NavLink | ({ id: string; label: Label } & { children: NavChild[] })
+export type NavItem = NavLink | NavDropdown
 
 /**
  * The PDF catalog without prices: the backend redirects to the file in its storage (the setting `catalog_pdf`), so a
@@ -145,6 +150,7 @@ export const mainNav = (categories: ProductCategory[], locale: Locale): NavItem[
   {
     id: 'products',
     label: (t: Dictionary) => t.nav.products,
+    link: linkOptions({ to: '/catalog' }),
     children: [
       { id: 'full-catalog', label: (t: Dictionary) => t.nav.fullCatalog, link: linkOptions({ to: '/catalog' }) },
       ...categories.map((category, i) => ({

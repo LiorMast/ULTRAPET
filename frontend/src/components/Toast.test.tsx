@@ -1,7 +1,7 @@
 /**
  * Toast.test.tsx — Tests for the toast notification (Toast.tsx), rendered alone (it needs no providers): its
  * message in a live region with a decorative icon, the color variants, the success / error / warning kinds (role,
- * color, icon; explicit props win), staying for half a second, then fading and calling onDone, and a custom duration.
+ * color, icon; explicit props win), staying for 2 seconds, then fading and calling onDone, and a custom duration.
  */
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -54,7 +54,7 @@ describe('Toast', () => {
     expect(toast().querySelector('svg')).toHaveClass('lucide-check')
   })
 
-  it('stays for half a second, fades, then calls onDone', () => {
+  it('stays for 2 seconds, fades, then calls onDone', () => {
     vi.useFakeTimers()
     const onDone = vi.fn()
     render(<Toast message="Saved" onDone={onDone} />)
@@ -71,10 +71,10 @@ describe('Toast', () => {
   it('accepts a custom duration', () => {
     vi.useFakeTimers()
     const onDone = vi.fn()
-    render(<Toast message="Saved" duration={2000} onDone={onDone} />)
+    render(<Toast message="Saved" duration={3000} onDone={onDone} />)
     act(() => vi.advanceTimersByTime(TOAST_SHOW_MS + TOAST_FADE_MS))
     expect(onDone).not.toHaveBeenCalled()
-    act(() => vi.advanceTimersByTime(2000))
+    act(() => vi.advanceTimersByTime(3000 - TOAST_SHOW_MS))
     expect(onDone).toHaveBeenCalledOnce()
   })
 })
