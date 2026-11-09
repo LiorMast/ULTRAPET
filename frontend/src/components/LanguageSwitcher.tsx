@@ -55,10 +55,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
         hrefLang={other}
         lang={other}
         aria-label={`${LOCALES[other].shortName} – ${LOCALES[other].nativeName}`}
-        className={cn(
-          'flex items-center gap-1.5 p-3 font-heading text-base font-semibold transition-colors',
-          'text-neutral-600 hover:text-brand-red',
-        )}
+        className="flex items-center gap-1.5 p-3 font-heading text-nav-button font-semibold text-neutral-600 transition-colors hover:text-brand-red"
       >
         <Globe size={22} aria-hidden="true" />
         {LOCALES[other].shortName}
@@ -102,10 +99,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
-        className={cn(
-          'group flex items-center gap-2.5 whitespace-nowrap px-5 py-3 font-heading text-base font-semibold uppercase tracking-widest transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand-red',
-          'text-neutral-600 hover:text-brand-red',
-        )}
+        className="group flex items-center gap-2.5 whitespace-nowrap px-5 py-3 font-heading text-nav-button font-semibold uppercase tracking-widest text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red"
       >
         <Globe size={18} aria-hidden="true" />
         {/* Accessible name = "Language: " + whichever label is visible (short below 2xl, full above),

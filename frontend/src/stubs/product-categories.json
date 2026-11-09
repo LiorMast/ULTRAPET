@@ -1,13 +1,5 @@
 [
  {
-  "slug": "dry-dog-food",
-  "name": {
-   "he": "מזון יבש לכלבים",
-   "en": "Dry Dog Food"
-  },
-  "legacyPath": "/product-category/כלבים/"
- },
- {
   "slug": "dry-cat-food",
   "name": {
    "he": "מזון יבש לחתולים",
@@ -16,12 +8,12 @@
   "legacyPath": "/product-category/חתולים/"
  },
  {
-  "slug": "dog-wet-food",
+  "slug": "dry-dog-food",
   "name": {
-   "he": "שימורים ומעדנים לכלבים",
-   "en": "Dog Cans & Treats"
+   "he": "מזון יבש לכלבים",
+   "en": "Dry Dog Food"
   },
-  "legacyPath": "/product-category/שימורים-ומעדנים-לכלבים/"
+  "legacyPath": "/product-category/כלבים/"
  },
  {
   "slug": "cat-wet-food",
@@ -32,12 +24,12 @@
   "legacyPath": "/product-category/שימורים-ומעדנים-לחתולים/"
  },
  {
-  "slug": "dog-treats",
+  "slug": "dog-wet-food",
   "name": {
-   "he": "חטיפים ועצמות לכלבים",
-   "en": "Dog Snacks & Bones"
+   "he": "שימורים ומעדנים לכלבים",
+   "en": "Dog Cans & Treats"
   },
-  "legacyPath": "/product-category/חטיפים-ועצמות-לכלבים/"
+  "legacyPath": "/product-category/שימורים-ומעדנים-לכלבים/"
  },
  {
   "slug": "cat-treats",
@@ -46,6 +38,14 @@
    "en": "Cat Snacks"
   },
   "legacyPath": "/product-category/חטיפים-לחתולים/"
+ },
+ {
+  "slug": "dog-treats",
+  "name": {
+   "he": "חטיפים ועצמות לכלבים",
+   "en": "Dog Snacks & Bones"
+  },
+  "legacyPath": "/product-category/חטיפים-ועצמות-לכלבים/"
  },
  {
   "slug": "cat-litter",

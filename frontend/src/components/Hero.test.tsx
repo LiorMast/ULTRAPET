@@ -1,12 +1,14 @@
 /**
  * Hero.test.tsx — Tests for the home page hero: its text and buttons in both languages, the photo
- * slideshow (one image per photo, controls, auto-advance, pausing) and the reduced-motion behavior.
+ * slideshow (one image per photo, controls, auto-advance, pausing), the reduced-motion behavior and the content staff
+ * saved (texts, fonts and sizes per language, with the dictionary as fallback; the editor slot).
  * Small cases render <Hero> alone with fake photos via renderComponent(); one case renders the real
  * home page to prove the photos in src/assets/hero are picked up.
  */
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Hero } from '@/components/Hero'
+import type { HeroContent } from '@/api'
+import { Hero, mergeHero } from '@/components/Hero'
 import type { HeroImage } from '@/config'
 import { renderComponent, renderPage } from '@/test/utils'
 
@@ -66,6 +68,98 @@ describe('Hero text and buttons', () => {
     expect(screen.getByRole('link', { name: 'Our Brands' })).toHaveAttribute('href', '/en#brands')
     expect(screen.queryByRole('link', { name: 'Become a Business Customer' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Scroll down' })).toHaveAttribute('href', '/en#stats')
+  })
+})
+
+describe('Hero saved content', () => {
+  const CONTENT: HeroContent = {
+    title: { text: { he: 'כותרת', en: 'Headline' }, accent: { en: 'Now' }, font: { he: 'rubik' }, size: { he: 'xl' } },
+    tagline: { text: { en: '  ' }, size: { en: 'sm' } },
+    description: { text: { he: 'תיאור חדש' }, font: { he: 'frank-ruhl-libre' }, size: { he: 'lg' } },
+  }
+
+  it('shows the saved texts, fonts and sizes of the page language', async () => {
+    renderComponent(<Hero images={[]} content={CONTENT} />, 'he')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'כותרת פט' })
+    expect(heading.style.fontFamily).toContain('Rubik Variable')
+    expect(heading).toHaveClass('text-[clamp(3.6rem,9.5vw,8.5rem)]')
+    const description = screen.getByText('תיאור חדש')
+    expect(description.style.fontFamily).toContain('Frank Ruhl Libre Variable')
+    expect(description).toHaveClass('text-lg')
+    // Not saved: the dictionary text, the site's font and the design size.
+    const tagline = screen.getByText('יבוא והפצה של מזון ומוצרים לחיות מחמד')
+    expect(tagline.style.fontFamily).toBe('')
+    expect(tagline).toHaveClass('text-lg', 'lg:text-xl')
+    // A size step keeps each text's own line height.
+    expect(heading).toHaveClass('leading-[1.05]')
+    expect(tagline).toHaveClass('leading-snug')
+    expect(description).toHaveClass('leading-relaxed')
+  })
+
+  it('falls back per language and for blank texts', async () => {
+    renderComponent(<Hero images={[]} content={CONTENT} />, 'en')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Headline Now' })
+    expect(heading.style.fontFamily).toBe('')
+    expect(heading).toHaveClass('text-[clamp(3.2rem,7.5vw,6.5rem)]')
+    expect(screen.getByText('Import and Distribution of Pet Food and Pet Supplies')).toHaveClass('text-base', 'lg:text-lg')
+  })
+
+  it('ignores unknown fonts and sizes', async () => {
+    const odd = { title: { font: { he: 'comic-sans' }, size: { he: 'huge' } } } as unknown as HeroContent
+    renderComponent(<Hero images={[]} content={odd} />, 'he')
+    const heading = await screen.findByRole('heading', { level: 1, name: 'אולטרה פט' })
+    expect(heading.style.fontFamily).toBe('')
+    expect(heading).toHaveClass('text-[clamp(3.2rem,7.5vw,6.5rem)]')
+  })
+
+  it('merges an inline edit into one language and keeps the others', () => {
+    const merged = mergeHero(CONTENT, 'he', {
+      title: { text: ' שלום ', font: 'assistant', size: 'sm' },
+      accent: { text: 'עולם', font: 'assistant', size: 'sm' },
+      tagline: { text: '', font: 'default', size: 'md' },
+      description: { text: '', font: 'heebo', size: 'lg' },
+    })
+    expect(merged.title).toEqual({
+      text: { he: 'שלום', en: 'Headline' },
+      accent: { he: 'עולם', en: 'Now' },
+      font: { he: 'assistant' },
+      size: { he: 'sm' },
+    })
+    // An emptied text is removed, so the built-in one shows; the English values stay.
+    expect(merged.tagline).toEqual({ text: { en: '  ' }, font: { he: 'default' }, size: { en: 'sm', he: 'md' } })
+    expect(merged.description?.text).toEqual({})
+    expect(mergeHero(null, 'en', {
+      title: { text: 'A', font: 'default', size: 'md' },
+      accent: { text: '', font: 'default', size: 'md' },
+      tagline: { text: '', font: 'default', size: 'md' },
+      description: { text: '', font: 'default', size: 'md' },
+    }).title?.text).toEqual({ en: 'A' })
+  })
+
+  it('shows a saved width and keeps the widths when merging an inline edit', async () => {
+    const sized: HeroContent = { ...CONTENT, tagline: { text: { en: 'Wide' }, width: { he: 50, en: 40 } } }
+    renderComponent(<Hero images={[]} content={sized} />, 'en')
+    expect((await screen.findByText('Wide')).style.inlineSize).toBe('40%')
+    const merged = mergeHero(sized, 'he', {
+      title: { text: 'שלום', font: 'default', size: 'md', width: 70 },
+      accent: { text: '', font: 'default', size: 'md' },
+      tagline: { text: '', font: 'default', size: 'md' },
+      description: { text: '', font: 'default', size: 'md' },
+    })
+    expect(merged.title?.width).toEqual({ he: 70 })
+    expect(merged.tagline?.width).toEqual({ en: 40 })
+    expect(merged.description).not.toHaveProperty('width')
+  })
+
+  it('has no inline editing without onSave', async () => {
+    renderComponent(<Hero images={[]} content={CONTENT} />, 'en')
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('button', { name: /^Edit on page/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the editor slot only when given', async () => {
+    renderComponent(<Hero images={[]} editor={<button type="button">Edit me</button>} />)
+    expect(await screen.findByRole('button', { name: 'Edit me' })).toBeInTheDocument()
   })
 })
 

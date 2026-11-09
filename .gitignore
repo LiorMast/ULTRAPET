@@ -80,3 +80,4 @@ CLAUDE.local.md
 
 # MCP server config: holds a plain-text database password for the local dev container
 .mcp.json
+.playwright-mcp/

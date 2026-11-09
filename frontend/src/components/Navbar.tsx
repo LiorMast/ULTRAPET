@@ -7,19 +7,28 @@
  *   scrolling underneath shows through blurred) with a hairline and a soft shadow (both drawn as
  *   box-shadows, so they add no height). It is exactly 88px tall so the logo reads clearly; pages
  *   offset their content by the same amount.
- * - The menu comes from MAIN_NAV in src/config.ts; an item with `children` opens a dropdown (Products).
+ * - The menu is built by mainNav() in src/config.ts (the Products dropdown lists the categories passed in); an item with `children` opens a dropdown (Products), on hover on desktop, and its label links to the full catalog.
  * - From the xl breakpoint the full menu is shown; below it, <MobileMenu> (a drawer) takes over.
+ * - Staff get an Admin panel button (in LoginPopover) that slides the admin drawer (<SubNavDrawer>, the
+ *   pages of ADMIN_NAV) down out of the header and back up; the header grows with it, over the page.
+ * - The header spans the full window: the logo sits at the start edge, the language switcher and login/logout
+ *   at the end edge, and the menu in the middle.
+ * - Signed-in business customers get a cart icon (<CartDrawer>) at the end edge, beside the language button (at
+ *   every width).
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
  *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
  */
-import { Fragment, useEffect } from 'react'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
 import { ChevronDown } from 'lucide-react'
 import { cn } from 'cn'
+import { CartDrawer } from '@/components/CartDrawer'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LoginPopover } from '@/components/LoginPopover'
 import { Logo } from '@/components/Logo'
 import { MobileMenu } from '@/components/MobileMenu'
+import { NAV_TEXT, Underline } from '@/components/NavText'
+import { SubNavDrawer, useSubNavDrawer } from '@/components/SubNavDrawer'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,54 +36,61 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MAIN_NAV, type NavChild, type NavItem } from '@/config'
+import { ADMIN_NAV, mainNav, type NavItem } from '@/config'
+import type { ProductCategory } from '@/api'
+import { useAuth } from '@/auth'
 import { useI18n } from '@/i18n'
 
 /**
- * Text style of the top-level menu entries (legacy look). Left-to-right (English) labels use 0.1em
- * letter-spacing instead of the 0.25em `tracking-widest`, so the seven entries fit on one line at every
- * desktop width (Hebrew has its own tight tracking).
- */
-const NAV_TEXT =
-  'group relative whitespace-nowrap font-heading text-xs font-medium uppercase tracking-widest ltr:tracking-[0.1em] 2xl:text-sm min-[1920px]:text-base text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:text-brand-red data-[status=active]:text-brand-red'
-
-/**
  * The site header.
- * @param props.items - Menu items; defaults to MAIN_NAV from src/config.ts.
+ * @param props.categories - The catalog categories for the Products dropdown (loaded by the root route).
+ * @param props.items - Menu items; defaults to mainNav(categories) from src/config.ts.
  * @returns The fixed <header> element.
  */
-export function Navbar({ items = MAIN_NAV }: { items?: NavItem[] }) {
-  const { t } = useI18n()
+export function Navbar({ categories = [], items }: { categories?: ProductCategory[]; items?: NavItem[] }) {
+  const { t, locale } = useI18n()
+  items ??= mainNav(categories, locale)
   useScrollSpy()
+  const { user } = useAuth()
+  const staff = user?.kind === 'staff' ? user : null
+  const adminDrawer = useSubNavDrawer(staff ? staff.email : null)
+  const mainNavRef = useRef<HTMLElement>(null)
 
   return (
     <header className="material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]">
-      <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-6 px-6 lg:px-10 xl:px-6 2xl:px-10">
+      <div className="flex w-full items-center justify-between gap-1 px-4 sm:px-6 lg:px-10 xl:gap-6 xl:px-6 2xl:px-10">
         <Link
           to="/"
           aria-label={t.header.home}
           onClick={() => window.scrollTo({ top: 0 })}
           className="shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-4"
         >
-          <Logo className="h-14" />
+          <Logo className="h-8 sm:h-14" />
         </Link>
 
-        <nav aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
+        <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
           {items.map((item) => (
             <DesktopNavItem key={item.id} item={item} />
           ))}
         </nav>
 
-        <div className="hidden shrink-0 items-center gap-2 xl:flex">
-          <LanguageSwitcher variant="dropdown" />
-          <LoginPopover />
-        </div>
+        {/* The end edge: the cart icon beside the language button, then login/logout (desktop) or the menu. */}
+        <div className="flex shrink-0 items-center gap-1 xl:gap-2">
+          {user?.kind === 'business' && <CartDrawer />}
 
-        <div className="flex items-center gap-1 xl:hidden">
-          <LanguageSwitcher variant="toggle" />
-          <MobileMenu items={items} />
+          <div className="hidden items-center gap-2 xl:flex">
+            <LanguageSwitcher variant="dropdown" />
+            <LoginPopover adminToggle={adminDrawer.trigger} />
+          </div>
+
+          <div className="flex items-center gap-1 xl:hidden">
+            <LanguageSwitcher variant="toggle" />
+            <MobileMenu items={items} />
+          </div>
         </div>
       </div>
+
+      {staff && <SubNavDrawer {...adminDrawer.drawer} items={ADMIN_NAV} label={t.nav.adminPanel} alignWith={mainNavRef} className="hidden xl:grid" />}
     </header>
   )
 }
@@ -136,14 +152,22 @@ function useScrollSpy() {
   }, [pathname, router])
 }
 
+/** How long a dropdown stays open after the pointer leaves it, so the pointer can cross the gap (ms). */
+const HOVER_CLOSE_MS = 150
+
 /**
- * One top-level menu entry: a link, or — for an item with `children` — a dropdown (Products).
- * @param props.item - The menu item (see MAIN_NAV in src/config.ts).
+ * One top-level menu entry: a link, or — for an item with `children` — a dropdown (Products). On desktop the
+ * dropdown opens on a mouse hover (touch and keyboard open it with a tap or ArrowDown), and activating its label
+ * (click or Enter) goes to the dropdown's own link (the full catalog) and closes the menu.
+ * @param props.item - The menu item (see mainNav in src/config.ts).
  * @returns The menu link or dropdown.
  */
 function DesktopNavItem({ item }: { item: NavItem }) {
   const { t } = useI18n()
-  const location = useLocation({ select: ({ pathname, hash }) => ({ pathname, hash }) })
+  const [open, setOpen] = useState(false)
+  const closeTimer = useRef<number | undefined>(undefined)
+
+  useEffect(() => () => window.clearTimeout(closeTimer.current), [])
 
   if (!('children' in item)) {
     return (
@@ -154,30 +178,83 @@ function DesktopNavItem({ item }: { item: NavItem }) {
     )
   }
 
+  /** Opens the dropdown now, cancelling a pending close. */
+  const openMenu = () => {
+    window.clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+
+  /**
+   * Closes the dropdown shortly, so the pointer can move from the label into the panel.
+   * @returns Nothing.
+   */
+  const closeSoon = () => {
+    window.clearTimeout(closeTimer.current)
+    closeTimer.current = window.setTimeout(() => setOpen(false), HOVER_CLOSE_MS)
+  }
+
+  /**
+   * Opens the dropdown on a mouse hover; touch and pen do not hover, so they only tap the link.
+   * @param event - The pointer event on the label.
+   * @returns Nothing.
+   */
+  const handleLabelEnter = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse') openMenu()
+  }
+
+  /**
+   * Closes the dropdown when the mouse leaves the label (the panel keeps it open while the pointer is in it).
+   * @param event - The pointer event on the label.
+   * @returns Nothing.
+   */
+  const handleLabelLeave = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse') closeSoon()
+  }
+
+  /**
+   * A click on the label goes to the full catalog (the link); the menu closes with it.
+   * @returns Nothing.
+   */
+  const handleLabelClick = () => setOpen(false)
+
+  /**
+   * Enter follows the link, as a click does (Radix would otherwise use Enter to open the menu). ArrowDown and
+   * Space keep opening the menu.
+   * @param event - The key event on the label.
+   * @returns Nothing.
+   */
+  const handleLabelKey = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      event.currentTarget.click()
+    }
+  }
+
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger
-        // Highlighted like an active link while the scrollspy is on one of its #sections (e.g. "All categories").
-        data-status={item.children.some((child) => isCurrentSection(child, location)) ? 'active' : undefined}
-        className={cn(NAV_TEXT, 'flex items-center gap-1.5')}
-      >
-        {item.label(t)}
-        <ChevronDown size={15} aria-hidden="true" className="transition-transform duration-200 group-data-[state=open]:rotate-180" />
-        <Underline />
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Link
+          {...item.link}
+          className={`${NAV_TEXT} flex items-center gap-1.5`}
+          onPointerEnter={handleLabelEnter}
+          onPointerLeave={handleLabelLeave}
+          onClick={handleLabelClick}
+          onKeyDown={handleLabelKey}
+        >
+          {item.label(t)}
+          <ChevronDown size={15} aria-hidden="true" className={cn('transition-transform duration-200', open && 'rotate-180')} />
+          <Underline />
+        </Link>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
         sideOffset={14}
         className="w-auto min-w-64 rounded-none border border-neutral-200 p-0 py-2 shadow-premium-sm ring-0"
+        onPointerEnter={openMenu}
+        onPointerLeave={handleLabelLeave}
       >
         {item.children.map((child) => {
-          const Icon = child.icon
-          const content = (
-            <>
-              {Icon && <Icon size={16} aria-hidden="true" className="text-brand-red" />}
-              {child.label(t)}
-            </>
-          )
+          const content = child.label(t)
           return (
             <Fragment key={child.id}>
               {child.divider && <DropdownMenuSeparator className="mx-0 my-2" />}
@@ -195,30 +272,5 @@ function DesktopNavItem({ item }: { item: NavItem }) {
         })}
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-/**
- * Tells whether a dropdown entry links to the home-page section the visitor is on.
- * @param child - The dropdown entry.
- * @param location - The current pathname and hash.
- * @returns True for an internal #section link on the home page whose hash is the current one.
- */
-function isCurrentSection(child: NavChild, location: { pathname: string; hash: string }) {
-  return 'link' in child && location.pathname === '/' && location.hash !== '' && child.link.hash === location.hash
-}
-
-/**
- * The thin red underline of a menu entry: grows from the start side on hover or keyboard focus (a scale,
- * so it animates on the compositor), and
- * stays visible on the active page and while a dropdown is open.
- * @returns A decorative <span>, hidden from screen readers.
- */
-function Underline() {
-  return (
-    <span
-      aria-hidden="true"
-      className="absolute -bottom-1 start-0 h-px w-full origin-left scale-x-0 bg-brand-red transition-transform duration-300 group-hover:scale-x-100 group-focus-visible:scale-x-100 group-data-[state=open]:scale-x-100 group-data-[status=active]:scale-x-100 rtl:origin-right"
-    />
   )
 }

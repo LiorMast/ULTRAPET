@@ -1,12 +1,12 @@
 /**
  * WhereToBuy.test.tsx — Tests for the Where to Buy page: the store list with real tel/Waze links in both
- * languages, search filtering, the empty state, and "find the nearest store" (sorted by distance, plus the
- * denied-location message). The Leaflet map is replaced by a stub because jsdom cannot draw maps; the map
+ * languages, the "try again" screen when the stores cannot be loaded, search filtering, the empty state, and
+ * "find the nearest store" (sorted by distance, plus the denied-location message). The Leaflet map is replaced by a stub because jsdom cannot draw maps; the map
  * itself is covered by the Playwright spec.
  */
 import { screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Branch } from '@/components/BranchMap'
+import type { Branch } from '@/api'
 import { renderPage } from '@/test/utils'
 import branches from '@/stubs/branches.json'
 
@@ -29,6 +29,23 @@ describe('Where to Buy page', () => {
     expect(await screen.findByTestId('map')).toHaveAttribute('data-count', String(branches.length))
     const first = screen.getAllByRole('listitem')[0]
     expect(within(first).getByRole('link', { name: 'ניווט בוויז' })).toHaveAttribute('href', expect.stringContaining('waze.com/ul?ll='))
+  })
+
+  it('offers to try again when the stores cannot be loaded', async () => {
+    const realFetch = globalThis.fetch
+    let failed = false
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+      if (!failed && String(input).includes('/api/resellers')) {
+        failed = true
+        return Promise.reject(new TypeError('Failed to fetch'))
+      }
+      return realFetch(input, init)
+    })
+    const { user } = await renderPage('/where-to-buy')
+    expect(screen.getByRole('heading', { level: 1, name: 'לא הצלחנו לטעון את העמוד' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'נסו שוב' }))
+    expect(await screen.findByRole('heading', { level: 1, name: 'איתור חנויות' })).toBeInTheDocument()
+    expect(listCount()).toBe(branches.length)
   })
 
   it('uses English texts in English', async () => {

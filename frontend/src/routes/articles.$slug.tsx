@@ -1,5 +1,6 @@
 /**
  * routes/articles.$slug.tsx — One article, e.g. /articles/living-with-a-cat. Unknown slugs show "not found".
+ * The loader fetches the article and the list of articles (for the "more articles" row) from the API.
  *
  * The page: breadcrumbs, topic/date/reading time, title, photo and text inside <article>; then a "find a
  * store" call to action, the related product categories and more articles (same topic first). Those
@@ -8,13 +9,14 @@
  * SEO: its `head` sets the article's title, description, canonical and hreflang links, og:image and
  * article dates, plus BlogPosting and BreadcrumbList JSON-LD (eligible for rich results).
  */
-import { createFileRoute, Link, linkOptions, notFound } from '@tanstack/react-router'
+import { createFileRoute, Link, linkOptions } from '@tanstack/react-router'
 import { ArrowRight, MapPin } from 'lucide-react'
 import { ArticleCard, ArticleMeta } from '@/components/ArticleCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { CategoryCard } from '@/components/CategoryCard'
 import { Button } from '@/components/ui/button'
-import { ARTICLES, CATEGORIES, localized, type Article, type ArticleBlock } from '@/config'
+import { fetchArticle, fetchArticles, rethrowNotFound, type Article, type ArticleBlock } from '@/api'
+import { articleImage, CATEGORIES, localized } from '@/config'
 import { dictionaryFor, localizePath, useI18n } from '@/i18n'
 import { absoluteUrl, breadcrumbJsonLd, organizationJsonLd, pageHead } from '@/seo'
 
@@ -22,13 +24,15 @@ import { absoluteUrl, breadcrumbJsonLd, organizationJsonLd, pageHead } from '@/s
 const MORE_COUNT = 3
 
 export const Route = createFileRoute('/articles/$slug')({
-  loader: ({ params }) => {
-    const article = ARTICLES.find((a) => a.slug === params.slug)
-    if (!article) throw notFound()
-    return article
+  loader: async ({ params, abortController }) => {
+    const { signal } = abortController
+    const [article, articles] = await Promise.all([fetchArticle(params.slug, signal).catch(rethrowNotFound), fetchArticles(signal)])
+    return { article, more: moreArticles(article, articles) }
   },
-  head: ({ match, loaderData: article }) => {
-    if (!article) return {}
+  head: ({ match, loaderData }) => {
+    if (!loaderData) return {}
+    const { article } = loaderData
+    const image = articleImage(article.slug)
     const { locale } = match.context
     const t = dictionaryFor(locale)
     const path = `/articles/${article.slug}`
@@ -38,7 +42,7 @@ export const Route = createFileRoute('/articles/$slug')({
       path,
       title,
       description: localized(article.description, locale),
-      image: article.image?.src,
+      image: image?.src,
       type: 'article',
       jsonLd: [
         {
@@ -46,7 +50,7 @@ export const Route = createFileRoute('/articles/$slug')({
           '@type': 'BlogPosting',
           headline: title,
           description: localized(article.description, locale),
-          image: article.image ? [absoluteUrl(article.image.src)] : undefined,
+          image: image ? [absoluteUrl(image.src)] : undefined,
           datePublished: article.publishedAt,
           dateModified: article.updatedAt,
           inLanguage: locale,
@@ -93,10 +97,11 @@ function ArticleBlockView({ block }: { block: ArticleBlock }) {
 /**
  * Picks the articles for the "more articles" row: the newest of the same topic first, then the others.
  * @param article - The current article (left out).
+ * @param articles - Every published article, newest first.
  * @returns Up to MORE_COUNT articles.
  */
-function moreArticles(article: Article) {
-  const others = ARTICLES.filter((a) => a.slug !== article.slug)
+function moreArticles(article: Article, articles: Article[]) {
+  const others = articles.filter((a) => a.slug !== article.slug)
   return [...others.filter((a) => a.topic === article.topic), ...others.filter((a) => a.topic !== article.topic)].slice(0, MORE_COUNT)
 }
 
@@ -106,10 +111,10 @@ function moreArticles(article: Article) {
  */
 function ArticlePage() {
   const { t, locale } = useI18n()
-  const article = Route.useLoaderData()
+  const { article, more } = Route.useLoaderData()
+  const image = articleImage(article.slug)
   const title = localized(article.title, locale)
   const categories = CATEGORIES.filter((c) => article.relatedCategories.includes(c.slug))
-  const more = moreArticles(article)
 
   return (
     <>
@@ -128,13 +133,13 @@ function ArticlePage() {
           </h1>
         </div>
 
-        {article.image && (
+        {image && (
           <figure className="mx-auto mt-12 max-w-5xl">
             <img
-              src={article.image.src}
-              srcSet={article.image.srcSet}
+              src={image.src}
+              srcSet={image.srcSet}
               sizes="(min-width: 1024px) 64rem, 100vw"
-              alt={localized(article.imageAlt, locale)}
+              alt={article.imageAlt ? localized(article.imageAlt, locale) : ''}
               width={1280}
               height={720}
               fetchPriority="high"
@@ -174,7 +179,13 @@ function ArticlePage() {
           </h2>
           <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {categories.map((category) => (
-              <CategoryCard key={category.slug} category={category} />
+              <CategoryCard
+                key={category.slug}
+                name={category.label(t)}
+                image={category.image}
+                icon={category.icon}
+                link={linkOptions({ to: '/categories/$slug', params: { slug: category.slug } })}
+              />
             ))}
           </div>
         </section>

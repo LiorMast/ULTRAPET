@@ -3,14 +3,14 @@
 Covers the joined-table user inheritance, the cascades and restrictions on delete, and that the CHECK constraints
 reject invalid rows.
 """
-from datetime import date
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
-from app.database.models.catalog import Category, Product
+from app.database.models.catalog import Category, Product, Supplier
 from app.database.models.orders import Order, PaymentMethod
 from app.pricing import PriceRule
 from app.database.models.users import AppUser, BusinessUser, StaffUser
@@ -93,7 +93,7 @@ def test_deleting_an_app_user_deletes_the_subtype_row(database):
 def test_deleting_a_customer_deletes_their_price_rules_and_never_makes_them_general(database, category):
     customer = make_customer()
     database.add(customer)
-    database.add(PriceRule(business_user=customer, category=category, kind="discount", value=Decimal(10)))
+    database.add(PriceRule(business_user=customer, category=category, kind="percent", value=Decimal(10)))
     database.commit()
     assert len(customer.price_rules) == 1  # loaded, so the ORM (not only the database) handles them
 
@@ -132,15 +132,21 @@ def test_a_customer_with_orders_cannot_be_deleted(database):
 @pytest.mark.parametrize(
     ("fields", "constraint"),
     [
-        ({"kind": "discount", "value": 10}, "price_rules_one_target_check"),  # no target
-        ({"kind": "discount", "value": 10, "with_product": True, "with_category": True}, "price_rules_one_target_check"),
-        ({"kind": "discount", "value": 120, "with_category": True}, "price_rules_discount_max_check"),
-        ({"kind": "discount", "value": 0, "with_category": True}, "price_rules_value_check"),
+        ({"kind": "percent", "value": 10}, "price_rules_target_check"),  # no target and no customer
+        ({"kind": "percent", "value": 10, "with_product": True, "with_category": True}, "price_rules_target_check"),
+        (
+            {"kind": "percent", "value": 10, "with_product": True, "with_category": True, "with_customer": True},
+            "price_rules_target_check",
+        ),
+        ({"kind": "fixed_price", "value": 50, "with_customer": True}, "price_rules_fixed_price_target_check"),
+        ({"kind": "percent", "value": 120, "with_category": True}, "price_rules_percent_max_check"),
+        ({"kind": "amount", "value": 0, "with_category": True}, "price_rules_value_check"),
+        ({"kind": "percent", "value": -5, "with_category": True}, "price_rules_value_check"),  # no surcharges
         ({"kind": "fixed_price", "value": 50, "with_product": True}, "price_rules_fixed_price_target_check"),
-        ({"kind": "increase", "value": 5, "with_category": True}, "price_rules_general_discount_only_check"),
+        ({"kind": "fixed_price", "value": -5, "with_product": True, "with_customer": True}, "price_rules_value_check"),
         ({"kind": "rebate", "value": 5, "with_category": True, "with_customer": True}, "price_rules_kind_check"),
         (
-            {"kind": "discount", "value": 5, "with_category": True, "starts_on": date(2026, 12, 1), "ends_on": date(2026, 11, 1)},
+            {"kind": "percent", "value": 5, "with_category": True, "starts_at": datetime(2026, 12, 1, 9, tzinfo=UTC), "ends_at": datetime(2026, 12, 1, 8, tzinfo=UTC)},
             "price_rules_dates_check",
         ),
     ],
@@ -164,6 +170,23 @@ def test_price_rule_checks_reject_invalid_rules(database, category, fields, cons
         database.commit()
 
 
+def test_general_percent_and_amount_discounts_are_valid(database, category):
+    database.add_all(
+        [
+            PriceRule(category=category, kind="percent", value=Decimal("100")),
+            PriceRule(category=category, kind="amount", value=Decimal("12.50")),
+        ]
+    )
+    database.commit()
+
+
+def test_a_customer_discount_on_every_product_is_valid(database):
+    customer = make_customer()
+    database.add(customer)
+    database.add(PriceRule(business_user=customer, kind="percent", value=Decimal(5)))
+    database.commit()
+
+
 def test_a_customer_fixed_price_on_a_product_is_valid(database, category):
     product = make_product(category)
     customer = make_customer()
@@ -184,3 +207,26 @@ def test_checks_reject_invalid_rows(database, model, constraint):
     database.add(model())
     with pytest.raises(IntegrityError, match=constraint):
         database.commit()
+
+
+@pytest.mark.parametrize(
+    ("coordinates", "constraint"),
+    [
+        ({"latitude": 91.0, "longitude": 10.0}, "suppliers_latitude_check"),
+        ({"latitude": 10.0, "longitude": -181.0}, "suppliers_longitude_check"),
+        ({"latitude": 10.0}, "suppliers_coordinates_check"),
+        ({"longitude": 10.0}, "suppliers_coordinates_check"),
+    ],
+)
+def test_supplier_coordinates_are_checked(database, coordinates, constraint):
+    database.add(Supplier(name="Bad Location Ltd", **coordinates))
+    with pytest.raises(IntegrityError, match=constraint):
+        database.commit()
+
+
+def test_a_supplier_location_is_stored_with_both_coordinates_or_none(database):
+    database.add_all([Supplier(name="Madrid Feeds", latitude=40.4168, longitude=-3.7038), Supplier(name="No Location")])
+    database.commit()
+    located = database.scalar(select(Supplier).where(Supplier.name == "Madrid Feeds"))
+    assert (located.latitude, located.longitude) == (40.4168, -3.7038)
+    assert database.scalar(select(Supplier.latitude).where(Supplier.name == "No Location")) is None

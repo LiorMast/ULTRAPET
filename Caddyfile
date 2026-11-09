@@ -1,0 +1,14 @@
+# Caddyfile — Web server of the demo deployment (compose.prod.yaml): HTTPS, the built frontend, and the API proxy.
+# {$SITE_ADDRESS} comes from .env (e.g. 3.120.1.2.sslip.io); Caddy fetches its certificate automatically.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# The backend: the API and the sitemap.
+	@backend path /api/* /sitemap.xml
+	reverse_proxy @backend backend:5000
+
+	# The single-page app: real files, otherwise index.html (the router handles the URL).
+	root * /srv/site
+	try_files {path} /index.html
+	file_server
+}

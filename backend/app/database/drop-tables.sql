@@ -20,8 +20,12 @@ DROP TABLE IF EXISTS brands;            -- referenced by: products
 DROP TABLE IF EXISTS suppliers;         -- referenced by: product_suppliers
 DROP TABLE IF EXISTS payment_methods;   -- referenced by: orders
 DROP TABLE IF EXISTS settings;          -- referenced by: nothing
+DROP TABLE IF EXISTS articles;          -- referenced by: nothing
+DROP TABLE IF EXISTS resellers;         -- referenced by: nothing
+DROP TABLE IF EXISTS page_sections;     -- referenced by: nothing
+DROP TABLE IF EXISTS faq_items;         -- referenced by: nothing
 DROP TABLE IF EXISTS business_users;    -- referenced by: orders, business_leads, price_rules
-DROP TABLE IF EXISTS staff_users;       -- referenced by: price_rules
+DROP TABLE IF EXISTS staff_users;       -- referenced by: price_rules, page_sections, faq_items
 DROP TABLE IF EXISTS app_users;         -- referenced by: business_users, staff_users
 
 COMMIT;

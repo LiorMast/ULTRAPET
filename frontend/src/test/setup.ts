@@ -2,15 +2,37 @@
  * test/setup.ts — Runs before every Vitest test file (configured in vite.config.ts).
  *
  * - Adds the jest-dom matchers (toBeInTheDocument, toHaveAttribute, ...).
- * - Unmounts whatever a test rendered, so tests don't leak into each other.
+ * - Answers the site's API calls with the fake backend in test/api.ts (fetch), built from the stub fixtures.
+ * - Unmounts whatever a test rendered, restores mocked functions, signs the fake API out and clears browser
+ *   storage (saved sessions, carts), so tests don't leak into each other.
  * - Adds browser APIs that jsdom lacks but Radix UI and TanStack Router call:
  *   ResizeObserver, scrollIntoView, pointer capture, window.scrollTo and matchMedia (no-ops here).
+ * - Keeps the event properties that user-event sets (relatedTarget, ...) redefinable, as they are in browsers,
+ *   because DataTables (DataTable.tsx) redefines them on the events it handles.
  */
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, vi } from 'vitest'
+import { fakeFetch, resetFakeApi } from '@/test/api'
 
-afterEach(() => cleanup())
+globalThis.fetch = fakeFetch
+
+// user-event adds properties to its events with Object.defineProperty, which makes them non-configurable;
+// in a browser they live on the event's prototype, and DataTables redefines them on the event itself. Defining
+// them configurable keeps DataTables' event handlers working under user-event.
+// `Event` is kept here because jsdom removes its globals while the test environment is torn down.
+const defineProperty = Object.defineProperty
+const DomEvent = Event
+Object.defineProperty = <T,>(target: T, key: PropertyKey, descriptor: PropertyDescriptor & ThisType<unknown>): T =>
+  defineProperty(target, key, target instanceof DomEvent && descriptor.configurable === undefined ? { ...descriptor, configurable: true } : descriptor)
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+  resetFakeApi()
+  localStorage.clear()
+  sessionStorage.clear()
+})
 
 /** Minimal ResizeObserver: jsdom has none, and Radix only needs the API to exist. */
 class ResizeObserverStub {

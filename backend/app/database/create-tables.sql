@@ -88,6 +88,8 @@ CREATE TABLE suppliers (
   id           UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- supplier id
   name         TEXT        NOT NULL UNIQUE,               -- company name
   country      TEXT        CHECK (country ~ '^[A-Z]{2}$'), -- ISO 3166 two-letter country code (e.g. 'ES'); NULL = unknown
+  latitude     DOUBLE PRECISION CHECK (latitude BETWEEN -90 AND 90),   -- where the supplier is: degrees north of the equator (negative = south), WGS 84; NULL = location not set
+  longitude    DOUBLE PRECISION CHECK (longitude BETWEEN -180 AND 180), -- degrees east of Greenwich (negative = west), WGS 84; NULL = location not set
   contact_name TEXT,                                      -- person to contact; NULL = not given
   email        TEXT,                                      -- contact email; NULL = not given
   phone        TEXT,                                      -- contact phone, international format; NULL = not given
@@ -95,20 +97,21 @@ CREATE TABLE suppliers (
   notes        TEXT,                                      -- internal notes (terms, lead times, ...)
   is_active    BOOLEAN     NOT NULL DEFAULT true,         -- false = no longer bought from (kept for history)
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),        -- when the supplier was added
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()         -- last change
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),        -- last change
+  CONSTRAINT suppliers_coordinates_check CHECK ((latitude IS NULL) = (longitude IS NULL)) -- a location has both coordinates or neither
 );
 
 -- brands — The brands Ultra Pet distributes (Ultra Pet, Internutri, Greenheart Premiums, ...); each has a page on the
 -- public site.
 CREATE TABLE brands (
   id           UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- brand id
-  slug         TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name of the brand page, e.g. 'jr-farm'
+  slug         TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name of the brand page, e.g. 'jr-farm'; the staff API names a new brand after its name and never changes it
   name         TEXT        NOT NULL,                      -- brand name as printed (not translated)
   tagline      JSONB       CHECK (tagline IS NULL OR coalesce(tagline ->> 'he', '') <> ''), -- short slogan per language; NULL = none
   description  JSONB       CHECK (description IS NULL OR coalesce(description ->> 'he', '') <> ''), -- brand page text per language; NULL = none
   accent_color TEXT        CHECK (accent_color ~ '^#[0-9A-Fa-f]{6}$'), -- brand colour for its cards, '#RRGGBB'; NULL = the site red
-  logo_url     TEXT,                                      -- logo image URL; NULL = show the name as text
-  sort_order   INTEGER     NOT NULL DEFAULT 0,            -- position in brand lists, lowest first
+  logo_url     TEXT,                                      -- object key of the uploaded logo in the file storage, e.g. 'brands/20261106T132045Z_3f2a.png' (never a URL: the API builds it); NULL = the frontend's bundled logo, else the name as text
+  sort_order   INTEGER     NOT NULL DEFAULT 0,            -- position in brand lists, lowest first (staff drag the order: PUT /api/staff/brands/order; a new brand goes last)
   is_active    BOOLEAN     NOT NULL DEFAULT true,         -- false = hidden from the public site
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),        -- when the brand was added
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()         -- last change
@@ -118,11 +121,11 @@ CREATE TABLE brands (
 -- parent categories. Discounts can target a whole category (price_rules).
 CREATE TABLE categories (
   id          UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- category id
-  slug        TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name, e.g. 'dry-dog-food' (the catalog's ?category=)
+  slug        TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name, e.g. 'dry-dog-food' (the catalog's ?category=); the staff API names a new category after its English name and never changes it
   name        JSONB       NOT NULL CHECK (coalesce(name ->> 'he', '') <> ''), -- display name per language
-  image_url   TEXT,                                       -- category photo URL; NULL = use a product photo
+  image_url   TEXT,                                       -- object key of the category photo in the file storage, e.g. 'categories/3f2a.webp' (never a URL: the API builds it from S3_BUCKET/S3_REGION); NULL = the frontend's bundled photo for the slug, else an icon
   legacy_path TEXT,                                       -- the old WordPress URL, for 301 redirects; NULL = none
-  sort_order  INTEGER     NOT NULL DEFAULT 0,             -- position in category lists, lowest first
+  sort_order  INTEGER     NOT NULL DEFAULT 0,             -- position in category lists, lowest first (staff drag the order: PUT /api/staff/categories/order; a new category goes last)
   is_active   BOOLEAN     NOT NULL DEFAULT true,          -- false = hidden from the catalog
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),         -- when the category was added
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()          -- last change
@@ -133,7 +136,7 @@ CREATE TABLE categories (
 CREATE TABLE products (
   id          UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- product id
   woocommerce_id BIGINT     UNIQUE,                       -- the product's id on the old WooCommerce site (also the id in the frontend's stub data); NULL = created after the migration
-  slug        TEXT          NOT NULL UNIQUE,              -- URL name of the product page (may be Hebrew)
+  slug        TEXT          NOT NULL UNIQUE,              -- URL name of the product page (may be Hebrew: the imported ones); the staff API names a new product after its English name and never changes it
   sku         TEXT          UNIQUE,                       -- Ultra Pet's item code (the Rivhit item number); NULL = not assigned yet
   barcode     TEXT,                                       -- EAN/UPC barcode printed on the package; NULL = unknown
   name        JSONB         NOT NULL CHECK (coalesce(name ->> 'he', '') <> ''), -- product name per language
@@ -141,6 +144,7 @@ CREATE TABLE products (
   category_id UUID        NOT NULL REFERENCES categories (id) ON DELETE RESTRICT, -- the product's category; a category with products cannot be deleted
   brand_id    UUID        REFERENCES brands (id) ON DELETE SET NULL, -- the product's brand; NULL = unbranded or not set
   list_price  NUMERIC(10,2) CHECK (list_price >= 0),      -- base wholesale price per unit, shekels before VAT, before any price rule; NULL = no price yet (cannot be ordered)
+  sort_order  INTEGER       NOT NULL DEFAULT 0,           -- position in product lists (the catalog), lowest first (staff drag the order: PUT /api/staff/products/order; a new product goes last)
   is_active   BOOLEAN       NOT NULL DEFAULT true,        -- false = hidden from the catalog and cannot be ordered
   legacy_path TEXT,                                       -- the old WooCommerce URL, for 301 redirects; NULL = none
   created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),       -- when the product was added
@@ -153,9 +157,9 @@ CREATE INDEX ON products (brand_id);
 CREATE TABLE product_images (
   id            UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- image id
   product_id    UUID      NOT NULL REFERENCES products (id) ON DELETE CASCADE, -- the product; deleting it deletes its images
-  url           TEXT        NOT NULL,                     -- full-size image URL
-  thumbnail_url TEXT,                                     -- small square copy for cards (300x300); NULL = use url
-  srcset        TEXT,                                     -- HTML srcset of other sized copies; NULL = none
+  url           TEXT        NOT NULL,                     -- object key of the full-size picture in the file storage, e.g. 'products/2026-05-45f8.png' (never a URL: the API builds it)
+  thumbnail_url TEXT,                                     -- object key of a small square copy for cards (300x300); NULL = use url
+  srcset        TEXT,                                     -- HTML srcset of other sized copies, with object keys: 'products/a-500x500.png 500w, products/a-768x768.png 768w'; NULL = none
   alt           JSONB       CHECK (alt IS NULL OR coalesce(alt ->> 'he', '') <> ''), -- alternative text per language; NULL = decorative (the product name is shown next to it)
   sort_order    INTEGER     NOT NULL DEFAULT 0,           -- display position, lowest first (0 = main photo)
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),       -- when the image was added
@@ -182,34 +186,40 @@ CREATE INDEX ON product_suppliers (supplier_id);
 -- Pricing.
 -- ===================================================================================================================
 
--- price_rules — Every discount, price increase and special price, general or per customer, for a set period or
--- open-ended. Written by staff. How a customer's price is computed (backend/app/pricing.py):
---   1. Rules count only while active: is_active and starts_on <= today <= ends_on (a NULL date = no limit), where
---      today is the date in Israel.
---   2. Two layers are picked separately: the customer's own rules, and the general rules (business_user_id NULL).
---      In each layer a product rule beats a category rule, and among rules on the same target the one that started
---      last wins (NULL start = earliest), so a temporary deal overrides permanent terms while it lasts.
---   3. A customer fixed_price is the final price. Otherwise:
---      price = list_price x (1 -/+ customer discount/increase) x (1 - general discount), rounded to agorot.
+-- price_rules — Every discount and special price, general or per customer, for a set period or
+-- open-ended, and the bulk discounts that apply from a minimum quantity. Written by staff (the staff panel's discount
+-- dialogs). How a customer's price is computed (backend/app/pricing.py):
+--   1. Rules count only while active: is_active and starts_at <= now < ends_at (a NULL time = no limit; the end is
+--      exclusive, so a rule ended "now" stops applying at once).
+--   2. Four layers are picked separately: the customer's own regular rules, the general regular rules
+--      (business_user_id NULL), then the customer's bulk rules and the general bulk rules (min_quantity set). A bulk
+--      rule counts only when the order line has at least min_quantity units of the one product. In each layer a
+--      product rule beats a category rule, which beats a customer's rule on every product (no target); among bulk
+--      rules on the same target the highest threshold reached wins;
+--      then the rule that started last wins (NULL start = earliest), so a temporary deal overrides permanent terms.
+--   3. A customer fixed_price is the final price. Otherwise the layers stack in that order: each discount is taken
+--      off the price so far, starting from list_price (a percent: x (1 - value/100); an amount: - value), never
+--      below 0, rounded to agorot once.
 CREATE TABLE price_rules (
   id               UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- rule id
   business_user_id UUID        REFERENCES business_users (id) ON DELETE CASCADE, -- the customer the rule is for; NULL = a general rule for all customers
-  category_id      UUID        REFERENCES categories (id) ON DELETE CASCADE,     -- target category (every product in it); NULL when the rule targets a product
-  product_id       UUID        REFERENCES products (id) ON DELETE CASCADE,       -- target product; NULL when the rule targets a category
-  kind             TEXT          NOT NULL CHECK (kind IN ('discount', 'increase', 'fixed_price')), -- 'discount' = value percent off; 'increase' = value percent on top (price hike); 'fixed_price' = the price is value shekels
-  value            NUMERIC(10,2) NOT NULL CHECK (value > 0), -- percent for discount/increase, shekels before VAT for fixed_price
-  starts_on        DATE,                                  -- first day the rule applies (Israel date, inclusive); NULL = already in effect
-  ends_on          DATE,                                  -- last day the rule applies (inclusive); NULL = no end date
+  category_id      UUID        REFERENCES categories (id) ON DELETE CASCADE,     -- target category (every product in it); NULL when the rule targets a product or every product
+  product_id       UUID        REFERENCES products (id) ON DELETE CASCADE,       -- target product; NULL when the rule targets a category or every product (both NULL = a customer's discount on every product)
+  kind             TEXT          NOT NULL CHECK (kind IN ('percent', 'amount', 'fixed_price')), -- 'percent' = value percent off; 'amount' = value shekels before VAT off each unit; 'fixed_price' = the price is value shekels
+  value            NUMERIC(10,2) NOT NULL CHECK (value > 0), -- percent or shekels before VAT (see kind); always positive: what is taken off, or the fixed price
+  starts_at        TIMESTAMPTZ,                           -- the moment the rule starts applying (inclusive; staff pick it in Israel time); NULL = already in effect
+  ends_at          TIMESTAMPTZ,                           -- the moment the rule stops applying (exclusive); NULL = no end
+  min_quantity     INTEGER       CHECK (min_quantity IS NULL OR min_quantity >= 2), -- bulk discount: applies only when an order line has at least this many units of the product, on top of the regular discounts; NULL = a regular rule (any quantity)
   is_active        BOOLEAN       NOT NULL DEFAULT true,   -- false = paused: ignored without being deleted
   note             TEXT,                                  -- why the rule exists (e.g. 'November promotion', 'negotiated terms'); staff only
   created_by_id    UUID        REFERENCES staff_users (id) ON DELETE SET NULL, -- staff member who created the rule; NULL = unknown or since deleted
   created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),  -- when the rule was created
   updated_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),  -- last change
-  CONSTRAINT price_rules_one_target_check CHECK (num_nonnulls(category_id, product_id) = 1), -- exactly one target: a category or a product
-  CONSTRAINT price_rules_discount_max_check CHECK (kind <> 'discount' OR value <= 100), -- a discount is at most 100 percent
+  CONSTRAINT price_rules_target_check CHECK (num_nonnulls(category_id, product_id) = 1 OR (num_nonnulls(category_id, product_id) = 0 AND business_user_id IS NOT NULL)), -- one target (a category or a product), or none = every product, which only a customer's rule may have
+  CONSTRAINT price_rules_percent_max_check CHECK (kind <> 'percent' OR value <= 100), -- a percent discount is at most 100 percent
   CONSTRAINT price_rules_fixed_price_target_check CHECK (kind <> 'fixed_price' OR (product_id IS NOT NULL AND business_user_id IS NOT NULL)), -- a fixed price is set on one product for one customer
-  CONSTRAINT price_rules_general_discount_only_check CHECK (business_user_id IS NOT NULL OR kind = 'discount'), -- a general rule can only be a discount (a general increase = change list_price)
-  CONSTRAINT price_rules_dates_check CHECK (starts_on IS NULL OR ends_on IS NULL OR ends_on >= starts_on) -- the period does not end before it starts
+  CONSTRAINT price_rules_dates_check CHECK (starts_at IS NULL OR ends_at IS NULL OR ends_at >= starts_at), -- the period does not end before it starts
+  CONSTRAINT price_rules_fixed_price_bulk_check CHECK (kind <> 'fixed_price' OR min_quantity IS NULL) -- a fixed price is never a bulk rule
 );
 CREATE INDEX ON price_rules (business_user_id);
 CREATE INDEX ON price_rules (category_id);
@@ -228,6 +238,79 @@ CREATE TABLE settings (
   description TEXT,                                       -- what the setting controls, shown in the staff panel
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),         -- when the setting was added
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()          -- last change
+);
+
+
+-- ===================================================================================================================
+-- Editable home page sections.
+-- ===================================================================================================================
+
+-- page_sections — The editable content of the home page sections (hero, stats, brands, categories, about, faq,
+-- contact, ...), one row per section. The content shape differs per section, so it is JSONB (the sections other than
+-- the hero hold {<text key>: {text, font, size}}, each per language). Staff edit it in place on the home page; the
+-- public site reads it. Only the last change is remembered: who made it (updated_by_id) and when (updated_at).
+CREATE TABLE page_sections (
+  key           TEXT        PRIMARY KEY CHECK (key ~ '^[a-z0-9_]+$'), -- section id, e.g. 'hero', 'about', 'private_label'
+  content       JSONB       NOT NULL CHECK (jsonb_typeof(content) = 'object'), -- the section's content (an object whose shape depends on the section; translated texts as {"he": ..., "en": ...})
+  updated_by_id UUID        REFERENCES staff_users (id) ON DELETE SET NULL, -- staff member who made the last change; NULL = unknown, seeded or since deleted
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),         -- when the section was added
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()          -- when the last change was made
+);
+CREATE INDEX ON page_sections (updated_by_id);
+
+-- faq_items — The questions and answers of the home page FAQ section, as many as staff want, in display order. Staff
+-- add, edit and delete them on the page itself (the FAQ's inline editor saves the whole list at once through
+-- PUT /api/staff/faq-items); the public site reads them (GET /api/faq). A question may exist in some languages only,
+-- an exception to the Hebrew-required convention: the site shows it in a language when both its question and its
+-- answer have text in that language, and never falls back to another language (a page does not mix languages).
+CREATE TABLE faq_items (
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- question id
+  question      JSONB       NOT NULL CHECK (jsonb_typeof(question) = 'object'), -- the question per language, {"he": ..., "en": ...}; a missing or empty language = not shown in it
+  answer        JSONB       NOT NULL CHECK (jsonb_typeof(answer) = 'object'), -- the answer per language, plain text (line breaks kept)
+  sort_order    INTEGER     NOT NULL DEFAULT 0,             -- position in the section, lowest first (the inline editor numbers the list 0, 1, 2, ...)
+  updated_by_id UUID        REFERENCES staff_users (id) ON DELETE SET NULL, -- staff member who made the last change; NULL = unknown, seeded or since deleted
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),         -- when the question was added
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()          -- when it was last changed
+);
+CREATE INDEX ON faq_items (updated_by_id);
+
+
+-- ===================================================================================================================
+-- Public site content. Staff write it in the staff panel; the public site reads it.
+-- ===================================================================================================================
+
+-- articles — The blog posts (מאמרים) of the public site, written by staff; the first ones were ported from the
+-- WordPress blog. Shown from published_at on; a NULL published_at is a draft.
+CREATE TABLE articles (
+  id                 UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- article id
+  slug               TEXT        NOT NULL UNIQUE CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'), -- URL name, e.g. 'cat-play-and-enrichment' (/articles/<slug>)
+  topic              TEXT        NOT NULL CHECK (topic IN ('cats', 'dogs')), -- which animal the article is about (its label and the "more articles" order)
+  title              JSONB       NOT NULL CHECK (coalesce(title ->> 'he', '') <> ''), -- headline per language
+  description        JSONB       NOT NULL CHECK (coalesce(description ->> 'he', '') <> ''), -- summary per language, also the meta description
+  image_alt          JSONB       CHECK (image_alt IS NULL OR coalesce(image_alt ->> 'he', '') <> ''), -- alternative text of the article photo per language; NULL = none
+  body               JSONB       NOT NULL CHECK (coalesce(jsonb_typeof(body -> 'he'), '') = 'array'), -- the text per language: a list of blocks, {"type": "p", "text"} or {"type": "ol", "items": [...]}
+  related_categories TEXT[]      NOT NULL DEFAULT '{}',   -- slugs of the home page category cards (frontend config.ts) linked below the article; empty = none
+  legacy_path        TEXT,                                -- the old WordPress URL, for 301 redirects; NULL = none
+  published_at       TIMESTAMPTZ,                         -- when the article was (or will be) published; NULL = draft, hidden from the public site
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),  -- when the article was added
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()   -- last change (the article's "modified" date)
+);
+
+-- resellers — The pet stores that sell Ultra Pet products (משווקים), listed on the "Where to Buy" page and its map.
+-- Maintained by staff.
+CREATE TABLE resellers (
+  id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,  -- reseller id
+  name       TEXT             NOT NULL,                   -- store name as shown
+  address    TEXT             NOT NULL,                   -- street address
+  city       TEXT             NOT NULL,                   -- city (the list is sorted by city, then name)
+  phone      TEXT,                                        -- store phone; NULL = not listed
+  website    TEXT,                                        -- store website URL; NULL = none
+  latitude   DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),   -- map position: degrees north of the equator, WGS 84
+  longitude  DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180), -- map position: degrees east of Greenwich, WGS 84
+  approximate_location BOOLEAN NOT NULL DEFAULT false,     -- true = the address could not be located and the pin sits at the city centre (the map says so)
+  is_active  BOOLEAN          NOT NULL DEFAULT true,      -- false = hidden from the public site
+  created_at TIMESTAMPTZ      NOT NULL DEFAULT now(),     -- when the reseller was added
+  updated_at TIMESTAMPTZ      NOT NULL DEFAULT now()      -- last change
 );
 
 

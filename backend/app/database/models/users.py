@@ -43,6 +43,24 @@ class AppUser(TimestampMixin, db.Model):
 
     __mapper_args__ = {"polymorphic_on": "user_type"}
 
+    @property
+    def password(self) -> None:
+        """Write-only: a stored password can never be read back (only its hash is kept).
+
+        Returns:
+            Always None.
+        """
+        return None
+
+    @password.setter
+    def password(self, password: str) -> None:
+        """Sets a new password, so `BusinessUser(password=...)` and the staff API's generic update can set one.
+
+        Args:
+            password: The new plain-text password (see set_password).
+        """
+        self.set_password(password)
+
     def set_password(self, password: str) -> None:
         """Stores a hash of the password (werkzeug's default, scrypt); the password itself is never kept.
 

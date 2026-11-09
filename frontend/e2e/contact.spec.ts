@@ -4,12 +4,13 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import { hideFixedOverlays, scrollIntoViewSettled } from './utils.ts'
 
 test('shows the cards and the form and does not overflow', async ({ page }) => {
   await page.goto('/')
   await page.locator('#contact').scrollIntoViewIfNeeded()
   await expect(page.locator('#contact ul > li')).toHaveCount(4)
-  await expect(page.locator('#contact form')).toBeVisible()
+  await expect(page.locator('#contact').getByRole('button', { name: 'שליחת הודעה' })).toBeVisible()
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
@@ -27,7 +28,8 @@ for (const [name, path] of [['he', '/'], ['en', '/en']] as const) {
   test(`screenshot (${name})`, async ({ page }) => {
     await page.goto(path)
     const section = page.locator('#contact')
-    await section.scrollIntoViewIfNeeded()
+    await hideFixedOverlays(page)
+    await scrollIntoViewSettled(section)
     await expect(section).toHaveScreenshot(`contact-${name}.png`)
   })
 }

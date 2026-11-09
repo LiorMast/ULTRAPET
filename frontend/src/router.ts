@@ -7,10 +7,13 @@
  *   router builds, so <Link to="/where-to-buy"> renders href="/en/where-to-buy" on English pages.
  * - The router context carries the page language, so route `head` options (titles, meta tags) can be
  *   translated outside React.
+ * - Pages load their data from the API in route loaders (src/api.ts); when a load fails, LoadError (in
+ *   routes/__root.tsx) replaces the page with a "try again" screen.
  * - Used by main.tsx (browser history) and by the tests (memory history, see src/test/utils.tsx).
  */
 import { createRouter, type RouterHistory } from '@tanstack/react-router'
 import { delocalizePath, localizePath, type Locale } from '@/i18n'
+import { LoadError } from '@/routes/__root'
 import { routeTree } from './routeTree.gen'
 
 /**
@@ -25,6 +28,7 @@ export function createAppRouter({ locale, history }: { locale: Locale; history?:
     history,
     scrollRestoration: true,
     defaultPreload: 'intent',
+    defaultErrorComponent: LoadError,
     rewrite: localeRewrite(locale),
     context: { locale },
   })

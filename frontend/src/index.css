@@ -12,6 +12,8 @@
  * - Motion and type follow Apple's interface guidelines: one critically damped spring curve for every
  *   transition (--ease-spring), size-specific letter-spacing on large text, a translucent header
  *   material (material-bar), and a reduced-motion mode that keeps fades but drops movement.
+ * - Restyles the DataTables tables of the admin panel (DataTable.tsx) to the brand, under `.data-table`.
+ * - Styles stored HTML text (RichText.tsx, e.g. a product description) under `.rich-text`.
  */
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -35,6 +37,10 @@
   --color-brand-charcoal-3: #3a3a3a;
   --color-brand-charcoal-muted: #6b6b6b;
 
+  /* Status colors (Toast's success / warning; an error uses brand-red). White on success = 5.0:1, charcoal on warning = 8.3:1. */
+  --color-success: #15803d;
+  --color-warning: #f0a020;
+
   --color-neutral-50: #fafafa;
   --color-neutral-100: #f5f5f5;
   --color-neutral-150: #efefef;
@@ -54,6 +60,22 @@
 
   --text-2xs: 0.65rem;
   --text-2xs--line-height: 1rem;
+
+  /*
+   * Header text sizes (NavText's menu entries at the base / 2xl / 1920px widths, and the header's buttons:
+   * login, admin panel, language). Tokens, so Hebrew can enlarge them below: Heebo's Hebrew letters stand only
+   * 0.56em tall against Montserrat's 0.72em capitals, so the same font size would look ~30% smaller.
+   * Note: `cn()` (tailwind-merge) does not know these sizes and reads text-nav* as a color, dropping it next
+   * to a text-<color> class, so pass them as plain class strings, not through cn().
+   */
+  --text-nav: 0.75rem;
+  --text-nav--line-height: 1rem;
+  --text-nav-lg: 0.875rem;
+  --text-nav-lg--line-height: 1.25rem;
+  --text-nav-xl: 1rem;
+  --text-nav-xl--line-height: 1.5rem;
+  --text-nav-button: 1rem;
+  --text-nav-button--line-height: 1.5rem;
 
   --tracking-widest: 0.25em;
   --tracking-ultra-wide: 0.35em;
@@ -94,6 +116,30 @@
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+
+  /* Added to cart: the header cart badge pops and the cart icon nudges (CartDrawer, replayed on every add). */
+  --animate-cart-pop: cart-pop 0.45s var(--ease-spring) both;
+  @keyframes cart-pop {
+    0%,
+    100% {
+      scale: 1;
+    }
+    35% {
+      scale: 1.4;
+    }
+  }
+  --animate-cart-nudge: cart-nudge 0.45s var(--ease-spring) both;
+  @keyframes cart-nudge {
+    0%,
+    100% {
+      scale: 1;
+      rotate: 0deg;
+    }
+    35% {
+      scale: 1.12;
+      rotate: -8deg;
     }
   }
 
@@ -177,6 +223,24 @@ html:lang(he) {
   --text-4xl--letter-spacing: -0.01em;
   --text-5xl--letter-spacing: -0.01em;
   --text-6xl--letter-spacing: -0.01em;
+}
+
+/*
+ * Header text sizes follow the language of the text itself, not only the page's: the mobile language toggle
+ * shows the other language's label (lang="en" on a Hebrew page, lang="he" on an English one). Hebrew is as tall
+ * as the English capitals (x 0.72 / 0.56), on the same line heights, so the bar and buttons keep their height.
+ */
+[lang]:lang(he) {
+  --text-nav: 0.95rem;
+  --text-nav-lg: 1.125rem;
+  --text-nav-xl: 1.25rem;
+  --text-nav-button: 1.25rem;
+}
+[lang]:not(:lang(he)) {
+  --text-nav: 0.75rem;
+  --text-nav-lg: 0.875rem;
+  --text-nav-xl: 1rem;
+  --text-nav-button: 1rem;
 }
 
 /*
@@ -280,6 +344,155 @@ html:lang(he) {
   }
 }
 
+/* An accordion panel's reduced-motion close (ui/accordion.tsx): it fades out instead of collapsing. */
+@keyframes accordion-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * Admin data tables (DataTable.tsx): the DataTables default look (datatables.net-dt, loaded with the admin pages)
+ * restyled to the brand. Every rule starts with the component's `.data-table` wrapper so it outranks the
+ * library's stylesheet, which loads later. Logical properties only, so Hebrew pages mirror.
+ */
+.data-table div.dt-container {
+  font-size: var(--text-sm);
+  color: var(--color-brand-charcoal);
+}
+.data-table div.dt-container div.dt-layout-row {
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+/* The library pins the cells with physical margins, which pull both to the middle in RTL: use logical ones. */
+.data-table div.dt-container div.dt-layout-row div.dt-layout-cell.dt-layout-start {
+  margin: 0;
+  margin-inline-end: auto;
+}
+.data-table div.dt-container div.dt-layout-row div.dt-layout-cell.dt-layout-end {
+  margin: 0;
+  margin-inline-start: auto;
+}
+.data-table div.dt-container .dt-search input,
+.data-table div.dt-container .dt-length select {
+  border: 1px solid var(--color-neutral-300);
+  border-radius: 0;
+  background: var(--color-neutral-50);
+  padding: 0.5rem 0.75rem;
+  margin-inline-start: 0.5rem;
+}
+.data-table div.dt-container .dt-search input:focus-visible,
+.data-table div.dt-container .dt-length select:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: 1px;
+  background: white;
+}
+.data-table div.dt-container .dt-info {
+  color: var(--color-brand-charcoal-muted);
+}
+.data-table table.dataTable {
+  border-collapse: collapse;
+}
+.data-table table.dataTable > thead > tr > th,
+.data-table table.dataTable > thead > tr > td {
+  border-bottom: 1px solid var(--color-brand-charcoal);
+  padding: 0.75rem 1rem;
+  text-align: start;
+  font-family: var(--font-heading);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+  color: var(--color-brand-charcoal-muted);
+  white-space: nowrap;
+}
+/* The sort arrows follow the label (the library pushes them to the far edge, or the near one for numbers). */
+.data-table table.dataTable > thead > tr > th div.dt-column-header {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+.data-table table.dataTable > thead > tr > th div.dt-column-header .dt-column-title {
+  flex-grow: 0;
+}
+.data-table table.dataTable > thead > tr > th:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: -2px;
+}
+.data-table table.dataTable > tbody > tr > td {
+  border-top: 1px solid var(--color-neutral-150);
+  padding: 0.75rem 1rem;
+  text-align: start;
+  vertical-align: middle;
+  /* One line per row: a narrow screen scrolls the table sideways inside its box instead. */
+  white-space: nowrap;
+}
+.data-table table.dataTable > tbody > tr:hover > td {
+  background: var(--color-neutral-50);
+}
+.data-table table.dataTable > tbody > tr > td.dt-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+.data-table div.dt-container .dt-paging .dt-paging-button {
+  border: 1px solid transparent;
+  border-radius: 0;
+  padding: 0.375rem 0.75rem;
+  color: var(--color-brand-charcoal) !important;
+  background: transparent;
+}
+.data-table div.dt-container .dt-paging .dt-paging-button:hover {
+  border-color: var(--color-neutral-300);
+  background: var(--color-neutral-100);
+}
+.data-table div.dt-container .dt-paging .dt-paging-button.current,
+.data-table div.dt-container .dt-paging .dt-paging-button.current:hover {
+  border-color: var(--color-brand-red);
+  background: var(--color-brand-red);
+  color: white !important;
+}
+.data-table div.dt-container .dt-paging .dt-paging-button.disabled {
+  color: var(--color-brand-charcoal-muted) !important;
+}
+.data-table div.dt-container .dt-paging .dt-paging-button:focus-visible {
+  outline: 2px solid var(--color-brand-red);
+  outline-offset: 1px;
+}
+
+/*
+ * Stored HTML text (RichText.tsx): the sanitized subset p, h2-h4, ul/ol/li, table, strong/em, br. Headings are small
+ * uppercase labels in the brand red, like the section eyebrows; a wide table scrolls sideways instead of
+ * widening the page.
+ */
+.rich-text {
+  @apply space-y-4 text-base leading-relaxed text-brand-charcoal;
+}
+.rich-text :is(h2, h3, h4) {
+  @apply pt-4 font-heading text-xs font-bold uppercase tracking-widest text-brand-red-dark;
+}
+.rich-text > :first-child {
+  @apply pt-0;
+}
+.rich-text strong {
+  @apply font-semibold;
+}
+.rich-text ul {
+  @apply list-disc space-y-1.5 ps-6 marker:text-brand-red;
+}
+.rich-text ol {
+  @apply list-decimal space-y-1.5 ps-6 marker:font-bold marker:text-brand-red;
+}
+.rich-text table {
+  @apply block max-w-full overflow-x-auto border-collapse text-sm;
+}
+.rich-text :is(th, td) {
+  @apply border border-neutral-200 px-3 py-2 text-start align-top;
+}
+.rich-text th,
+.rich-text tr:first-child > td {
+  @apply bg-neutral-50 font-semibold;
+}
+
 /*
  * Reduced motion keeps feedback but drops movement (Apple: a gentler, non-vestibular equivalent, not "no
  * animation"). Colors, shadows and opacity still fade, so photos and panels cross-fade instead of
@@ -307,12 +520,26 @@ html:lang(he) {
   .animate-hero-rise {
     animation-name: hero-fade;
   }
+  /* The cart badge fades in instead of popping; the icon stays still. */
+  .animate-cart-pop {
+    animation-name: hero-fade;
+  }
+  .animate-cart-nudge {
+    animation: none;
+  }
   .animate-hint-down,
   .animate-bounce {
     animation: none;
   }
   details::details-content {
     transition: none;
+  }
+  /* Accordion panels (ui/accordion.tsx) stop resizing: they open at full height (the text still fades in) and fade out. */
+  [data-slot='accordion-content'][data-state='open'] {
+    animation: none;
+  }
+  [data-slot='accordion-content'][data-state='closed'] {
+    animation-name: accordion-fade-out;
   }
   html {
     scroll-behavior: auto;

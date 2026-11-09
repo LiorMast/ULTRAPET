@@ -6,12 +6,14 @@
  * or a click on the backdrop, and stops the page behind it from scrolling. The drawer slides in from
  * the end side — right in English, left in Hebrew — next to the hamburger button in both cases — and can
  * be swiped back towards that edge to close it. Like the desktop menu, the current page or home-page section
- * (kept in the URL hash by the navbar's scrollspy) is shown in red.
+ * (kept in the URL hash by the navbar's scrollspy) is shown in red. The Login entry becomes Log out when
+ * signed in, and staff also get an Admin panel entry.
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ChevronDown, Menu, UserRound, X } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, ShieldCheck, UserRound, X } from 'lucide-react'
 import { cn } from 'cn'
+import { useAuth, useSignOut } from '@/auth'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Logo } from '@/components/Logo'
 import { Button } from '@/components/ui/button'
@@ -34,6 +36,8 @@ const SUB_ENTRY_CLASS =
  */
 export function MobileMenu({ items }: { items: NavItem[] }) {
   const { t, isRtl } = useI18n()
+  const { user } = useAuth()
+  const handleSignOut = useSignOut()
   const [open, setOpen] = useState(false)
   /** Closes the drawer; every link calls it, so choosing a destination also closes the menu. */
   const close = () => setOpen(false)
@@ -82,13 +86,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
                     </summary>
                     <ul className="pb-3">
                       {item.children.map((child) => {
-                        const Icon = child.icon
-                        const content = (
-                          <>
-                            {Icon && <Icon size={15} aria-hidden="true" className="text-brand-red" />}
-                            {child.label(t)}
-                          </>
-                        )
+                        const content = child.label(t)
                         return (
                           <li key={child.id}>
                             {'href' in child ? (
@@ -112,11 +110,33 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
                 )}
               </li>
             ))}
+            {user?.kind === 'staff' && (
+              <li>
+                <Link to="/admin" onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2')}>
+                  <ShieldCheck size={14} aria-hidden="true" />
+                  {t.nav.adminPanel}
+                </Link>
+              </li>
+            )}
             <li>
-              <Link {...HEADER_LOGIN.link} onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2')}>
-                <UserRound size={14} aria-hidden="true" />
-                {HEADER_LOGIN.label(t)}
-              </Link>
+              {user ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    close()
+                    handleSignOut()
+                  }}
+                  className={cn(ENTRY_CLASS, 'flex items-center gap-2')}
+                >
+                  <LogOut size={14} aria-hidden="true" />
+                  {t.login.signOut}
+                </button>
+              ) : (
+                <Link {...HEADER_LOGIN.link} onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2')}>
+                  <UserRound size={14} aria-hidden="true" />
+                  {HEADER_LOGIN.label(t)}
+                </Link>
+              )}
             </li>
           </ul>
         </nav>
