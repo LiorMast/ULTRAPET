@@ -2,7 +2,7 @@
  * DiscountDialog.tsx — The admin panel's dialog for creating or editing one discount, whatever it applies to: a
  * category or a product (for all customers or one customer), or a payment method.
  *
- * It asks for the type (a percentage or an amount in shekels before VAT, as a switch), the value, whether it is a
+ * It asks for the type (a percentage or an amount in shekels before VAT, as a SegmentedSwitch), the value, whether it is a
  * bulk discount (with its minimum quantity: it applies from that many units of one product, on top of the regular
  * discounts), a start date and time and an end date and time or "no end date" (Israel time; the times default to
  * 00:00 and 23:59, so a period covers whole days unless staff pick otherwise). The value is always positive: the
@@ -13,10 +13,10 @@
  * words a discount the same way for lists (DiscountsDialog, the Discounts page).
  *
  * Given `scope` (the Discounts page, routes/admin.discounts.tsx), the form also asks what the discount applies to:
- * all products, or a category or a product (one searchable list of both), and all customers or one customer (a
- * searchable list), and hands that back as a RuleScope; scopeFields turns it into a price rule's target fields. A
- * discount on all products is always for one customer (a store-wide discount for every customer would just lower the
- * list prices), so choosing it asks for the customer directly. Without `scope.customers` (a customer's own discounts,
+ * the "Global discount" switch (every product), or else a category or a product (a SegmentedSwitch, then a searchable
+ * list of that kind only), and all customers or one customer (a searchable list), and hands that back as a RuleScope;
+ * scopeFields turns it into a price rule's target fields. A global discount is always for one customer (a store-wide
+ * discount for every customer would just lower the list prices), so switching it on asks for the customer directly. Without `scope.customers` (a customer's own discounts,
  * routes/admin.customers.tsx) it asks only what it applies to, and the caller sets the customer. discountTargets
  * builds the category and product choices for both pages.
  *
@@ -31,6 +31,8 @@ import { ApiError, type StaffCategory, type StaffProduct } from '@/api'
 import { localized } from '@/config'
 import { errorMessage, INPUT_CLASS, LABEL_CLASS } from '@/components/RecordDialog'
 import { SearchableField, type SearchOption } from '@/components/SearchableField'
+import { SegmentedSwitch } from '@/components/SegmentedSwitch'
+import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n, type Locale } from '@/i18n'
@@ -317,6 +319,7 @@ function DiscountForm({
   const [noEnd, setNoEnd] = useState(initial ? initial.endsAt === null : true)
   const [everyProduct, setEveryProduct] = useState(scope?.initial?.target === ALL_PRODUCTS)
   const [ruleTarget, setRuleTarget] = useState(scope?.initial?.target === ALL_PRODUCTS ? '' : (scope?.initial?.target ?? ''))
+  const [targetKind, setTargetKind] = useState<'category' | 'product'>(scope?.initial?.target.startsWith('product:') ? 'product' : 'category')
   const [oneCustomer, setOneCustomer] = useState(Boolean(scope?.initial?.customerId))
   const [customerId, setCustomerId] = useState(scope?.initial?.customerId ?? '')
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({})
@@ -329,6 +332,8 @@ function DiscountForm({
   const quantityValid = !bulk || quantity >= 2
   // A discount on every product is always for one customer.
   const askCustomer = Boolean(scope?.customers) && (oneCustomer || everyProduct)
+  // The search lists only the chosen kind's targets (their values start with "category:" / "product:").
+  const kindTargets = scope?.targets.filter((option) => option.value.startsWith(`${targetKind}:`)) ?? []
   // The period as Israel times; an emptied time box falls back to the default time.
   const startsAt = `${startsOn}T${startTime || START_TIME}:00`
   const endsAt = noEnd || !endsOn ? null : `${endsOn}T${endTime || END_TIME}:00`
@@ -373,6 +378,17 @@ function DiscountForm({
       setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
       setPending(false)
     }
+  }
+
+  /**
+   * Switches between a category and a product discount; the chosen target belongs to the other kind, so it is cleared
+   * (with its error).
+   * @param next - The newly chosen kind.
+   */
+  const handleKindChange = (next: 'category' | 'product') => {
+    setTargetKind(next)
+    setRuleTarget('')
+    setErrors(({ target: _target, ...rest }) => rest)
   }
 
   /**
@@ -425,28 +441,43 @@ function DiscountForm({
           {scope && (
             <>
               <div>
-                <Segmented
-                  name={`${id}-products`}
-                  legend={d.products}
-                  options={[
-                    { value: 'some', label: d.someProducts },
-                    { value: 'all', label: d.allProducts },
-                  ]}
-                  value={everyProduct ? 'all' : 'some'}
-                  onChange={(next) => setEveryProduct(next === 'all')}
-                />
-                {everyProduct && <p className="mt-1 text-xs text-brand-charcoal-muted">{d.allProductsHint}</p>}
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id={`${id}-global`}
+                    checked={everyProduct}
+                    onCheckedChange={setEveryProduct}
+                    aria-describedby={everyProduct ? `${id}-global-hint` : undefined}
+                  />
+                  <label htmlFor={`${id}-global`} className="cursor-pointer text-sm font-medium text-brand-charcoal">
+                    {d.global}
+                  </label>
+                </div>
+                {everyProduct && (
+                  <p id={`${id}-global-hint`} className="mt-1 text-xs text-brand-charcoal-muted">
+                    {d.allProductsHint}
+                  </p>
+                )}
               </div>
 
               {!everyProduct && (
                 <div>
-                  <label htmlFor={`${id}-target`} className={LABEL_CLASS}>{`${d.appliesTo} *`}</label>
+                  <SegmentedSwitch
+                    name={`${id}-kind`}
+                    legend={d.targetKind}
+                    options={[
+                      { value: 'category', label: d.category },
+                      { value: 'product', label: d.product },
+                    ]}
+                    value={targetKind}
+                    onChange={handleKindChange}
+                  />
+                  <label htmlFor={`${id}-target`} className={cn(LABEL_CLASS, 'mt-4')}>{`${d[targetKind]} *`}</label>
                   <SearchableField
                     id={`${id}-target`}
-                    label={d.appliesTo}
+                    label={d[targetKind]}
                     value={ruleTarget}
                     onChange={(next) => setRuleTarget(next)}
-                    options={scope.targets}
+                    options={kindTargets}
                     strict
                     className="mt-2"
                     inputClassName={INPUT_CLASS}
@@ -454,7 +485,7 @@ function DiscountForm({
                     {...described('target', `${id}-target-hint`)}
                   />
                   <p id={`${id}-target-hint`} className="mt-1 text-xs text-brand-charcoal-muted">
-                    {d.appliesToHint}
+                    {targetKind === 'category' ? d.categoryHint : d.productHint}
                   </p>
                   {fieldError('target')}
                 </div>
@@ -463,7 +494,7 @@ function DiscountForm({
               {scope.customers && (
                 <div>
                   {!everyProduct && (
-                    <Segmented
+                    <SegmentedSwitch
                       name={`${id}-customers`}
                       legend={d.customers}
                       options={[
@@ -497,7 +528,7 @@ function DiscountForm({
             </>
           )}
 
-          <Segmented
+          <SegmentedSwitch
             name={`${id}-type`}
             legend={d.type}
             options={[
@@ -625,45 +656,5 @@ function DiscountForm({
         </DialogFooter>
       </form>
     </>
-  )
-}
-
-/**
- * A two-way (or more) switch of radio buttons drawn as one segmented bar: the chosen part is dark.
- * @param props.name - The radio group's name (unique on the page).
- * @param props.legend - The group's visible name.
- * @param props.options - The choices, in order: value and visible label.
- * @param props.value - The chosen value.
- * @param props.onChange - Called with the newly chosen value.
- * @returns The fieldset.
- */
-function Segmented<Value extends string>({
-  name,
-  legend,
-  options,
-  value,
-  onChange,
-}: {
-  name: string
-  legend: string
-  options: { value: Value; label: string }[]
-  value: Value
-  onChange: (value: Value) => void
-}) {
-  return (
-    <fieldset>
-      <legend className={LABEL_CLASS}>{legend}</legend>
-      <div className="mt-2 grid auto-cols-fr grid-flow-col border border-neutral-300">
-        {options.map((option) => (
-          <label
-            key={option.value}
-            className="flex cursor-pointer items-center justify-center py-2.5 text-sm font-medium text-brand-charcoal transition-colors has-checked:bg-brand-charcoal has-checked:text-white has-focus-visible:outline-2 has-focus-visible:-outline-offset-2 has-focus-visible:outline-brand-red"
-          >
-            <input type="radio" name={name} value={option.value} checked={value === option.value} onChange={() => onChange(option.value)} className="sr-only" />
-            {option.label}
-          </label>
-        ))}
-      </div>
-    </fieldset>
   )
 }
