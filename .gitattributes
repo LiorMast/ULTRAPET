@@ -1,0 +1,18 @@
+# Line endings: LF everywhere in the working tree and the repository.
+* text=auto eol=lf
+
+# Reference material is never edited, so leave its bytes untouched.
+legacy/** -text
+requirements/** -text
+
+# Binary files.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
