@@ -17,6 +17,13 @@
  * another table, 409 duplicate or in use, 404) and its cascade (a deleted category's or product's price rules go with
  * it). The customers table starts with STAFF_CUSTOMERS: a new one needs a password (8+ characters, write-only: never
  * stored nor answered), the email is lowercased and unique, and DELETE is 405 (customers are never deleted).
+ * A product's stock (the server's app/inventory.py): `stockQuantity` is read-only in the products table (null = not
+ * tracked, as every seeded product starts) and changes only through GET/POST /api/staff/products/<id>/stock, which keep
+ * an in-memory ledger with the server's rules and errors (only a count starts tracking; "insufficient_stock" when
+ * removing more than is on hand); GET /api/prices answers the `stock` status of the active, tracked products (keyed by
+ * their public id, the WooCommerce id). setFakeStock is a test's shortcut for a stock staff counted.
+ * The generated PDF catalog: GET/POST /api/staff/catalog-pdf keep its options and answer a build as finished at once
+ * (setFakeCatalogPdf sets another state, e.g. "building").
  * POST /api/staff/uploads fakes the S3-stub upload (staff only; folder "categories" or "brands"; JPEG/PNG/WebP/AVIF by the
  * file's type, at most 5 MB; answers `/api/media/<folder>/fake-<n>.<ext>`, nothing is stored; the server names it
  * `<folder>/<UTC timestamp>_<uuid>.<ext>`). A picture field
@@ -28,7 +35,7 @@
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
  */
 import { CATALOG_SORTS, type CatalogSort } from '@/api'
-import type { Brand, Branch, ContactDetails, ProductCategory, ProductDetail, ProductImage, ProductPage, Stat, StaffCustomer, User } from '@/api'
+import type { Brand, Branch, CatalogPdfOptions, CatalogPdfState, ContactDetails, ProductCategory, ProductDetail, ProductImage, ProductPage, ProductStock, Stat, StaffCustomer, StockMovement, StockStatus, User } from '@/api'
 import type { Localized } from '@/config'
 import articles from '@/stubs/articles.json'
 import branches from '@/stubs/branches.json'
@@ -107,11 +114,42 @@ let staffRows: Partial<Record<string, Promise<StaffRow[]>>> = {}
 /** How many files the fake upload route took (numbers the fake URLs). */
 let uploadCount = 0
 
+/** The stock ledger: each product's movements (by staff product id), oldest first. */
+let stockMovements: Record<string, StockMovement[]> = {}
+
+/** The PDF catalog's options before staff change them (the server's DEFAULT_OPTIONS). */
+const CATALOG_PDF_DEFAULTS: CatalogPdfOptions = { perPage: 3, categoryPages: true, showBrand: false, showSku: false, showBarcode: false, autoRebuild: true }
+
+/** The generated PDF catalog's state (GET/POST /api/staff/catalog-pdf): never built until a test generates it. */
+let catalogPdf: CatalogPdfState = { options: CATALOG_PDF_DEFAULTS, status: { state: 'none' }, urls: {} }
+
+/**
+ * Sets the PDF catalog's state as if the server had it (a test's shortcut, e.g. a build that is still running).
+ * @param state - The parts to change.
+ */
+export function setFakeCatalogPdf(state: Partial<CatalogPdfState>) {
+  catalogPdf = { ...catalogPdf, ...state }
+}
+
 /** Signs the fake out and forgets staff edits; setup.ts calls it after every test. */
 export function resetFakeApi() {
   session = null
+  catalogPdf = { options: CATALOG_PDF_DEFAULTS, status: { state: 'none' }, urls: {} }
   staffRows = {}
   uploadCount = 0
+  stockMovements = {}
+}
+
+/**
+ * Sets a stub product's stock as if staff had counted it (a test's shortcut; no movement is recorded).
+ * @param publicId - The product's public id (its WooCommerce id, the id the catalog and /api/prices use).
+ * @param quantity - Its units on hand; null = not tracked.
+ * @param lowStockThreshold - Its low-stock threshold; null = none (default).
+ */
+export async function setFakeStock(publicId: string, quantity: number | null, lowStockThreshold: number | null = null) {
+  const row = (await tableRows('products')).find((product) => String(product.woocommerceId) === publicId)
+  if (!row) throw new Error(`No stub product ${publicId}`)
+  Object.assign(row, { stockQuantity: quantity, lowStockThreshold })
 }
 
 /**
@@ -306,12 +344,13 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     inUse: async (category) => ((await tableRows('products')).some((product) => product.categoryId === category.id) ? 'products_category_id_fkey' : null),
   },
   products: {
-    fields: ['woocommerceId', 'slug', 'sku', 'barcode', 'name', 'description', 'categoryId', 'brandId', 'listPrice', 'sortOrder', 'isActive', 'legacyPath', 'images'],
+    // stockQuantity is answered, never taken (it changes through the stock routes): sending it is an unknown field.
+    fields: ['woocommerceId', 'slug', 'sku', 'barcode', 'name', 'description', 'categoryId', 'brandId', 'listPrice', 'lowStockThreshold', 'sortOrder', 'isActive', 'legacyPath', 'images'],
     required: ['slug', 'name', 'categoryId', 'sortOrder', 'isActive'],
     numeric: ['listPrice'],
     orderable: true,
     createDefaults: newRowDefaults('product'),
-    defaults: { woocommerceId: null, sku: null, barcode: null, description: null, brandId: null, listPrice: null, sortOrder: 0, isActive: true, legacyPath: null, images: [] },
+    defaults: { woocommerceId: null, sku: null, barcode: null, description: null, brandId: null, listPrice: null, stockQuantity: null, lowStockThreshold: null, sortOrder: 0, isActive: true, legacyPath: null, images: [] },
     seed: async () => {
       const [{ default: products }, { default: prices }, categoryRows, brandRows] = await Promise.all([
         import('@/stubs/products.json') as Promise<{ default: StubProduct[] }>,
@@ -330,6 +369,8 @@ const STAFF_TABLES: Record<string, FakeTable> = {
         categoryId: categoryRows.find((category) => category.slug === product.category)?.id,
         brandId: brandRows.find((brand) => brand.slug === product.brand)?.id ?? null,
         listPrice: prices.prices[product.id] ?? null,
+        stockQuantity: null,
+        lowStockThreshold: null,
         sortOrder: index,
         isActive: true,
         legacyPath: null,
@@ -344,6 +385,7 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     check: async (product, others) => {
       if (noHebrew(product.name)) return invalid('products_name_check')
       if (product.listPrice !== null && Number(product.listPrice) < 0) return invalid('products_list_price_check')
+      if (product.lowStockThreshold !== null && Number(product.lowStockThreshold) < 0) return invalid('products_low_stock_threshold_check')
       if (!(await tableRows('categories')).some((category) => category.id === product.categoryId)) {
         return json({ error: 'invalid_reference', constraint: 'products_category_id_fkey' }, 400)
       }
@@ -575,6 +617,102 @@ function uploadAnswer(body: BodyInit | null | undefined): Response {
 }
 
 /**
+ * The stock status of a product, like the server's stock_status.
+ * @param quantity - Its units on hand; null = not tracked.
+ * @param threshold - Its low-stock threshold; null = none.
+ * @returns null when not tracked, else "out" / "low" / "in".
+ */
+function fakeStockStatus(quantity: unknown, threshold: unknown): StockStatus | null {
+  if (quantity === null || quantity === undefined) return null
+  if (Number(quantity) <= 0) return 'out'
+  return threshold !== null && threshold !== undefined && Number(quantity) <= Number(threshold) ? 'low' : 'in'
+}
+
+/** How many movements the stock routes answer (the server's HISTORY_LIMIT). */
+const STOCK_HISTORY_LIMIT = 50
+
+/**
+ * Answers /api/staff/products/<id>/stock like the server's product_stock / record_stock (staff only).
+ * @param productId - The staff product id from the path.
+ * @param method - "GET" (read the stock) or "POST" (record a movement).
+ * @param body - The movement {kind, quantity, note?}.
+ * @returns The product's stock (201 after a movement), or the server's error.
+ */
+async function stockAnswer(productId: string, method: string, body: BodyInit | null | undefined): Promise<Response> {
+  if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  const row = (await tableRows('products')).find((product) => product.id === productId)
+  if (!row || (method !== 'GET' && method !== 'POST')) return json({ error: 'not_found' }, 404)
+  /** @returns The product's stock, as the server's product_stock_json. */
+  const answer = (): ProductStock => {
+    const movements = stockMovements[productId] ?? []
+    return {
+      stockQuantity: row.stockQuantity as number | null,
+      lowStockThreshold: row.lowStockThreshold as number | null,
+      status: fakeStockStatus(row.stockQuantity, row.lowStockThreshold),
+      movementCount: movements.length,
+      movements: [...movements].reverse().slice(0, STOCK_HISTORY_LIMIT),
+    }
+  }
+  if (method === 'GET') return json(answer())
+
+  const data = body ? (JSON.parse(String(body)) as unknown) : null
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return json({ error: 'invalid_body' }, 400)
+  const values = data as Record<string, unknown>
+  const unknown = Object.keys(values).find((key) => !['kind', 'quantity', 'note'].includes(key))
+  if (unknown) return json({ error: 'unknown_field', field: unknown }, 400)
+  const kinds = ['received', 'returned', 'removed', 'count']
+  if (!kinds.includes(String(values.kind))) return json({ error: values.kind === undefined || values.kind === null ? 'required' : 'invalid', field: 'kind' }, 400)
+  const { quantity, note } = values
+  if (quantity !== undefined && quantity !== null && !Number.isInteger(quantity)) return json({ error: 'invalid', field: 'quantity' }, 400)
+  if (note !== undefined && note !== null && typeof note !== 'string') return json({ error: 'invalid', field: 'note' }, 400)
+  if (quantity === undefined || quantity === null) return json({ error: 'required', field: 'quantity' }, 400)
+  const kind = values.kind as StockMovement['kind']
+  const units = quantity as number
+  const current = row.stockQuantity as number | null
+  if (units < (kind === 'count' ? 0 : 1)) return json({ error: 'invalid', field: 'quantity' }, 400)
+  if (kind !== 'count' && current === null) return json({ error: 'untracked' }, 400)
+  const change = kind === 'count' ? units - (current ?? 0) : kind === 'removed' ? -units : units
+  const after = kind === 'count' ? units : (current ?? 0) + change
+  if (after < 0) return json({ error: 'insufficient_stock' }, 400)
+  const now = new Date().toISOString()
+  const text = typeof note === 'string' ? note.trim() : ''
+  stockMovements[productId] = [
+    ...(stockMovements[productId] ?? []),
+    { id: crypto.randomUUID(), kind, quantityChange: change, quantityAfter: after, note: text || null, createdBy: session.fullName, createdAt: now },
+  ]
+  Object.assign(row, { stockQuantity: after, updatedAt: now })
+  return json(answer(), 201)
+}
+
+/**
+ * Answers /api/staff/catalog-pdf like the server's get_catalog_pdf / generate_catalog_pdf (staff only). A POST saves
+ * the options and answers a finished build at once (the server answers "building" and finishes in the background;
+ * setFakeCatalogPdf sets that state for a test).
+ * @param method - "GET" (read the state) or "POST" (save {options} and build).
+ * @param body - The POST body.
+ * @returns The state (202 after a POST), or the server's error.
+ */
+async function catalogPdfAnswer(method: string, body: BodyInit | null | undefined): Promise<Response> {
+  if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  if (method === 'GET') return json(catalogPdf)
+  if (method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
+  const data = body ? (JSON.parse(String(body)) as { options?: unknown } | null) : null
+  const sent = data?.options
+  if (typeof sent !== 'object' || sent === null || Array.isArray(sent)) return json({ error: 'invalid_body' }, 400)
+  const options = { ...catalogPdf.options, ...(sent as Partial<CatalogPdfOptions>) }
+  if (!Number.isInteger(options.perPage) || options.perPage < 1 || options.perPage > 12) return json({ error: 'invalid', field: 'perPage' }, 400)
+  const flag = (['categoryPages', 'showBrand', 'showSku', 'showBarcode', 'autoRebuild'] as const).find((key) => typeof options[key] !== 'boolean')
+  if (flag) return json({ error: 'invalid', field: flag }, 400)
+  const products = (await tableRows('products')).filter((row) => row.isActive).length
+  catalogPdf = {
+    options,
+    status: { state: 'ready', builtAt: new Date().toISOString(), products, pages: Math.ceil(products / options.perPage) + 2, error: null },
+    urls: { he: '/api/media/catalog/ultrapet-catalog-he-test.pdf', en: '/api/media/catalog/ultrapet-catalog-en-test.pdf' },
+  }
+  return json(catalogPdf, 202)
+}
+
+/**
  * Answers /api/staff/<resource>[/<id>] like the server's generic staff CRUD.
  * @param resource - The table's URL name, e.g. "price-rules".
  * @param method - The HTTP method.
@@ -778,6 +916,9 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
   const slug = (prefix: string) => (path.startsWith(prefix) ? decodeURIComponent(path.slice(prefix.length)) : null)
 
   if (path === '/api/staff/uploads' && method === 'POST') return uploadAnswer(init.body)
+  if (path === '/api/staff/catalog-pdf') return catalogPdfAnswer(method, init.body)
+  const stockPath = /^\/api\/staff\/products\/([^/]+)\/stock$/.exec(path)
+  if (stockPath) return stockAnswer(decodeURIComponent(stockPath[1]), method, init.body)
   const staff = /^\/api\/staff\/([a-z-]+)(?:\/(.+))?$/.exec(path)
   if (staff) return staffAnswer(staff[1], method, staff[2] ? decodeURIComponent(staff[2]) : null, init.body)
 
@@ -817,7 +958,13 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
     if (path === '/api/resellers') return json(branches.map((b) => ({ approximate: false, ...b })) satisfies Branch[])
     if (path === '/api/prices') {
       const { default: prices } = await import('@/stubs/prices.json')
-      return json({ currency: prices.currency, prices: prices.prices })
+      // The stock statuses of the active, tracked products, by their public id (the server's customer_stock).
+      const stock: Record<string, StockStatus> = {}
+      for (const row of await tableRows('products')) {
+        const status = fakeStockStatus(row.stockQuantity, row.lowStockThreshold)
+        if (row.isActive && status && row.woocommerceId !== null) stock[String(row.woocommerceId)] = status
+      }
+      return json({ currency: prices.currency, prices: prices.prices, stock })
     }
     if (path === '/api/auth/me') return session ? json({ user: session }) : json({ error: 'unauthorized' }, 401)
   }

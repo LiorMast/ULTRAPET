@@ -42,7 +42,7 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
         "articles": 4,
         "resellers": 124,
         "faq_items": 7,
-        "settings": 16,
+        "settings": 17,
         "payment_methods": 3,
         "staff_users": 1,
         "business_users": 1,

@@ -24,7 +24,9 @@ Phase 2 (the backend) is in progress: a PostgreSQL database with the full data m
 per-customer pricing, orders, articles, resellers) and a Flask API. The site now loads all its data from the API:
 catalog (searched and paged on the server), brands, stats, articles and resellers. Business customers sign in with
 JWTs in HttpOnly cookies and see their own prices; staff have a sign-in and a create/edit/delete API for the
-catalog and the site content. Still to come: lead and contact endpoints, and serving the PDF catalog.
+catalog and the site content, and the downloadable PDF catalog is generated from the products (`flask build-catalog`;
+rebuilt after every product change, layout set in the "PDF catalog" dialog of `/admin/products`). Still to come:
+lead and contact endpoints.
 
 Later phases: an admin CMS (the staff UI), and the B2B portal (cart, checkout, sync with Rivhit).
 [CLAUDE.md](CLAUDE.md) has the full roadmap and requirements.
@@ -36,8 +38,10 @@ the repository root:
 
 ```bash
 cp .env.example .env                        # then set POSTGRES_PASSWORD, SECRET_KEY and SEED_CUSTOMER_* (see the file)
-docker compose up -d --build                # PostgreSQL on 127.0.0.1:5433, Flask on http://localhost:5000
+docker compose up -d --build                # PostgreSQL on 127.0.0.1:5433, Flask on http://localhost:5000 (BACKEND_PORT in .env)
 docker compose exec backend flask seed      # load the catalog, brands, stats, articles, resellers and the demo users
+docker compose exec backend flask import-media   # copy the product photos into the file storage (once, about 215 MB)
+docker compose exec backend flask build-catalog  # generate the downloadable PDF catalog (Hebrew + English)
 curl localhost:5000/api/health              # {"status": "ok"}
 ```
 

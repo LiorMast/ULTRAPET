@@ -8,5 +8,9 @@ SQLAlchemy==2.1.6
 psycopg[binary]==3.3.6
 gunicorn==26.2.0
 tzdata==2026.6
+# The PDF catalog (app/catalog_pdf.py): fpdf2 draws it, uharfbuzz gives Hebrew its right-to-left order, Pillow resizes the photos.
+fpdf2==2.9.0
+uharfbuzz==0.57.0
+pillow==13.0.0
 pytest==9.2.0
 alembic==1.20.1

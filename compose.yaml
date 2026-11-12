@@ -1,6 +1,6 @@
 # compose.yaml — Local development services: PostgreSQL 17 and the Flask backend.
 #
-#   docker compose up -d --build        start both (http://localhost:5000/api/health)
+#   docker compose up -d --build        start both (http://localhost:5000/api/health; BACKEND_PORT in .env changes 5000)
 #   docker compose exec backend pytest  run the backend tests
 #   docker compose exec backend flask seed
 #
@@ -50,7 +50,9 @@ services:
       - ./frontend/src/stubs:/srv/frontend/src/stubs:ro
       - ./legacy/supabase-export:/srv/legacy/supabase-export:ro
     ports:
-      - "127.0.0.1:5000:5000"
+      # The host port: BACKEND_PORT in .env (default 5000), e.g. when another app already uses 5000. Vite's /api proxy
+      # and the e2e config read the same setting.
+      - "127.0.0.1:${BACKEND_PORT:-5000}:5000"
     depends_on:
       postgres:
         condition: service_healthy

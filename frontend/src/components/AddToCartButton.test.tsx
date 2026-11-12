@@ -3,12 +3,13 @@
  * QuantityStepper) inside the real app: who gets the buttons (customers only, where a price is shown), adding from a
  * catalog card (the "Added" morph and its status line, the header badge, merging, no navigation), adding a quantity
  * from the product page, the product photo flying to the cart icon (the badge pops when it lands; no flight with
- * reduced motion), and the cart being saved per customer in browser storage.
+ * reduced motion), the cart being saved per customer in browser storage, and the stock status (a product out of stock
+ * cannot be added; low stock is marked; visitors see no stock at all).
  */
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ADDED_MS } from '@/components/AddToCartButton'
-import { TEST_STAFF, TEST_USER } from '@/test/api'
+import { setFakeStock, TEST_STAFF, TEST_USER } from '@/test/api'
 import { renderPage } from '@/test/utils'
 import products from '@/stubs/products.json'
 import prices from '@/stubs/prices.json'
@@ -16,6 +17,16 @@ import prices from '@/stubs/prices.json'
 /** A product with a price and a photo, for the product page tests. */
 const product = products.find((p) => p.id in prices.prices && p.images.length > 0)!
 const productUrl = `/en/products/${encodeURIComponent(product.slug)}`
+
+/** Two other priced products of the catalog's first page (the stub order), for the stock tests. */
+const [soldOut, running] = products.slice(0, 24).filter((p) => p.id in prices.prices && p.id !== product.id)
+
+/**
+ * The catalog card of a product.
+ * @param name - The product's English name.
+ * @returns The card (<article>).
+ */
+const cardOf = (name: string) => screen.getByRole('heading', { name }).closest('article')!
 
 /**
  * The first catalog card that has an "Add to cart" button, once the customer's prices arrived.
@@ -151,5 +162,51 @@ describe('Add to cart', () => {
     expect(animate).not.toHaveBeenCalled()
     expect(within(screen.getByRole('button', { name: 'Shopping cart, 1 item' })).getByTestId('cart-badge')).toHaveClass('animate-cart-pop')
     delete (HTMLElement.prototype as Partial<HTMLElement>).animate
+  })
+})
+
+describe('Stock', () => {
+  it('cannot add a product that is out of stock, and marks one that is low, on the catalog cards', async () => {
+    await setFakeStock(soldOut.id, 0)
+    await setFakeStock(running.id, 2, 5)
+    await renderPage('/en/catalog', { user: TEST_USER })
+    await screen.findAllByRole('button', { name: 'Add to cart' })
+
+    const out = cardOf(soldOut.name.en)
+    expect(within(out).getByRole('button', { name: 'Out of stock' })).toBeDisabled()
+    expect(within(out).queryByRole('button', { name: 'Add to cart' })).not.toBeInTheDocument()
+
+    const low = cardOf(running.name.en)
+    expect(within(low).getByText('Low stock')).toBeInTheDocument()
+    expect(within(low).getByRole('button', { name: 'Add to cart' })).toBeEnabled()
+  })
+
+  it('shows the stock status on the product page, and no quantity or Add to cart when out of stock', async () => {
+    await setFakeStock(product.id, 40, 5)
+    const first = await renderPage(productUrl, { user: TEST_USER })
+    const main = screen.getByRole('main')
+    expect(await within(main).findByText('In stock')).toBeInTheDocument()
+    expect(within(main).getByRole('textbox', { name: 'Quantity' })).toBeInTheDocument()
+    first.unmount()
+
+    await setFakeStock(product.id, 0, 5)
+    await renderPage(productUrl, { user: TEST_USER })
+    const page = screen.getByRole('main')
+    expect(await within(page).findByRole('button', { name: 'Out of stock' })).toBeDisabled()
+    expect(within(page).getByText('Out of stock', { selector: '[data-slot="discount-ribbon"]' })).toBeInTheDocument()
+    expect(within(page).queryByRole('textbox', { name: 'Quantity' })).not.toBeInTheDocument()
+  })
+
+  it('shows nothing about stock to visitors, nor for products whose stock is not tracked', async () => {
+    await setFakeStock(soldOut.id, 0)
+    const visitor = await renderPage('/en/catalog')
+    expect(screen.queryByText('Out of stock')).not.toBeInTheDocument()
+    visitor.unmount()
+
+    // The product itself is untracked (its related products below may not be).
+    await renderPage(productUrl, { user: TEST_USER })
+    const details = screen.getByRole('article', { name: product.name.en })
+    await within(details).findByRole('button', { name: 'Add to cart' })
+    expect(within(details).queryByText(/^(In stock|Low stock|Out of stock)$/)).not.toBeInTheDocument()
   })
 })

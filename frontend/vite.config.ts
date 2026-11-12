@@ -9,7 +9,8 @@
  *    into WebP files at several widths, with a ready-made `srcset`.
  * `define` gives the app the public origin (SITE_URL in src/seo.ts) used for canonical URLs.
  * `server.allowedHosts` lets the dev server be reached through a Cloudflare quick tunnel.
- * `server.proxy` forwards /api to the Flask backend (compose.yaml, port 5000) in dev, and /sitemap.xml to the
+ * `server.proxy` forwards /api to the Flask backend (compose.yaml; port BACKEND_PORT from the repo's .env, default
+ * 5000) in dev, and /sitemap.xml to the
  * backend's /api/sitemap.xml, which lists the public pages and every published article from the database
  * (the production web server must forward it the same way). public/robots.txt points to it.
  * `optimizeDeps` pre-bundles the lazily loaded map libraries at server start, so the first visit to
@@ -24,10 +25,13 @@ import tailwindcss from '@tailwindcss/vite'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { imagetools } from 'vite-imagetools'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 
 /** The public origin of the site. */
 const SITE_URL = 'https://www.ultrapet.co.il'
+
+/** The Flask backend in dev: its host port is BACKEND_PORT in the repo's .env (as in compose.yaml), default 5000. */
+const BACKEND_URL = `http://localhost:${loadEnv('development', path.resolve(import.meta.dirname, '..'), 'BACKEND_').BACKEND_PORT || 5000}`
 
 export default defineConfig({
   plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss(), imagetools()],
@@ -43,8 +47,8 @@ export default defineConfig({
   server: {
     allowedHosts: ['.trycloudflare.com'],
     proxy: {
-      '/api': 'http://localhost:5000',
-      '/sitemap.xml': { target: 'http://localhost:5000', rewrite: () => '/api/sitemap.xml' },
+      '/api': BACKEND_URL,
+      '/sitemap.xml': { target: BACKEND_URL, rewrite: () => '/api/sitemap.xml' },
     },
   },
   test: {

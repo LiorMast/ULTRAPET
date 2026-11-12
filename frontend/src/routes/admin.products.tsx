@@ -1,23 +1,32 @@
 /**
  * routes/admin.products.tsx — Staff panel: the catalog's products (/admin/products). Lists every product, active
- * or not, and lets staff add, edit and delete them (names, codes, category, brand, list price, ...) and set
- * discounts on a product for every business customer, through the staff API (backend/app/staff/routes.py,
- * resources "products" and "price-rules"); a change shows on the catalog at once and the discounts in the
- * customers' prices. A product's photos are kept as they are (editing them comes with the product upload page).
+ * or not, and lets staff add, edit and delete them (names, codes, category, brand, list price, low-stock threshold,
+ * ...), manage each product's stock and set discounts on a product for every business customer, through the staff
+ * API (backend/app/staff/routes.py, resources "products" and "price-rules", and the products' stock routes); a change
+ * shows on the catalog at once, the discounts in the customers' prices and the stock in their stock statuses.
+ * The stock column shows the units on hand with a Low / Out ribbon, the stock alerts above the table count the
+ * products low or out of stock, and the "Stock" row action (StockDialog) records goods received, returns, removals
+ * and stock counts and shows the product's history. A product's photos are kept as they are (editing them comes with the product upload page).
+ * The "PDF catalog" button (CatalogPdfDialog) sets the layout of the downloadable PDF catalog the server generates from
+ * the products and builds it; the server also rebuilds it after every change made here.
  * The technical fields stay out of the table and the form: the URL name (the server names a new product after its
  * English name and never renames it), the old site address and the order number; the order is set in "Change order"
  * (DataTable's onReorder: ReorderDialog) and the table lists the products in it, the catalog's order.
  *
  * The page is a DataTable with the products' column config (the category and brand are picked from the current
- * lists, by typing to search: SearchableField) and a "Discounts" row action (DiscountsDialog); after every change it reloads the rows and the rules
- * from the server. Loads nothing when signed out (the layout shows the sign-in form instead).
+ * lists, by typing to search: SearchableField) and the "Stock" (StockDialog) and "Discounts" (DiscountsDialog) row
+ * actions; after every change it reloads the rows and the rules from the server. Loads nothing when signed out (the layout shows the sign-in form instead).
  */
 import { useMemo } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import {
   createStaffRow,
   deleteStaffRow,
+  fetchCatalogPdf,
+  fetchProductStock,
+  generateCatalogPdf,
   fetchStaffRows,
+  recordStockMovement,
   reorderStaffRows,
   updateStaffRow,
   type StaffBrand,
@@ -26,8 +35,10 @@ import {
   type StaffProduct,
 } from '@/api'
 import { localized } from '@/config'
+import { CatalogPdfButton } from '@/components/CatalogPdfDialog'
 import { DataTable, type DataColumn } from '@/components/DataTable'
 import { DiscountsCell, discountFields, discountsAction, withDiscounts, type DiscountRow } from '@/components/DiscountsDialog'
+import { StockCell, StockSummary, stockAction } from '@/components/StockDialog'
 import { dictionaryFor, useI18n } from '@/i18n'
 
 export const Route = createFileRoute('/admin/products')({
@@ -53,7 +64,7 @@ export const Route = createFileRoute('/admin/products')({
 type ProductRow = DiscountRow<StaffProduct>
 
 /**
- * The products page: its title and the products table.
+ * The products page: its title, the PDF catalog button and the products table.
  * @returns The page.
  */
 function AdminProducts() {
@@ -78,6 +89,9 @@ function AdminProducts() {
       },
       { key: 'brandId', label: f.brand, type: 'select', searchable: true, options: brands.map((brand) => ({ value: brand.id, label: brand.name })) },
       { key: 'listPrice', label: f.listPrice, type: 'money', hint: f.listPriceHint },
+      // The units on hand change only through the "Stock" action (a recorded movement), never in the form.
+      { key: 'stockQuantity', label: f.stock, type: 'integer', inForm: false, render: (row) => <StockCell quantity={row.stockQuantity} threshold={row.lowStockThreshold} /> },
+      { key: 'lowStockThreshold', label: f.lowStockThreshold, type: 'integer', hint: f.lowStockThresholdHint, inTable: false },
       { key: 'discountText', label: f.discounts, inForm: false, render: (row) => <DiscountsCell rules={row.discounts} /> },
       { key: 'isActive', label: f.isActive, type: 'boolean' },
       { key: 'barcode', label: f.barcode, ltr: true, inTable: false },
@@ -85,6 +99,16 @@ function AdminProducts() {
     ],
     [f, categories, brands, locale],
   )
+
+  const stock = stockAction<ProductRow>(t, {
+    target: (row) => localized(row.name, locale),
+    load: (row, signal) => fetchProductStock(row.id, signal),
+    onSave: async (row, movement) => {
+      const saved = await recordStockMovement(row.id, movement)
+      await router.invalidate()
+      return saved
+    },
+  })
 
   const discounts = discountsAction<ProductRow>(t, {
     target: (row) => localized(row.name, locale),
@@ -101,8 +125,14 @@ function AdminProducts() {
 
   return (
     <section>
-      <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.productsTitle}</h1>
-      <p className="mb-8 mt-2 max-w-2xl text-sm text-brand-charcoal-muted">{t.admin.productsDescription}</p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.productsTitle}</h1>
+          <p className="mt-2 max-w-2xl text-sm text-brand-charcoal-muted">{t.admin.productsDescription}</p>
+        </div>
+        <CatalogPdfButton load={fetchCatalogPdf} onGenerate={generateCatalogPdf} />
+      </div>
+      <StockSummary products={products} className="mb-6" />
       <DataTable
         rows={rows}
         columns={columns}
@@ -126,7 +156,7 @@ function AdminProducts() {
           await reorderStaffRows('products', ids)
           await router.invalidate()
         }}
-        rowActions={[discounts]}
+        rowActions={[stock, discounts]}
       />
     </section>
   )

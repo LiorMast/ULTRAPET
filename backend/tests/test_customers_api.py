@@ -486,4 +486,5 @@ def test_prices_are_the_customers_own(customer_client, customer, catalog, databa
     database.commit()
     data = customer_client.get("/api/prices").get_json()
     # Only the treat has a list price; the customer's 10% dog discount applies to it.
-    assert data == {"currency": "ILS", "prices": {str(catalog.treat.id): 9.0}}
+    # No product's stock is tracked, so there is no stock status (see test_inventory.py).
+    assert data == {"currency": "ILS", "prices": {str(catalog.treat.id): 9.0}, "stock": {}}

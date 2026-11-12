@@ -3,7 +3,7 @@
 Public, no sign-in (/products also reads an optional customer sign-in for its price sorts and price range):
     GET /categories, /products, /products/<slug>, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
     /articles, /articles/<slug>, /resellers, /sitemap.xml, /media/<key> (stored files: the S3 stub's objects),
-    /catalog.pdf (redirects to the PDF catalog in the file storage)
+    /catalog.pdf?lang= (redirects to the generated PDF catalog in the file storage, see app/catalog_pdf.py)
 Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
     POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me
 Business customers only:
@@ -12,7 +12,7 @@ Business customers only:
 JSON keys are camelCase, in the shapes the frontend types in src/api.ts (the same shapes as its stub fixtures).
 Only active rows are shown. Pictures are stored as object keys and answered as URLs (storage.url_of /
 storage.srcset_urls). The public routes never return a price: prices come only from /prices, computed for
-the signed-in customer by app.pricing.
+the signed-in customer by app.pricing (with the stock status of the tracked products, app.inventory).
 """
 import math
 from decimal import Decimal, InvalidOperation
@@ -25,7 +25,7 @@ from flask_jwt_extended import current_user, get_jwt, verify_jwt_in_request
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import contains_eager, selectinload
 
-from app import storage
+from app import inventory, storage
 from app.auth import authenticate, clear_tokens, issue_tokens, read_credentials, refresh_access, require_user, user_type
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
@@ -596,16 +596,22 @@ def media(key: str) -> Response:
 
 @bp.get("/catalog.pdf")
 def catalog_pdf() -> Response:
-    """The downloadable PDF catalog (without prices): a redirect to the file in the storage, whose key is the setting
-    `catalog_pdf` (so a new catalog is a new object and a changed setting, and links to /api/catalog.pdf stay).
+    """The downloadable PDF catalog (without prices): a redirect to the file in the storage, so links to
+    /api/catalog.pdf stay while every build is a new object. The file is the catalog generated from the products
+    (app/catalog_pdf.py; setting `catalog_pdf_files`, one per language) in the language of the query parameter `lang`
+    ("he" by default; a language without a file gets the Hebrew one); until the first build it is the file copied
+    from the old site (setting `catalog_pdf`).
 
     Returns:
-        302 to the file's URL; 404 when no catalog is set.
+        302 to the file's URL (never cached, so the next download follows a newer build); 404 when there is none.
     """
-    key = get_setting("catalog_pdf")
+    files = get_setting("catalog_pdf_files") or {}
+    key = files.get(request.args.get("lang", "he")) or files.get("he") or get_setting("catalog_pdf")
     if not key:
         abort(404)
-    return redirect(storage.public_url(key))
+    response = redirect(storage.public_url(key))
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @bp.get("/sitemap.xml")
@@ -732,14 +738,17 @@ def me() -> dict[str, Any]:
 
 @bp.get("/prices")
 def prices() -> dict[str, Any]:
-    """The signed-in customer's price of every product they can buy (the catalog shows them on the cards).
+    """The signed-in customer's price of every product they can buy (the catalog shows them on the cards), and the
+    stock status of the products whose stock is tracked (never the units: see app.inventory).
 
     Returns:
-        {currency, prices: {product id: unit price in shekels before VAT}}; products without a price are left out.
+        {currency, prices: {product id: unit price in shekels before VAT}, stock: {product id: "in" | "low" | "out"}};
+        products without a price are left out of `prices`, untracked ones out of `stock` (always orderable).
         401 when signed out, 403 for a staff token.
     """
     user = require_user("business")
     return {
         "currency": get_setting("currency", "ILS"),
         "prices": {str(product_id): price for product_id, price in customer_prices(user.id).items()},
+        "stock": {str(product_id): status for product_id, status in inventory.customer_stock().items()},
     }

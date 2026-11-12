@@ -2,6 +2,7 @@
 
 Staff create, edit and delete all of these in the staff panel; the public site and the B2B portal read them.
 Products never carry a customer's price: that is computed by app.pricing from `list_price` and the price rules.
+A product's `stock_quantity` is written only by app.inventory, together with a StockMovement (models/inventory.py).
 ProductSupplier is the junction table between products and suppliers. Column meanings are documented in
 create-tables.sql.
 """
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.db import Localized, TimestampMixin, db, localized_check, uuid_pk
 
 if TYPE_CHECKING:
+    from app.database.models.inventory import StockMovement
     from app.database.models.price_rules import PriceRule
 
 # URL slugs of brands and categories: lowercase words joined by single hyphens.
@@ -109,6 +111,8 @@ class Product(TimestampMixin, db.Model):
         CheckConstraint(localized_check("name"), name="name"),
         CheckConstraint(localized_check("description", nullable=True), name="description"),
         CheckConstraint("list_price >= 0", name="list_price"),
+        CheckConstraint("stock_quantity >= 0", name="stock_quantity"),
+        CheckConstraint("low_stock_threshold >= 0", name="low_stock_threshold"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -121,6 +125,8 @@ class Product(TimestampMixin, db.Model):
     category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categories.id", ondelete="RESTRICT"), index=True)
     brand_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("brands.id", ondelete="SET NULL"), index=True)
     list_price: Mapped[Decimal | None]
+    stock_quantity: Mapped[int | None] = mapped_column(Integer)
+    low_stock_threshold: Mapped[int | None] = mapped_column(Integer)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
     legacy_path: Mapped[str | None]
@@ -137,6 +143,9 @@ class Product(TimestampMixin, db.Model):
         back_populates="product", cascade="all, delete-orphan", passive_deletes=True
     )
     price_rules: Mapped[list[PriceRule]] = relationship(
+        back_populates="product", cascade="all, delete-orphan", passive_deletes=True
+    )
+    stock_movements: Mapped[list[StockMovement]] = relationship(
         back_populates="product", cascade="all, delete-orphan", passive_deletes=True
     )
 

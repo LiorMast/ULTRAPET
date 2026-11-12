@@ -7,10 +7,11 @@
  * and the badge pops at once. Screen readers hear "Added to cart: <name>" from a polite live
  * region, while the button keeps its name. Used by CatalogCard (size `sm`, adds 1) and the product page (size
  * `lg`, with a QuantityStepper). Callers render it only where the customer's price is shown.
+ * A product that is out of stock (`available={false}`) shows a disabled "Out of stock" button instead, which adds nothing.
  */
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { Check, ShoppingCart } from 'lucide-react'
+import { Check, PackageX, ShoppingCart } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { CART_TARGET_ATTR, useCart, type CartProduct } from '@/cart'
@@ -109,19 +110,22 @@ const LABEL_CLASS =
  * @param props.quantity - Units to add per click (default 1).
  * @param props.onAdded - Called after the units were added (e.g. the product page resets its quantity).
  * @param props.size - 'sm' (default: a full-width compact button on a card) or 'lg' (the product page).
+ * @param props.available - false = the product is out of stock: a disabled "Out of stock" button (default true).
  * @param props.className - Extra classes for the button.
- * @returns The button and its visually hidden status line.
+ * @returns The button and its visually hidden status line (just the disabled button when unavailable).
  */
 export function AddToCartButton({
   product,
   quantity = 1,
   onAdded,
   size,
+  available = true,
   className,
 }: {
   product: CartProduct
   quantity?: number
   onAdded?: () => void
+  available?: boolean
   className?: string
 } & VariantProps<typeof addVariants>) {
   const { t, locale } = useI18n()
@@ -146,6 +150,15 @@ export function AddToCartButton({
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setAdded(false), ADDED_MS)
     onAdded?.()
+  }
+
+  if (!available) {
+    return (
+      <Button type="button" variant="action" disabled className={cn(addVariants({ size }), 'h-auto rounded-none', className)}>
+        <PackageX aria-hidden="true" className="size-4" />
+        {t.cart.soldOut}
+      </Button>
+    )
   }
 
   return (

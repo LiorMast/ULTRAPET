@@ -13,8 +13,9 @@ DROP TABLE IF EXISTS orders;            -- referenced by: order_items
 DROP TABLE IF EXISTS business_leads;    -- referenced by: nothing
 DROP TABLE IF EXISTS price_rules;       -- referenced by: nothing
 DROP TABLE IF EXISTS product_suppliers; -- referenced by: nothing
+DROP TABLE IF EXISTS stock_movements;   -- referenced by: nothing
 DROP TABLE IF EXISTS product_images;    -- referenced by: nothing
-DROP TABLE IF EXISTS products;          -- referenced by: order_items, price_rules, product_suppliers, product_images
+DROP TABLE IF EXISTS products;          -- referenced by: order_items, price_rules, product_suppliers, product_images, stock_movements
 DROP TABLE IF EXISTS categories;        -- referenced by: products, price_rules
 DROP TABLE IF EXISTS brands;            -- referenced by: products
 DROP TABLE IF EXISTS suppliers;         -- referenced by: product_suppliers
@@ -25,7 +26,7 @@ DROP TABLE IF EXISTS resellers;         -- referenced by: nothing
 DROP TABLE IF EXISTS page_sections;     -- referenced by: nothing
 DROP TABLE IF EXISTS faq_items;         -- referenced by: nothing
 DROP TABLE IF EXISTS business_users;    -- referenced by: orders, business_leads, price_rules
-DROP TABLE IF EXISTS staff_users;       -- referenced by: price_rules, page_sections, faq_items
+DROP TABLE IF EXISTS staff_users;       -- referenced by: price_rules, page_sections, faq_items, stock_movements
 DROP TABLE IF EXISTS app_users;         -- referenced by: business_users, staff_users
 
 COMMIT;

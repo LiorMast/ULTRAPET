@@ -21,5 +21,7 @@ if [ "$1" = "--seed" ]; then
   docker compose exec -T backend flask seed || true
 fi
 
-echo "Backend: http://localhost:5000/api/health"
+# The backend's host port: BACKEND_PORT in .env (compose.yaml and Vite's /api proxy read it too), default 5000.
+BACKEND_PORT=$(grep -E '^BACKEND_PORT=' .env | cut -d= -f2 | tr -d '\r')
+echo "Backend: http://localhost:${BACKEND_PORT:-5000}/api/health"
 cd frontend && npm run dev

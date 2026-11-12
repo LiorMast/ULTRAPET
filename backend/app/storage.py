@@ -8,10 +8,11 @@ files to another bucket or region changes no rows. object_key turns a value staf
 URLs) back into a key and refuses anything else (another site's URL, "../x").
 
 The interface is S3's: put an object under a key, delete it, and the object's public URL. Callers (the staff upload
-route in app/staff/routes.py, `flask import-media` in app/database/legacy_media.py) use only these functions, so moving to S3 changes this module alone:
+route in app/staff/routes.py, `flask import-media` in app/database/legacy_media.py, the PDF catalog builder in app/catalog_pdf.py) use only these functions, so moving to S3 changes this module alone:
     put_object    -> boto3 `s3.put_object(Bucket=..., Key=key, Body=body, ContentType=content_type)`
     delete_object -> `s3.delete_object(Bucket=..., Key=key)`
     object_exists -> `s3.head_object(Bucket=..., Key=key)` (False on a 404)
+    get_object    -> `s3.get_object(Bucket=..., Key=key)["Body"].read()` (None on a 404)
     public_url    -> already builds the bucket's URL once S3_BUCKET and S3_REGION are set
     send_object   -> not needed any more (S3 serves the files); drop the /api/media route with it.
 Until then leave S3_BUCKET / S3_REGION empty: the stub keeps the files on disk and they are served from /api/media/.
@@ -191,6 +192,19 @@ def object_exists(key: str) -> bool:
         True when the object exists.
     """
     return object_path(key).is_file()
+
+
+def get_object(key: str) -> bytes | None:
+    """Reads an object's bytes (S3 GetObject), e.g. a product photo for the PDF catalog (app/catalog_pdf.py).
+
+    Args:
+        key: The object key.
+
+    Returns:
+        The file's bytes; None when there is no such object.
+    """
+    path = object_path(key)
+    return path.read_bytes() if path.is_file() else None
 
 
 def delete_object(key: str) -> None:

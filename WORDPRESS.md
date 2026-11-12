@@ -170,7 +170,7 @@ The structured data is Yoast's WebPage, BreadcrumbList and WebSite graph. There 
   | Category | `/product-category/<slug>/` | `legacyPath` in product-categories.json |
   | Post | `/<hebrew slug>/` | `legacyPath` in articles.json |
   | Page | `/אודות/`, `/צור-קשר/`, `/משווקים/`, `/מאמרים/`, `/תקנון-ותנאי-שימוש/`, `/הצהרת-נגישות/`, `/refund_returns/`, `/privacy-policy/`, `/shop/`, `/card-instructions-sand/`, `/my-account/` | (none yet) |
-  | PDF | `/wp-content/uploads/2025/03/ultrapetcatalog.pdf` (linked from both menus) | (none yet) |
+  | PDF | `/wp-content/uploads/2025/03/ultrapetcatalog.pdf` (linked from both menus) | Replaced by the catalog generated from the products (`flask build-catalog`, `backend/app/catalog_pdf.py`); the old file is only the fallback until the first build |
 
 ## 8. What was imported, and how
 

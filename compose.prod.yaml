@@ -4,6 +4,7 @@
 #   docker compose -f compose.prod.yaml up -d --build
 #   docker compose -f compose.prod.yaml exec backend flask seed
 #   docker compose -f compose.prod.yaml exec backend flask import-media
+#   docker compose -f compose.prod.yaml exec backend flask build-catalog     the downloadable PDF catalog (after the two above)
 #
 # Reads .env (see .env.example): POSTGRES_PASSWORD, SECRET_KEY, SEED_*. Plain HTTP only: the site is reached at
 # http://<the instance's Elastic IP>/, so JWT_COOKIE_SECURE stays empty. Only nginx publishes a port (80); its

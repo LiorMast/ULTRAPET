@@ -4,7 +4,7 @@
  */
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CATALOG_PDF_URL } from '@/config'
+import { catalogPdfUrl } from '@/config'
 import categories from '@/stubs/product-categories.json'
 import { TEST_STAFF } from '@/test/api'
 import { renderPage } from '@/test/utils'
@@ -114,7 +114,7 @@ describe('Products dropdown', () => {
     expect(within(menu).getByRole('menuitem', { name: 'כל המוצרים' })).toHaveAttribute('href', '/catalog')
 
     const catalog = within(menu).getByRole('menuitem', { name: 'הקטלוג המלא להורדה (PDF)' })
-    expect(catalog).toHaveAttribute('href', CATALOG_PDF_URL)
+    expect(catalog).toHaveAttribute('href', catalogPdfUrl('he'))
     expect(catalog).toHaveAttribute('target', '_blank')
   })
 

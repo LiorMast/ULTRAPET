@@ -40,10 +40,12 @@ export type NavDropdown = { id: string; label: Label; link: AppLink; children: N
 export type NavItem = NavLink | NavDropdown
 
 /**
- * The PDF catalog without prices: the backend redirects to the file in its storage (the setting `catalog_pdf`), so a
- * new catalog needs no frontend change.
+ * The PDF catalog without prices, in a language: the backend redirects to the current file in its storage (the
+ * catalog it generates from the products, backend/app/catalog_pdf.py), so a new build needs no frontend change.
+ * @param locale - The page language.
+ * @returns The download URL.
  */
-export const CATALOG_PDF_URL = '/api/catalog.pdf'
+export const catalogPdfUrl = (locale: Locale) => `/api/catalog.pdf?lang=${locale}`
 
 /**
  * Finds the file named after a slug among globbed asset files (e.g. "dog-food" -> .../dog-food.jpg).
@@ -159,7 +161,7 @@ export const mainNav = (categories: ProductCategory[], locale: Locale): NavItem[
         label: () => localized(category.name, locale),
         link: linkOptions({ to: '/catalog', search: { category: category.slug } }),
       })),
-      { id: 'catalog', label: (t: Dictionary) => t.nav.catalog, href: CATALOG_PDF_URL },
+      { id: 'catalog', label: (t: Dictionary) => t.nav.catalog, href: catalogPdfUrl(locale) },
     ],
   },
   { id: 'private-label', label: (t: Dictionary) => t.nav.privateLabel, link: linkOptions({ to: '/', hash: 'private-label' }) },

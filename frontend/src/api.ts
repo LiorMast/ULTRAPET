@@ -19,6 +19,10 @@
  * in-place editors; a resource edited as one ordered list (the FAQ) is saved whole with replaceStaffRows, and the
  * order of a table staff drag into order (categories, brands, products) with reorderStaffRows.
  * Pictures are uploaded with uploadImage (multipart; the server stores them in its S3 stub and returns their URL).
+ * A product's stock (the stock ledger, backend/app/inventory.py) is read with fetchProductStock and changed only by
+ * recording a movement with recordStockMovement.
+ * The generated PDF catalog (backend/app/catalog_pdf.py): fetchCatalogPdf reads its layout options, the last build's
+ * status and the files; generateCatalogPdf saves the options and starts a build.
  * Every picture and file the API names is one of the server's stored objects (or the site bundles it): nothing is
  * loaded from another site.
  */
@@ -106,8 +110,17 @@ export type CatalogSort = (typeof CATALOG_SORTS)[number]
  */
 export type CatalogSearch = { page?: number; category?: string; q?: string; sort?: CatalogSort; brand?: string; min?: number; max?: number }
 
-/** A signed-in customer's prices: product id → unit price in shekels before VAT. */
-export type Prices = { currency: string; prices: Record<string, number> }
+/**
+ * A product's stock status as customers see it (never the units): "in", "low" (at or below its low-stock threshold)
+ * or "out" (none left: it cannot be added to the cart).
+ */
+export type StockStatus = 'in' | 'low' | 'out'
+
+/**
+ * A signed-in customer's prices: product id → unit price in shekels before VAT; and `stock`: product id → the stock
+ * status of the products whose stock is tracked (an untracked product is left out: always orderable, no status).
+ */
+export type Prices = { currency: string; prices: Record<string, number>; stock: Record<string, StockStatus> }
 
 /**
  * A brand. `accent` null = the site red; `logoUrl` null = the logo file bundled with the site (see
@@ -394,8 +407,8 @@ export function fetchProducts({ category, q, page, sort, brand, min, max }: Cata
 export const fetchProduct = (slug: string, signal?: AbortSignal) => apiFetch<ProductDetail>(`/api/products/${encodeURIComponent(slug)}`, { signal })
 
 /**
- * The signed-in customer's prices.
- * @returns The prices by product id; throws ApiError 401/403 when no customer is signed in.
+ * The signed-in customer's prices and the stock status of the tracked products.
+ * @returns The prices and stock statuses by product id; throws ApiError 401/403 when no customer is signed in.
  */
 export const fetchPrices = () => apiFetch<Prices>('/api/prices')
 
@@ -532,7 +545,11 @@ export type StaffCategory = StaffRowBase & {
 /** A product photo as the staff API stores it; the first of a product's photos is its main photo. */
 export type StaffProductImage = { url: string; thumbnailUrl: string | null; srcset: string | null; alt: Localized<string> | null }
 
-/** A product as the staff API returns it (every column, active or not). `listPrice`: shekels before VAT. */
+/**
+ * A product as the staff API returns it (every column, active or not). `listPrice`: shekels before VAT.
+ * `stockQuantity`: units on hand, read-only (changed by recordStockMovement); null = stock not tracked.
+ * `lowStockThreshold`: "low in stock" at or below this many units; null = no low-stock warning.
+ */
 export type StaffProduct = StaffRowBase & {
   id: string
   woocommerceId: number | null
@@ -544,11 +561,46 @@ export type StaffProduct = StaffRowBase & {
   categoryId: string
   brandId: string | null
   listPrice: number | null
+  stockQuantity: number | null
+  lowStockThreshold: number | null
   sortOrder: number
   isActive: boolean
   legacyPath: string | null
   images: StaffProductImage[]
 }
+
+/**
+ * What a stock movement does: "received" (goods in from a supplier) and "returned" (a customer return back on the
+ * shelf) add units, "removed" (damaged, expired or lost) takes them out, "count" (a stock count) sets the units on
+ * hand. Only a count can start tracking a product.
+ */
+export type StockMovementKind = 'received' | 'returned' | 'removed' | 'count'
+
+/** One movement of a product's stock ledger: the signed change, the units on hand after it, who recorded it, when and why. */
+export type StockMovement = {
+  id: string
+  kind: StockMovementKind
+  quantityChange: number
+  quantityAfter: number
+  note: string | null
+  createdBy: string | null
+  createdAt: string
+}
+
+/**
+ * A product's stock for the staff panel: units on hand (null = not tracked), its low-stock threshold, its status
+ * (null = not tracked), how many movements it has, and the latest of them (newest first, at most 50).
+ */
+export type ProductStock = {
+  stockQuantity: number | null
+  lowStockThreshold: number | null
+  status: StockStatus | null
+  movementCount: number
+  movements: StockMovement[]
+}
+
+/** A stock movement to record: its kind, the units (in, out, or counted) and an optional note. */
+export type StockMovementInput = { kind: StockMovementKind; quantity: number; note?: string }
 
 /**
  * A price rule (table price_rules): a discount on one category or one product, for every customer
@@ -675,6 +727,72 @@ export const replaceStaffRows = <Row,>(resource: StaffListResource, rows: Record
  */
 export const reorderStaffRows = <Row,>(resource: OrderableResource, ids: string[]) =>
   apiFetch<Row[]>(`/api/staff/${resource}/order`, { method: 'PUT', body: { ids } })
+
+/**
+ * The layout of the generated PDF catalog, set by staff. `perPage`: products on a page (1-12); `categoryPages`: a
+ * title page before each category; `showBrand` / `showSku` / `showBarcode`: extra lines under a product's name;
+ * `autoRebuild`: rebuild whenever a product, category, brand or contact detail changes.
+ */
+export type CatalogPdfOptions = {
+  perPage: number
+  categoryPages: boolean
+  showBrand: boolean
+  showSku: boolean
+  showBarcode: boolean
+  autoRebuild: boolean
+}
+
+/**
+ * The last build of the PDF catalog. `state`: "none" = never built (customers get the old site's file), "building",
+ * "ready", "failed" (the previous files stay). `builtAt` (ISO time), `pages` and `products` describe the last
+ * finished build.
+ */
+export type CatalogPdfStatus = {
+  state: 'none' | 'building' | 'ready' | 'failed'
+  startedAt?: string
+  builtAt?: string
+  pages?: number
+  products?: number
+  error?: string | null
+}
+
+/** What the "PDF catalog" dialog shows: the options, the build status and each language's current file. */
+export type CatalogPdfState = { options: CatalogPdfOptions; status: CatalogPdfStatus; urls: Partial<Record<Locale, string>> }
+
+/**
+ * The PDF catalog's options, build status and files (staff only).
+ * @param signal - Aborts the request.
+ * @returns The state; throws ApiError 401/403 without a staff sign-in.
+ */
+export const fetchCatalogPdf = (signal?: AbortSignal) => apiFetch<CatalogPdfState>('/api/staff/catalog-pdf', { signal })
+
+/**
+ * Saves the PDF catalog's options and builds it now, in the background (staff only).
+ * @param options - The options to change; the others keep their stored value.
+ * @returns The state, usually with status "building" (poll fetchCatalogPdf until it is ready); throws ApiError 400
+ *   "invalid" (field = the bad option).
+ */
+export const generateCatalogPdf = (options: Partial<CatalogPdfOptions>) =>
+  apiFetch<CatalogPdfState>('/api/staff/catalog-pdf', { method: 'POST', body: { options } })
+
+/**
+ * A product's stock and its latest movements (staff only).
+ * @param productId - The product.
+ * @param signal - Aborts the request.
+ * @returns The stock; throws ApiError 404 for an unknown product, 401/403 without a staff sign-in.
+ */
+export const fetchProductStock = (productId: string, signal?: AbortSignal) =>
+  apiFetch<ProductStock>(`/api/staff/products/${encodeURIComponent(productId)}/stock`, { signal })
+
+/**
+ * Records a stock movement of a product, which changes its units on hand (staff only).
+ * @param productId - The product.
+ * @param movement - What happened (see StockMovementInput).
+ * @returns The product's stock after it; throws ApiError 400 "invalid" (field "quantity", ...), "untracked" (only a
+ *   count can start tracking a product) or "insufficient_stock" (more units removed than are on hand), 404.
+ */
+export const recordStockMovement = (productId: string, movement: StockMovementInput) =>
+  apiFetch<ProductStock>(`/api/staff/products/${encodeURIComponent(productId)}/stock`, { method: 'POST', body: movement })
 
 /** The folders pictures are uploaded into (UPLOAD_FOLDERS in backend/app/staff/routes.py), one per kind of picture. */
 export type UploadFolder = 'categories' | 'brands'

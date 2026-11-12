@@ -76,6 +76,8 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> Flask:
             "SECRET_KEY": "test-secret-at-least-32-bytes-long",
             "TESTING": True,
             "MEDIA_ROOT": str(tmp_path_factory.mktemp("media")),
+            # No PDF catalog rebuilds after staff changes (test_catalog_pdf.py switches them on, inline).
+            "CATALOG_REBUILD": "off",
         }
     )
     with application.app_context():

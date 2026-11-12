@@ -1,6 +1,6 @@
 /**
  * DiscountRibbon.test.tsx — Tests for the discount ribbon (DiscountRibbon.tsx), rendered alone (it needs no
- * providers): its message with a decorative icon, the color variants, the discount / sale kinds (color, icon;
+ * providers): its message with a decorative icon, the color variants, the discount / sale / stock kinds (color, icon;
  * explicit props win) and the inline / corner placements.
  */
 import { render, screen } from '@testing-library/react'
@@ -32,6 +32,9 @@ describe('DiscountRibbon', () => {
   it.each([
     ['discount', 'bg-brand-red', 'lucide-percent'],
     ['sale', 'bg-brand-charcoal', 'lucide-tag'],
+    ['inStock', 'bg-success', 'lucide-package-check'],
+    ['lowStock', 'bg-warning', 'lucide-triangle-alert'],
+    ['outOfStock', 'bg-brand-charcoal', 'lucide-package-x'],
   ] as const)('a %s ribbon has its own color and icon', (kind, colorClass, iconClass) => {
     render(<DiscountRibbon kind={kind} message="-20%" />)
     expect(ribbon()).toHaveAttribute('data-kind', kind)

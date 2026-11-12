@@ -5,8 +5,9 @@
  *
  * The page follows the old WordPress product page: breadcrumbs (home > catalog > category > product); the gallery
  * beside the title, the product details (brand, item code, barcode), the price slot (a signed-in customer's price,
- * "log in to see the price" for everyone else; with a price, a quantity stepper and "Add to cart") and the shipping and
- * returns notes; then the full description and
+ * "log in to see the price" for everyone else; with a price, the stock status when the product's stock is tracked
+ * (In stock / Low stock / Out of stock), a quantity stepper and "Add to cart", or a disabled "Out of stock" button) and
+ * the shipping and returns notes; then the full description and
  * "You may also like" (CatalogCards of the same category).
  *
  * SEO: its `head` sets the product's title, a description from its text, the canonical and hreflang links,
@@ -19,7 +20,8 @@ import { fetchProduct, rethrowNotFound, type ProductDetail } from '@/api'
 import { useCustomerPrices } from '@/auth'
 import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { CatalogCard, PriceSlot, priceFor } from '@/components/CatalogCard'
+import { CatalogCard, PriceSlot, priceFor, stockFor } from '@/components/CatalogCard'
+import { DiscountRibbon, STOCK_RIBBONS } from '@/components/DiscountRibbon'
 import { ProductGallery } from '@/components/ProductGallery'
 import { QuantityStepper } from '@/components/QuantityStepper'
 import { RichText } from '@/components/RichText'
@@ -147,6 +149,7 @@ function ProductPage() {
   const product = Route.useLoaderData()
   const prices = useCustomerPrices()
   const price = priceFor(prices, product.id)
+  const stock = stockFor(prices, product.id)
   // The quantity to add belongs to this product: opening another product (same component) starts again at 1.
   const [chosen, setChosen] = useState({ id: product.id, quantity: 1 })
   const quantity = chosen.id === product.id ? chosen.quantity : 1
@@ -220,16 +223,18 @@ function ProductPage() {
 
             <div className="mt-8 border-y border-neutral-150 py-6">
               <PriceSlot state={price} size="lg" />
+              {price.status === 'shown' && stock && <DiscountRibbon kind={STOCK_RIBBONS[stock]} message={t.stock[stock]} className="mt-3" />}
               <p className="mt-3 text-sm text-brand-charcoal-muted">{t.product.wholesale}</p>
               {price.status === 'shown' && (
                 <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <QuantityStepper value={quantity} onChange={setQuantity} />
+                  {stock !== 'out' && <QuantityStepper value={quantity} onChange={setQuantity} />}
                   <AddToCartButton
                     key={product.id}
                     size="lg"
                     product={{ id: product.id, slug: product.slug, name: product.name, image: product.images[0]?.thumbnail ?? null, unitPrice: price.price }}
                     quantity={quantity}
                     onAdded={() => setQuantity(1)}
+                    available={stock !== 'out'}
                   />
                 </div>
               )}
@@ -261,7 +266,7 @@ function ProductPage() {
             <ul className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
               {product.related.map((other) => (
                 <li key={other.id} className="flex">
-                  <CatalogCard product={other} categoryName={categoryName} price={priceFor(prices, other.id)} className="w-full" />
+                  <CatalogCard product={other} categoryName={categoryName} price={priceFor(prices, other.id)} stock={stockFor(prices, other.id)} className="w-full" />
                 </li>
               ))}
             </ul>

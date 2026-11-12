@@ -144,6 +144,8 @@ CREATE TABLE products (
   category_id UUID        NOT NULL REFERENCES categories (id) ON DELETE RESTRICT, -- the product's category; a category with products cannot be deleted
   brand_id    UUID        REFERENCES brands (id) ON DELETE SET NULL, -- the product's brand; NULL = unbranded or not set
   list_price  NUMERIC(10,2) CHECK (list_price >= 0),      -- base wholesale price per unit, shekels before VAT, before any price rule; NULL = no price yet (cannot be ordered)
+  stock_quantity INTEGER    CHECK (stock_quantity >= 0),  -- units on hand now; written only with a stock_movements row (backend/app/inventory.py), so it equals the last movement's quantity_after; NULL = stock not tracked (always orderable)
+  low_stock_threshold INTEGER CHECK (low_stock_threshold >= 0), -- the product is "low in stock" while 0 < stock_quantity <= this; NULL = no low-stock warning
   sort_order  INTEGER       NOT NULL DEFAULT 0,           -- position in product lists (the catalog), lowest first (staff drag the order: PUT /api/staff/products/order; a new product goes last)
   is_active   BOOLEAN       NOT NULL DEFAULT true,        -- false = hidden from the catalog and cannot be ordered
   legacy_path TEXT,                                       -- the old WooCommerce URL, for 301 redirects; NULL = none
@@ -180,6 +182,25 @@ CREATE TABLE product_suppliers (
   PRIMARY KEY (product_id, supplier_id)                   -- a supplier is linked to a product at most once
 );
 CREATE INDEX ON product_suppliers (supplier_id);
+
+-- stock_movements — The stock ledger: every change of a product's units on hand, with who made it, when and why.
+-- Staff record them in the staff panel's Stock dialog (POST /api/staff/products/<id>/stock, backend/app/inventory.py),
+-- which updates products.stock_quantity in the same transaction. Rows are never edited or deleted (a mistake is fixed
+-- by a new count); deleting the product deletes its history. Later kinds: 'order' (checkout), 'sync' (Rivhit).
+CREATE TABLE stock_movements (
+  id              UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- movement id
+  product_id      UUID        NOT NULL REFERENCES products (id) ON DELETE CASCADE, -- the product; deleting it deletes its history
+  kind            TEXT        NOT NULL CHECK (kind IN ('received', 'returned', 'removed', 'count')), -- 'received' = goods in from a supplier; 'returned' = a customer return back on the shelf; 'removed' = damaged, expired or lost units out; 'count' = a stock count that sets the units on hand
+  quantity_change INTEGER     NOT NULL,                   -- units added (positive) or taken out (negative); a count stores the difference it made (0 = the count matched)
+  quantity_after  INTEGER     NOT NULL CHECK (quantity_after >= 0), -- units on hand after this movement
+  note            TEXT,                                   -- why, e.g. the supplier's invoice number or 'expired'; NULL = none. Staff only
+  created_by_id   UUID        REFERENCES staff_users (id) ON DELETE SET NULL, -- staff member who recorded it; NULL = unknown or since deleted
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),     -- when the movement was recorded
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),     -- last change (movements are never changed, so = created_at)
+  CONSTRAINT stock_movements_direction_check CHECK (kind = 'count' OR (kind = 'removed' AND quantity_change < 0) OR (kind IN ('received', 'returned') AND quantity_change > 0)) -- received and returned add units, removed takes them out, a count may do either
+);
+CREATE INDEX ON stock_movements (product_id);
+CREATE INDEX ON stock_movements (created_by_id);
 
 
 -- ===================================================================================================================

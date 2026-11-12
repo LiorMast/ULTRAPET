@@ -5,19 +5,20 @@
  * state (page, category, brands, search, sort, price range) in
  * the URL of the route that renders it, so every filtered page is a real, shareable, crawlable link; the
  * route reloads the results when the URL changes. Prices are shown only when the caller passes `prices`
- * (routes/catalog.tsx does that for signed-in customers); otherwise every card shows "log in to see the price".
+ * (routes/catalog.tsx does that for signed-in customers), with each card's stock status; otherwise every card shows
+ * "log in to see the price".
  */
 import { useState } from 'react'
 import { Link, linkOptions, useNavigate } from '@tanstack/react-router'
 import { Download, Lock, Search } from 'lucide-react'
 import { cn } from 'cn'
-import { CatalogCard, priceFor } from '@/components/CatalogCard'
+import { CatalogCard, priceFor, stockFor } from '@/components/CatalogCard'
 import { CatalogToolbar } from '@/components/CatalogToolbar'
 import { Pagination } from '@/components/Pagination'
 import { Button } from '@/components/ui/button'
 import type { Brand, CatalogSearch, ProductCategory, ProductPage } from '@/api'
 import type { CustomerPrices } from '@/auth'
-import { CATALOG_PDF_URL, localized } from '@/config'
+import { catalogPdfUrl, localized } from '@/config'
 import { useI18n } from '@/i18n'
 
 /**
@@ -81,7 +82,7 @@ function PricesHiddenBanner() {
  * @param props.categories - The categories for the chips; products are labelled with their names.
  * @param props.brands - The active brands (the brand filter).
  * @param props.search - The URL state (page, category, brands, search text, sort, price range), as validated by the route.
- * @param props.prices - Prices for a signed-in customer; omit to hide every price.
+ * @param props.prices - Prices and stock statuses for a signed-in customer; omit to hide every price.
  * @returns The catalog <section>.
  */
 export function Catalog({
@@ -132,7 +133,7 @@ export function Catalog({
           <p className="mt-5 max-w-2xl text-lg text-brand-charcoal-muted">{t.catalog.description}</p>
         </div>
         <a
-          href={CATALOG_PDF_URL}
+          href={catalogPdfUrl(locale)}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex shrink-0 items-center gap-2 font-heading text-xs font-bold uppercase tracking-widest text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
@@ -201,7 +202,7 @@ export function Catalog({
         <ul aria-label={t.catalog.listLabel} className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
           {items.map((product) => (
             <li key={product.id} className="flex">
-              <CatalogCard product={product} categoryName={categoryName.get(product.category)} price={priceFor(prices, product.id)} className="w-full" />
+              <CatalogCard product={product} categoryName={categoryName.get(product.category)} price={priceFor(prices, product.id)} stock={stockFor(prices, product.id)} className="w-full" />
             </li>
           ))}
         </ul>

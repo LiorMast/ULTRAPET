@@ -257,6 +257,7 @@ describe('/admin/products', () => {
     expect(bodies(fetchSpy, 'POST')[0]).toMatchObject({ productId: '00000000-0000-4000-8002-000000000001', kind: 'percent', value: 7.5 })
     await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(within(rowOf(first.name.en)).getAllByRole('cell')[5]).toHaveTextContent(/7\.5%.+off/)
+    // Name, SKU, category, brand, list price, stock, then the discounts.
+    expect(within(rowOf(first.name.en)).getAllByRole('cell')[6]).toHaveTextContent(/7\.5%.+off/)
   })
 })

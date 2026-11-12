@@ -5,15 +5,18 @@
  * `list` (a horizontal row, e.g. for a list view or the B2B order screen).
  * The whole card links to the product's page (/products/$slug); the login link of the price slot and, when the
  * price is shown (a signed-in customer), the "Add to cart" button (AddToCartButton, adds 1) stay clickable above it.
- * Used by the Catalog component and the product page's "You may also like" row. Also exports the price helpers
- * the product page and the cart share (priceFor, PriceSlot, formatPrice).
+ * With the price, the caller may pass the product's stock status: "low" adds a "Low stock" ribbon under the price,
+ * "out" turns the button into a disabled "Out of stock" one (untracked products and "in" show nothing extra).
+ * Used by the Catalog component and the product page's "You may also like" row. Also exports the price and stock
+ * helpers the product page and the cart share (priceFor, stockFor, PriceSlot, formatPrice).
  */
 import { Link } from '@tanstack/react-router'
 import { Lock } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from 'cn'
 import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
-import type { Product } from '@/api'
+import { DiscountRibbon } from '@/components/DiscountRibbon'
+import type { Product, StockStatus } from '@/api'
 import type { CustomerPrices } from '@/auth'
 import { localized } from '@/config'
 import { useI18n, type Locale } from '@/i18n'
@@ -32,6 +35,16 @@ export function priceFor(prices: CustomerPrices | undefined, id: string): PriceS
   if (prices.status === 'loading') return { status: 'loading' }
   const price = prices.prices[id]
   return price === undefined ? { status: 'hidden' } : { status: 'shown', price }
+}
+
+/**
+ * The stock status of one product, for the signed-in customer.
+ * @param prices - The signed-in customer's prices and stock statuses (undefined = signed out).
+ * @param id - The product id.
+ * @returns "in", "low" or "out"; undefined when signed out, still loading, or the product's stock is not tracked.
+ */
+export function stockFor(prices: CustomerPrices | undefined, id: string): StockStatus | undefined {
+  return prices?.status === 'loaded' ? prices.stock[id] : undefined
 }
 
 /**
@@ -107,6 +120,8 @@ export function PriceSlot({ state, size = 'sm' }: { state: PriceState; size?: 's
  * @param props.categoryName - The product's category, already translated (shown above the name).
  * @param props.price - The price slot (see PriceState); hidden by default. When shown, the card also gets an
  *   "Add to cart" button.
+ * @param props.stock - The product's stock status (stockFor), used only with a shown price: "low" adds a ribbon,
+ *   "out" disables the button; undefined = not tracked.
  * @param props.variant - `grid` (tile, default) or `list` (row).
  * @param props.headingLevel - The name's heading tag, so the card fits the page outline; default "h3".
  * @param props.className - Extra classes for the card.
@@ -116,6 +131,7 @@ export function CatalogCard({
   product,
   categoryName,
   price = { status: 'hidden' },
+  stock,
   variant,
   headingLevel: Heading = 'h3',
   className,
@@ -123,10 +139,11 @@ export function CatalogCard({
   product: Product
   categoryName?: string
   price?: PriceState
+  stock?: StockStatus
   headingLevel?: 'h2' | 'h3'
   className?: string
 } & VariantProps<typeof cardVariants>) {
-  const { locale } = useI18n()
+  const { t, locale } = useI18n()
   return (
     <article {...{ [CART_FLY_SOURCE_ATTR]: '' }} className={cn(cardVariants({ variant }), className)}>
       <div className={photoVariants({ variant })}>
@@ -158,9 +175,11 @@ export function CatalogCard({
         </Heading>
         <div className="border-t border-neutral-150 pt-3">
           <PriceSlot state={price} />
+          {price.status === 'shown' && stock === 'low' && <DiscountRibbon kind="lowStock" message={t.stock.low} className="mt-2" />}
           {price.status === 'shown' && (
             <AddToCartButton
               product={{ id: product.id, slug: product.slug, name: product.name, image: product.image?.thumbnail ?? null, unitPrice: price.price }}
+              available={stock !== 'out'}
               className="z-10 mt-3"
             />
           )}

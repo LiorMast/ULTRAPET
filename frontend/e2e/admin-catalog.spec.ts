@@ -8,12 +8,16 @@
  * page overflow on a phone, and screenshots of the categories page (Hebrew, English). Plus a category picture
  * uploaded in the edit form (ImageUploadField) that then shows on the home page carousel. The Discounts page
  * (/admin/discounts): a discount added there with its "applies to" fields is saved, listed, and deleted, with axe
- * scans of the page and its form.
+ * scans of the page and its form. The products' stock (StockDialog): a count and goods received recorded with the
+ * keyboard show in the dialog's history and the table's stock column, with an axe scan of the dialog.
  *
  * The upload goes to the real backend (its S3 stub stores the file under backend/media, which nothing else reads),
  * but the category save (PATCH /api/staff/categories/<id>) is answered in the browser and laid over the reads that
  * follow (GET /api/staff/categories, /api/categories), so the shared dev database the screenshots read never
  * changes (as in home-editor.spec.ts).
+ *
+ * The stock movements are answered in the browser too (keepStockInBrowser: the product's real stock is read once,
+ * then the movements are kept in the page), because a recorded movement can never be deleted from the stock ledger.
  *
  * The discount is put on the last seeded product (found with the table's search), so it never shows in the
  * screenshots, which other workers may take at the same time; leftovers of an interrupted run are deleted first.
@@ -236,6 +240,78 @@ for (const [name, path] of [['he', '/admin/categories'], ['en', '/en/admin/categ
     await expect(page.locator('main')).toHaveScreenshot(`admin-categories-${name}.png`)
   })
 }
+
+/** A product's stock as the stock routes answer it (ProductStock in src/api.ts). */
+type Stock = {
+  stockQuantity: number | null
+  status: string | null
+  movementCount: number
+  movements: { id: string; kind: string; quantityChange: number; quantityAfter: number; note: string | null; createdBy: string | null; createdAt: string }[]
+}
+
+/**
+ * Answers the stock movements in the browser (see the file header): the first read of a product's stock comes from the
+ * server, then each POST changes the page's copy (a count sets the units, the other kinds add or take out), and the
+ * products table's rows carry that copy's units.
+ * @param page - The Playwright page.
+ */
+async function keepStockInBrowser(page: Page) {
+  const ledger = new Map<string, Stock>()
+  await page.route('**/api/staff/products', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    const response = await route.fetch()
+    const rows = (await response.json()) as { id: string; stockQuantity: number | null }[]
+    await route.fulfill({ response, json: rows.map((row) => ({ ...row, ...(ledger.has(row.id) && { stockQuantity: ledger.get(row.id)!.stockQuantity }) })) })
+  })
+  await page.route('**/api/staff/products/*/stock', async (route) => {
+    const id = new URL(route.request().url()).pathname.split('/').at(-2)!
+    if (!ledger.has(id)) ledger.set(id, (await (await page.request.get(`/api/staff/products/${id}/stock`)).json()) as Stock)
+    const stock = ledger.get(id)!
+    if (route.request().method() === 'POST') {
+      const { kind, quantity, note } = route.request().postDataJSON() as { kind: string; quantity: number; note?: string }
+      const before = stock.stockQuantity ?? 0
+      const after = kind === 'count' ? quantity : before + (kind === 'removed' ? -quantity : quantity)
+      stock.movements.unshift({ id: crypto.randomUUID(), kind, quantityChange: after - before, quantityAfter: after, note: note ?? null, createdBy: 'E2E', createdAt: new Date().toISOString() })
+      Object.assign(stock, { stockQuantity: after, status: after === 0 ? 'out' : 'in', movementCount: stock.movementCount + 1 })
+      return route.fulfill({ status: 201, json: stock })
+    }
+    await route.fulfill({ json: stock })
+  })
+}
+
+test("records a product's stock with the keyboard, with no accessibility violations", async ({ page }) => {
+  test.slow() // the 400-product table and an axe scan
+  await keepStockInBrowser(page)
+  await signInStaff(page, '/en/admin/products')
+  await findProduct(page)
+  const open = page.getByRole('button', { name: `Stock: ${PRODUCT}` })
+  const dialog = page.getByRole('dialog', { name: 'Stock' })
+  await open.focus()
+  await page.keyboard.press('Enter')
+  await settled(dialog)
+  await dialog.getByRole('group', { name: 'Movement' }).waitFor()
+
+  // A count works on any product, tracked or not.
+  await dialog.getByText('Count', { exact: true }).click()
+  await dialog.getByLabel('Units counted *').fill('20')
+  await dialog.getByLabel('Units counted *').press('Enter')
+  await expect(page.getByRole('status').filter({ hasText: 'Stock updated.' })).toBeVisible()
+  await expect(dialog.getByRole('listitem').first()).toContainText('On hand: 20')
+
+  // Tracked now: goods received are added.
+  await dialog.getByText('Received', { exact: true }).click()
+  await dialog.getByLabel('Units received *').fill('5')
+  await expect(dialog.getByText('After recording: 25 on hand (now 20).')).toBeVisible()
+  await dialog.getByLabel('Units received *').press('Enter')
+  await expect(dialog.getByRole('listitem').first()).toContainText(/Received\s*\+5/)
+  await expect(dialog.getByRole('listitem').first()).toContainText('On hand: 25')
+  expect((await new AxeBuilder({ page }).include('[role=dialog]').analyze()).violations).toEqual([])
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(open).toBeFocused()
+  await expect(page.getByRole('row', { name: new RegExp(PRODUCT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).getByRole('cell').nth(5)).toHaveText(/^25/)
+})
 
 /** The category the upload test gives a picture: the first seeded one, on the home carousel's first page. */
 const CATEGORY = categories[0].name.en

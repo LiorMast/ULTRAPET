@@ -58,20 +58,26 @@ frontend/
                         admin.customers = the business customers' accounts + each one's own discounts)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
                         Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, InlineEditor,
-                        CatalogCard (links to its product page; PriceSlot, priceFor), ProductGallery, RichText
+                        CatalogCard (links to its product page; PriceSlot, priceFor, stockFor), ProductGallery, RichText
                         (stored sanitized HTML, styled by `.rich-text` in index.css),
                         EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
                         ImageUploadField (picture upload of the admin forms), ReorderDialog (drag a list into order),
                         Offcanvas (the reusable side panel on ui/sheet: title, close, `notice` strip, scrolling body, footer;
                         logical side; optional trigger `tooltip`),
                         CartDrawer (the business customers' header cart icon + badge and its Offcanvas: lines, subtotal,
-                        minimum order), AddToCartButton (adds to the cart, "✓ Added" morph), QuantityStepper (− n +),
+                        minimum order), AddToCartButton (adds to the cart, "✓ Added" morph; `available={false}` = a
+                        disabled "Out of stock"), QuantityStepper (− n +),
+                        StockDialog (a product's stock in the admin: record a movement, the history; stockAction,
+                        StockCell, StockSummary, stockStatus), DiscountRibbon (icon + short message on a color; kinds
+                        discount / sale and the stock statuses: STOCK_RIBBONS),
                         SegmentedSwitch (the multi-choice switch: a radio group drawn as one bar with a sliding thumb),
                         Toast (a short notification at the top center: icon, message, color; `kind` success / error / warning
                         presets them (TOAST_KINDS; tokens `success`, `warning`); shows 2 s, fades, then onDone; above everything, z-[100]),
-                        PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button), ...)
+                        PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button),
+                        CatalogPdfDialog (the "PDF catalog" button + dialog of /admin/products: the generated PDF
+                        catalog's layout, status, files and "Generate now"; catalogPdfGrid), ...)
                         + their tests
-    components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet, switch, tooltip), restyled for the brand
+    components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet, slider, switch, tooltip), restyled for the brand
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
                         imports them (oxlint no-restricted-imports); legacy-media.json = object key -> WordPress URL
                         of every file `flask import-media` copies into the storage
@@ -89,9 +95,9 @@ backend/
                         products/<slug>
                         (one product's page: gallery, sanitized description, up to 4 related), brands, stats,
                         contact (the contact_* settings), sections + sections/<key> (saved home page section content),
-                        faq, articles, resellers, sitemap.xml, media/<key> (the S3 stub's files), catalog.pdf
-                        (redirect to the stored PDF catalog, setting `catalog_pdf`), the shared auth
-                        (login/refresh/logout/me: customers AND staff), prices
+                        faq, articles, resellers, sitemap.xml, media/<key> (the S3 stub's files), catalog.pdf?lang=
+                        (redirect to the generated PDF catalog of that language, see catalog_pdf.py), the shared auth
+                        (login/refresh/logout/me: customers AND staff), prices (+ the stock status of tracked products)
     staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
                         products+images, price-rules, settings, articles, resellers, page-sections, faq-items (these two
                         stamp updated_by_id), customers (the business users: `write_only` password, `read_only`
@@ -99,9 +105,19 @@ backend/
                         `replaceable` resources: faq-items); PUT /<resource>/order sets the order from every row's id
                         (`orderable`: categories, brands, products); `create_defaults` (new_row_defaults) fill a new
                         row of these three (slug from its English / brand name, last place); DB constraint errors -> 400/409; POST /uploads stores a
-                        picture (multipart file + folder) through storage.py and returns its URL
+                        picture (multipart file + folder) through storage.py and returns its URL; GET/POST
+                        /products/<id>/stock reads a product's stock / records a stock movement (products'
+                        `stock_quantity` is `read_only`); GET/POST /catalog-pdf = the PDF catalog dialog (options,
+                        status, files / save the options and build now); an after_request hook asks for a rebuild of
+                        the PDF catalog after a change to products, categories, brands or the contact_* settings
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
-    storage.py          the S3 stub for every stored file: put_object / delete_object / object_exists write and serve
+    inventory.py        the stock ledger: stock_status, apply_movement / record_movement (a movement + the product's
+                        units on hand, row locked), product_stock_json (the Stock dialog), customer_stock (/api/prices)
+    catalog_pdf.py      the generated PDF catalog (fpdf2 + uharfbuzz + Pillow; fonts and logo in catalog_assets/):
+                        catalog_data, render (cover, category title pages, product grid pages, back page), build_catalog
+                        (advisory lock, fingerprint skip, new objects per build), request_rebuild (background thread),
+                        `flask build-catalog`
+    storage.py          the S3 stub for every stored file: put_object / get_object / delete_object / object_exists write and serve
                         backend/media (MEDIA_ROOT, git-ignored); rows store object keys, public_url / url_of / srcset_urls
                         build the URLs from S3_BUCKET + S3_REGION, object_key validates a submitted one, file_type
                         recognizes a file by its bytes; swap the bodies for boto3 later
@@ -116,6 +132,7 @@ backend/
       models/             the SQLAlchemy models, one module per area (importing the package registers them all):
         users.py            AppUser -> StaffUser / BusinessUser (joined-table inheritance), BusinessLead
         catalog.py          Supplier, Brand, Category, Product, ProductImage, ProductSupplier (junction)
+        inventory.py        StockMovement (the stock ledger)
         price_rules.py      PriceRule
         orders.py           PaymentMethod, Order, OrderItem
         settings.py         Setting + get_setting()
@@ -137,13 +154,17 @@ backend/
 ## Commands (backend, from the repo root)
 
 - `docker compose up -d --build` — Postgres (127.0.0.1:5433) + the Flask dev server (http://localhost:5000, reloads
-  on change). Needs `.env` (copy `.env.example`).
+  on change). Needs `.env` (copy `.env.example`). The host port is `BACKEND_PORT` in `.env` (default 5000; this
+  machine uses 5001, since another app holds 5000): compose, Vite's `/api` proxy, `start.sh` and the e2e config read it.
 - `docker compose exec backend pytest` — backend tests (database `content_test`; the dev data is never touched).
 - `docker compose exec backend flask seed` — fill an empty database from the frontend stubs (plus the staff admin and
   the demo customer when SEED_ADMIN_* / SEED_CUSTOMER_* are set in `.env`).
 - `docker compose exec backend flask import-media` — copy the old site's files (product photos, the PDF catalog; about
   1,370 files, 215 MB) into the storage (backend/media); skips what is there, so rerun it after a failure. Once the
   WordPress site is gone, copy the bucket / backend/media instead.
+- `docker compose exec backend flask build-catalog [--force]` — build the downloadable PDF catalog (Hebrew + English)
+  from the database into the storage; run it after `seed` + `import-media` (about 40 s for the 408 products). Skipped
+  when nothing it shows changed, unless `--force` (e.g. after photos were added).
 - `docker compose exec backend flask reset-db --yes` — drop and recreate every table (all data is lost); then `seed`.
 - `docker compose exec backend flask export-wordpress --out /tmp/wp` — re-read the old site's public APIs into the stubs
   (GET only; the container mounts the stubs read-only, so copy /tmp/wp/*.json over; see WORDPRESS.md). It keeps the
@@ -392,6 +413,22 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   In the cart panel a line's `QuantityStepper min={0}` removes the line at 0 (the minus shows a trash icon at 1; the
   focus moves to the next line), and the minimum-order banner with its progress bar sits in the `Offcanvas notice`
   strip (under the header, never scrolls away). Money is formatted with `formatPrice` (CatalogCard.tsx). Checkout stays disabled until Phase 4.
+- **Inventory** (stock ledger: `backend/app/inventory.py`, table `stock_movements`, `StockDialog`): a product's units on
+  hand are `products.stock_quantity` (**NULL = not tracked**: always orderable, no status; every seeded product starts
+  untracked) and its `low_stock_threshold` (NULL = no low warning). The units change only by recording a movement
+  (`POST /api/staff/products/<id>/stock`, which locks the product row and writes the movement and the new units in one
+  transaction): `received` / `returned` add, `removed` takes out (never below 0: 400 `insufficient_stock`), `count`
+  sets them; only a count starts tracking an untracked product (else 400 `untracked`). Movements are never edited or
+  deleted (fix a mistake with a new count); the product's delete takes its history. Status (`stock_status`, mirrored by
+  `stockStatus` in StockDialog.tsx and by the fake API): `out` at 0, `low` at or below the threshold, else `in`.
+  Staff: the products table's stock column (`StockCell`: units + a Low / Out ribbon, "Not counted"), the stock alerts
+  above it (`StockSummary`), the "Stock" row action (`stockAction` → `StockDialog`: kind switch, units, note, preview,
+  the latest 50 movements with who and when); the threshold is a field of the product form. Customers: `/api/prices`
+  also answers `stock` (product id → status, active tracked products only; never the units, never for visitors);
+  `stockFor(prices, id)` gives a card or the product page its status: "low" = a `lowStock` ribbon, "out" = a
+  disabled "Out of stock" button and no quantity stepper. Lines already in a cart are not checked; checkout (Phase 4)
+  must re-check stock on the server and decide when an order takes units out (a movement kind `order`); a Rivhit sync
+  would record kind `sync` (add the kinds to the CHECK).
 - **Toasts** (`src/toast.tsx`, `Toast`): a confirmation with no place of its own on the page is a toast:
   `useToast().success(t...)` (the admin tables' add/save/delete/reorder, the discount dialogs, in-place and hero saves,
   signing in and out), `.warning` (signing out dropped an in-place draft), `.error` (a failure with no form to show it
@@ -546,9 +583,23 @@ content exists in each language, and the layout flips direction automatically.
   Email is unconfirmed (the legacy CMS says office@ultrapet.co.il) — ask the owner. They live in the settings
   `contact_phone` / `contact_whatsapp` / `contact_email` (seeded from `stubs/contact.json`, read with `GET /api/contact`
   by the root route for the Contact section and the WhatsApp button; staff edit them in the Contact section).
-- **PDF catalog**: the object `catalog/ultrapetcatalog.pdf` in the storage (copied from the WordPress site by
-  `flask import-media`), named by the setting `catalog_pdf`; `CATALOG_PDF_URL` in `config.ts` = `/api/catalog.pdf`,
-  which redirects to it.
+- **PDF catalog** (generated, `backend/app/catalog_pdf.py`): built from the active products of the active categories
+  in the look of the old printed catalog (A4 landscape: cover, a red title page per category, product pages with the
+  photos above a red band of names, a back page with the contact details; never prices), one file per language
+  (`he`, `en`). Objects `catalog/ultrapet-catalog-<locale>-<UTC timestamp>.pdf` (a new key per build; the replaced
+  ones are deleted), named by the setting `catalog_pdf_files`; `catalogPdfUrl(locale)` in `config.ts` =
+  `/api/catalog.pdf?lang=<locale>`, which redirects to it (no-store). Until the first build the redirect goes to the
+  old site's file `catalog/ultrapetcatalog.pdf` (setting `catalog_pdf`, copied by `flask import-media`).
+  Layout options = setting `catalog_pdf_options` (`perPage` 1–12, default 3: one row up to 4, two up to 8, three
+  above; `categoryPages`, `showBrand`, `showSku`, `showBarcode`, `autoRebuild`), edited in the "PDF catalog" dialog of
+  `/admin/products` (`CatalogPdfDialog`: `ui/slider` + switches, status, files, "Generate now" = `POST
+  /api/staff/catalog-pdf`, then it polls `GET` every 2 s). Build state = setting `catalog_pdf_status`.
+  **Rebuilt after every change** to a product, category, brand or `contact_*` setting made through the staff API
+  (the staff blueprint's `after_request` → `request_rebuild()`: a background thread, so the request answers at once;
+  builds queue on a Postgres advisory lock; a build whose fingerprint (data shown + options + `TEMPLATE_VERSION`)
+  equals the stored one is skipped). Config `CATALOG_REBUILD` = `thread` (default) / `inline` / `off` (the tests).
+  Changes made outside the staff API (`flask seed`, SQL, `import-media`) need `flask build-catalog`. Bump
+  `TEMPLATE_VERSION` when the drawing changes. The PDF's own words (cover title, labels) are `TEXTS` in the module.
 - **WordPress product categories (15)**: dry cat food, dry dog food, cat cans & treats, dog cans & treats, cat
   snacks, dog snacks & bones, cat litter, beds & mattresses, grooming & hygiene, cat scratchers, rodents, birds,
   plastics, collars & leashes, equipment. **Decided:** the catalog uses these 15 (`stubs/product-categories.json`);
@@ -623,9 +674,9 @@ content exists in each language, and the layout flips direction automatically.
 - [ ] Pages: brand, category, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
 **Phase 2 — Backend**
-- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 19 tables: users with staff and
-      business subtypes, leads, suppliers, brands, categories, products, images, product-supplier junction, price
-      rules, settings, payment methods, orders, order items, articles, resellers, page sections, FAQ items); models; price resolution (`pricing.py`); seed from the
+- [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 20 tables: users with staff and
+      business subtypes, leads, suppliers, brands, categories, products, images, product-supplier junction, stock
+      movements, price rules, settings, payment methods, orders, order items, articles, resellers, page sections, FAQ items); models; price resolution (`pricing.py`); seed from the
       stubs; `/api/health`; Vite `/api` proxy
 - [x] public content API (blueprint `customers`: categories, products, brands, stats, sections, FAQ, articles,
       resellers, sitemap);
@@ -638,6 +689,8 @@ content exists in each language, and the layout flips direction automatically.
 - [ ] staff API for leads, payment methods and orders (with the admin UI, Phase 3)
 - [ ] lead/contact endpoints (`business_leads`)
 - [x] serve the PDF catalog (`/api/catalog.pdf`) and every product photo from the storage (`flask import-media`)
+- [x] generate the PDF catalog from the database (`catalog_pdf.py`, `flask build-catalog`), per language, rebuilt
+      after every product change; layout set in the "PDF catalog" dialog of `/admin/products`
 
 **Phase 3 — Admin CMS**: port the legacy admin.
 - [x] Reusable admin table (`DataTable`, `RecordDialog`, `ui/dialog`), the shared sign-in form at `/admin`, `/admin/brands`
@@ -647,6 +700,8 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Picture uploads (S3 stub `storage.py`, `ImageUploadField`, upload-only): the categories' home carousel pictures,
       the brands' logos
 - [ ] Product images in the admin; tables for settings, articles, resellers (a column config + route each)
+- [x] Inventory on `/admin/products`: the stock ledger (`stock_movements`, `app/inventory.py`, `StockDialog`), stock
+      column + alerts, low-stock threshold; customers see In stock / Low / Out and cannot add an out-of-stock product
 - [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API
 - [x] `/admin/discounts`: every discount in one table (general and per customer; the `customers` resource)
 - [x] `/admin/customers`: staff open and edit the business accounts (customers cannot register), set or generate the
@@ -655,7 +710,7 @@ content exists in each language, and the layout flips direction automatically.
 
 **Phase 4 — B2B portal**: [x] cart in the browser (add from cards and product pages, edit in the header panel);
 auth, price catalog, per-customer/category discounts, cart + checkout (minimum ₪2,000;
-card / Bit / bank transfer), Rivhit sync, generated PDF catalog.
+card / Bit / bank transfer), Rivhit sync.
 
 **Phase 5**: Russian + Arabic, branch map, image API, performance and SEO hardening, WordPress 301 redirects.
 

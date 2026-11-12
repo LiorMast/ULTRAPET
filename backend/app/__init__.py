@@ -1,10 +1,11 @@
 """app — The Ultra Pet backend: one Flask application (monolith) over PostgreSQL.
 
 create_app() builds the application: configuration from the environment, the database (app.database.db), JWT
-sign-in (app.auth), the CLI commands (app.database.seed, app.database.legacy_media) and the routes. The routes are two blueprints, each in its
+sign-in (app.auth), the CLI commands (app.database.seed, app.database.legacy_media, app.catalog_pdf) and the routes. The routes are two blueprints, each in its
 own folder: customers/ (prefix /api: everything the public site and the business customers call) and staff/
 (prefix /api/staff: the staff panel API). Other modules: database/ (schema SQL, SQLAlchemy base, models, seed
-commands), pricing (the customer's price) and storage (the stub of the S3 file storage for uploads).
+commands), pricing (the customer's price), storage (the stub of the S3 file storage for uploads) and catalog_pdf (builds the
+downloadable PDF catalog from the products).
 
 Run: `flask --app app run --debug` (DATABASE_URL and SECRET_KEY must be set; compose sets them and FLASK_APP).
 """
@@ -21,6 +22,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 
 from app.auth import init_auth
+from app.catalog_pdf import build_catalog_command
 from app.customers.routes import bp as customers_bp
 from app.database import models  # noqa: F401  (registers every model on db.metadata)
 from app.database.db import db
@@ -97,6 +99,9 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         # Empty (dev, until the stub uses a real bucket) = the stub's /api/media/ URLs.
         S3_BUCKET=os.environ.get("S3_BUCKET", ""),
         S3_REGION=os.environ.get("S3_REGION", ""),
+        # How a change to the catalog rebuilds the PDF catalog (app/catalog_pdf.py): "thread" (in the background),
+        # "inline" (before the request answers) or "off".
+        CATALOG_REBUILD=os.environ.get("CATALOG_REBUILD", "thread"),
         MAX_CONTENT_LENGTH=MAX_CONTENT_LENGTH,
     )
     if config:
@@ -112,6 +117,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
     app.cli.add_command(seed_command)
     app.cli.add_command(import_media_command)
     app.cli.add_command(export_wordpress_command)
+    app.cli.add_command(build_catalog_command)
     app.register_error_handler(HTTPException, http_error)
     app.register_blueprint(customers_bp)
     app.register_blueprint(staff_bp)

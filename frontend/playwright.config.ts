@@ -3,7 +3,8 @@
  * backend: the site's data comes from the Flask API (proxied by Vite), so the database must be seeded
  * (`docker compose exec backend flask seed`). The backend is reused when it already runs, else started with
  * `docker compose up`. The repo's .env is loaded so the sign-in tests can use the demo customer that the seed
- * creates (SEED_CUSTOMER_EMAIL / SEED_CUSTOMER_PASSWORD, see .env.example).
+ * creates (SEED_CUSTOMER_EMAIL / SEED_CUSTOMER_PASSWORD, see .env.example), and the backend's host port
+ * (BACKEND_PORT, default 5000).
  * Two projects: a desktop window (1440×900) and a phone (Pixel 7). Run with `npm run test:e2e`;
  * after an intended visual change, refresh the screenshots with `npm run test:e2e -- --update-snapshots`.
  */
@@ -33,7 +34,7 @@ export default defineConfig({
     {
       command: 'docker compose up postgres backend',
       cwd: '..',
-      url: 'http://localhost:5000/api/health',
+      url: `http://localhost:${process.env.BACKEND_PORT || 5000}/api/health`,
       reuseExistingServer: true,
       timeout: 180_000,
     },

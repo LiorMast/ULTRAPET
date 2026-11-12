@@ -9,8 +9,8 @@ still use them as fixtures):
   product stubs come from the old site (`flask export-wordpress`, app/database/wordpress.py);
 - the articles (with their WordPress dates) and the resellers of the Where to Buy page;
 - the questions of the home page FAQ section (stubs/faq.json, in file order);
-- the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order, the currency and the
-  PDF catalog's object key;
+- the home page stats from legacy/supabase-export/cms_settings.json, plus VAT, the minimum order, the currency, the
+  old PDF catalog's object key and the generated PDF catalog's default options (build it with `flask build-catalog`);
 - the contact details of the Contact section and the WhatsApp button, and the opening hours (stubs/contact.json:
   settings contact_<field>);
 - the three payment methods;
@@ -31,6 +31,7 @@ import click
 import psycopg
 from sqlalchemy import func, select
 
+from app.catalog_pdf import DEFAULT_OPTIONS, OPTIONS_KEY, SETTING_DESCRIPTIONS
 from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.models.content import Article, FaqItem, Reseller
 from app.database.db import db
@@ -50,7 +51,8 @@ BASE_SETTINGS = [
     ("vat_percent", 18, "VAT rate in percent, added to prices at checkout"),
     ("min_order_amount", 2000, "Minimum order subtotal in shekels before VAT"),
     ("currency", "ILS", "Currency of all prices (ISO 4217)"),
-    ("catalog_pdf", "catalog/ultrapetcatalog.pdf", "Object key of the downloadable PDF catalog (no prices) in the file storage; /api/catalog.pdf redirects to it"),
+    ("catalog_pdf", "catalog/ultrapetcatalog.pdf", "Object key of the old site's PDF catalog in the file storage; /api/catalog.pdf redirects to it until the catalog is generated (flask build-catalog)"),
+    (OPTIONS_KEY, DEFAULT_OPTIONS, SETTING_DESCRIPTIONS[OPTIONS_KEY]),
 ]
 
 # What each contact setting (contact_<field>, from stubs/contact.json) holds.

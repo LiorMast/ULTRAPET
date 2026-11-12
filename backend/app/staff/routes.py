@@ -14,6 +14,10 @@ resource in RESOURCES:
                                  list: `faq-items`, see replace_rows)
     PUT /<resource>/order        set the display order from a list of every row's id (only `orderable` resources:
                                  categories, brands, products; see reorder_rows)
+Stock (the stock ledger, app/inventory.py): a product's `stockQuantity` is read-only in the products resource; it
+changes only by recording a movement:
+    GET /products/<id>/stock     the product's units on hand, status and latest movements
+    POST /products/<id>/stock    record a movement {kind, quantity, note?} (201), which updates the units on hand
 `customers` are the business customers: only staff open accounts (customers cannot register). Their `password` is
 write-only (set on create, changed by sending a new one, never answered), `lastLoginAt` is read-only, and they are
 never deleted (DELETE is 405): `isActive` false blocks the sign-in.
@@ -27,6 +31,10 @@ stub for now) and returns its key and URL. The staff panel saves the URL in a ro
 row stores only the key (converters media_key, and media_srcset for a product photo's srcset) and every response
 turns it back into a URL (storage.url_of, storage.srcset_urls). A picture field takes nothing but our own objects:
 every file the site loads comes from the storage or is bundled with the frontend.
+The PDF catalog (app/catalog_pdf.py): a successful change to a product, category, brand or contact detail asks for a
+rebuild (rebuild_catalog_after_change), and the "PDF catalog" dialog of the products page uses:
+    GET /catalog-pdf             the layout options, the last build's status and the files' URLs
+    POST /catalog-pdf            save {options} and build now (202; the dialog polls GET until it is ready)
 Each field checks its JSON type here; the database's constraints (create-tables.sql) do the rest of the validation,
 and their errors become 400 (a failed check, a missing required field, an unknown reference) or 409 (a duplicate,
 or deleting a row others still use, e.g. a category with products).
@@ -45,7 +53,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import selectinload
 
-from app import storage
+from app import catalog_pdf, inventory, storage
 from app.auth import require_user
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
@@ -555,11 +563,14 @@ RESOURCES: dict[str, Resource] = {
         Product,
         {"woocommerce_id": integer, "slug": text, "sku": text, "barcode": text, "name": localized,
          "description": localized, "category_id": reference, "brand_id": reference, "list_price": money,
-         "sort_order": integer, "is_active": boolean, "legacy_path": text, "images": images},
+         "low_stock_threshold": integer, "sort_order": integer, "is_active": boolean, "legacy_path": text,
+         "images": images},
         (Product.sort_order, Product.id),
         options=(selectinload(Product.images),),
         orderable=True,
         create_defaults=new_row_defaults(Product, "product", english_name),
+        # The units on hand change only through a stock movement (POST /products/<id>/stock).
+        read_only=("stock_quantity",),
     ),
     "price-rules": Resource(
         PriceRule,
@@ -756,6 +767,65 @@ def require_staff() -> None:
     require_user("staff")
 
 
+# The resources whose rows the PDF catalog shows: a change to one rebuilds it.
+CATALOG_RESOURCES = frozenset({"products", "categories", "brands"})
+
+
+@bp.after_request
+def rebuild_catalog_after_change(response: Response) -> Response:
+    """Asks for a rebuild of the PDF catalog after a successful change to what it shows: the products, categories
+    and brands, and the contact details of its back page (settings contact_*). The rebuild runs in the background
+    and is skipped when the catalog would come out the same (app.catalog_pdf.request_rebuild).
+
+    Args:
+        response: The response about to be sent.
+
+    Returns:
+        The same response.
+    """
+    args = request.view_args or {}
+    resource = args.get("resource")
+    shown = resource in CATALOG_RESOURCES or (resource == "settings" and str(args.get("key", "")).startswith("contact_"))
+    if shown and request.method != "GET" and response.status_code < 300:
+        catalog_pdf.request_rebuild()
+    return response
+
+
+@bp.get("/catalog-pdf")
+def get_catalog_pdf() -> dict[str, Any]:
+    """The PDF catalog's layout options, the last build's status and the current files (the "PDF catalog" dialog).
+
+    Returns:
+        {"options", "status", "urls"} (see app.catalog_pdf.catalog_state).
+    """
+    return catalog_pdf.catalog_state()
+
+
+@bp.post("/catalog-pdf")
+def generate_catalog_pdf() -> tuple[dict[str, Any], int]:
+    """Saves the layout options and builds the PDF catalog now, in the background.
+
+    The JSON body is {"options": {...}}: any of perPage (1-12), categoryPages, showBrand, showSku, showBarcode,
+    autoRebuild (booleans); options left out keep their stored value.
+
+    Returns:
+        The state with status "building" and 202 (the dialog polls GET /catalog-pdf). Errors: 400 {"error":
+        "invalid_body"} for a body without an options object; 400 {"error": "invalid", "field"} for a bad option.
+    """
+    data = request.get_json()
+    if not isinstance(data, dict) or not isinstance(data.get("options"), dict):
+        fail(400, error="invalid_body")
+    try:
+        options = catalog_pdf.clean_options(catalog_pdf.stored_options() | data["options"])
+    except ValueError as error:
+        fail(400, error="invalid", field=str(error))
+    catalog_pdf.put_setting(catalog_pdf.OPTIONS_KEY, options)
+    catalog_pdf.mark_building()
+    db.session.commit()
+    catalog_pdf.request_rebuild(force=True)
+    return catalog_pdf.catalog_state(), 202
+
+
 @bp.get(f"/{RESOURCE_PATH}")
 def list_rows(resource: str) -> list[dict[str, Any]]:
     """Every row of a resource, active or not, in display order.
@@ -939,6 +1009,70 @@ def reorder_rows(resource: str) -> list[dict[str, Any]]:
         rows[key].sort_order = position
     commit()
     return [row_json(spec, rows[key]) for key in ids]
+
+
+@bp.get("/products/<uuid:product_id>/stock")
+def product_stock(product_id: uuid.UUID) -> dict[str, Any]:
+    """A product's stock for the Stock dialog of the staff panel.
+
+    Args:
+        product_id: The product.
+
+    Returns:
+        The stock (see inventory.product_stock_json); 404 when the product does not exist.
+    """
+    product = db.session.get(Product, product_id)
+    if product is None:
+        abort(404)
+    return inventory.product_stock_json(product)
+
+
+@bp.post("/products/<uuid:product_id>/stock")
+def record_stock(product_id: uuid.UUID) -> tuple[dict[str, Any], int]:
+    """Records a stock movement of a product, signed by the staff member, and updates its units on hand.
+
+    The JSON body is {"kind", "quantity", "note"?}: `kind` one of inventory.MOVEMENT_KINDS, `quantity` a whole number
+    (the units in or out; the counted units for a "count", which may be 0), `note` optional text (blank = none).
+
+    Args:
+        product_id: The product.
+
+    Returns:
+        The product's stock after it (see inventory.product_stock_json) with 201. Errors: 404 for an unknown product;
+        400 {"error": "invalid_body"} for a body that is not an object; 400 {"error": "unknown_field", "field"};
+        400 {"error": "invalid" | "required", "field": "kind" | "quantity" | "note"}; 400 {"error": "untracked"} for
+        anything but a count on a product whose stock is not tracked yet; 400 {"error": "insufficient_stock"} for
+        removing more units than are on hand.
+    """
+    data = request.get_json()
+    if not isinstance(data, dict):
+        fail(400, error="invalid_body")
+    unknown = next((key for key in data if key not in ("kind", "quantity", "note")), None)
+    if unknown is not None:
+        fail(400, error="unknown_field", field=unknown)
+    kind = data.get("kind")
+    if kind not in inventory.MOVEMENT_KINDS:
+        fail(400, error="invalid" if kind is not None else "required", field="kind")
+    values: dict[str, Any] = {}
+    for key, converter in (("quantity", integer), ("note", text)):
+        try:
+            values[key] = converter(data.get(key))
+        except Invalid:
+            fail(400, error="invalid", field=key)
+    if values["quantity"] is None:
+        fail(400, error="required", field="quantity")
+    note = (values["note"] or "").strip() or None
+    try:
+        product = inventory.record_movement(product_id, kind, values["quantity"], note, current_user.id)
+    except inventory.StockError as error:
+        db.session.rollback()
+        if error.code == "invalid_quantity":
+            fail(400, error="invalid", field="quantity")
+        fail(400, error=error.code)
+    if product is None:
+        abort(404)
+    commit()
+    return inventory.product_stock_json(product), 201
 
 
 # Uploads (the S3 stub, app/storage.py), each stored as `<folder>/<UTC timestamp>_<uuid>.<ext>`: the folders staff
