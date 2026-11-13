@@ -671,7 +671,12 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Product pages (`/products/$slug`, `routes/products.$slug.tsx`; `ProductGallery`, `RichText`): the old store's
       anatomy (breadcrumbs, gallery, details, shipping/returns notes, the sanitized description, "You may also like"),
       the customer's price when signed in, Product + Breadcrumb JSON-LD, in the sitemap; every catalog card links to one
-- [ ] Pages: brand, category, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
+- [x] Brand pages (`/brands/$slug`, `routes/brands.$slug.tsx`): built like the product page (breadcrumbs, the logo panel
+      in the gallery's place, tagline, name, description (plain text, `brands.description`, seeded from the legacy CMS
+      export), product count, the brand's categories as links into `/catalog?brand=&category=`, "View all N products"),
+      its first 8 products as `CatalogCard`s (`fetchProducts(..., pageSize)`), the other brands' `BrandCard`s, Brand +
+      Breadcrumb JSON-LD, in the sitemap
+- [ ] Pages: category, legal; per-route SEO head tags (use `pageHead()` from `seo.ts`)
 
 **Phase 2 — Backend**
 - [x] compose (Postgres + Flask); the schema (`create-tables.sql` / `drop-tables.sql`, 20 tables: users with staff and

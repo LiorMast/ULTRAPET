@@ -392,6 +392,15 @@ export const he = {
     wholesale: 'מכירה סיטונאית בלבד: לחנויות, לרשתות ולמפיצים.',
     related: 'אולי תאהבו גם',
   },
+  brandPage: {
+    brands: 'מותגים',
+    products: 'מוצרים',
+    categories: 'קטגוריות',
+    viewAll: 'לכל {n} המוצרים',
+    viewAllShort: 'לכל המוצרים',
+    productsTitle: 'המוצרים של {brand}',
+    otherBrands: 'מותגים נוספים',
+  },
   pagination: {
     label: 'עמודים',
     previous: 'לעמוד הקודם',

@@ -125,6 +125,7 @@ def seed_database() -> dict[str, int]:
             slug=item["slug"],
             name=item["name"],
             tagline=item.get("tagline"),
+            description=item.get("description"),
             accent_color=item.get("accent"),
             sort_order=order,
             is_active=item.get("active", True),

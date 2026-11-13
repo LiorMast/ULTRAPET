@@ -5,7 +5,8 @@
  *
  * Route files call pageHead() from their `head` option; <HeadContent /> in routes/__root.tsx renders
  * the tags, and the deepest route wins for the title and each meta name. The JSON-LD builders here are
- * shared by the article pages (Organization, BreadcrumbList) and the home page (FAQPage). sitemap.xml is built by the backend.
+ * shared by the article pages (Organization, BreadcrumbList) and the home page (FAQPage); metaDescription() shortens a
+ * page's text for the product and brand pages. sitemap.xml is built by the backend.
  */
 import type { JSX } from 'react'
 import { DEFAULT_LOCALE, dictionaryFor, ENABLED_LOCALES, LOCALES, localizePath, type Locale } from '@/i18n'
@@ -24,6 +25,22 @@ export const SITE_URL = __SITE_URL__
  */
 export function absoluteUrl(path: string) {
   return new URL(path, SITE_URL).href
+}
+
+/** The longest meta description, in characters (search engines cut the rest). */
+const META_DESCRIPTION_LENGTH = 160
+
+/**
+ * Turns a page's text into its meta description: cut at a word boundary, with an ellipsis, when it is too long.
+ * Used by the product and brand pages.
+ * @param text - The plain text (no HTML), whitespace already collapsed.
+ * @returns The description, or undefined for an empty text (pageHead then uses the site description).
+ */
+export function metaDescription(text: string) {
+  if (!text) return undefined
+  if (text.length <= META_DESCRIPTION_LENGTH) return text
+  const cut = text.slice(0, META_DESCRIPTION_LENGTH - 1)
+  return `${cut.slice(0, cut.lastIndexOf(' ') > 0 ? cut.lastIndexOf(' ') : cut.length)}…`
 }
 
 /** One JSON-LD object (schema.org). */

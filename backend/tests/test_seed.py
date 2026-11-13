@@ -85,6 +85,10 @@ def test_seed_loads_the_stub_data(database, monkeypatch):
     # Brands found only in product names stay off the public site until the owner confirms them.
     assert database.scalar(select(Brand).where(Brand.slug == "yagu")).is_active is False
     assert database.scalar(select(func.count()).select_from(Brand).where(Brand.is_active)) == 6
+    # The shown brands have a description for their brand page (from the legacy CMS export); the others have none.
+    jr_farm = database.scalar(select(Brand).where(Brand.slug == "jr-farm"))
+    assert jr_farm.description["en"].startswith("Europe's leading brand")
+    assert database.scalar(select(func.count()).select_from(Brand).where(Brand.description.is_not(None))) == 6
 
     article = database.scalar(select(Article).where(Article.slug == "living-with-a-cat"))
     assert article.published_at.isoformat() == "2024-03-17T10:35:25+00:00"

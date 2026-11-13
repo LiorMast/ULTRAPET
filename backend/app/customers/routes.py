@@ -616,7 +616,7 @@ def catalog_pdf() -> Response:
 
 @bp.get("/sitemap.xml")
 def sitemap() -> Response:
-    """The sitemap for search engines: every public page, published article and product page in each language, with hreflang
+    """The sitemap for search engines: every public page, active brand page, published article and product page in each language, with hreflang
     alternates. Served at /sitemap.xml (the Vite dev proxy, and the production server, forward it here).
 
     Returns:
@@ -632,8 +632,10 @@ def sitemap() -> Response:
         .where(Product.is_active, Category.is_active)
         .order_by(Category.sort_order, Product.sort_order, Product.id)
     )
+    brands = db.session.execute(select(Brand.slug, Brand.updated_at).where(Brand.is_active).order_by(Brand.sort_order, Brand.name))
     pages = (
         [(page, None) for page in SITEMAP_PAGES]
+        + [(f"/brands/{slug}", updated_at.astimezone(ISRAEL).date().isoformat()) for slug, updated_at in brands]
         + [(f"/articles/{slug}", updated_at.astimezone(ISRAEL).date().isoformat()) for slug, updated_at in articles]
         # Product slugs keep the old store's Hebrew words: percent-encoded, as a URL in a sitemap must be.
         + [(f"/products/{quote(slug)}", updated_at.astimezone(ISRAEL).date().isoformat()) for slug, updated_at in products]

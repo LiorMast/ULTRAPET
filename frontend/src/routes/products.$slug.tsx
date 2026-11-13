@@ -27,10 +27,7 @@ import { QuantityStepper } from '@/components/QuantityStepper'
 import { RichText } from '@/components/RichText'
 import { localized } from '@/config'
 import { dictionaryFor, localizePath, useI18n, type Locale } from '@/i18n'
-import { absoluteUrl, breadcrumbJsonLd, pageHead } from '@/seo'
-
-/** The longest meta description, in characters (search engines cut the rest). */
-const META_DESCRIPTION_LENGTH = 160
+import { absoluteUrl, breadcrumbJsonLd, metaDescription, pageHead } from '@/seo'
 
 export const Route = createFileRoute('/products/$slug')({
   loader: ({ params, abortController }) => fetchProduct(params.slug, abortController.signal).catch(rethrowNotFound),
@@ -46,7 +43,7 @@ export const Route = createFileRoute('/products/$slug')({
       locale,
       path,
       title: name,
-      description: text ? shorten(text, META_DESCRIPTION_LENGTH) : undefined,
+      description: metaDescription(text),
       image: product.images[0]?.src,
       jsonLd: [
         {
@@ -107,18 +104,6 @@ function plainText(html: string) {
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-/**
- * Cuts a text to a length at a word boundary, with an ellipsis.
- * @param text - The text.
- * @param max - The most characters, the ellipsis included.
- * @returns The text, or its start + "…".
- */
-function shorten(text: string, max: number) {
-  if (text.length <= max) return text
-  const cut = text.slice(0, max - 1)
-  return `${cut.slice(0, cut.lastIndexOf(' ') > 0 ? cut.lastIndexOf(' ') : cut.length)}…`
 }
 
 /**

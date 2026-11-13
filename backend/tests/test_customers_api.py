@@ -463,6 +463,15 @@ def test_the_sitemap_lists_the_visible_product_pages(client, catalog, database):
     assert "old-salmon" not in xml and "hidden-salmon" not in xml
 
 
+def test_the_sitemap_lists_the_active_brand_pages(client, database):
+    database.add_all([Brand(slug="jr-farm", name="JR Farm"), Brand(slug="yagu", name="YAGU", is_active=False)])
+    database.commit()
+    xml = client.get("/api/sitemap.xml").get_data(as_text=True)
+    assert "<loc>https://www.ultrapet.co.il/brands/jr-farm</loc>" in xml
+    assert "<loc>https://www.ultrapet.co.il/en/brands/jr-farm</loc>" in xml
+    assert "yagu" not in xml
+
+
 def test_the_catalog_pdf_redirects_to_the_stored_file(client, database):
     assert client.get("/api/catalog.pdf").status_code == 404
     database.add(Setting(key="catalog_pdf", value="catalog/ultrapetcatalog.pdf"))

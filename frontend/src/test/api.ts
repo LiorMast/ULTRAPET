@@ -891,7 +891,7 @@ async function productDetail(slug: string): Promise<ProductDetail | null> {
  * @returns The API brand.
  */
 function brandJson({ active: _active, ...brand }: (typeof brands)[number]): Brand {
-  return { ...brand, description: null, logoUrl: null }
+  return { ...brand, logoUrl: null }
 }
 
 /** The articles, newest first (the server's order). */

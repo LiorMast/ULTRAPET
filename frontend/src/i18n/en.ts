@@ -386,6 +386,15 @@ export const en: Dictionary = {
     wholesale: 'Wholesale only: for pet stores, retail chains and distributors.',
     related: 'You may also like',
   },
+  brandPage: {
+    brands: 'Brands',
+    products: 'Products',
+    categories: 'Categories',
+    viewAll: 'View all {n} products',
+    viewAllShort: 'View all products',
+    productsTitle: 'Products of {brand}',
+    otherBrands: 'More brands',
+  },
   pagination: {
     label: 'Pages',
     previous: 'Previous page',

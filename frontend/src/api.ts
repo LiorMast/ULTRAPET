@@ -382,9 +382,10 @@ export const fetchCategories = (signal?: AbortSignal) => apiFetch<ProductCategor
  * @param search - The catalog URL state (category, brands, search text, sort, price range, page).
  * @param locale - The page's language, whose names the name sorts compare; omit for Hebrew.
  * @param signal - Aborts the request (a newer search replaces it).
+ * @param pageSize - Products per page (1-100); omit for the server's 24 (the catalog). A brand page asks for a few.
  * @returns The page of products with its totals and filter counts.
  */
-export function fetchProducts({ category, q, page, sort, brand, min, max }: CatalogSearch, locale?: Locale, signal?: AbortSignal) {
+export function fetchProducts({ category, q, page, sort, brand, min, max }: CatalogSearch, locale?: Locale, signal?: AbortSignal, pageSize?: number) {
   const params = new URLSearchParams()
   if (category) params.set('category', category)
   if (brand) params.set('brand', brand)
@@ -394,6 +395,7 @@ export function fetchProducts({ category, q, page, sort, brand, min, max }: Cata
   if (min !== undefined) params.set('min', String(min))
   if (max !== undefined) params.set('max', String(max))
   if (page && page > 1) params.set('page', String(page))
+  if (pageSize) params.set('pageSize', String(pageSize))
   const query = params.toString()
   return apiFetch<ProductPage>(`/api/products${query ? `?${query}` : ''}`, { signal })
 }

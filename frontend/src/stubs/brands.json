@@ -3,6 +3,7 @@
   "slug": "ultra-pet",
   "name": "Ultra Pet",
   "accent": "#BE1E24",
+  "description": { "he": "המותג המוביל שלנו המספק תזונה מלאה ומאוזנת לכלבים וחתולים בכל שלבי החיים.", "en": "Our flagship brand delivering complete and balanced nutrition for dogs and cats at every life stage." },
   "tagline": { "he": "תזונה פרמיום מלאה", "en": "Premium Complete Nutrition" },
   "active": true
  },
@@ -10,6 +11,7 @@
   "slug": "internutri",
   "name": "Internutri",
   "accent": "#1C4E80",
+  "description": { "he": "פורמולות תזונה וטרינרית שפותחו בשיתוף עם מדענים אירופאים מובילים לתוצאות קליניות מיטביות.", "en": "Veterinary-grade nutritional formulas developed in collaboration with leading European nutrition scientists for optimal clinical outcomes." },
   "tagline": { "he": "פורמולות מדעיות", "en": "Science-Based Formulas" },
   "active": true
  },
@@ -17,6 +19,7 @@
   "slug": "greenheart",
   "name": "Greenheart Premiums",
   "accent": "#2D6A4F",
+  "description": { "he": "מתכונים טבעיים פרמיום עם מרכיבים שמקורם בחקלאות אורגנית מאושרת באירופה.", "en": "Premium natural recipes crafted with sustainably sourced ingredients from certified organic European farms." },
   "tagline": { "he": "טבעי ואורגני", "en": "Natural & Organic" },
   "active": true
  },
@@ -24,6 +27,7 @@
   "slug": "paw",
   "name": "Paw",
   "accent": "#C97D30",
+  "description": { "he": "תזונה איכותית נגישה העונה על הצרכים היומיומיים של כל בית עם חיות מחמד, ללא פשרות על מרכיבים.", "en": "Accessible quality nutrition meeting the daily needs of every pet household, without compromise on ingredients." },
   "tagline": { "he": "מצוינות יומיומית", "en": "Everyday Excellence" },
   "active": true
  },
@@ -31,6 +35,7 @@
   "slug": "jr-farm",
   "name": "JR Farm",
   "accent": "#4A7C42",
+  "description": { "he": "המותג המוביל באירופה לארנבות, חזירי ים, אוגרים, ציפורים וחיות קטנות.", "en": "Europe's leading brand for rabbits, guinea pigs, hamsters, birds and small pets — loved by specialists and hobbyists alike." },
   "tagline": { "he": "מומחי בעלי חיים קטנים", "en": "Small Animal Specialists" },
   "active": true
  },
@@ -38,6 +43,7 @@
   "slug": "ultra-clean",
   "name": "Ultra Clean",
   "accent": "#4A4A6A",
+  "description": { "he": "פתרונות חול מתקדמים עם טכנולוגיית בקרת ריחות מעולה לבית נקי יותר.", "en": "Advanced clumping and non-clumping litter solutions with superior odor-control technology for a cleaner home." },
   "tagline": { "he": "היגיינת חתולים פרמיום", "en": "Premium Cat Hygiene" },
   "active": true
  },
@@ -45,6 +51,7 @@
   "slug": "lino",
   "name": "LINO",
   "accent": "#3D5A80",
+  "description": null,
   "tagline": { "he": "רתמות וקולרים מעוצבים", "en": "Designer Harnesses & Collars" },
   "active": false
  },
@@ -52,6 +59,7 @@
   "slug": "yagu",
   "name": "YAGU",
   "accent": "#6B4F3A",
+  "description": null,
   "tagline": { "he": "מיטות ובתים לחיות מחמד", "en": "Pet Beds & Houses" },
   "active": false
  },
@@ -59,6 +67,7 @@
   "slug": "pet-fan",
   "name": "Pet Fan",
   "accent": "#5A7D9A",
+  "description": null,
   "tagline": { "he": "חול מתגבש בניחוחות", "en": "Scented Clumping Litter" },
   "active": false
  },
@@ -66,6 +75,7 @@
   "slug": "lizi",
   "name": "Lizi",
   "accent": "#A0522D",
+  "description": null,
   "tagline": { "he": "שימורים לחתולים", "en": "Wet Food for Cats" },
   "active": false
  },
@@ -73,6 +83,7 @@
   "slug": "specialcan",
   "name": "Specialcan",
   "accent": "#2E6F6F",
+  "description": null,
   "tagline": { "he": "טיפוח והיגיינה", "en": "Grooming & Hygiene" },
   "active": false
  },
@@ -80,6 +91,7 @@
   "slug": "petpall",
   "name": "Petpall",
   "accent": "#5C5C7A",
+  "description": null,
   "tagline": { "he": "כלי טיפוח", "en": "Grooming Tools" },
   "active": false
  }
