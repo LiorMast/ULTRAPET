@@ -454,7 +454,8 @@ html:lang(he) {
 
 /*
  * Admin data tables (DataTable.tsx): the DataTables default look (datatables.net-dt, loaded with the admin pages)
- * restyled to the brand. Every rule starts with the component's `.data-table` wrapper so it outranks the
+ * restyled to the brand: a rounded frame, sentence-case column titles on a light grey band, rounded search and length
+ * fields, pill page buttons. Every rule starts with the component's `.data-table` wrapper so it outranks the
  * library's stylesheet, which loads later. Logical properties only, so Hebrew pages mirror.
  */
 .data-table div.dt-container {
@@ -491,19 +492,24 @@ html:lang(he) {
 .data-table div.dt-container .dt-info {
   color: var(--color-brand-charcoal-muted);
 }
+/* A rounded frame: separate borders (a collapsed table cannot round its corners), clipped by the table itself, which is
+   as wide as its content, so the sideways scroll of a wide table still works. */
 .data-table table.dataTable {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
 }
 .data-table table.dataTable > thead > tr > th,
 .data-table table.dataTable > thead > tr > td {
-  border-bottom: 1px solid var(--color-brand-charcoal);
+  border-bottom: 1px solid var(--color-neutral-200);
+  background: var(--color-neutral-50);
   padding: 0.75rem 1rem;
   text-align: start;
   font-family: var(--font-heading);
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: var(--tracking-widest);
-  text-transform: uppercase;
   color: var(--color-brand-charcoal-muted);
   white-space: nowrap;
 }
@@ -519,6 +525,9 @@ html:lang(he) {
 .data-table table.dataTable > thead > tr > th:focus-visible {
   outline: 2px solid var(--color-brand-red);
   outline-offset: -2px;
+}
+.data-table table.dataTable > tbody > tr:first-child > td {
+  border-top: 0;
 }
 .data-table table.dataTable > tbody > tr > td {
   border-top: 1px solid var(--color-neutral-150);

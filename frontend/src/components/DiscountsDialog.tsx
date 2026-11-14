@@ -13,7 +13,6 @@
  * shows them in the table, and discountsAction is the row's "Discounts" button that opens this dialog.
  */
 import { useId, useRef, useState } from 'react'
-import { Pencil, Percent, Plus, Trash2 } from 'lucide-react'
 import { ApiError, type StaffPriceRule } from '@/api'
 import type { RowAction } from '@/components/DataTable'
 import { ALL_PRODUCTS, DiscountDialog, describeDiscount, formatValue, israelNow, israelTime, scopeTarget, type DiscountValue, type RuleScope } from '@/components/DiscountDialog'
@@ -189,7 +188,6 @@ export function discountsAction<Row extends { discounts: StaffPriceRule[] }>(
     name: 'discounts',
     label: t.admin.discounts.button,
     rowLabel: (name) => t.admin.discounts.buttonRow.replace('{name}', name),
-    icon: <Percent aria-hidden />,
     dialog: (row, props) => (
       <DiscountsDialog
         target={handlers.target(row)}
@@ -339,7 +337,6 @@ export function DiscountsDialog({
                         {/* A fixed price is not a discount DiscountDialog edits: it can only be deleted here. */}
                         {rule.kind !== 'fixed_price' && (
                           <Button id={`${id}-edit-${rule.id}`} variant="ghost" size="xs" aria-label={d.editRule.replace('{discount}', text)} onClick={() => openEditor(rule)}>
-                            <Pencil aria-hidden />
                             {t.admin.edit}
                           </Button>
                         )}
@@ -353,7 +350,6 @@ export function DiscountsDialog({
                             setConfirming(rule.id)
                           }}
                         >
-                          <Trash2 aria-hidden />
                           {t.admin.delete}
                         </Button>
                       </span>
@@ -374,7 +370,6 @@ export function DiscountsDialog({
             {t.admin.close}
           </Button>
           <Button ref={addButton} size="sm" onClick={() => openEditor()}>
-            <Plus aria-hidden />
             {d.add}
           </Button>
         </DialogFooter>

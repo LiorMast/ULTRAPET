@@ -13,7 +13,7 @@ import { useEffect, useRef } from 'react'
 import { createFileRoute, Link, Outlet, useRouter } from '@tanstack/react-router'
 import { fetchSession, type User } from '@/api'
 import { useAuth } from '@/auth'
-import { LoginForm } from '@/components/LoginForm'
+import { LoginCard, LoginForm } from '@/components/LoginForm'
 import { ADMIN_NAV } from '@/config'
 import { dictionaryFor, useI18n } from '@/i18n'
 
@@ -53,11 +53,9 @@ function AdminLayout() {
 
   if (!staff) {
     return (
-      <section className="mx-auto max-w-md px-6 py-24 lg:px-10">
-        <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.signInTitle}</h1>
-        <p className="mb-8 mt-2 text-sm text-brand-charcoal-muted">{t.admin.signInSubtitle}</p>
+      <LoginCard title={t.admin.signInTitle} subtitle={t.admin.signInSubtitle}>
         <LoginForm idPrefix="staff" />
-      </section>
+      </LoginCard>
     )
   }
   if (!loaded) return null
@@ -65,12 +63,12 @@ function AdminLayout() {
     <div className="mx-auto max-w-screen-2xl px-4 py-10 sm:px-6 lg:px-10">
       <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-150 pb-4">
         <nav aria-label={t.admin.navLabel}>
-          <ul className="flex flex-wrap gap-6">
+          <ul className="flex flex-wrap gap-1">
             {ADMIN_NAV.map(({ id, link, label }) => (
               <li key={id}>
                 <Link
                   {...link}
-                  className="font-heading text-xs font-semibold uppercase tracking-widest text-brand-charcoal-muted transition-colors hover:text-brand-charcoal aria-[current=page]:text-brand-red"
+                  className="block rounded-full px-3.5 py-2 font-heading text-sm font-medium text-neutral-700 outline-none transition-[color,background-color] duration-300 hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red aria-[current=page]:bg-brand-red-muted aria-[current=page]:text-brand-red-dark"
                 >
                   {label(t)}
                 </Link>

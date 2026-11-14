@@ -14,7 +14,6 @@
  * same ones customers see on the catalog.
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
-import { Boxes } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type ProductStock, type StockMovement, type StockMovementInput, type StockMovementKind, type StockStatus } from '@/api'
 import type { RowAction } from '@/components/DataTable'
@@ -107,7 +106,6 @@ export function stockAction<Row>(
     name: 'stock',
     label: t.admin.stock.button,
     rowLabel: (name) => t.admin.stock.buttonRow.replace('{name}', name),
-    icon: <Boxes aria-hidden />,
     dialog: (row, props) => (
       <StockDialog
         target={handlers.target(row)}

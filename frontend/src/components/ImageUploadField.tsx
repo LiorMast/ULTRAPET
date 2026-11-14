@@ -11,7 +11,6 @@
  * caller gives the group label (a <fieldset> legend), the hint and the form errors, like with SearchableField.
  */
 import { useEffect, useId, useRef, useState, type ChangeEvent, type ComponentProps } from 'react'
-import { ImageIcon, Trash2, Upload } from 'lucide-react'
 import { ApiError, uploadImage, type UploadFolder } from '@/api'
 import { Button } from '@/components/ui/button'
 import type { Dictionary } from '@/i18n/he'
@@ -133,14 +132,11 @@ export function ImageUploadField({
   return (
     <div className={className}>
       <div className="mt-2 flex flex-wrap items-center gap-4">
-        <div className="flex aspect-[4/3] w-40 shrink-0 items-center justify-center overflow-hidden border border-neutral-300 bg-neutral-50">
+        <div className="flex aspect-[4/3] w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100">
           {value ? (
             <img src={value} alt={t.admin.upload.preview} width={160} height={120} className="size-full object-cover" />
           ) : (
-            <span className="flex flex-col items-center gap-2 text-xs text-brand-charcoal-muted">
-              <ImageIcon aria-hidden className="size-8" strokeWidth={1.25} />
-              {t.admin.upload.none}
-            </span>
+            <span className="px-3 text-center text-xs text-brand-charcoal-muted">{t.admin.upload.none}</span>
           )}
         </div>
         <div className="flex flex-col items-start gap-2">
@@ -156,12 +152,10 @@ export function ImageUploadField({
             aria-describedby={[describedBy, problem && problemId].filter(Boolean).join(' ') || undefined}
             onClick={() => fileInput.current?.click()}
           >
-            <Upload aria-hidden />
             {value ? t.admin.upload.replace : t.admin.upload.choose}
           </Button>
           {value && (
             <Button type="button" variant="ghost" size="sm" disabled={disabled || busy} onClick={handleRemove}>
-              <Trash2 aria-hidden />
               {t.admin.upload.remove}
             </Button>
           )}

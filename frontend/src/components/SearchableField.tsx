@@ -280,10 +280,10 @@ export function SearchableField({
           // A click on the input itself, or focus leaving it (onBlur settles), is not "outside".
           if (event.type === 'dismissableLayer.focusOutside' || wrapper.current?.contains(event.target as Node)) event.preventDefault()
         }}
-        className="z-50 w-(--radix-popover-trigger-width) min-w-48 max-w-[calc(100vw-2rem)] bg-white text-brand-charcoal shadow-premium ring-1 ring-foreground/10 outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+        className="z-50 w-(--radix-popover-trigger-width) min-w-48 max-w-[calc(100vw-2rem)] rounded-2xl bg-white p-1.5 text-brand-charcoal shadow-premium ring-1 ring-black/5 outline-none duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
       >
         {results.length > 0 && (
-          <div id={listId} role="listbox" aria-label={label} className="max-h-64 overflow-y-auto py-1">
+          <div id={listId} role="listbox" aria-label={label} className="max-h-64 overflow-y-auto">
             {results.map((option, index) => (
               <div
                 key={option.value}
@@ -294,7 +294,7 @@ export function SearchableField({
                 onPointerMove={() => index !== activeIndex && setActive(index)}
                 onClick={() => choose(option)}
                 className={cn(
-                  'flex cursor-pointer items-start gap-2 px-4 py-2.5 text-sm transition-colors',
+                  'flex cursor-pointer items-start gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors',
                   index === activeIndex && 'bg-brand-red-muted',
                 )}
               >

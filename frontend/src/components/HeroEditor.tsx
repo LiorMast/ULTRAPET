@@ -8,7 +8,6 @@
  * stores it in page_sections through the staff API); a refusal is shown above the buttons.
  */
 import { useId, useRef, useState, type FormEvent } from 'react'
-import { Pencil } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type FontKey, type HeroContent, type SectionText, type SizeStep } from '@/api'
 import { resolveHero } from '@/components/Hero'
@@ -97,7 +96,6 @@ export function HeroEditor({ content, onSave }: { content: HeroContent | null; o
   return (
     <>
       <Button ref={button} size="sm" onClick={() => setOpen(true)}>
-        <Pencil size={14} aria-hidden="true" />
         {t.hero.edit.button}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>

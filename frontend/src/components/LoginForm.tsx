@@ -7,8 +7,11 @@
  * shows "wrong email or password" (or a retry message when the server cannot be reached); a caller can pass
  * `onSubmit` to handle the values instead, or `signIn` to sign in somewhere else with the same error handling
  * (the /admin staff sign-in).
+ *
+ * Also exports LoginCard, the rounded card a sign-in page centers its title, subtitle and form in (the /login page and
+ * the /admin staff sign-in), so both pages look the same.
  */
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError } from '@/api'
 import { useAuth, type Credentials } from '@/auth'
 import { PasswordInput } from '@/components/PasswordInput'
@@ -20,6 +23,25 @@ import { useToast } from '@/toast'
 /** The values the form submits. */
 export type LoginValues = Credentials
 
+
+/**
+ * The centered card of a sign-in page: a rounded white card with the page's title (its <h1>), a subtitle and the form.
+ * @param props.title - The page's heading.
+ * @param props.subtitle - The line under it.
+ * @param props.children - The form (or the account panel once signed in).
+ * @returns The page section with the card.
+ */
+export function LoginCard({ title, subtitle, children }: { title: ReactNode; subtitle: ReactNode; children: ReactNode }) {
+  return (
+    <section className="mx-auto max-w-md px-4 py-16 sm:px-6 lg:py-24">
+      <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-soft sm:p-10">
+        <h1 className="font-display text-3xl font-bold text-brand-charcoal">{title}</h1>
+        <p className="mb-8 mt-2 text-sm text-brand-charcoal-muted">{subtitle}</p>
+        {children}
+      </div>
+    </section>
+  )
+}
 
 /**
  * The login form.

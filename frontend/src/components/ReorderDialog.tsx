@@ -267,7 +267,7 @@ function SortableEntry({ item, position, first, last, onMove }: { item: ReorderI
       ref={setNodeRef}
       style={style}
       className={cn(
-        'relative flex items-center gap-3 border border-neutral-150 bg-white py-2 pe-2 ps-1 transition-[box-shadow,scale]',
+        'relative flex items-center gap-3 rounded-xl border border-neutral-200 bg-white py-2 pe-2 ps-1 transition-[box-shadow,scale] duration-300',
         isDragging && 'z-10 scale-[1.02] shadow-premium',
       )}
     >

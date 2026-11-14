@@ -57,7 +57,7 @@ frontend/
                         (admin.products / admin.categories also manage their discounts through DiscountsDialog;
                         admin.discounts = every price rule in one table, general or for one customer;
                         admin.customers = the business customers' accounts + each one's own discounts)
-    components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
+    components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm (+ LoginCard, the sign-in pages' card), Logo,
                         Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, TextLink (the secondary text link: sentence case,
                         sweeping underline, no arrow; `link` or `href`, textLinkVariants for a button), InlineEditor,
                         CatalogCard (links to its product page; PriceSlot, priceFor, stockFor), ProductGallery, RichText
@@ -313,7 +313,7 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   page = a route `admin.<resource>.tsx` whose loader calls `fetchStaffRows` and a `DataColumn[]` config (key = the
   staff API's camelCase field, `type`, `required`, `pattern`, `ltr`, `inTable`/`inForm`). The same config drives the
   cells, sorting/search and the generated edit form; editing is our Radix dialog (not the paid DataTables Editor);
-  omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons that open its dialog
+  omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons (text-only pills like Edit / Delete: no icons) that open its dialog
   (e.g. "Discounts"); `formDialog` replaces the column-driven form for Add and Edit with the page's own dialog (it
   gets the row and `FormDialogProps`: `onSave` goes through `onCreate`/`onUpdate`), and `canEdit(row)` hides Edit on
   rows that form cannot edit (the Discounts page: DiscountDialog with `scope`, Edit hidden on fixed prices); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
