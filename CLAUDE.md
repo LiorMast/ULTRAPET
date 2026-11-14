@@ -523,8 +523,10 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   and to axe.
 - **Type**: Inter with optical sizing (`opsz`); sizes from `text-xl` up carry size-specific negative tracking
   (`--text-*--letter-spacing`, milder in Hebrew); `tracking-display` for the hero headline; headings balance.
-- **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,
-  short language label "EN"/"עב"); English menu labels use 0.1em tracking (not `tracking-widest`) so they fit; the header row spans the full window (logo at the start edge; the business customers' cart icon, language and login at the end edge; the menu centered). Re-run the e2e overflow test
+- **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (2px gaps between
+  the entries' pills, short language label "EN"/"עב"). Menu entries (`NAV_TEXT` in NavText.tsx) are sentence-case
+  pills: grey background on hover / while a dropdown is open, light brand red on the active page (no underline); the
+  account buttons are text-only outlined pills; the header row spans the full window (logo at the start edge; the business customers' cart icon, language and login at the end edge; the menu centered). Re-run the e2e overflow test
   after adding menu items.
 - **Look and feel**: like Royal Canin / Purina / Hill's / Hamilton — a large international distributor, **not a pet
   shop**. Clean, minimal and premium; large typography, high-end photography, elegant animations; beautiful and

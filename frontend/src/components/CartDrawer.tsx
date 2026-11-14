@@ -11,7 +11,8 @@
  * removes the product, like its trash button; the focus then moves to the next line (or the empty state's link).
  *
  * Every add replays a short pop of the badge and a nudge of the icon (`animate-cart-pop` / `animate-cart-nudge`
- * in index.css; a fade with reduced motion). The panel lists the lines (photo, name linking to the product, unit
+ * in index.css; a fade with reduced motion). A new line fades in and settles 4px (`starting:` styles, @starting-style).
+ * The panel lists the lines (photo, name linking to the product, unit
  * price, a QuantityStepper, remove, line total), or an empty state with a link to the catalog; its footer shows
  * the subtotal before VAT and Checkout, which stays disabled until checkout exists (Phase 4).
  */
@@ -82,7 +83,7 @@ export function CartDrawer({ className }: { className?: string }) {
           {...{ [CART_TARGET_ATTR]: '' }}
           aria-label={label}
           className={cn(
-            'relative p-2 text-brand-charcoal sm:p-3 transition-[color,scale] outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.97] active:duration-100',
+            'relative rounded-full p-2 text-brand-charcoal sm:p-3 transition-[color,background-color,scale] duration-300 outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100',
             className,
           )}
         >
@@ -107,7 +108,7 @@ export function CartDrawer({ className }: { className?: string }) {
           {lines.length > 0 && (
             <>
               <div className="flex items-baseline justify-between gap-4">
-                <span className="font-heading text-xs font-semibold uppercase tracking-widest text-brand-charcoal">{t.cart.subtotal}</span>
+                <span className="font-heading text-sm font-semibold text-brand-charcoal">{t.cart.subtotal}</span>
                 <span className="text-end">
                   <span className="block font-display text-2xl font-bold text-brand-charcoal">{formatPrice(locale, subtotal)}</span>
                   <span className="text-2xs text-brand-charcoal-muted">{t.cart.exVat}</span>
@@ -129,8 +130,7 @@ export function CartDrawer({ className }: { className?: string }) {
         </ul>
       ) : (
         <div className="flex flex-col items-center gap-3 py-12 text-center">
-          <ShoppingCart size={40} aria-hidden="true" className="text-neutral-300" />
-          <p className="font-heading text-sm font-semibold text-brand-charcoal">{t.cart.empty}</p>
+          <p className="font-heading text-base font-semibold text-brand-charcoal">{t.cart.empty}</p>
           <p className="max-w-xs text-xs text-brand-charcoal-muted">{t.cart.emptyHint}</p>
           <Button asChild size="sm" className="mt-3">
             <Link to="/catalog" data-cart-empty-action onClick={() => setOpen(false)}>
@@ -160,7 +160,7 @@ function MinimumOrderBanner({ subtotal }: { subtotal: number }) {
   const Icon = reached ? CircleCheck : CircleAlert
 
   return (
-    <div className={cn('flex gap-3 p-4', reached ? 'bg-neutral-50 text-brand-charcoal' : 'bg-brand-red-muted text-brand-red-dark')}>
+    <div className={cn('flex gap-3 rounded-2xl p-4 transition-colors duration-500', reached ? 'bg-neutral-100 text-brand-charcoal' : 'bg-brand-red-muted text-brand-red-dark')}>
       <Icon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-2.5">
         <p className="text-sm font-semibold leading-snug">{message}</p>
@@ -172,9 +172,9 @@ function MinimumOrderBanner({ subtotal }: { subtotal: number }) {
             aria-valuemax={MIN_ORDER_AMOUNT}
             aria-valuenow={Math.round(subtotal)}
             aria-valuetext={`${formatPrice(locale, subtotal)} / ${minimum}`}
-            className="h-1.5 overflow-hidden bg-white"
+            className="h-1.5 overflow-hidden rounded-full bg-white"
           >
-            <div className="h-full bg-brand-red transition-[width] duration-500" style={{ width: `${(subtotal / MIN_ORDER_AMOUNT) * 100}%` }} />
+            <div className="h-full rounded-full bg-brand-red transition-[width] duration-500" style={{ width: `${(subtotal / MIN_ORDER_AMOUNT) * 100}%` }} />
           </div>
         )}
       </div>
@@ -196,8 +196,8 @@ function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNaviga
   const name = localized(line.name, locale)
 
   return (
-    <li data-cart-line={line.id} className="flex gap-4 py-4 first:pt-0">
-      <div className="size-20 shrink-0 border border-neutral-150 bg-neutral-50">
+    <li data-cart-line={line.id} className="flex gap-4 py-4 transition-[opacity,translate] duration-500 first:pt-0 starting:translate-y-1 starting:opacity-0">
+      <div className="size-20 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
         {line.image && <img src={line.image} alt="" width={80} height={80} loading="lazy" className="size-full object-contain p-1.5 mix-blend-multiply" />}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -214,7 +214,7 @@ function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNaviga
             type="button"
             aria-label={t.cart.remove.replace('{name}', name)}
             onClick={onRemove}
-            className="-me-1 shrink-0 p-1 text-neutral-500 transition-[color,scale] outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.97] active:duration-100"
+            className="-me-1.5 -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-brand-red-muted hover:text-brand-red-dark focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
           >
             <Trash2 aria-hidden="true" className="size-4" />
           </button>

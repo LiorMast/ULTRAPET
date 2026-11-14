@@ -71,18 +71,18 @@
 
   /*
    * Header text sizes (NavText's menu entries at the base / 2xl / 1920px widths, and the header's buttons:
-   * login, admin panel, language). Tokens, so Hebrew can enlarge them below: Heebo's Hebrew letters stand only
-   * 0.56em tall against Montserrat's 0.72em capitals, so the same font size would look ~30% smaller.
+   * login, admin panel, language). Tokens, so Hebrew can enlarge them a little below: Heebo's Hebrew letters
+   * stand about as tall as Inter's lowercase, but Hebrew reads better a step larger.
    * Note: `cn()` (tailwind-merge) does not know these sizes and reads text-nav* as a color, dropping it next
    * to a text-<color> class, so pass them as plain class strings, not through cn().
    */
-  --text-nav: 0.75rem;
-  --text-nav--line-height: 1rem;
-  --text-nav-lg: 0.875rem;
-  --text-nav-lg--line-height: 1.25rem;
+  --text-nav: 0.875rem;
+  --text-nav--line-height: 1.25rem;
+  --text-nav-lg: 0.9375rem;
+  --text-nav-lg--line-height: 1.375rem;
   --text-nav-xl: 1rem;
   --text-nav-xl--line-height: 1.5rem;
-  --text-nav-button: 1rem;
+  --text-nav-button: 0.9375rem;
   --text-nav-button--line-height: 1.5rem;
 
   --tracking-widest: 0.25em;
@@ -271,20 +271,20 @@ html:lang(he) {
 
 /*
  * Header text sizes follow the language of the text itself, not only the page's: the mobile language toggle
- * shows the other language's label (lang="en" on a Hebrew page, lang="he" on an English one). Hebrew is as tall
- * as the English capitals (x 0.72 / 0.56), on the same line heights, so the bar and buttons keep their height.
+ * shows the other language's label (lang="en" on a Hebrew page, lang="he" on an English one). Hebrew is one step
+ * larger, on the same line heights, so the bar and buttons keep their height.
  */
 [lang]:lang(he) {
-  --text-nav: 0.95rem;
-  --text-nav-lg: 1.125rem;
-  --text-nav-xl: 1.25rem;
-  --text-nav-button: 1.25rem;
+  --text-nav: 0.9375rem;
+  --text-nav-lg: 1rem;
+  --text-nav-xl: 1.0625rem;
+  --text-nav-button: 1rem;
 }
 [lang]:not(:lang(he)) {
-  --text-nav: 0.75rem;
-  --text-nav-lg: 0.875rem;
+  --text-nav: 0.875rem;
+  --text-nav-lg: 0.9375rem;
   --text-nav-xl: 1rem;
-  --text-nav-button: 1rem;
+  --text-nav-button: 0.9375rem;
 }
 
 /*

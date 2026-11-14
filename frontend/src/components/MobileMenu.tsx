@@ -11,7 +11,7 @@
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ChevronDown, LogOut, Menu, ShieldCheck, UserRound, X } from 'lucide-react'
+import { ChevronDown, Menu, X } from 'lucide-react'
 import { cn } from 'cn'
 import { useAuth, useSignOut } from '@/auth'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -21,13 +21,13 @@ import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger 
 import { HEADER_CTA, HEADER_LOGIN, type NavItem } from '@/config'
 import { useI18n } from '@/i18n'
 
-/** Style of the drawer's top-level entries (legacy look). */
+/** Style of the drawer's top-level entries: sentence-case rows whose grey background fades in on hover; the active page is light brand red. */
 const ENTRY_CLASS =
-  'block w-full py-3.5 text-start font-heading text-xs font-semibold uppercase tracking-widest text-neutral-700 transition-colors hover:text-brand-red data-[status=active]:text-brand-red'
+  'block w-full rounded-lg px-3 py-3 text-start font-heading text-base font-medium text-neutral-800 transition-[color,background-color] duration-300 outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red data-[status=active]:bg-brand-red-muted data-[status=active]:text-brand-red-dark'
 
 /** Style of the entries inside the Products group. */
 const SUB_ENTRY_CLASS =
-  'flex items-center gap-3 py-2.5 ps-1 font-heading text-sm text-neutral-600 transition-colors hover:text-brand-red'
+  'flex items-center gap-3 rounded-lg px-3 py-2.5 font-heading text-sm text-neutral-600 transition-[color,background-color] duration-300 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red'
 
 /**
  * The mobile menu: a hamburger button that opens the navigation drawer.
@@ -47,11 +47,11 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
       <SheetTrigger
         aria-label={t.header.openMenu}
         className={cn(
-          'p-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-red',
+          'rounded-full p-2.5 transition-[background-color,scale] duration-300 outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100',
           'text-brand-charcoal',
         )}
       >
-        <Menu size={32} aria-hidden="true" />
+        <Menu size={28} aria-hidden="true" />
       </SheetTrigger>
 
       <SheetContent
@@ -59,7 +59,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
         showCloseButton={false}
         onSwipeClose={close}
         aria-describedby={undefined}
-        className="w-72 gap-0 border-0 bg-white p-0 shadow-2xl sm:max-w-72"
+        className="w-72 gap-0 border-0 bg-white p-0 sm:max-w-72"
       >
         <SheetHeader className="flex-row items-center justify-between border-b border-neutral-150 px-6 py-5">
           <SheetTitle className="sr-only">{t.header.mainMenu}</SheetTitle>
@@ -68,23 +68,23 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
           </Link>
           <SheetClose
             aria-label={t.header.closeMenu}
-            className="p-1 text-neutral-500 transition-colors outline-none hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red"
+            className="-me-2 flex size-9 items-center justify-center rounded-full text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
           >
             <X size={20} aria-hidden="true" />
           </SheetClose>
         </SheetHeader>
 
         <nav aria-label={t.header.mainMenu} className="flex-1 overflow-y-auto px-6 py-4">
-          <ul className="divide-y divide-neutral-100">
+          <ul className="-mx-3 space-y-0.5">
             {items.map((item) => (
               <li key={item.id}>
                 {'children' in item ? (
                   <details className="group">
                     <summary className={cn(ENTRY_CLASS, 'flex cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden')}>
                       {item.label(t)}
-                      <ChevronDown size={14} aria-hidden="true" className="transition-transform duration-200 group-open:rotate-180" />
+                      <ChevronDown size={16} aria-hidden="true" className="transition-transform duration-300 group-open:rotate-180" />
                     </summary>
-                    <ul className="pb-3">
+                    <ul className="ps-3 pb-2">
                       {item.children.map((child) => {
                         const content = child.label(t)
                         return (
@@ -112,8 +112,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
             ))}
             {user?.kind === 'staff' && (
               <li>
-                <Link to="/admin" onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2')}>
-                  <ShieldCheck size={14} aria-hidden="true" />
+                <Link to="/admin" onClick={close} className={ENTRY_CLASS}>
                   {t.nav.adminPanel}
                 </Link>
               </li>
@@ -126,14 +125,12 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
                     close()
                     handleSignOut()
                   }}
-                  className={cn(ENTRY_CLASS, 'flex items-center gap-2')}
+                  className={ENTRY_CLASS}
                 >
-                  <LogOut size={14} aria-hidden="true" />
                   {t.login.signOut}
                 </button>
               ) : (
-                <Link {...HEADER_LOGIN.link} onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2')}>
-                  <UserRound size={14} aria-hidden="true" />
+                <Link {...HEADER_LOGIN.link} onClick={close} className={ENTRY_CLASS}>
                   {HEADER_LOGIN.label(t)}
                 </Link>
               )}
