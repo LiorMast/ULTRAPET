@@ -11,7 +11,7 @@ import { createStaffRow } from '@/api'
 import { israelToday } from '@/components/DiscountDialog'
 import categories from '@/stubs/product-categories.json'
 import products from '@/stubs/products.json'
-import { fakeFetch, signInFakeUser, TEST_STAFF } from '@/test/api'
+import { fakeFetch, holdRequests, signInFakeUser, TEST_STAFF } from '@/test/api'
 import { renderPage } from '@/test/utils'
 
 /** The id the fake gives the first category (seeded rows have fixed ids). */
@@ -150,6 +150,62 @@ describe('/admin/categories', () => {
     // The confirmation is a toast, outside the dialog.
     expect(screen.getByText('Discount deleted.')).toHaveAttribute('data-slot', 'toast')
     expect(within(dialog).getByRole('button', { name: 'Add discount' })).toHaveFocus()
+  })
+
+  it('shows Save busy while the server saves, holds "End discount now" meanwhile, and sends one change', async () => {
+    await seedCategoryDiscount()
+    const held = holdRequests((path, method) => method === 'PATCH' && path.startsWith('/api/staff/price-rules/'))
+    const { user } = await renderPage('/en/admin/categories', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: `Discounts: ${categories[0].name.en}` }))
+    const dialog = await screen.findByRole('dialog', { name: 'Discounts' })
+    await user.click(within(dialog).getByRole('button', { name: `Edit: ${SEEDED}` }))
+    const edit = await screen.findByRole('dialog', { name: 'Edit discount' })
+    await user.clear(within(edit).getByLabelText('Value *'))
+    await user.type(within(edit).getByLabelText('Value *'), '15')
+    const save = within(edit).getByRole('button', { name: 'Save' })
+    const endNow = within(edit).getByRole('button', { name: 'End discount now' })
+    await user.click(save)
+    expect(save).toHaveAttribute('aria-busy', 'true')
+    expect(endNow).toBeDisabled()
+    await user.click(save)
+    await user.type(within(edit).getByLabelText('Value *'), '{Enter}')
+    expect(held.calls).toHaveLength(1)
+    held.release()
+    expect(await within(dialog).findByText(`\u206615%\u2069 off, from ${todayText()}, with no end date`)).toBeInTheDocument()
+    expect(held.calls).toHaveLength(1)
+  })
+
+  it('shows "End discount now" busy while the server saves it, with Save held', async () => {
+    await seedCategoryDiscount()
+    const held = holdRequests((path, method) => method === 'PATCH' && path.startsWith('/api/staff/price-rules/'))
+    const { user } = await renderPage('/en/admin/categories', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: `Discounts: ${categories[0].name.en}` }))
+    const dialog = await screen.findByRole('dialog', { name: 'Discounts' })
+    await user.click(within(dialog).getByRole('button', { name: `Edit: ${SEEDED}` }))
+    const edit = await screen.findByRole('dialog', { name: 'Edit discount' })
+    const endNow = within(edit).getByRole('button', { name: 'End discount now' })
+    await user.dblClick(endNow)
+    expect(endNow).toHaveAttribute('aria-busy', 'true')
+    expect(within(edit).getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(held.calls).toHaveLength(1)
+    held.release()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit discount' })).not.toBeInTheDocument())
+  })
+
+  it('shows Delete busy while the server deletes the discount, and sends one request', async () => {
+    await seedCategoryDiscount()
+    const held = holdRequests((path, method) => method === 'DELETE' && path.startsWith('/api/staff/price-rules/'))
+    const { user } = await renderPage('/en/admin/categories', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: `Discounts: ${categories[0].name.en}` }))
+    const dialog = await screen.findByRole('dialog', { name: 'Discounts' })
+    await user.click(within(dialog).getByRole('button', { name: `Delete: ${SEEDED}` }))
+    const remove = within(dialog).getByRole('button', { name: /^Delete$/ })
+    await user.dblClick(remove)
+    expect(remove).toHaveAttribute('aria-busy', 'true')
+    expect(held.calls).toHaveLength(1)
+    held.release()
+    expect(await within(dialog).findByText('No discounts yet.')).toBeInTheDocument()
+    expect(held.calls).toHaveLength(1)
   })
 
   it('marks a discount that has ended', async () => {

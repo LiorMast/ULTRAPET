@@ -4,11 +4,16 @@
  * panel, /admin/...; the contact details this route loads; the home page's Contact section reads them from here too), the "page not found" screen for
  * unknown URLs, and the "could not load" screen (LoadError, the router's default error component) for pages
  * whose API request failed. Its `head` sets the default title and description; pages override them (see seo.ts).
+ * Loading feedback: while a navigation waits for its data, the current page stays (so a field being typed in keeps
+ * its focus) and a slim red bar runs along the top of the window (RouteProgress; <main> is aria-busy); the very first
+ * load, before there is any page to keep, shows a centered Spinner (PagePending, this route's pendingComponent).
  */
-import { createRootRouteWithContext, HeadContent, Link, Outlet, useMatchRoute, useRouter } from '@tanstack/react-router'
+import { useState } from 'react'
+import { createRootRouteWithContext, HeadContent, Link, Outlet, useMatchRoute, useRouter, useRouterState } from '@tanstack/react-router'
 import { fetchCategories, fetchContact, type ContactDetails, type ProductCategory } from '@/api'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 
@@ -27,7 +32,42 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   },
   component: RootLayout,
   notFoundComponent: NotFound,
+  // Only the first load has no page to keep on screen: after 400ms it shows the spinner (for at least 300ms, no blink).
+  pendingComponent: PagePending,
+  pendingMs: 400,
+  pendingMinMs: 300,
 })
+
+/**
+ * The first page load's waiting screen: a centered brand-red Spinner that fades in.
+ * @returns The spinner, centered in the window.
+ */
+export function PagePending() {
+  return (
+    <div className="flex min-h-svh animate-fade-in items-center justify-center text-brand-red">
+      <Spinner size="lg" />
+    </div>
+  )
+}
+
+/**
+ * The navigation progress bar: a slim red bar sliding along the top edge while the next page's data loads. It
+ * appears only after 200ms (a quick navigation shows nothing) and fades out when the page arrives. Decorative: the
+ * busy state is announced through <main aria-busy>.
+ * @param props.active - True while the router waits for a page's data.
+ * @returns The bar.
+ */
+function RouteProgress({ active }: { active: boolean }) {
+  return (
+    <div
+      aria-hidden="true"
+      data-active={active || undefined}
+      className="group pointer-events-none fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden opacity-0 transition-opacity duration-300 data-active:opacity-100 data-active:delay-200"
+    >
+      <span className="block h-full w-1/3 rounded-full bg-brand-red group-data-active:animate-route-progress" />
+    </div>
+  )
+}
 
 /**
  * Renders the site chrome around the current page. The fixed 88px header is always white, so every
@@ -39,6 +79,7 @@ function RootLayout() {
   const { categories, contact } = Route.useLoaderData()
   const matchRoute = useMatchRoute()
   const isAdmin = Boolean(matchRoute({ to: '/admin', fuzzy: true }))
+  const loading = useRouterState({ select: (state) => state.status === 'pending' })
 
   return (
     <>
@@ -49,8 +90,9 @@ function RootLayout() {
       >
         {t.header.skipToContent}
       </a>
+      <RouteProgress active={loading} />
       <Navbar categories={categories} />
-      <main id="main" tabIndex={-1} className="pt-22 outline-none">
+      <main id="main" tabIndex={-1} aria-busy={loading || undefined} className="pt-22 outline-none">
         <Outlet />
       </main>
       {!isAdmin && <WhatsAppButton phone={contact.whatsapp} />}
@@ -79,16 +121,28 @@ function NotFound() {
 /**
  * The "could not load" screen, shown inside the layout in place of a page whose data request failed (the API
  * is down or the connection dropped). The router's defaultErrorComponent (router.ts).
- * @returns The message with a button that runs the page's loaders again.
+ * @returns The message with a button that runs the page's loaders again (spinning while they run).
  */
 export function LoadError() {
   const { t } = useI18n()
   const router = useRouter()
+  const [retrying, setRetrying] = useState(false)
+
+  /** "Try again": runs the page's loaders again, the button spinning until they answer. */
+  const handleRetry = async () => {
+    setRetrying(true)
+    try {
+      await router.invalidate()
+    } finally {
+      setRetrying(false)
+    }
+  }
+
   return (
     <section className="mx-auto max-w-3xl px-6 py-32 text-center">
       <h1 className="font-heading text-3xl font-bold text-brand-charcoal">{t.page.loadErrorTitle}</h1>
       <p className="mt-4 text-brand-charcoal-muted">{t.page.loadErrorBody}</p>
-      <Button className="mt-8" onClick={() => void router.invalidate()}>
+      <Button className="mt-8" loading={retrying} onClick={() => void handleRetry()}>
         {t.page.retry}
       </Button>
     </section>

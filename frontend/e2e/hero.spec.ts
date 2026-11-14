@@ -20,11 +20,11 @@ async function waitForFirstPhoto(page: Page) {
  * @param page - The Playwright page, already on the home page.
  */
 async function waitForHeroText(page: Page) {
-  await page.waitForFunction(() =>
-    [...document.querySelectorAll('#home .animate-hero-rise')].every((el) =>
-      el.getAnimations().every((animation) => animation.playState === 'finished'),
-    ),
-  )
+  // At least one entrance must exist: before the hero renders (the first load may show a spinner) the list is empty.
+  await page.waitForFunction(() => {
+    const texts = [...document.querySelectorAll('#home .animate-hero-rise')]
+    return texts.length > 0 && texts.every((el) => el.getAnimations().every((animation) => animation.playState === 'finished'))
+  })
 }
 
 /**

@@ -6,6 +6,9 @@
  * focus to the trigger on close. Every sheet needs a SheetTitle (it may be visually hidden with
  * className="sr-only") so screen readers can announce what opened.
  *
+ * Look: a white panel with the premium shadow whose edge facing the page is rounded (rounded-3xl). Those corner
+ * classes are physical (rounded-l / rounded-r) on purpose: `side` names a physical screen edge.
+ *
  * Motion (Apple's fluid-interface rules): the panel slides in from its own edge and leaves the same way, on
  * the site's spring curve. A left or right panel given `onSwipeClose` can also be swiped away: it follows the
  * finger 1:1, resists when pulled inwards (rubber band), and on release a flick's momentum decides whether
@@ -281,7 +284,7 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg ease-spring data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-e data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-s data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-open:animate-in data-open:duration-450 data-[side=bottom]:data-open:slide-in-from-bottom data-[side=left]:data-open:slide-in-from-left data-[side=right]:data-open:slide-in-from-right data-[side=top]:data-open:slide-in-from-top data-closed:animate-out data-closed:duration-300 data-[side=bottom]:data-closed:slide-out-to-bottom data-[side=left]:data-closed:slide-out-to-left data-[side=right]:data-closed:slide-out-to-right data-[side=top]:data-closed:slide-out-to-top motion-reduce:data-open:fade-in-0 motion-reduce:data-closed:fade-out-0",
+          "fixed z-50 flex flex-col gap-4 overflow-hidden bg-popover bg-clip-padding text-sm text-popover-foreground shadow-premium ease-spring data-[side=right]:rounded-l-3xl data-[side=left]:rounded-r-3xl data-[side=top]:rounded-b-3xl data-[side=bottom]:rounded-t-3xl data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-e data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-s data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-open:animate-in data-open:duration-450 data-[side=bottom]:data-open:slide-in-from-bottom data-[side=left]:data-open:slide-in-from-left data-[side=right]:data-open:slide-in-from-right data-[side=top]:data-open:slide-in-from-top data-closed:animate-out data-closed:duration-300 data-[side=bottom]:data-closed:slide-out-to-bottom data-[side=left]:data-closed:slide-out-to-left data-[side=right]:data-closed:slide-out-to-right data-[side=top]:data-closed:slide-out-to-top motion-reduce:data-open:fade-in-0 motion-reduce:data-closed:fade-out-0",
           onSwipeClose && "touch-pan-y",
           className
         )}

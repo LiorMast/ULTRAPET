@@ -2,13 +2,14 @@
  * LoginPopover.test.tsx — Tests for the header login popover and its LoginForm: opening, fields, validation,
  * remember-me, signing in and out from the header through the API (the fake in test/api.ts; the login button
  * turns into Log out, staff also get an Admin panel button), the "wrong email or password" and "try again"
- * alerts, Escape, and the /login page showing the same form (and the account panel once signed in).
+ * alerts, Escape, the busy Log in button (one sign-in request however often it is pressed), and the /login page
+ * showing the same form (and the account panel once signed in).
  */
 import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { LoginForm } from '@/components/LoginForm'
-import { TEST_STAFF, TEST_USER, WRONG_PASSWORD } from '@/test/api'
+import { holdRequests, TEST_STAFF, TEST_USER, WRONG_PASSWORD } from '@/test/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
 describe('Login popover', () => {
@@ -58,6 +59,23 @@ describe('Login popover', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret' } })
     fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
     expect(await screen.findByRole('status')).toHaveTextContent('You are signed in.')
+  })
+
+  it('shows Log in busy while the server checks, and signs in once however often it is clicked', async () => {
+    const held = holdRequests((path) => path === '/api/auth/login')
+    const { user } = renderComponent(<LoginForm />, 'en')
+    await user.type(await screen.findByLabelText('Email'), 'a@b.co')
+    await user.type(screen.getByLabelText('Password'), 'secret')
+    const submit = screen.getByRole('button', { name: 'Log in' })
+    await user.click(submit)
+    expect(submit).toHaveAttribute('aria-busy', 'true')
+    expect(submit).toHaveFocus()
+    await user.click(submit)
+    await user.type(screen.getByLabelText('Password'), '{Enter}')
+    expect(held.calls).toEqual(['POST /api/auth/login'])
+    held.release()
+    expect(await screen.findByRole('status')).toHaveTextContent('You are signed in.')
+    expect(submit).not.toHaveAttribute('aria-busy')
   })
 
   it('shows "wrong email or password" when the server refuses the sign-in', async () => {

@@ -12,7 +12,8 @@ import { Pencil } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type FontKey, type HeroContent, type SectionText, type SizeStep } from '@/api'
 import { resolveHero } from '@/components/Hero'
-import { errorMessage, INPUT_CLASS, LABEL_CLASS } from '@/components/RecordDialog'
+import { errorMessage } from '@/components/RecordDialog'
+import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FONTS, fontsFor, SIZE_STEPS } from '@/config'
@@ -149,6 +150,7 @@ function HeroEditForm({ content, onSave, onCancel }: { content: HeroContent | nu
    */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (pending) return
     setFormError('')
     setPending(true)
     try {
@@ -187,7 +189,7 @@ function HeroEditForm({ content, onSave, onCancel }: { content: HeroContent | nu
           <Button type="button" variant="outline" size="sm" onClick={onCancel}>
             {t.admin.cancel}
           </Button>
-          <Button type="submit" size="sm" disabled={pending}>
+          <Button type="submit" size="sm" loading={pending}>
             {t.admin.save}
           </Button>
         </DialogFooter>

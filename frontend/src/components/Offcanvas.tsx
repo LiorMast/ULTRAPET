@@ -23,9 +23,9 @@ import { useI18n } from '@/i18n'
 /** After the panel closes, a tooltip that asks to show this soon (the focus returning to the trigger) is ignored (ms). */
 const TOOLTIP_QUIET_MS = 500
 
-/** The panel's widths: always the full screen on phones, capped from the `sm` breakpoint. */
+/** The panel's widths: always the full screen on phones (square there: it touches both edges), capped and rounded on its inner edge from the `sm` breakpoint. */
 const panelVariants = cva(
-  'gap-0 border-0 bg-white p-0 shadow-2xl data-[side=left]:w-full data-[side=right]:w-full',
+  'gap-0 border-0 bg-white p-0 shadow-premium max-sm:rounded-none data-[side=left]:w-full data-[side=right]:w-full',
   {
     variants: {
       size: {
@@ -137,7 +137,7 @@ export function Offcanvas({
           </div>
           <SheetClose
             aria-label={closeLabel ?? t.offcanvas.close}
-            className="-me-1 shrink-0 p-1 text-neutral-500 transition-[color,scale] outline-none hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.97] active:duration-100"
+            className="-me-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
           >
             <X size={20} aria-hidden="true" />
           </SheetClose>

@@ -1,7 +1,7 @@
 /**
  * DiscountRibbon.test.tsx — Tests for the discount ribbon (DiscountRibbon.tsx), rendered alone (it needs no
- * providers): its message with a decorative icon, the color variants, the discount / sale / stock kinds (color, icon;
- * explicit props win) and the inline / corner placements.
+ * providers): its message with an optional decorative icon, the color variants, the discount / sale / stock kinds (a
+ * color each and no icon: the words say it; explicit props win) and the inline / corner placements.
  */
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
@@ -30,16 +30,17 @@ describe('DiscountRibbon', () => {
   })
 
   it.each([
-    ['discount', 'bg-brand-red', 'lucide-percent'],
-    ['sale', 'bg-brand-charcoal', 'lucide-tag'],
-    ['inStock', 'bg-success', 'lucide-package-check'],
-    ['lowStock', 'bg-warning', 'lucide-triangle-alert'],
-    ['outOfStock', 'bg-brand-charcoal', 'lucide-package-x'],
-  ] as const)('a %s ribbon has its own color and icon', (kind, colorClass, iconClass) => {
+    ['discount', 'bg-brand-red'],
+    ['sale', 'bg-brand-charcoal'],
+    ['inStock', 'bg-success'],
+    ['lowStock', 'bg-warning'],
+    ['outOfStock', 'bg-brand-charcoal'],
+  ] as const)('a %s ribbon has its own color, a pill shape and no icon', (kind, colorClass) => {
     render(<DiscountRibbon kind={kind} message="-20%" />)
     expect(ribbon()).toHaveAttribute('data-kind', kind)
-    expect(ribbon()).toHaveClass(colorClass)
-    expect(ribbon().querySelector('svg')).toHaveClass(iconClass)
+    expect(ribbon()).toHaveClass(colorClass, 'rounded-full')
+    expect(ribbon()).toHaveTextContent('-20%')
+    expect(ribbon().querySelector('svg')).toBeNull()
   })
 
   it('lets an explicit icon and color override the kind', () => {
@@ -48,8 +49,8 @@ describe('DiscountRibbon', () => {
     expect(ribbon().querySelector('svg')).toHaveClass('lucide-truck')
   })
 
-  it('pins itself to the inline-start corner when placed in the corner', () => {
+  it('floats inside the inline-start corner when placed in the corner', () => {
     render(<DiscountRibbon message="-5%" placement="corner" className="top-0" />)
-    expect(ribbon()).toHaveClass('absolute', 'start-0', 'top-0')
+    expect(ribbon()).toHaveClass('absolute', 'start-3', 'top-0')
   })
 })

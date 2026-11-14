@@ -74,6 +74,12 @@ describe('/admin/products PDF catalog', () => {
     expect(await screen.findByText('The PDF catalog is ready')).toBeInTheDocument()
     expect(within(dialog).getByRole('link', { name: 'Download: English' })).toHaveAttribute('href', '/api/media/catalog/ultrapet-catalog-en-test.pdf')
     expect(within(dialog).getByRole('link', { name: 'Download: עברית' })).toHaveAttribute('target', '_blank')
+
+    // "Generate now" kept the focus while it built; closing puts it back on the button that opened the dialog.
+    expect(within(dialog).getByRole('button', { name: 'Generate now' })).toHaveFocus()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PDF catalog' })).toHaveFocus())
   })
 
   it('waits for a running build and shows it when it ends', { timeout: 15000 }, async () => {
@@ -81,12 +87,20 @@ describe('/admin/products PDF catalog', () => {
     const { user } = await renderPage('/en/admin/products', { staff: TEST_STAFF })
     const dialog = await openDialog(user)
     expect(within(dialog).getByText(/Building the catalog/)).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: 'Building…' })).toBeDisabled()
+    // While it builds, the button spins and a click asks for nothing.
+    const building = within(dialog).getByRole('button', { name: 'Building…' })
+    expect(building).toHaveAttribute('aria-busy', 'true')
+    expect(building).toHaveAttribute('aria-disabled', 'true')
+    const posts = vi.spyOn(globalThis, 'fetch')
+    await user.click(building)
+    expect(posts.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0)
+    posts.mockRestore()
 
     // The dialog asks again after CATALOG_PDF_POLL_MS (real time).
     setFakeCatalogPdf({ status: { state: 'ready', builtAt: '2026-11-12T10:00:00+00:00', products: 12, pages: 9 }, urls: { he: '/api/media/catalog/he.pdf' } })
     await waitFor(() => expect(within(dialog).getByText(/12 products, 9 pages\./)).toBeInTheDocument(), { timeout: CATALOG_PDF_POLL_MS + 3000 })
     expect(within(dialog).getByRole('button', { name: 'Generate now' })).toBeEnabled()
+    expect(within(dialog).getByRole('button', { name: 'Generate now' })).not.toHaveAttribute('aria-busy')
     expect(within(dialog).getAllByRole('link')).toHaveLength(1)
     // Only a build asked for in this dialog is confirmed in a toast.
     expect(screen.queryByText('The PDF catalog is ready')).not.toBeInTheDocument()

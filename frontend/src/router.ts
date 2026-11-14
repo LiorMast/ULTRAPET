@@ -9,6 +9,9 @@
  *   translated outside React.
  * - Pages load their data from the API in route loaders (src/api.ts); when a load fails, LoadError (in
  *   routes/__root.tsx) replaces the page with a "try again" screen.
+ * - A change of page (a new path) cross-fades through a view transition (index.css `::view-transition-*`); a change of
+ *   only the search or the hash (catalog filters, the home scrollspy) switches without one, and browsers without view
+ *   transitions simply switch.
  * - Used by main.tsx (browser history) and by the tests (memory history, see src/test/utils.tsx).
  */
 import { createRouter, type RouterHistory } from '@tanstack/react-router'
@@ -29,6 +32,7 @@ export function createAppRouter({ locale, history }: { locale: Locale; history?:
     scrollRestoration: true,
     defaultPreload: 'intent',
     defaultErrorComponent: LoadError,
+    defaultViewTransition: { types: ({ pathChanged }) => (pathChanged ? ['page'] : false) },
     rewrite: localeRewrite(locale),
     context: { locale },
   })

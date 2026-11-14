@@ -1,6 +1,6 @@
 /**
  * slider.tsx — The site's slider (shadcn/ui on the Radix Slider primitive, restyled for the brand): a thin grey
- * track whose filled part is brand red, and a square white thumb with a red border that grows a little on hover and
+ * rounded track whose filled part is brand red, and a round white thumb with a red border that grows a little on hover and
  * settles on press. Each thumb is a `role="slider"` (arrow keys, Home / End, Page Up / Down; the direction follows
  * the page's, from LocaleProvider). Values are arrays, one thumb per value. Name the thumb with `aria-label` or
  * `aria-labelledby`, and give `aria-valuetext` when the number alone does not say enough.
@@ -33,8 +33,8 @@ function Slider({
       className={cn("relative flex h-6 w-full touch-none items-center select-none data-[disabled]:opacity-50", className)}
       {...props}
     >
-      <SliderPrimitive.Track data-slot="slider-track" className="relative h-1.5 w-full grow bg-neutral-300">
-        <SliderPrimitive.Range data-slot="slider-range" className="absolute h-full bg-brand-red" />
+      <SliderPrimitive.Track data-slot="slider-track" className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-neutral-200">
+        <SliderPrimitive.Range data-slot="slider-range" className="absolute h-full rounded-full bg-brand-red" />
       </SliderPrimitive.Track>
       {Array.from({ length: thumbs }, (_, index) => (
         <SliderPrimitive.Thumb
@@ -43,7 +43,7 @@ function Slider({
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledBy}
           aria-valuetext={ariaValueText}
-          className="block size-5 cursor-grab border-2 border-brand-red bg-white shadow-premium-sm transition-[scale,box-shadow] outline-none hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red active:scale-[0.97] active:cursor-grabbing active:duration-100 data-[disabled]:cursor-not-allowed"
+          className="block size-5 cursor-grab rounded-full border-2 border-brand-red bg-white shadow-premium-sm transition-[scale,box-shadow] duration-300 outline-none hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red active:scale-[0.97] active:cursor-grabbing active:duration-100 data-[disabled]:cursor-not-allowed"
         />
       ))}
     </SliderPrimitive.Root>

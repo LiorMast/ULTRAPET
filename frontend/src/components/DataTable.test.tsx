@@ -4,7 +4,8 @@
  * (only the changed fields are sent), adding without a URL name or order (the server fills them), "Change order",
  * deleting with confirmation, server and client errors shown on their field (a table of its own for patterns and
  * duplicates), Hebrew/RTL and English texts, a caller's own Add/Edit dialog (formDialog) with Edit hidden on some
- * rows (canEdit), and a read-only table without action buttons.
+ * rows (canEdit), a read-only table without action buttons, and the busy Save / Delete buttons (spinner, one request
+ * however often they are clicked, back to normal after a refusal).
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,7 +13,7 @@ import { ApiError } from '@/api'
 import { DataTable, type DataColumn, type FormDialogProps } from '@/components/DataTable'
 import brands from '@/stubs/brands.json'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { fakeFetch, TEST_STAFF } from '@/test/api'
+import { fakeFetch, holdRequests, TEST_STAFF } from '@/test/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
 /** The brands table on the page. */
@@ -130,6 +131,46 @@ describe('DataTable on /admin/brands', () => {
     const dialog = await screen.findByRole('alertdialog')
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(/other records still use it/)
+  })
+
+  it('shows Save busy while the server saves, and sends one request however often it is clicked or Enter is pressed', async () => {
+    const held = holdRequests((path, method) => method === 'PATCH' && path.startsWith('/api/staff/brands/'))
+    const { user } = await renderPage('/en/admin/brands', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: `Edit ${brands[0].name}` }))
+    const dialog = await screen.findByRole('dialog', { name: `Edit ${brands[0].name}` })
+    const english = within(within(dialog).getByRole('group', { name: 'Tagline' })).getByLabelText('English')
+    await user.clear(english)
+    await user.type(english, 'Complete nutrition')
+    const save = within(dialog).getByRole('button', { name: 'Save' })
+    await user.click(save)
+    await waitFor(() => expect(held.calls).toHaveLength(1))
+    expect(save).toHaveAttribute('aria-busy', 'true')
+    expect(save).toHaveFocus()
+    await user.click(save)
+    await user.type(english, '{Enter}')
+    expect(held.calls).toHaveLength(1)
+    held.release()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(held.calls).toHaveLength(1)
+  })
+
+  it('shows Delete busy while the server deletes, sends one request, and is ready again after a refusal', async () => {
+    const { user } = await renderPage('/en/admin/brands', { staff: TEST_STAFF })
+    let refuse: (response: Response) => void = () => {}
+    const deletes = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+      init?.method === 'DELETE' ? new Promise<Response>((resolve) => (refuse = resolve)) : fakeFetch(input, init),
+    )
+    await user.click(screen.getByRole('button', { name: `Delete ${brands[0].name}` }))
+    const dialog = await screen.findByRole('alertdialog')
+    const remove = within(dialog).getByRole('button', { name: 'Delete' })
+    await user.click(remove)
+    await user.dblClick(remove)
+    expect(remove).toHaveAttribute('aria-busy', 'true')
+    expect(deletes.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
+    refuse(new Response(JSON.stringify({ error: 'in_use' }), { status: 409 }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/other records still use it/)
+    expect(remove).not.toHaveAttribute('aria-busy')
+    expect(remove).not.toHaveAttribute('aria-disabled')
   })
 
   it('is right-to-left with Hebrew texts on the Hebrew page', async () => {

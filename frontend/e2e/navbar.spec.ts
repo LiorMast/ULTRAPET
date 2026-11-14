@@ -64,6 +64,8 @@ async function expectSectionBelowHeader(page: Page, id: string) {
  * @param page - The Playwright page, in the state to check (e.g. with a menu open).
  */
 async function expectNoA11yViolations(page: Page) {
+  // The page's own content first (the first load may show a spinner): before it renders there is no entrance to wait for.
+  await page.locator('main h1').first().waitFor()
   await page.waitForFunction(() =>
     document.getAnimations().every((a) => !(a instanceof CSSAnimation && a.animationName === 'hero-rise') || a.playState === 'finished'),
   )

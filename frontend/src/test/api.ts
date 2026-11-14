@@ -33,6 +33,8 @@
  * products' photos are object keys too, answered as `/api/media/<key>` URLs (mediaImage).
  * Unknown paths answer 404. A test can replace one
  * answer with vi.spyOn(globalThis, 'fetch'); setup.ts restores the fake and signs it out after every test.
+ * holdRequests keeps chosen requests waiting until the test releases them (then the fake answers them as usual), so a
+ * test can see a button wait on the server (its spinner) and count that a second click sent nothing.
  */
 import { CATALOG_SORTS, type CatalogSort } from '@/api'
 import type { Brand, Branch, CatalogPdfOptions, CatalogPdfState, ContactDetails, ProductCategory, ProductDetail, ProductImage, ProductPage, ProductStock, Stat, StaffCustomer, StockMovement, StockStatus, User } from '@/api'
@@ -43,6 +45,7 @@ import brands from '@/stubs/brands.json'
 import contact from '@/stubs/contact.json'
 import faq from '@/stubs/faq.json'
 import categories from '@/stubs/product-categories.json'
+import { vi } from 'vitest'
 
 /** The password the fake sign-in refuses (401 "invalid_credentials"). */
 export const WRONG_PASSWORD = 'wrong-password'
@@ -896,6 +899,25 @@ function brandJson({ active: _active, ...brand }: (typeof brands)[number]): Bran
 
 /** The articles, newest first (the server's order). */
 const publishedArticles = [...articles].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+
+/**
+ * Holds the matching requests: the fake answers them only when the test calls `release` (as it would have at once).
+ * Every other request is answered right away. Restored after the test like any fetch spy (setup.ts).
+ * @param match - Picks the requests to hold, from the path (e.g. "/api/staff/brands/<id>") and the method.
+ * @returns `calls`, the held requests so far ("METHOD path"), and `release()`, which answers all of them.
+ */
+export function holdRequests(match: (path: string, method: string) => boolean) {
+  const calls: string[] = []
+  const waiting: Array<() => void> = []
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input, init = {}) => {
+    const path = new URL(input instanceof Request ? input.url : String(input), 'http://localhost').pathname
+    const method = (init.method ?? 'GET').toUpperCase()
+    if (!match(path, method)) return fakeFetch(input, init)
+    calls.push(`${method} ${path}`)
+    return new Promise<Response>((resolve, reject) => waiting.push(() => fakeFetch(input, init).then(resolve, reject)))
+  })
+  return { calls, release: () => waiting.splice(0).forEach((answer) => answer()) }
+}
 
 /**
  * The fake `fetch`: routes a request to the answer the backend would give.

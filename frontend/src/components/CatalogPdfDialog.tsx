@@ -13,7 +13,8 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } f
 import { Download, FileText } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type CatalogPdfOptions, type CatalogPdfState } from '@/api'
-import { errorMessage, LABEL_CLASS } from '@/components/RecordDialog'
+import { errorMessage } from '@/components/RecordDialog'
+import { LABEL_CLASS } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Slider } from '@/components/ui/slider'
@@ -56,18 +57,29 @@ type CatalogPdfHandlers = {
  * @param props.load - Reads the catalog's state (see CatalogPdfHandlers).
  * @param props.onGenerate - Saves the options and starts a build.
  * @param props.className - Extra classes on the button.
- * @returns The button, and the dialog while it is open.
+ * @returns The button, and the dialog while it is open (closing it puts the focus back on the button).
  */
 export function CatalogPdfButton({ className, ...handlers }: CatalogPdfHandlers & { className?: string }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
+  const button = useRef<HTMLButtonElement>(null)
+
+  /**
+   * Puts the focus back on the button when the dialog closes (it has no Radix DialogTrigger to return to).
+   * @param event - Radix's close-autofocus event; its default (focusing nothing) is prevented.
+   */
+  const handleCloseFocus = (event: Event) => {
+    event.preventDefault()
+    button.current?.focus()
+  }
+
   return (
     <>
-      <Button type="button" variant="outline" size="sm" className={className} onClick={() => setOpen(true)}>
+      <Button ref={button} type="button" variant="outline" size="sm" className={className} onClick={() => setOpen(true)}>
         <FileText aria-hidden />
         {t.admin.catalogPdf.button}
       </Button>
-      {open && <CatalogPdfDialog {...handlers} onClose={() => setOpen(false)} />}
+      {open && <CatalogPdfDialog {...handlers} onClose={() => setOpen(false)} onCloseAutoFocus={handleCloseFocus} />}
     </>
   )
 }
@@ -77,9 +89,10 @@ export function CatalogPdfButton({ className, ...handlers }: CatalogPdfHandlers 
  * @param props.load - Reads the catalog's state (see CatalogPdfHandlers).
  * @param props.onGenerate - Saves the options and starts a build.
  * @param props.onClose - Closes the dialog.
+ * @param props.onCloseAutoFocus - Where the focus goes when it closes (passed to DialogContent); without it, Radix's default.
  * @returns The dialog.
  */
-export function CatalogPdfDialog({ load, onGenerate, onClose }: CatalogPdfHandlers & { onClose: () => void }) {
+export function CatalogPdfDialog({ load, onGenerate, onClose, onCloseAutoFocus }: CatalogPdfHandlers & { onClose: () => void; onCloseAutoFocus?: (event: Event) => void }) {
   const { t, locale } = useI18n()
   const s = t.admin.catalogPdf
   const id = useId()
@@ -139,7 +152,7 @@ export function CatalogPdfDialog({ load, onGenerate, onClose }: CatalogPdfHandle
    */
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!options) return
+    if (!options || pending || building) return
     setFormError('')
     setPending(true)
     try {
@@ -165,7 +178,7 @@ export function CatalogPdfDialog({ load, onGenerate, onClose }: CatalogPdfHandle
 
   return (
     <Dialog open onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent closeLabel={t.admin.close}>
+      <DialogContent closeLabel={t.admin.close} onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{s.title}</DialogTitle>
           <DialogDescription>{s.description}</DialogDescription>
@@ -252,7 +265,7 @@ export function CatalogPdfDialog({ load, onGenerate, onClose }: CatalogPdfHandle
               {t.admin.close}
             </Button>
             {state !== null && (
-              <Button type="submit" size="sm" disabled={pending || building}>
+              <Button type="submit" size="sm" loading={pending || building}>
                 {building ? s.generating : s.generate}
               </Button>
             )}

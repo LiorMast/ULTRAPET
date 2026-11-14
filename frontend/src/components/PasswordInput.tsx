@@ -25,7 +25,7 @@ export type PasswordInputProps = Omit<ComponentProps<'input'>, 'type' | 'classNa
 
 /**
  * The password input with its show/hide button.
- * @param props.inputClassName - The input's look (the form's input class, e.g. RecordDialog's INPUT_CLASS); its
+ * @param props.inputClassName - The input's look (the form's input class, e.g. INPUT_CLASS of ui/input); its
  *   top margin moves to the wrapper, so the buttons stay centred on the input.
  * @param props.className - Extra classes of the wrapper.
  * @param props.visible - Shows the password as text (controlled); omit to let the component keep it.

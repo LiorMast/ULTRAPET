@@ -16,11 +16,11 @@ import { cn } from 'cn'
 import { MAX_QUANTITY, MIN_QUANTITY } from '@/cart'
 import { useI18n } from '@/i18n'
 
-const stepperVariants = cva('inline-flex items-stretch border border-neutral-300 bg-white', {
+const stepperVariants = cva('inline-flex items-stretch overflow-hidden rounded-full border border-neutral-300 bg-white transition-[border-color] duration-150 focus-within:border-brand-red', {
   variants: {
     size: {
-      sm: 'h-9 [&_button]:w-8 [&_input]:w-11 [&_input]:text-sm',
-      md: 'h-12 [&_button]:w-11 [&_input]:w-14 [&_input]:text-base',
+      sm: 'h-9 [&_button]:w-9 [&_input]:w-10 [&_input]:text-sm',
+      md: 'h-12 [&_button]:w-12 [&_input]:w-12 [&_input]:text-base',
     },
   },
   defaultVariants: { size: 'md' },
@@ -28,7 +28,7 @@ const stepperVariants = cva('inline-flex items-stretch border border-neutral-300
 
 /** Style of the minus and plus buttons. */
 const BUTTON_CLASS =
-  'flex shrink-0 items-center justify-center text-brand-charcoal transition-[color,background-color,scale] outline-none hover:bg-neutral-50 hover:text-brand-red focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red active:scale-[0.97] active:duration-100 disabled:pointer-events-none disabled:opacity-40'
+  'flex shrink-0 items-center justify-center rounded-full text-brand-charcoal transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-red focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red active:scale-[0.97] active:duration-100 disabled:pointer-events-none disabled:opacity-40'
 
 /**
  * The quantity field.
@@ -100,7 +100,7 @@ export function QuantityStepper({
         value={draft ?? String(value)}
         onChange={(event) => handleType(event.target.value)}
         onBlur={() => setDraft(null)}
-        className="border-x border-neutral-300 text-center font-semibold tabular-nums text-brand-charcoal outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red"
+        className="bg-transparent text-center font-semibold tabular-nums text-brand-charcoal outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red"
       />
       <button type="button" aria-label={t.quantity.increase} disabled={value >= max} onClick={() => send(value + 1)} className={BUTTON_CLASS}>
         <Plus aria-hidden="true" className="size-4" />

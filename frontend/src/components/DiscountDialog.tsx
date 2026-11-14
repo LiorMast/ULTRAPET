@@ -29,7 +29,8 @@ import { CalendarX2 } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type StaffCategory, type StaffProduct } from '@/api'
 import { localized } from '@/config'
-import { errorMessage, INPUT_CLASS, LABEL_CLASS } from '@/components/RecordDialog'
+import { errorMessage } from '@/components/RecordDialog'
+import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { SearchableField, type SearchOption } from '@/components/SearchableField'
 import { SegmentedSwitch } from '@/components/SegmentedSwitch'
 import { Switch } from '@/components/ui/switch'
@@ -324,7 +325,8 @@ function DiscountForm({
   const [customerId, setCustomerId] = useState(scope?.initial?.customerId ?? '')
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({})
   const [formError, setFormError] = useState('')
-  const [pending, setPending] = useState(false)
+  // Which action waits on the server: Save, "End discount now", or none.
+  const [pending, setPending] = useState<'save' | 'end' | null>(null)
 
   const number = Number(value.trim())
   const valid = /^-?\d+(\.\d{1,2})?$/.test(value.trim()) && number > 0
@@ -349,6 +351,7 @@ function DiscountForm({
    */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (pending) return
     const found: Partial<Record<FieldName, string>> = {}
     if (scope && !everyProduct && !ruleTarget) found.target = t.admin.errors.required
     if (askCustomer && !customerId) found.customer = t.admin.errors.required
@@ -368,7 +371,7 @@ function DiscountForm({
       document.getElementById(`${id}-${first}`)?.focus()
       return
     }
-    setPending(true)
+    setPending('save')
     try {
       const chosen = scope
         ? { target: everyProduct ? ALL_PRODUCTS : ruleTarget, customerId: scope.customers ? (askCustomer ? customerId : null) : (scope.initial?.customerId ?? null) }
@@ -376,7 +379,7 @@ function DiscountForm({
       await onSave({ type, value: number, minQuantity: bulk ? quantity : null, startsAt, endsAt }, chosen)
     } catch (error) {
       setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
-      setPending(false)
+      setPending(null)
     }
   }
 
@@ -397,15 +400,15 @@ function DiscountForm({
    * started yet also starts now (an empty period), so its period stays valid. Shows the server's refusal like Save does.
    */
   const handleEndNow = async () => {
-    if (!initial) return
+    if (!initial || pending) return
     const now = israelNow()
-    setPending(true)
+    setPending('end')
     setFormError('')
     try {
       await onSave({ ...initial, startsAt: initial.startsAt && initial.startsAt > now ? now : initial.startsAt, endsAt: now }, scope?.initial)
     } catch (error) {
       setFormError(errorMessage(error instanceof ApiError ? error.code : undefined, t))
-      setPending(false)
+      setPending(null)
     }
   }
 
@@ -642,7 +645,7 @@ function DiscountForm({
         )}
         <DialogFooter>
           {canEnd && (
-            <Button type="button" variant="outline" size="sm" className="sm:me-auto" disabled={pending} onClick={handleEndNow}>
+            <Button type="button" variant="outline" size="sm" className="sm:me-auto" loading={pending === 'end'} disabled={pending === 'save'} onClick={handleEndNow}>
               <CalendarX2 aria-hidden />
               {d.endNow}
             </Button>
@@ -650,7 +653,7 @@ function DiscountForm({
           <Button type="button" variant="outline" size="sm" onClick={onCancel}>
             {t.admin.cancel}
           </Button>
-          <Button type="submit" size="sm" disabled={pending}>
+          <Button type="submit" size="sm" loading={pending === 'save'} disabled={pending === 'end'}>
             {t.admin.save}
           </Button>
         </DialogFooter>

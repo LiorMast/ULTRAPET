@@ -18,6 +18,7 @@ import { GeneratedPasswordInput, MIN_PASSWORD_LENGTH } from '@/components/Genera
 import { ImageUploadField } from '@/components/ImageUploadField'
 import { SearchableField } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
+import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { Dictionary } from '@/i18n/he'
 import { useI18n } from '@/i18n'
@@ -25,11 +26,6 @@ import { useI18n } from '@/i18n'
 /** A field's value while it is edited: text for most inputs, a pair for localized text, a flag for a checkbox. */
 type FormValue = string | boolean | { he: string; en: string }
 
-/** The admin forms' text input look (also used by DiscountDialog). */
-export const INPUT_CLASS =
-  'mt-2 block w-full border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-brand-charcoal transition-colors focus:border-brand-red focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40 disabled:cursor-not-allowed disabled:text-brand-charcoal-muted aria-[invalid=true]:border-brand-red'
-/** The admin forms' field label look (also used by DiscountDialog). */
-export const LABEL_CLASS = 'block font-heading text-2xs font-semibold uppercase tracking-widest text-brand-charcoal-muted'
 
 /**
  * The message for a server error code.
@@ -187,6 +183,7 @@ export function RecordDialog<Row>({
    */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (pending) return
     const found: Record<string, string> = {}
     const payload: RowValues = {}
     for (const column of fields) {
@@ -247,7 +244,7 @@ export function RecordDialog<Row>({
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               {t.admin.cancel}
             </Button>
-            <Button type="submit" size="sm" disabled={pending || uploads > 0}>
+            <Button type="submit" size="sm" loading={pending} disabled={uploads > 0}>
               {t.admin.save}
             </Button>
           </DialogFooter>

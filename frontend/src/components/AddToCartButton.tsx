@@ -154,7 +154,7 @@ export function AddToCartButton({
 
   if (!available) {
     return (
-      <Button type="button" variant="action" disabled className={cn(addVariants({ size }), 'h-auto rounded-none', className)}>
+      <Button type="button" variant="action" disabled className={cn(addVariants({ size }), 'h-auto', className)}>
         <PackageX aria-hidden="true" className="size-4" />
         {t.cart.soldOut}
       </Button>

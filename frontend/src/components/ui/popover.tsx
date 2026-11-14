@@ -5,6 +5,9 @@
  * moving into the panel and back to the trigger, Escape and outside-click closing, and right-to-left
  * layouts (the direction comes from the Direction.Provider in src/i18n/index.tsx). It is non-modal by
  * default: the page behind stays scrollable and accessible.
+ *
+ * Look: a white rounded panel (rounded-2xl) with the premium shadow; it fades and zooms in, drifting 4px away from its
+ * trigger, and fades out a little faster.
  */
 import * as React from "react"
 import { cn } from "cn"
@@ -49,7 +52,7 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-80 max-w-[calc(100vw-2rem)] origin-(--radix-popover-content-transform-origin) bg-popover p-6 text-popover-foreground shadow-premium ring-1 ring-foreground/10 outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "z-50 w-80 max-w-[calc(100vw-2rem)] origin-(--radix-popover-content-transform-origin) rounded-2xl bg-popover p-6 text-popover-foreground shadow-premium ring-1 ring-black/5 outline-none duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:duration-150",
           className
         )}
         {...props}

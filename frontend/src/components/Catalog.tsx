@@ -16,6 +16,7 @@ import { CatalogCard, priceFor, stockFor } from '@/components/CatalogCard'
 import { CatalogToolbar } from '@/components/CatalogToolbar'
 import { Pagination } from '@/components/Pagination'
 import { Button } from '@/components/ui/button'
+import { inputVariants } from '@/components/ui/input'
 import type { Brand, CatalogSearch, ProductCategory, ProductPage } from '@/api'
 import type { CustomerPrices } from '@/auth'
 import { catalogPdfUrl, localized } from '@/config'
@@ -158,7 +159,7 @@ export function Catalog({
             onChange={(e) => handleQuery(e.target.value)}
             placeholder={t.catalog.searchPlaceholder}
             autoComplete="off"
-            className="block h-12 w-full border border-neutral-300 bg-neutral-50 ps-12 pe-4 text-sm text-brand-charcoal focus:border-brand-red focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40"
+            className={inputVariants({ size: 'search' })}
           />
         </form>
 

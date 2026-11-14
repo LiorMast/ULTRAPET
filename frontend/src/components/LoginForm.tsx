@@ -13,15 +13,13 @@ import { ApiError } from '@/api'
 import { useAuth, type Credentials } from '@/auth'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Button } from '@/components/ui/button'
+import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import { useToast } from '@/toast'
 
 /** The values the form submits. */
 export type LoginValues = Credentials
 
-const INPUT_CLASS =
-  'mt-2 block w-full border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-brand-charcoal transition-colors focus:border-brand-red focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40 aria-[invalid=true]:border-brand-red'
-const LABEL_CLASS = 'block font-heading text-2xs font-semibold uppercase tracking-widest text-brand-charcoal-muted'
 
 /**
  * The login form.
@@ -61,7 +59,7 @@ export function LoginForm({
     if (!values.password) found.password = t.login.errorRequired
     setErrors(found)
     setFormError('')
-    if (Object.keys(found).length > 0) return
+    if (Object.keys(found).length > 0 || pending) return
     if (onSubmit) {
       onSubmit(values)
       return
@@ -124,7 +122,7 @@ export function LoginForm({
           {formError}
         </p>
       )}
-      <Button type="submit" disabled={pending} className="w-full">{t.login.submit}</Button>
+      <Button type="submit" loading={pending} className="w-full">{t.login.submit}</Button>
     </form>
   )
 }

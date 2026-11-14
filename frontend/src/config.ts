@@ -224,7 +224,7 @@ export const FONTS: Record<FontKey, FontOption> = {
     load: () => import('@fontsource-variable/frank-ruhl-libre/index.css'),
   },
   inter: { name: 'Inter', family: '"Inter Variable", system-ui, sans-serif', hebrew: false },
-  montserrat: { name: 'Montserrat', family: '"Montserrat Variable", system-ui, sans-serif', hebrew: false },
+  montserrat: { name: 'Montserrat', family: '"Montserrat Variable", system-ui, sans-serif', hebrew: false, load: () => import('@fontsource-variable/montserrat/index.css') },
 }
 
 /** The size steps of the editable texts, smallest first. */

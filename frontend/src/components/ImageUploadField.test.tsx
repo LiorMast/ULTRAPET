@@ -103,10 +103,17 @@ describe('ImageUploadField on /admin/categories', () => {
     await user.upload(fileInput, png())
     expect(await within(picture).findByText('Uploading the picture…')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(within(picture).getByRole('button', { name: 'Upload picture' })).toBeDisabled()
+    // The upload button keeps its focus and name but shows the spinner and ignores clicks (no second file picker).
+    const upload = within(picture).getByRole('button', { name: 'Upload picture' })
+    expect(upload).toHaveAttribute('aria-busy', 'true')
+    expect(upload).toHaveAttribute('aria-disabled', 'true')
+    const pick = vi.spyOn(HTMLInputElement.prototype, 'click')
+    await user.click(upload)
+    expect(pick).not.toHaveBeenCalled()
     finish(Response.json({ key: 'categories/slow.png', url: '/api/media/categories/slow.png' }, { status: 201 }))
     expect(await within(picture).findByText('Picture uploaded. Save to keep it.')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(within(picture).getByRole('button', { name: 'Replace picture' })).not.toHaveAttribute('aria-busy')
   })
 
   it('removes a picture and saves the category without one', async () => {

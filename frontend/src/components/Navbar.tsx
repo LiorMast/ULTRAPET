@@ -249,7 +249,7 @@ function DesktopNavItem({ item }: { item: NavItem }) {
       <DropdownMenuContent
         align="start"
         sideOffset={14}
-        className="w-auto min-w-64 rounded-none border border-neutral-200 p-0 py-2 shadow-premium-sm ring-0"
+        className="w-auto min-w-64"
         onPointerEnter={openMenu}
         onPointerLeave={handleLabelLeave}
       >
@@ -258,7 +258,7 @@ function DesktopNavItem({ item }: { item: NavItem }) {
           return (
             <Fragment key={child.id}>
               {child.divider && <DropdownMenuSeparator className="mx-0 my-2" />}
-              <DropdownMenuItem asChild className="gap-3 rounded-none px-5 py-2.5 font-heading text-sm font-medium text-neutral-700">
+              <DropdownMenuItem asChild className="gap-3 px-4 py-2.5 font-heading text-sm font-medium text-neutral-700">
                 {'href' in child ? (
                   <a href={child.href} target="_blank" rel="noopener noreferrer">
                     {content}

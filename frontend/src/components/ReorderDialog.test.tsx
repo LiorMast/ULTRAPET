@@ -10,7 +10,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ReorderDialog } from '@/components/ReorderDialog'
 import categories from '@/stubs/product-categories.json'
-import { fakeFetch, TEST_STAFF } from '@/test/api'
+import { fakeFetch, holdRequests, TEST_STAFF } from '@/test/api'
 import { renderComponent, renderPage } from '@/test/utils'
 
 /** The category names in the table body, in display order. */
@@ -135,6 +135,19 @@ describe('Change order (ReorderDialog)', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Invalid value')
     expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('shows Save busy while the server saves the order, and sends it once', async () => {
+    const held = holdRequests((path) => path === '/api/staff/categories/order')
+    const { dialog, user } = await openReorder()
+    await user.click(within(dialog).getByRole('button', { name: `Move ${english[0]} down` }))
+    const save = within(dialog).getByRole('button', { name: 'Save' })
+    await user.dblClick(save)
+    expect(save).toHaveAttribute('aria-busy', 'true')
+    expect(held.calls).toEqual(['PUT /api/staff/categories/order'])
+    held.release()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(held.calls).toHaveLength(1)
   })
 
   it('Escape during a keyboard drag cancels the drag, and only then closes the dialog', async () => {

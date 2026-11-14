@@ -172,6 +172,7 @@ export function ReorderDialog({
 
   /** Save handler: sends the new order; on failure keeps the dialog open with the server's reason. */
   const handleSave = async () => {
+    if (pending) return
     setPending(true)
     setError('')
     try {
@@ -233,7 +234,7 @@ export function ReorderDialog({
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             {t.admin.cancel}
           </Button>
-          <Button type="button" size="sm" disabled={!changed || pending} onClick={handleSave}>
+          <Button type="button" size="sm" disabled={!changed} loading={pending} onClick={handleSave}>
             {t.admin.save}
           </Button>
         </DialogFooter>

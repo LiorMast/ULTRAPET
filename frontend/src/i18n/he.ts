@@ -722,6 +722,10 @@ export const he = {
       isActive: 'פעיל',
     },
   },
+  common: {
+    /** The Spinner's spoken label while something loads. */
+    loading: 'טוען…',
+  },
   page: {
     comingSoon: 'העמוד הזה בבנייה ויעלה בקרוב.',
     notFoundTitle: 'הדף לא נמצא',

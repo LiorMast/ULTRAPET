@@ -112,10 +112,10 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-auto min-w-44 rounded-none border border-neutral-200 p-0 py-1 shadow-premium-sm ring-0"
+        className="w-auto min-w-44"
       >
         {ENABLED_LOCALES.map((l) => (
-          <DropdownMenuItem key={l} asChild className="gap-3 rounded-none px-4 py-2.5 font-heading font-medium text-neutral-700">
+          <DropdownMenuItem key={l} asChild className="gap-3 px-3.5 py-2.5 font-heading font-medium text-neutral-700">
             <a href={hrefFor(l)} hrefLang={l} lang={l} dir={LOCALES[l].dir} aria-current={l === locale ? 'true' : undefined}>
               <span
                 aria-hidden="true"
@@ -127,7 +127,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
         ))}
         {COMING_SOON_LOCALES.length > 0 && <DropdownMenuSeparator className="mx-0" />}
         {COMING_SOON_LOCALES.map((l) => (
-          <DropdownMenuItem key={l} disabled className="justify-between gap-6 rounded-none px-4 py-2.5 font-heading">
+          <DropdownMenuItem key={l} disabled className="justify-between gap-6 px-3.5 py-2.5 font-heading">
             <span lang={l} dir={LOCALES[l].dir}>
               {LOCALES[l].nativeName}
             </span>

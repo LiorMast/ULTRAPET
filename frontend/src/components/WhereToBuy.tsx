@@ -7,6 +7,7 @@
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import { LocateFixed, MapPin, Navigation, Phone, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { inputVariants } from '@/components/ui/input'
 import type { Branch } from '@/api'
 import type { LatLng } from '@/components/BranchMap'
 import { useI18n } from '@/i18n'
@@ -163,10 +164,10 @@ export function WhereToBuy({ branches }: { branches: Branch[] }) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t.whereToBuy.searchPlaceholder}
             autoComplete="off"
-            className="block h-12 w-full border border-neutral-300 bg-neutral-50 ps-12 pe-4 text-sm text-brand-charcoal focus:border-brand-red focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40"
+            className={inputVariants({ size: 'search' })}
           />
         </div>
-        <Button type="button" onClick={handleNearest} disabled={location.status === 'locating'}>
+        <Button type="button" onClick={handleNearest} loading={location.status === 'locating'}>
           <LocateFixed aria-hidden="true" />
           {t.whereToBuy.nearest}
         </Button>

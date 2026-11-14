@@ -6,9 +6,9 @@
  * page from screen readers while it is open, and returns focus to the element that opened it. Every dialog
  * needs a DialogTitle (screen readers announce it) and, ideally, a DialogDescription.
  *
- * Look: white panel with square corners and the premium shadow over the same dimmed, blurred backdrop as the
- * mobile drawer (ui/sheet.tsx). Motion: fades and zooms in from 95% on the site's spring curve; reduced motion
- * keeps only the fade (global rule in index.css).
+ * Look: a white rounded panel (rounded-2xl) with the premium shadow over the same dimmed, blurred backdrop as the
+ * mobile drawer (ui/sheet.tsx); a round close button. Motion: fades, rises 8px and zooms in from 95% on the site's
+ * spring curve; reduced motion keeps only the fade (global rule in index.css).
  */
 import * as React from "react"
 import { cn } from "cn"
@@ -56,7 +56,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed start-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-y-1/2 flex-col bg-white text-brand-charcoal shadow-premium outline-none ltr:-translate-x-1/2 rtl:translate-x-1/2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:duration-300 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:duration-200",
+          "fixed start-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg -translate-y-1/2 flex-col rounded-2xl bg-white text-brand-charcoal shadow-premium outline-none ltr:-translate-x-1/2 rtl:translate-x-1/2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-bottom-2 data-open:duration-300 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:duration-200",
           className
         )}
         {...props}
@@ -65,7 +65,7 @@ function DialogContent({
         {closeLabel && (
           <DialogPrimitive.Close
             aria-label={closeLabel}
-            className="absolute end-4 top-4 p-1 text-brand-charcoal-muted transition-colors hover:text-brand-charcoal focus-visible:outline-2 focus-visible:outline-brand-red active:scale-[0.97] active:duration-100"
+            className="absolute end-3 top-3 flex size-9 items-center justify-center rounded-full text-brand-charcoal-muted transition-[color,background-color,scale] duration-150 hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:outline-2 focus-visible:outline-brand-red active:scale-[0.94] active:duration-100"
           >
             <XIcon className="size-5" aria-hidden />
           </DialogPrimitive.Close>
@@ -82,7 +82,7 @@ function DialogContent({
  * @returns The header.
  */
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="dialog-header" className={cn("space-y-2 border-b border-neutral-150 px-6 pt-6 pb-4 pe-12", className)} {...props} />
+  return <div data-slot="dialog-header" className={cn("space-y-2 border-b border-neutral-150 px-6 pt-6 pb-4 pe-14", className)} {...props} />
 }
 
 /**

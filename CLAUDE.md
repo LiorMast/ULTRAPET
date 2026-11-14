@@ -68,22 +68,26 @@ frontend/
                         minimum order), AddToCartButton (adds to the cart, "✓ Added" morph; `available={false}` = a
                         disabled "Out of stock"), QuantityStepper (− n +),
                         StockDialog (a product's stock in the admin: record a movement, the history; stockAction,
-                        StockCell, StockSummary, stockStatus), DiscountRibbon (icon + short message on a color; kinds
-                        discount / sale and the stock statuses: STOCK_RIBBONS),
+                        StockCell, StockSummary, stockStatus), DiscountRibbon (a pill badge: short message on a color; kinds
+                        discount / sale and the stock statuses: STOCK_RIBBONS; an `icon` only when asked),
                         SegmentedSwitch (the multi-choice switch: a radio group drawn as one bar with a sliding thumb),
-                        Toast (a short notification at the top center: icon, message, color; `kind` success / error / warning
+                        Toast (a short pill notification at the top center: icon, message, color; `kind` success / error / warning
                         presets them (TOAST_KINDS; tokens `success`, `warning`); shows 2 s, fades, then onDone; above everything, z-[100]),
                         PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button),
                         CatalogPdfDialog (the "PDF catalog" button + dialog of /admin/products: the generated PDF
                         catalog's layout, status, files and "Generate now"; catalogPdfGrid), ...)
                         + their tests
-    components/ui/      shadcn primitives (accordion, button, dialog, dropdown-menu, popover, sheet, slider, switch, tooltip), restyled for the brand
+    components/ui/      shadcn primitives (accordion, button (+ `loading`), dialog, dropdown-menu, popover, sheet, slider, spinner,
+                        switch, tooltip), restyled for the brand; input.tsx = the one form-field look (inputVariants,
+                        INPUT_CLASS, LABEL_CLASS) for inputs, selects, textareas, PasswordInput and SearchableField
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
                         imports them (oxlint no-restricted-imports); legacy-media.json = object key -> WordPress URL
                         of every file `flask import-media` copies into the storage
     assets/             logo SVGs; hero/ = the home hero photos (drop images in, no code changes); categories/,
                         category-cards/ (the marketing categories' placeholders), articles/, brands/ = bundled photos by slug
-    test/               setup.ts (jsdom polyfills, fake fetch), utils.tsx (renderPage), api.ts (fake backend API)
+    test/               setup.ts (jsdom polyfills, fake fetch), utils.tsx (renderPage), api.ts (fake backend API;
+                        holdRequests keeps chosen requests waiting, to test a busy button)
+    router.test.tsx     the router's loading feedback (progress bar, LoadError retry) and view transitions
 backend/
   Dockerfile  requirements.txt  pyproject.toml (pytest config)
   app/
@@ -434,6 +438,15 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   signing in and out), `.warning` (signing out dropped an in-place draft), `.error` (a failure with no form to show it
   in). One at a time, top center just under the header (`top-20`, `sm:top-[6.5rem]`); every toast stays 2 s (`TOAST_SHOW_MS`; errors and warnings use `TOAST_ALERT_MS`, also 2 s), above everything (z-[100]). Form and
   field errors stay inline next to their fields (`role="alert"`), not in toasts. Never add a hand-made "Saved" status line.
+- **Loading states**: a button whose action waits on the server gets `loading={pending}` (`ui/button`): its label
+  cross-fades into a `Spinner` in the same box (after 150ms), it is aria-busy + aria-disabled (never `disabled`, so the
+  focus stays) and swallows clicks and implicit submits; its handler also starts with `if (pending) return`. Pass
+  `loading` only to such buttons (Save, Sign in, Delete, Record, Generate, Try again, Upload; DiscountDialog tracks which
+  of its two actions runs). Anything else that waits shows `<Spinner label? size? />` (`ui/spinner`, a status region
+  named "Loading…"; `label={false}` = decorative). Page loads: the current page stays while the next one loads (so a
+  typed-in field keeps its focus), <main> is aria-busy and a slim red bar runs along the top (`RouteProgress` in
+  `__root.tsx`); only the first load shows a centered Spinner (`PagePending`). Test a busy button with
+  `holdRequests` (test/api.ts): the spinner shows and a second click / Enter sends nothing.
 - **Choices** (`SegmentedSwitch`): one choice among a few options (2+) is a `SegmentedSwitch` (`legend`, `options`
   { value, label, icon?, disabled? }, `value`, `onChange`; `tone` light/dark, `size` default/sm, `hideLegend`): native
   radios (arrow keys, one tab stop), never copied radio markup.
@@ -443,7 +456,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
   (global rule in `index.css`). An accessible name must contain the visible label (WCAG 2.5.3); avoid building
   names from several spans that rely on whitespace.
-- **Icons**: lucide-react only; logos are SVG assets.
+- **Icons**: lucide-react only; logos are SVG assets. Use them sparingly: an icon stays only when it *is* the
+  control (close, menu, chevrons, carousel arrows, cart, play/pause, password eye, drag grip, stepper −/+, the search
+  field's magnifier, map locate) or a state signal (a toast's kind, a sent form's check). No icon beside a label that
+  already says the same thing, and no arrow appended to link or button text.
 - **Images**: SVG / WebP / AVIF with explicit sizes; lazy-load below the fold.
 
 ## i18n
@@ -471,15 +487,23 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
 - **Colors**: `brand-red` #BE1E24 (`-dark` #96181D, `-light` #D42830, `-muted` #F5E8E8); `brand-charcoal` #1A1A1A
   (`-2` #2A2A2A, `-3` #3A3A3A, `-muted` #6B6B6B); the legacy neutral scale (`neutral-50` #FAFAFA, `neutral-150`
   #EFEFEF ... `neutral-900` #181818). White backgrounds.
-- **Fonts**: Inter (body), Montserrat (`font-heading`: uppercase labels with `tracking-widest` = 0.25em),
-  Inter at bold weights (`font-display`, English display headings and stats numbers; was Playfair Display), Heebo (all Hebrew: `html:lang(he)` swaps every font
-  token to Heebo and tightens the tracking to 0.02em). Staff-picked fonts for editable texts (`FONTS` in `config.ts`:
-  Heebo, Rubik, Assistant, Frank Ruhl Libre, and Inter/Montserrat for English only) are applied as inline
-  `font-family` and lazy-loaded (`load()`, a CSS chunk each). In `cn()`, put a text-size class before `leading-*`:
+- **Fonts**: one family per language. English: Inter for everything (`font-sans` body, `font-heading` labels,
+  `font-display` bold headings and stats numbers); labels, buttons and eyebrows are **sentence case**, semibold, never
+  tracked capitals. Heebo for all Hebrew (`html:lang(he)` swaps every font token to Heebo and tightens the tracking
+  to 0.02em). Staff-picked fonts for editable texts (`FONTS` in `config.ts`: Heebo, Rubik, Assistant, Frank Ruhl
+  Libre, and Inter/Montserrat for English only) are applied as inline `font-family` and lazy-loaded (`load()`, a CSS
+  chunk each; Montserrat is no longer loaded by every page). In `cn()`, put a text-size class before `leading-*`:
   tailwind-merge drops a line height that comes before a size.
-- `text-2xs` (0.65rem); shadows `shadow-premium`, `shadow-premium-sm`, `shadow-red`; square corners (`--radius: 0`).
-- **Buttons**: `<Button>` default variant = legacy `.btn-primary` (red, uppercase, lifts with a red glow on hover);
-  `size="sm"` for the header.
+- `text-2xs` (0.65rem); shadows `shadow-soft` (a resting card or menu), `shadow-premium-sm` (lifted, hover),
+  `shadow-premium` (floating panels: dialogs, sheets, toasts), `shadow-red`.
+- **Corners** (soft and rounded; the radius follows the element's rank, never one radius for all): `rounded-md` 8px
+  (tags, thumbnails), `rounded-lg` 12px (inputs, menu items, small tiles), `rounded-2xl` 20px (cards, dialogs,
+  popovers, menus), `rounded-3xl` 28px (large panels, the side sheets' inner edge), `rounded-full` (buttons, chips,
+  filter pills, switches, steppers, badges, toasts). A rounded thing inside another gets the outer radius minus the gap.
+- **Buttons**: `<Button>` is a pill (rounded-full) with a sentence-case semibold label; the default variant is brand
+  red and lifts with a red glow on hover; `size="sm"` (40px) for dialogs and the header; `loading` (see Loading states).
+- **Form fields**: `ui/input` (`inputVariants` default / compact / search, `INPUT_CLASS` under a label, `LABEL_CLASS`):
+  rounded-lg, light grey fill, white with a red border and a faint red halo when focused; never copy field classes.
 - **Logo**: `<Logo className="h-14" />` — horizontal lockup traced from `legacy/public/UltraPet_Logo.pdf`.
 - **Header**: a translucent white material (`material-bar` in `index.css`: 85% white + backdrop blur; solid white
   for reduced transparency / more contrast), 88px tall (`py-4` + 56px logo; below `sm` the logo shrinks to h-8 so the cart, language and menu buttons fit at 360px); pages use `pt-22` to clear it. No
@@ -490,7 +514,13 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   active:duration-100`); clickable cards lift on hover and settle on press (`transition-[box-shadow,translate,scale]`;
   Tailwind v4 moves with `translate`/`scale`, so `transition-[transform]` would not animate them). The mobile drawer
   can be swiped closed (`onSwipeClose` on `SheetContent`). Reduced motion keeps fades and drops movement (see the
-  `prefers-reduced-motion` block in `index.css`).
+  `prefers-reduced-motion` block in `index.css`). Subtle motion wherever it answers an action, in three durations
+  (150ms press / color, 300ms hover lift / menus / pills, 500ms panels / photos), never more than ~8px of travel or
+  1.03 scale, never looping (except a Spinner or the progress bar while something loads): shared utilities `img-fade`
+  (a photo fades in once loaded), `link-underline` (an underline that sweeps in), `animate-spinner`,
+  `animate-route-progress`, `animate-fade-in`; a change of page cross-fades through a view transition (`router.ts`,
+  only when the path changes). No scroll-triggered reveals: content below the fold must be visible in screenshots
+  and to axe.
 - **Type**: Inter with optical sizing (`opsz`); sizes from `text-xl` up carry size-specific negative tracking
   (`--text-*--letter-spacing`, milder in Hebrew); `tracking-display` for the hero headline; headings balance.
 - **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,

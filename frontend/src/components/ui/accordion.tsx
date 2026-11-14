@@ -8,7 +8,8 @@
  * again); `type="multiple"` lets any number stay open.
  *
  * Variants (on the root, shared with the parts through context): "line" (default) = rows divided by hairlines,
- * "card" = separate white boxes that lift with a shadow while open.
+ * "card" = separate white rounded boxes (rounded-2xl) that lift with a shadow while open. The chevron sits in a round
+ * tile that turns red while open.
  *
  * Motion (the site's spring, --ease-spring): a panel grows to its measured height (Radix's
  * --radix-accordion-content-height) while its text fades in and settles from 8px above; closing collapses it faster,
@@ -33,7 +34,7 @@ const itemVariants = cva("", {
   variants: {
     variant: {
       line: "border-b border-neutral-200 first:border-t",
-      card: "border border-neutral-200 bg-white transition-[border-color,box-shadow] duration-300 hover:border-brand-red/30 data-[state=open]:border-brand-red/30 data-[state=open]:shadow-premium-sm",
+      card: "rounded-2xl border border-neutral-200 bg-white transition-[border-color,box-shadow] duration-300 hover:border-brand-red/30 data-[state=open]:border-brand-red/30 data-[state=open]:shadow-premium-sm",
     },
   },
 })
@@ -89,7 +90,7 @@ function AccordionTrigger({ className, children, ...props }: React.ComponentProp
         <span>{children}</span>
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center bg-neutral-100 text-brand-charcoal transition-[background-color,color,scale] duration-300 group-hover/trigger:bg-brand-red-muted group-hover/trigger:text-brand-red group-active/trigger:scale-[0.92] group-active/trigger:duration-100 group-data-[state=open]/trigger:bg-brand-red group-data-[state=open]/trigger:text-white"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-brand-charcoal transition-[background-color,color,scale] duration-300 group-hover/trigger:bg-brand-red-muted group-hover/trigger:text-brand-red group-active/trigger:scale-[0.92] group-active/trigger:duration-100 group-data-[state=open]/trigger:bg-brand-red group-data-[state=open]/trigger:text-white"
         >
           <ChevronDownIcon className="size-5 transition-[rotate] duration-500 group-data-[state=open]/trigger:rotate-180" />
         </span>

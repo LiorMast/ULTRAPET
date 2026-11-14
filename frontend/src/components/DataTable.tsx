@@ -515,6 +515,7 @@ function DeleteDialog({
 
   /** Runs the delete; on failure keeps the dialog open with the server's reason. */
   const handleConfirm = async () => {
+    if (pending) return
     setPending(true)
     setError('')
     try {
@@ -541,7 +542,7 @@ function DeleteDialog({
           <Button variant="outline" size="sm" onClick={onClose}>
             {t.admin.cancel}
           </Button>
-          <Button size="sm" disabled={pending} onClick={handleConfirm}>
+          <Button size="sm" loading={pending} onClick={handleConfirm}>
             {t.admin.delete}
           </Button>
         </DialogFooter>

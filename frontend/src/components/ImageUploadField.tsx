@@ -150,7 +150,8 @@ export function ImageUploadField({
             type="button"
             variant="outline"
             size="sm"
-            disabled={disabled || busy}
+            disabled={disabled}
+            loading={busy}
             aria-invalid={invalid}
             aria-describedby={[describedBy, problem && problemId].filter(Boolean).join(' ') || undefined}
             onClick={() => fileInput.current?.click()}

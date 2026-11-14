@@ -7,7 +7,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createStaffRow } from '@/api'
-import { signInFakeUser, TEST_STAFF, TEST_USER } from '@/test/api'
+import { holdRequests, signInFakeUser, TEST_STAFF, TEST_USER } from '@/test/api'
 import { renderPage } from '@/test/utils'
 
 /**
@@ -160,6 +160,37 @@ describe('HeroEditor', () => {
         .map((option) => option.textContent)
     expect(options('עברית')).toEqual(['ברירת המחדל של האתר', 'Heebo', 'Rubik', 'Assistant', 'Frank Ruhl Libre'])
     expect(options('English')).toEqual(['ברירת המחדל של האתר', 'Heebo', 'Rubik', 'Assistant', 'Frank Ruhl Libre', 'Inter', 'Montserrat'])
+  })
+
+  it('shows the dialog\'s Save busy while the server saves, and saves once', async () => {
+    const held = holdRequests((path, method) => method !== 'GET' && path.startsWith('/api/staff/page-sections'))
+    const { user } = await renderPage('/en', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: 'Edit both languages' }))
+    const dialog = await screen.findByRole('dialog')
+    const save = within(dialog).getByRole('button', { name: 'Save' })
+    await user.dblClick(save)
+    expect(save).toHaveAttribute('aria-busy', 'true')
+    expect(held.calls).toHaveLength(1)
+    held.release()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(held.calls).toHaveLength(1)
+  })
+
+  it('shows the in-place Save busy while the server saves, and saves once', async () => {
+    const held = holdRequests((path, method) => method !== 'GET' && path.startsWith('/api/staff/page-sections'))
+    const { user } = await renderPage('/en', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: 'Edit on page: Hero' }))
+    const tagline = screen.getByRole('textbox', { name: 'Tagline' })
+    await user.type(tagline, 'Wholesale only')
+    const save = screen.getByRole('button', { name: 'Save' })
+    await user.click(save)
+    expect(save).toHaveAttribute('aria-busy', 'true')
+    await user.click(save)
+    await user.type(tagline, '{Enter}')
+    expect(held.calls).toHaveLength(1)
+    held.release()
+    expect(await screen.findByRole('button', { name: 'Edit on page: Hero' })).toBeInTheDocument()
+    expect(held.calls).toHaveLength(1)
   })
 
   it('shows a refused save and keeps the dialog open', async () => {

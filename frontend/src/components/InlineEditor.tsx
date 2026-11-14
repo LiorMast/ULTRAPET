@@ -290,7 +290,7 @@ type InlineEditBarProps = ReturnType<typeof useInlineDraft>['bar'] & { onEdit: (
  * The section's edit controls: "Edit on page", or Save and Cancel while editing.
  * @param props.editing - Whether the section is in edit mode.
  * @param props.formId - The id of the section's <form> (Save submits it).
- * @param props.pending - True while saving (Save is disabled).
+ * @param props.pending - True while saving (Save shows the spinner and ignores clicks).
  * @param props.error - Why the last save was refused; '' = none.
  * @param props.editButton - Ref of "Edit on page", focused again after saving or cancelling.
  * @param props.onEdit - Starts editing (the section calls start() with its current values).
@@ -316,7 +316,7 @@ export function InlineEditBar({ editing, formId, pending, error, editButton, onE
           <Button type="button" variant={tone === 'dark' ? 'ghostWhite' : 'outline'} size="sm" onClick={onCancel}>
             {t.admin.cancel}
           </Button>
-          <Button type="submit" form={formId} size="sm" disabled={pending}>
+          <Button type="submit" form={formId} size="sm" loading={pending}>
             {t.admin.save}
           </Button>
         </>

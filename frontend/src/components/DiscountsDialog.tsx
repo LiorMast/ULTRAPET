@@ -278,6 +278,7 @@ export function DiscountsDialog({
    * @param rule - The rule.
    */
   const handleDelete = async (rule: StaffPriceRule) => {
+    if (pending) return
     setPending(true)
     setError('')
     try {
@@ -326,7 +327,7 @@ export function DiscountsDialog({
                         <span id={`${id}-confirm`} className="text-sm font-semibold text-brand-charcoal">
                           {d.confirm}
                         </span>
-                        <Button size="xs" autoFocus disabled={pending} aria-describedby={`${id}-confirm`} onClick={() => handleDelete(rule)}>
+                        <Button size="xs" autoFocus loading={pending} aria-describedby={`${id}-confirm`} onClick={() => handleDelete(rule)}>
                           {t.admin.delete}
                         </Button>
                         <Button size="xs" variant="outline" onClick={() => cancelDelete(rule)}>

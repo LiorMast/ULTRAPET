@@ -19,6 +19,7 @@ import { EditableText, InlineEditError } from '@/components/InlineEditor'
 import { HEADING_KEYS, headingLabels, SectionHeading } from '@/components/SectionHeading'
 import type { SettingChanges } from '@/components/Stats'
 import { Button } from '@/components/ui/button'
+import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { CONTACT_METHODS, type ContactMethod } from '@/config'
 import { useI18n } from '@/i18n'
 
@@ -50,8 +51,6 @@ function detailError(detail: keyof ContactDetails, value: string, errors: { requ
 /** Field names of the form. */
 type Field = 'name' | 'phone' | 'email' | 'message'
 
-const INPUT_CLASS =
-  'mt-2 block w-full border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-brand-charcoal transition-colors focus:border-brand-red focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40 aria-[invalid=true]:border-brand-red'
 
 /**
  * One contact card: a link (tel/mailto/WhatsApp) or plain text, with icon, label, value and sub-line.
@@ -160,7 +159,7 @@ function ContactForm({ email }: { email: string }) {
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
         {fields.map((f) => (
           <div key={f.name}>
-            <label htmlFor={`contact-${f.name}`} className="block font-heading text-2xs font-semibold uppercase tracking-widest text-brand-charcoal-muted">
+            <label htmlFor={`contact-${f.name}`} className={LABEL_CLASS}>
               {f.label}{f.required && ' *'}
             </label>
             <input
@@ -181,7 +180,7 @@ function ContactForm({ email }: { email: string }) {
           </div>
         ))}
         <div>
-          <label htmlFor="contact-message" className="block font-heading text-2xs font-semibold uppercase tracking-widest text-brand-charcoal-muted">
+          <label htmlFor="contact-message" className={LABEL_CLASS}>
             {t.contact.fieldMessage} *
           </label>
           <textarea

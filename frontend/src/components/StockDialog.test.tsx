@@ -8,7 +8,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import products from '@/stubs/products.json'
-import { fakeFetch, setFakeStock, TEST_STAFF } from '@/test/api'
+import { fakeFetch, holdRequests, setFakeStock, TEST_STAFF } from '@/test/api'
 import { renderPage } from '@/test/utils'
 
 /** The first two products of the table (the fake's staff order is the stub order). */
@@ -114,6 +114,25 @@ describe('/admin/products stock', () => {
     await waitFor(() => expect(within(dialog).getByText('Out of stock')).toBeInTheDocument())
     expect(within(within(dialog).getByRole('list')).getAllByRole('listitem')[0]).toHaveTextContent(/Removed\s*−17/)
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows Record busy while the server records, and records the movement once', async () => {
+    await setFakeStock(first.id, 12)
+    const held = holdRequests((path, method) => method === 'POST' && path.endsWith('/stock'))
+    const { user } = await renderPage('/en/admin/products', { staff: TEST_STAFF })
+    const dialog = await openStock(user, first.name.en)
+    const received = within(dialog).getByRole('textbox', { name: 'Units received *' })
+    await user.type(received, '5')
+    const record = within(dialog).getByRole('button', { name: 'Record' })
+    await user.click(record)
+    expect(record).toHaveAttribute('aria-busy', 'true')
+    await user.click(record)
+    await user.type(received, '{Enter}')
+    expect(held.calls).toHaveLength(1)
+    held.release()
+    await screen.findByText('Stock updated.')
+    expect(record).not.toHaveAttribute('aria-busy')
+    expect(within(within(dialog).getByRole('list')).getAllByRole('listitem').filter((item) => /Received\s*\+5/.test(item.textContent ?? ''))).toHaveLength(1)
   })
 
   it('refuses a quantity that is not a whole number, without sending it', async () => {

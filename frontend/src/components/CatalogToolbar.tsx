@@ -14,6 +14,7 @@ import { cn } from 'cn'
 import { CATALOG_SORTS, type Brand, type CatalogSearch, type CatalogSort, type ProductPage } from '@/api'
 import { formatPrice } from '@/components/CatalogCard'
 import { Button } from '@/components/ui/button'
+import { inputVariants } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -40,12 +41,11 @@ const triggerVariants = cva(
 )
 
 /** The look of the menu panels and their entries (square, roomy, like the language menu). */
-const MENU = 'w-auto min-w-60 rounded-none p-1'
-const MENU_ITEM = 'rounded-none py-2.5 ps-4 pe-10 font-medium text-brand-charcoal'
+const MENU = 'w-auto min-w-60'
+const MENU_ITEM = 'py-2.5 ps-3.5 pe-10 font-medium text-brand-charcoal'
 
-/** The look of the price inputs (the search box's look, smaller). */
-const INPUT =
-  'block h-11 w-full border border-neutral-300 bg-neutral-50 px-3 text-sm text-brand-charcoal focus:border-brand-red focus:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/40'
+/** The look of the price inputs (the shared field, compact). */
+const INPUT = inputVariants({ size: 'compact' })
 
 /** The URL state the toolbar changes; any change goes back to page 1. */
 type Changes = Pick<CatalogSearch, 'brand' | 'min' | 'max' | 'sort'>

@@ -19,7 +19,8 @@ import { cn } from 'cn'
 import { ApiError, type ProductStock, type StockMovement, type StockMovementInput, type StockMovementKind, type StockStatus } from '@/api'
 import type { RowAction } from '@/components/DataTable'
 import { DiscountRibbon, STOCK_RIBBONS } from '@/components/DiscountRibbon'
-import { errorMessage, INPUT_CLASS, LABEL_CLASS } from '@/components/RecordDialog'
+import { errorMessage } from '@/components/RecordDialog'
+import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { SegmentedSwitch } from '@/components/SegmentedSwitch'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -220,6 +221,7 @@ export function StockDialog({
    */
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    if (pending) return
     setFormError('')
     if (Number.isNaN(units) || units < minimum) {
       setQuantityError(s.errors.quantity.replace('{min}', minimum.toLocaleString(locale)))
@@ -386,7 +388,7 @@ export function StockDialog({
               {t.admin.close}
             </Button>
             {stock !== null && (
-              <Button type="submit" size="sm" disabled={pending}>
+              <Button type="submit" size="sm" loading={pending}>
                 {s.save}
               </Button>
             )}

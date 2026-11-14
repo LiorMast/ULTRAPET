@@ -715,6 +715,10 @@ export const en: Dictionary = {
       isActive: 'Active',
     },
   },
+  common: {
+    /** The Spinner's spoken label while something loads. */
+    loading: 'Loading…',
+  },
   page: {
     comingSoon: 'This page is under construction and will be available soon.',
     notFoundTitle: 'Page not found',
