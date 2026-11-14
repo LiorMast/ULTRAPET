@@ -1,15 +1,15 @@
 /**
- * BrandCard.tsx — A minimalist card for one brand: logo (the brand's logoUrl, else the logo file bundled
- * with the site, else a text wordmark), name, tagline and an "explore" arrow. The whole card is one link to
- * the brand's page.
+ * BrandCard.tsx — A minimalist rounded card for one brand: logo (the brand's logoUrl, else the logo file bundled
+ * with the site, else a text wordmark) on a soft panel, name and tagline. The whole card is one link to the brand's
+ * page; it lifts and brightens on hover, and the logo fades in once loaded and grows a little on hover.
  * Used by the home page Brands section; reusable on a future all-brands page.
  */
 import { Link } from '@tanstack/react-router'
-import { ArrowRight } from 'lucide-react'
 import { cn } from 'cn'
 import type { Brand } from '@/api'
 import { brandLogo, localized } from '@/config'
 import { useI18n } from '@/i18n'
+import { imgFade } from '@/motion'
 
 /**
  * One brand card. The card is a real link (crawlable, keyboard-focusable); a thin line in the brand's
@@ -27,29 +27,34 @@ export function BrandCard({ brand, className }: { brand: Brand; className?: stri
       to="/brands/$slug"
       params={{ slug: brand.slug }}
       className={cn(
-        'group relative flex flex-col overflow-hidden border border-white/20 bg-transparent p-8 outline-none',
-        'transition-[box-shadow,translate,scale] duration-300 hover:-translate-y-1 hover:shadow-premium-sm',
+        'group relative flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-white/5 p-6 outline-none sm:p-7',
+        'transition-[box-shadow,translate,scale,background-color] duration-300 hover:-translate-y-1 hover:bg-white/10 hover:shadow-premium-sm',
         'active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100',
         'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
         className,
       )}
     >
-      <div className={cn('flex h-36 items-center justify-center', logo && 'bg-white/15')}>
+      <div className={cn('flex h-36 items-center justify-center rounded-xl', logo && 'bg-white/15')}>
         {logo ? (
-          <img src={logo} alt="" width={200} height={144} loading="lazy" className="max-h-28 w-auto max-w-[75%] object-contain" />
+          <img
+            src={logo}
+            alt=""
+            width={200}
+            height={144}
+            loading="lazy"
+            {...imgFade}
+            className="img-fade max-h-28 w-auto max-w-[75%] object-contain group-hover:scale-[1.03]"
+          />
         ) : (
-          <span aria-hidden="true" className="font-heading text-2xl font-bold uppercase tracking-widest text-white">
+          <span aria-hidden="true" className="font-display text-2xl font-bold text-white">
             {brand.name}
           </span>
         )}
       </div>
-      <div className="mt-8 flex items-end justify-between gap-4 border-t border-white/20 pt-5">
-        <div className="min-w-0">
-          <h3 className="font-heading text-sm font-bold uppercase tracking-widest text-white">{brand.name}</h3>
-          {brand.tagline && <p className="mt-1 text-sm text-white/75">{localized(brand.tagline, locale)}</p>}
-        </div>
+      <div className="mt-6 min-w-0">
+        <h3 className="font-heading text-base font-semibold text-white">{brand.name}</h3>
+        {brand.tagline && <p className="mt-1 text-sm text-white/75">{localized(brand.tagline, locale)}</p>}
         <span className="sr-only">{t.brands.explore}</span>
-        <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-white transition-transform duration-300 group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
       </div>
       <span
         aria-hidden="true"

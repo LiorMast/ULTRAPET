@@ -1,5 +1,5 @@
 /**
- * SectionHeading.tsx — The heading block that opens a page section: a small uppercase eyebrow, the title and an
+ * SectionHeading.tsx — The heading block that opens a page section: a small sentence-case red eyebrow, the title and an
  * optional intro paragraph. The home sections (Brands, Categories, About, FAQ, Contact) open with it, so every section
  * starts the same way; pages can use it with `as="h1"`. `tone="dark"` is the white-on-black version (Brands).
  *
@@ -16,16 +16,16 @@ import type { Dictionary } from '@/i18n/he'
 // The size class goes first in cn(): tailwind-merge drops a `leading-*` that comes before a text size.
 
 /** The eyebrow's look: its size steps and tone. */
-const eyebrowLook = cva('font-heading font-bold uppercase tracking-widest', {
+const eyebrowLook = cva('font-heading font-semibold', {
   variants: {
-    size: { sm: 'text-2xs', md: 'text-xs', lg: 'text-sm', xl: 'text-base' },
+    size: { sm: 'text-xs', md: 'text-sm', lg: 'text-base', xl: 'text-lg' },
     tone: { light: 'text-brand-red', dark: 'text-white/80' },
   },
   defaultVariants: { size: 'md', tone: 'light' },
 })
 
 /** The title's look: its size steps and tone. */
-const titleLook = cva('mt-4 font-display font-bold', {
+const titleLook = cva('mt-3 font-display font-bold', {
   variants: {
     size: { sm: 'text-3xl lg:text-4xl', md: 'text-4xl lg:text-5xl', lg: 'text-5xl lg:text-6xl', xl: 'text-5xl lg:text-7xl' },
     tone: { light: 'text-brand-charcoal', dark: 'text-white' },

@@ -51,7 +51,7 @@ describe('Contact section', () => {
   })
 
   it('renders custom cards given by props', async () => {
-    const methods: ContactMethod[] = [{ id: 'x', icon: (() => null) as unknown as ContactMethod['icon'], label: () => 'Lbl', value: () => 'Val', sub: () => 'Sub' }]
+    const methods: ContactMethod[] = [{ id: 'x', label: () => 'Lbl', value: () => 'Val', sub: () => 'Sub' }]
     renderComponent(<Contact details={{ phone: '', whatsapp: '', email: 'a@b.co' }} methods={methods} />, 'en')
     expect(await screen.findByText('Val')).toBeInTheDocument()
     expect(screen.queryAllByRole('link')).toHaveLength(0)

@@ -60,8 +60,8 @@ const SECTIONS: { id: string; title: (t: Dictionary) => string }[] = [
 function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
   const { t } = useI18n()
   return (
-    <section id={section.id} className="min-h-[70vh] border-b border-neutral-150 px-6 py-24 lg:px-10">
-      <div className="mx-auto max-w-7xl">
+    <section id={section.id} className="px-6 py-12 lg:px-10 lg:py-16">
+      <div className="mx-auto flex min-h-[50vh] max-w-7xl flex-col justify-center rounded-3xl bg-neutral-100 p-8 lg:p-14">
         <h2 className="font-heading text-3xl font-bold text-brand-charcoal">{section.title(t)}</h2>
         <p className="mt-4 text-brand-charcoal-muted">{t.page.comingSoon}</p>
       </div>

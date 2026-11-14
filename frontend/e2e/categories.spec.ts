@@ -24,8 +24,17 @@ for (const [name, path, next, previous] of [
     await section.getByRole('button', { name: next }).click()
     await expect.poll(offset).toBeGreaterThan(50)
     await expect(section.getByRole('button', { name: previous })).toBeEnabled()
+    /** Waits until the row has stopped scrolling (two reads 200ms apart agree), so the arrows' state is final. */
+    const settled = () =>
+      expect
+        .poll(async () => {
+          const before = await offset()
+          await page.waitForTimeout(200)
+          return (await offset()) === before
+        })
+        .toBe(true)
     for (let i = 0; i < 20; i++) {
-      await page.waitForTimeout(700) // let the smooth scroll settle before reading the button state
+      await settled()
       if (!(await section.getByRole('button', { name: next }).isEnabled())) break
       await section.getByRole('button', { name: next }).click()
     }

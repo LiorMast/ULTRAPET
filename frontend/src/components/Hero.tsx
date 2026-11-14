@@ -1,7 +1,9 @@
 /**
- * Hero.tsx — The home page hero: a full-width slideshow of photos with a dark gradient on the text
- * side, the "Ultra Pet" headline, a short pitch and two buttons. Rebuilt from legacy/src/components/Hero.tsx.
+ * Hero.tsx — The home page hero: a slideshow of photos with a dark gradient on the text side, the "Ultra Pet"
+ * headline, a short pitch and a button. Rebuilt from legacy/src/components/Hero.tsx.
  *
+ * - The page's one bold shape: from `sm` up the hero is an inset frame (a 12-16px margin, rounded-3xl corners) under
+ *   the header; on phones it stays full-bleed.
  * - The photos come from the folder src/assets/hero (see HERO_IMAGES in src/config.ts): drop files there
  *   and they appear, in filename order. Photos are decorative; the headline carries the meaning.
  * - Each photo fades in over 1.6s while slowly zooming in (styles: .hero-slide in src/index.css).
@@ -22,7 +24,7 @@
  */
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, ChevronDown, Pause, Play } from 'lucide-react'
+import { ChevronDown, Pause, Play } from 'lucide-react'
 import { cva } from 'class-variance-authority'
 import { cn } from 'cn'
 import type { HeroContent, SectionText } from '@/api'
@@ -229,7 +231,7 @@ export function Hero({
     <section
       id="home"
       className={cn(
-        'relative isolate h-[calc(100svh-5.5rem)] max-h-[960px] min-h-[600px] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3',
+        'relative isolate h-[calc(100svh-5.5rem)] max-h-[960px] min-h-[600px] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3 sm:mx-3 sm:mt-3 sm:h-[calc(100svh-6.25rem)] sm:rounded-3xl lg:mx-4',
         // While editing, the boxes' frames and a wrapped bar can add height: the hero grows instead of cutting off.
         editing && 'h-auto max-h-none py-28',
       )}
@@ -253,13 +255,12 @@ export function Hero({
       <div className="pointer-events-none absolute inset-0 bg-linear-to-r from-black/85 via-black/50 to-black/15 rtl:bg-linear-to-l" />
       <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-black/20" />
       <div className="pointer-events-none absolute inset-0 bg-black/30 lg:hidden" />
-      <div className="absolute inset-y-0 start-0 z-10 w-1 bg-brand-red" aria-hidden="true" />
 
       <div className={cn('relative z-10 mx-auto flex h-full max-w-screen-2xl flex-col justify-center', PAGE_GUTTER)}>
         <form {...inline.formProps} className="max-w-3xl">
           <div className="mb-5 flex animate-hero-rise items-center gap-3 [animation-delay:200ms]">
             <span aria-hidden="true" className="h-px w-8 bg-brand-red" />
-            <span className="font-heading text-2xs font-semibold uppercase tracking-ultra-wide text-white/90">
+            <span className="font-heading text-sm font-medium text-white/90">
               {t.hero.eyebrow}
             </span>
           </div>
@@ -332,13 +333,10 @@ export function Hero({
             className={cn('mb-10 max-w-xl leading-relaxed text-white/80 [animation-delay:600ms]', rise)}
           />
           <div className="flex animate-hero-rise flex-col gap-4 [animation-delay:750ms] sm:flex-row sm:flex-wrap">
-            <Button asChild className="px-9 py-5 text-sm">
-              <Link {...HERO_LINKS.brands.link}>
-                {HERO_LINKS.brands.label(t)}
-                <ArrowRight size={16} aria-hidden="true" className="rtl:rotate-180" />
-              </Link>
+            <Button asChild className="px-8 py-4 text-base">
+              <Link {...HERO_LINKS.brands.link}>{HERO_LINKS.brands.label(t)}</Link>
             </Button>
-            {/* <Button asChild variant="ghostWhite" className="px-9 py-5 text-sm">
+            {/* <Button asChild variant="ghostWhite" className="px-8 py-4 text-base">
               <Link {...HERO_LINKS.business.link}>{HERO_LINKS.business.label(t)}</Link>
             </Button> */}
           </div>
@@ -346,7 +344,9 @@ export function Hero({
       </div>
 
       {hasControls && (
-        <div className={cn('absolute inset-x-0 bottom-6 z-10 mx-auto flex max-w-screen-2xl justify-end', PAGE_GUTTER)}>
+        // At the text's side (inline start): the inline end belongs to the floating WhatsApp button. On phones the row
+        // sits higher, clear of the centered scroll-down arrow.
+        <div className={cn('absolute inset-x-0 bottom-16 z-10 mx-auto flex max-w-screen-2xl justify-start sm:bottom-6', PAGE_GUTTER)}>
           <div
             role="group"
             aria-label={t.hero.slideshowLabel}
@@ -363,7 +363,7 @@ export function Hero({
               >
                 <span
                   className={cn(
-                    'block h-0.5 overflow-hidden transition-all duration-300',
+                    'block h-1 overflow-hidden rounded-full transition-[width,background-color] duration-500',
                     i === current ? 'w-14 bg-white/25' : 'w-5 bg-white/40 group-hover/dash:bg-white/70',
                   )}
                 >

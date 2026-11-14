@@ -26,7 +26,7 @@ describe('About section', () => {
   })
 
   it('renders custom lists given by props', async () => {
-    const one: AboutItem[] = [{ id: 'x', icon: (() => null) as unknown as AboutItem['icon'], title: () => 'Only', text: () => 'One' }]
+    const one: AboutItem[] = [{ id: 'x', title: () => 'Only', text: () => 'One' }]
     renderComponent(<About pillars={one} offers={[]} advantages={[]} />, 'en')
     expect(await screen.findByRole('heading', { level: 4, name: 'Only' })).toBeInTheDocument()
   })

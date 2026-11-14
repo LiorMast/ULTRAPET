@@ -183,7 +183,6 @@ function ArticlePage() {
                 key={category.slug}
                 name={category.label(t)}
                 image={category.image}
-                icon={category.icon}
                 link={linkOptions({ to: '/categories/$slug', params: { slug: category.slug } })}
               />
             ))}

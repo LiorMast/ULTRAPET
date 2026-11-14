@@ -7,7 +7,6 @@
  * advantages and the closing paragraph (the button keeps its label).
  */
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, Check } from 'lucide-react'
 import { cn } from 'cn'
 import type { SectionContent } from '@/api'
 import { fieldLabel, SectionEditBar, useEditableSection, type EditableField } from '@/components/EditableSection'
@@ -22,23 +21,16 @@ import { useI18n } from '@/i18n'
 const BLOCK_KEYS = ['visionTitle', 'offerTitle', 'advantagesTitle', 'joinTitle', 'joinText', 'closing'] as const
 
 /**
- * One About item: an icon in a square, a title and a description.
- * @param props.item - The item to show (its icon).
+ * One About item: a title over its description, the items divided by hairlines (no icons: the words say it).
  * @param props.title - Its title's EditableText props.
  * @param props.text - Its description's EditableText props.
  * @returns The list item.
  */
-function AboutCard({ item, title, text }: { item: AboutItem; title: EditableField; text: EditableField }) {
-  const Icon = item.icon
+function AboutCard({ title, text }: { title: EditableField; text: EditableField }) {
   return (
-    <li className="flex gap-5 border-t border-neutral-150 py-6">
-      <span className="flex size-12 shrink-0 items-center justify-center bg-brand-red-muted text-brand-red">
-        <Icon aria-hidden="true" className="size-6" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <EditableText as="h4" wrap {...title} className="font-heading text-sm font-bold uppercase tracking-widest text-brand-charcoal" />
-        <EditableText multiline {...text} className="mt-2 text-brand-charcoal-muted" />
-      </div>
+    <li className="border-t border-neutral-200 py-6">
+      <EditableText as="h4" wrap {...title} className="font-heading text-lg font-semibold text-brand-charcoal" />
+      <EditableText multiline {...text} className="mt-2 text-brand-charcoal-muted" />
     </li>
   )
 }
@@ -99,7 +91,7 @@ export function About({
   const section = useEditableSection<string>({ content, ...aboutTexts(t, { pillars, offers, advantages }), styled: HEADING_KEYS, onSave: onSave && ((next) => onSave(next)) })
   const { field } = section
   return (
-    <section id="about" aria-labelledby="about-title" className="border-b border-neutral-150 bg-white px-6 py-24 lg:px-10 lg:py-32">
+    <section id="about" aria-labelledby="about-title" className="bg-white px-6 py-24 lg:px-10 lg:py-32">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.about.eyebrow} className="bg-white" />}
         <form {...section.formProps}>
@@ -110,7 +102,7 @@ export function About({
               <EditableText as="h3" wrap {...field('visionTitle')} className="font-display text-2xl font-bold text-brand-charcoal" />
               <ul className="mt-6">
                 {pillars.map((item) => (
-                  <AboutCard key={item.id} item={item} title={field(`pillar.${item.id}.title`)} text={field(`pillar.${item.id}.text`)} />
+                  <AboutCard key={item.id} title={field(`pillar.${item.id}.title`)} text={field(`pillar.${item.id}.text`)} />
                 ))}
               </ul>
             </div>
@@ -118,19 +110,19 @@ export function About({
               <EditableText as="h3" wrap {...field('offerTitle')} className="font-display text-2xl font-bold text-brand-charcoal" />
               <ul className="mt-6">
                 {offers.map((item) => (
-                  <AboutCard key={item.id} item={item} title={field(`offer.${item.id}.title`)} text={field(`offer.${item.id}.text`)} />
+                  <AboutCard key={item.id} title={field(`offer.${item.id}.title`)} text={field(`offer.${item.id}.text`)} />
                 ))}
               </ul>
             </div>
           </div>
 
-          <div className="mt-20 grid gap-10 bg-brand-charcoal p-8 text-white lg:grid-cols-2 lg:gap-16 lg:p-14">
+          <div className="mt-20 grid gap-10 rounded-3xl bg-brand-charcoal p-8 text-white lg:grid-cols-2 lg:gap-16 lg:p-14">
             <div>
               <EditableText as="h3" wrap {...field('advantagesTitle')} className="font-display text-2xl font-bold" />
               <ul className="mt-6 space-y-4">
                 {advantages.map((a) => (
                   <li key={a.id} className="flex items-start gap-3 text-white/85">
-                    <Check aria-hidden="true" className="mt-1 size-5 shrink-0 text-white" />
+                    <span aria-hidden="true" className="mt-2.5 size-1.5 shrink-0 rounded-full bg-brand-red-light" />
                     <EditableText as="span" wrap {...field(`advantage.${a.id}`)} className="min-w-0 flex-1" />
                   </li>
                 ))}
@@ -141,10 +133,7 @@ export function About({
               <EditableText multiline {...field('joinText')} className="mt-4 text-white/85" />
               {/* While editing, the button is shown but not followed: the page stays in edit mode. */}
               <Button asChild className={cn('mt-8', section.editing && 'pointer-events-none')}>
-                <Link to="/" hash="contact">
-                  {t.about.cta}
-                  <ArrowRight aria-hidden="true" className="rtl:rotate-180" />
-                </Link>
+                <Link to="/" hash="contact">{t.about.cta}</Link>
               </Button>
             </div>
           </div>

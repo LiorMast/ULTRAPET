@@ -3,7 +3,8 @@
  * with a short label. Used by routes/index.tsx, which loads the figures from the API (fetchStats); the labels
  * come from the dictionaries through STAT_LABELS in config.ts. The numbers count up once when they scroll into view
  * (skipped for visitors who prefer reduced motion); the final value is always in the page for screen readers.
- * Phones get a smaller number size, so the widest figure ("1,000+") fits its half of the row even at 360px.
+ * Phones get a smaller number size, so the widest figure ("1,000+") fits its half of the row even at 360px. The
+ * figures sit together in one soft grey rounded panel (rounded-3xl), divided by hairlines.
  *
  * With `onSave`, staff edit the band in place (EditableSection, the page's language): each figure's number and suffix
  * (settings stat_<id>_value / stat_<id>_suffix, the same in every language) and its label (words only, page_sections
@@ -25,7 +26,7 @@ export type SettingChanges = Record<string, string | number>
 const NUMBER_CLASS = 'font-display text-4xl font-bold leading-none text-brand-red sm:text-5xl lg:text-6xl'
 
 /** The look of the figure's label, in read and edit mode. */
-const LABEL_CLASS = 'mt-4 font-heading text-xs font-bold uppercase tracking-widest text-brand-charcoal'
+const LABEL_CLASS = 'mt-3 font-heading text-sm font-semibold text-brand-charcoal'
 
 const COUNT_UP_MS = 1600
 
@@ -83,7 +84,7 @@ function StatFigure({ stat, label, edit, className }: { stat: Stat; label: Edita
   const shown = useCountUp(stat.value, visible, canObserve && !reducedMotion)
   const format = (n: number) => `${n.toLocaleString(locale)}${stat.suffix}`
   return (
-    <li ref={ref} className={cn('px-6 py-10 lg:px-10 lg:py-14', className)}>
+    <li ref={ref} className={cn('px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-14', className)}>
       {edit ? (
         <div dir="ltr" className={cn(NUMBER_CLASS, 'flex items-baseline gap-2 rtl:justify-end')}>
           <EditableText as="span" {...edit.value} dir="ltr" inputMode="numeric" />
@@ -157,22 +158,22 @@ export function Stats({
   })
   const { field } = section
   return (
-    <section id="stats" aria-labelledby="stats-title" className="border-b border-neutral-150 bg-white">
+    <section id="stats" aria-labelledby="stats-title" className="bg-white px-3 py-10 sm:px-6 lg:px-10 lg:py-16">
       <h2 id="stats-title" className="sr-only">{t.stats.title}</h2>
       {section.edit && (
-        <div className="mx-auto max-w-7xl px-6 pt-6 lg:px-10">
-          <SectionEditBar edit={section.edit} label={t.stats.title} className="mb-0 bg-white" />
+        <div className="mx-auto max-w-7xl">
+          <SectionEditBar edit={section.edit} label={t.stats.title} className="mb-4 bg-white" />
         </div>
       )}
       <form {...section.formProps}>
-        <ul className="mx-auto grid max-w-7xl grid-cols-2 lg:grid-cols-4">
+        <ul className="mx-auto grid max-w-7xl grid-cols-2 overflow-hidden rounded-3xl bg-neutral-100 lg:grid-cols-4">
           {shown.map((stat, i) => (
             <StatFigure
               key={stat.id}
               stat={stat}
               label={field(`label.${stat.id}`)}
               edit={section.editing ? { value: field(`value.${stat.id}`), suffix: field(`suffix.${stat.id}`) } : undefined}
-              className={cn(i % 2 === 1 && 'border-s border-neutral-150', i > 1 && 'border-t border-neutral-150 lg:border-t-0', i > 0 && 'lg:border-s lg:border-neutral-150')}
+              className={cn(i % 2 === 1 && 'border-s border-neutral-200', i > 1 && 'border-t border-neutral-200 lg:border-t-0', i > 0 && 'lg:border-s lg:border-neutral-200')}
             />
           ))}
         </ul>

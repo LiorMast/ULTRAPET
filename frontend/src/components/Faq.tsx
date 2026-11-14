@@ -19,7 +19,6 @@
  */
 import { useRef } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, Plus, Trash2 } from 'lucide-react'
 import type { FaqItem, FaqItemInput, SectionContent } from '@/api'
 import { fieldLabel, mergeSection, SectionEditBar, sectionFields, type SectionOptions } from '@/components/EditableSection'
 import { EditableText, InlineEditError, useInlineDraft, type TextValue } from '@/components/InlineEditor'
@@ -226,14 +225,11 @@ export function Faq({
       <form {...inline.formProps} className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
         <div className="lg:sticky lg:top-32 lg:self-start">
           <SectionHeading id="faq-title" edit={field} />
-          <div className="mt-10 border-s-2 border-brand-red ps-6">
+          <div className="mt-10 rounded-2xl bg-neutral-100 p-6 lg:p-8">
             <EditableText as="h3" wrap {...field('moreTitle')} className="font-display text-xl font-bold text-brand-charcoal" />
             <EditableText multiline {...field('moreText')} className="mt-2 text-brand-charcoal-muted" />
             <Button asChild className="mt-6">
-              <Link to="/" hash="contact">
-                {t.faq.cta}
-                <ArrowRight aria-hidden="true" className="rtl:rotate-180" />
-              </Link>
+              <Link to="/" hash="contact">{t.faq.cta}</Link>
             </Button>
           </div>
         </div>
@@ -282,7 +278,6 @@ export function Faq({
                         />
                       </div>
                       <Button type="button" variant="ghost" size="xs" aria-label={t.admin.deleteRow.replace('{name}', label)} onClick={() => removeQuestion(entry)}>
-                        <Trash2 aria-hidden="true" />
                         {t.admin.delete}
                       </Button>
                     </li>
@@ -291,7 +286,6 @@ export function Faq({
               </ol>
               {/* data-focus-fallback: the focus lands here when the last question is deleted. */}
               <Button type="button" variant="outline" size="sm" className="mt-6" data-focus-fallback onClick={addQuestion}>
-                <Plus aria-hidden="true" />
                 {e.add}
               </Button>
             </div>

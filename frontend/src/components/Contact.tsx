@@ -53,8 +53,8 @@ type Field = 'name' | 'phone' | 'email' | 'message'
 
 
 /**
- * One contact card: a link (tel/mailto/WhatsApp) or plain text, with icon, label, value and sub-line.
- * @param props.method - The card's icon (see CONTACT_METHODS in config.ts).
+ * One contact card: a rounded link (tel/mailto/WhatsApp) or plain text, with its label, value and sub-line (no icon:
+ * the label names the method). A link card lifts on hover and its value turns brand red.
  * @param props.label - Its label's EditableText props.
  * @param props.value - Its value's EditableText props.
  * @param props.sub - Its sub-line's EditableText props.
@@ -63,28 +63,22 @@ type Field = 'name' | 'phone' | 'email' | 'message'
  *   then left-to-right (a phone number or an address). Omitted: the value follows the page's direction (the hours).
  * @returns The list item.
  */
-function ContactCard({ method, label, value, sub, href, inputMode }: { method: ContactMethod; label: EditableField; value: EditableField; sub: EditableField; href?: string; inputMode?: 'tel' | 'email' }) {
-  const Icon = method.icon
+function ContactCard({ label, value, sub, href, inputMode }: { label: EditableField; value: EditableField; sub: EditableField; href?: string; inputMode?: 'tel' | 'email' }) {
   const body = (
     <>
-      <span className="flex size-11 shrink-0 items-center justify-center bg-neutral-100 text-brand-charcoal-muted transition-colors group-hover:bg-brand-red group-hover:text-white">
-        <Icon aria-hidden="true" className="size-5" />
-      </span>
-      <span className="block min-w-0 flex-1">
-        <EditableText as="span" wrap {...label} className="block font-heading text-2xs font-semibold uppercase tracking-widest text-brand-charcoal-muted" />
-        <EditableText as="span" wrap {...value} dir={inputMode && 'ltr'} inputMode={inputMode} className="mt-0.5 block text-sm font-medium text-brand-charcoal" />
-        <EditableText as="span" wrap {...sub} className="mt-0.5 block text-xs text-brand-charcoal-muted" />
-      </span>
+      <EditableText as="span" wrap {...label} className="block font-heading text-sm font-medium text-brand-charcoal-muted" />
+      <EditableText as="span" wrap {...value} dir={inputMode && 'ltr'} inputMode={inputMode} className="mt-1 block text-lg font-semibold text-brand-charcoal transition-colors duration-300 group-hover:text-brand-red-dark" />
+      <EditableText as="span" wrap {...sub} className="mt-0.5 block text-sm text-brand-charcoal-muted" />
     </>
   )
-  const className = 'group flex items-center gap-5 border border-neutral-200 bg-white p-6 transition-all duration-300'
+  const className = 'group block rounded-2xl border border-neutral-200 bg-white px-6 py-5 transition-[border-color,box-shadow,translate,scale] duration-300'
   return (
     <li>
       {href ? (
         <a
           href={href}
           {...(href.startsWith('http') && { target: '_blank', rel: 'noopener noreferrer' })}
-          className={cn(className, 'hover:border-brand-red/30 hover:shadow-premium-sm focus-visible:ring-2 focus-visible:ring-brand-red/40')}
+          className={cn(className, 'hover:-translate-y-0.5 hover:border-brand-red/30 hover:shadow-premium-sm active:translate-y-0 active:scale-[0.99] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red/40')}
         >
           {body}
         </a>
@@ -152,10 +146,8 @@ function ContactForm({ email }: { email: string }) {
 
   return (
     <div className="p-8 lg:p-10">
-      <div className="border-s-2 border-brand-red ps-4">
-        <h3 className="font-heading text-lg font-bold text-brand-charcoal">{t.contact.formTitle}</h3>
-        <p className="mt-0.5 text-xs text-brand-charcoal-muted">{t.contact.formSubtitle}</p>
-      </div>
+      <h3 className="font-display text-2xl font-bold text-brand-charcoal">{t.contact.formTitle}</h3>
+      <p className="mt-1 text-sm text-brand-charcoal-muted">{t.contact.formSubtitle}</p>
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
         {fields.map((f) => (
           <div key={f.name}>
@@ -276,7 +268,6 @@ export function Contact({
               {methods.map((method) => (
                 <ContactCard
                   key={method.id}
-                  method={method}
                   label={field(`method.${method.id}.label`)}
                   value={field(method.detail ? `detail.${method.detail}` : `method.${method.id}.value`)}
                   sub={field(`method.${method.id}.sub`)}
@@ -286,7 +277,7 @@ export function Contact({
               ))}
             </ul>
           </form>
-          <div className="mt-10 border border-neutral-200 bg-white lg:mt-14">
+          <div className="mt-10 rounded-3xl bg-white shadow-soft lg:mt-14">
             <ContactForm email={details.email} />
           </div>
         </div>

@@ -33,7 +33,7 @@
  * into its new list of questions).
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
-import { GripVertical, Pencil } from 'lucide-react'
+import { GripVertical } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type FontKey, type SizeStep } from '@/api'
 import { errorMessage } from '@/components/RecordDialog'
@@ -307,7 +307,7 @@ export function InlineEditBar({ editing, formId, pending, error, editButton, onE
   return (
     <div className={cn('flex flex-wrap items-center justify-end gap-3', className)}>
       {error && (
-        <p role="alert" className="bg-white px-3 py-2 text-sm font-medium text-brand-red">
+        <p role="alert" className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-brand-red shadow-soft">
           {error}
         </p>
       )}
@@ -322,7 +322,6 @@ export function InlineEditBar({ editing, formId, pending, error, editButton, onE
         </>
       ) : (
         <Button ref={editButton} type="button" size="sm" aria-label={label ? t.inlineEdit.editSection.replace('{section}', label) : undefined} onClick={onEdit}>
-          <Pencil size={14} aria-hidden="true" />
           {t.inlineEdit.edit}
         </Button>
       )}
@@ -332,7 +331,7 @@ export function InlineEditBar({ editing, formId, pending, error, editButton, onE
 
 /** The look of the PropBar's selectors, on its dark chip (readable on any section). */
 const SELECT_CLASS =
-  'border border-white/30 bg-brand-charcoal px-2 py-1 text-xs text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white'
+  'rounded-md border border-white/30 bg-brand-charcoal px-2 py-1 text-xs text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white'
 
 /** How far one arrow-key press moves the PropBar, in pixels (with Shift: KEY_STEP * 5). */
 const KEY_STEP = 10
@@ -464,7 +463,7 @@ export function PropBar({
       aria-label={t.inlineEdit.toolbar}
       onKeyDown={onKeyDown}
       style={{ translate: `${offset.x}px ${offset.y}px` }}
-      className={cn('relative z-30 flex flex-wrap items-center gap-3 bg-brand-charcoal py-2 ps-1 pe-3 font-sans text-xs text-white shadow-premium', className)}
+      className={cn('relative z-30 flex flex-wrap items-center gap-3 rounded-2xl bg-brand-charcoal py-2 ps-1.5 pe-3 font-sans text-xs text-white shadow-premium', className)}
     >
       <button
         type="button"

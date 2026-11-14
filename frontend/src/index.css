@@ -308,11 +308,14 @@ html:lang(he) {
 
 /*
  * A photo that fades in once it has loaded instead of popping in (motion.ts `imgFade` sets data-loaded on load or
- * error, so a broken image still shows its alt text). Without the attribute the photo is transparent.
+ * error, so a broken image still shows its alt text). Without the attribute the photo is transparent. It also
+ * carries the photo's hover zoom transition (scale, translate), so don't add a transition-* class next to it.
  */
 @utility img-fade {
   opacity: 0;
-  transition: opacity 500ms var(--ease-spring);
+  transition-property: opacity, scale, translate;
+  transition-duration: 500ms;
+  transition-timing-function: var(--ease-spring);
   &[data-loaded] {
     opacity: 1;
   }

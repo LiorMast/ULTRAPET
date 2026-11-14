@@ -11,7 +11,6 @@
  * doesn't exist is a type error.
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
-import { BadgeCheck, Bird, Bone, Boxes, Cat, Dog, Clock, Handshake, Heart, Mail, MessageCircle, Package, Phone, PawPrint, Rabbit, Sparkles, Tag, Truck, type LucideIcon } from 'lucide-react'
 import type { ContactDetails, FontKey, ProductCategory, SizeStep } from '@/api'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
@@ -66,8 +65,8 @@ const categoryPhotoFiles = import.meta.glob<string>('/src/assets/categories/*.{p
  */
 export const categoryPhoto = (slug: string) => fileBySlug(categoryPhotoFiles, slug)
 
-/** A product category card: URL slug, label, fallback icon and optional photo (a bundled file; none = the icon). */
-export type Category = { slug: string; label: Label; icon: LucideIcon; image?: string }
+/** A product category card: URL slug, label and optional photo (a bundled file; none = a plain white card). */
+export type Category = { slug: string; label: Label; image?: string }
 
 /**
  * The placeholder photos of the marketing categories: product photos of the old store, bundled in
@@ -83,15 +82,15 @@ const categoryCardFiles = import.meta.glob<string>('/src/assets/category-cards/*
  * The marketing categories of legacy (from legacy/supabase-export/cms_categories.json), now only the article pages'
  * related categories and the /categories/$slug placeholder; the catalog's 15 store categories come from the API.
  * Each card shows the photo in src/assets/categories/ named after its slug, else its placeholder in
- * src/assets/category-cards/, else its icon.
+ * src/assets/category-cards/, else a plain white card.
  */
 export const CATEGORIES: Category[] = [
-  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood, icon: Dog },
-  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood, icon: Cat },
-  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood, icon: Bone },
-  { slug: 'litter', label: (t: Dictionary) => t.categories.litter, icon: Sparkles },
-  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals, icon: Rabbit },
-  { slug: 'birds', label: (t: Dictionary) => t.categories.birds, icon: Bird },
+  { slug: 'dog-food', label: (t: Dictionary) => t.categories.dogFood },
+  { slug: 'cat-food', label: (t: Dictionary) => t.categories.catFood },
+  { slug: 'wet-food', label: (t: Dictionary) => t.categories.wetFood },
+  { slug: 'litter', label: (t: Dictionary) => t.categories.litter },
+  { slug: 'small-animals', label: (t: Dictionary) => t.categories.smallAnimals },
+  { slug: 'birds', label: (t: Dictionary) => t.categories.birds },
 ].map((category) => ({ ...category, image: fileBySlug(categoryPhotoFiles, category.slug) ?? fileBySlug(categoryCardFiles, category.slug) }))
 
 /** The label of each home page figure, by the figure's id (the values come from the API, see fetchStats). */
@@ -102,30 +101,30 @@ export const STAT_LABELS: Record<string, Label> = {
   years: (t: Dictionary) => t.stats.years,
 }
 
-/** An item of the About section (a vision pillar or an offering): icon, title and description. */
-export type AboutItem = { id: string; icon: LucideIcon; title: Label; text: Label }
+/** An item of the About section (a vision pillar or an offering): title and description. */
+export type AboutItem = { id: string; title: Label; text: Label }
 
 /** The three vision-and-mission pillars of the About section. */
 export const ABOUT_PILLARS: AboutItem[] = [
-  { id: 'expertise', icon: BadgeCheck, title: (t: Dictionary) => t.about.pillars.expertise.title, text: (t: Dictionary) => t.about.pillars.expertise.text },
-  { id: 'service', icon: Handshake, title: (t: Dictionary) => t.about.pillars.service.title, text: (t: Dictionary) => t.about.pillars.service.text },
-  { id: 'care', icon: Heart, title: (t: Dictionary) => t.about.pillars.care.title, text: (t: Dictionary) => t.about.pillars.care.text },
+  { id: 'expertise', title: (t: Dictionary) => t.about.pillars.expertise.title, text: (t: Dictionary) => t.about.pillars.expertise.text },
+  { id: 'service', title: (t: Dictionary) => t.about.pillars.service.title, text: (t: Dictionary) => t.about.pillars.service.text },
+  { id: 'care', title: (t: Dictionary) => t.about.pillars.care.title, text: (t: Dictionary) => t.about.pillars.care.text },
 ]
 
 /** What Ultra Pet offers, shown in the About section. */
 export const ABOUT_OFFERS: AboutItem[] = [
-  { id: 'food', icon: Bone, title: (t: Dictionary) => t.about.offers.food.title, text: (t: Dictionary) => t.about.offers.food.text },
-  { id: 'litter', icon: Sparkles, title: (t: Dictionary) => t.about.offers.litter.title, text: (t: Dictionary) => t.about.offers.litter.text },
-  { id: 'accessories', icon: PawPrint, title: (t: Dictionary) => t.about.offers.accessories.title, text: (t: Dictionary) => t.about.offers.accessories.text },
-  { id: 'private-label', icon: Tag, title: (t: Dictionary) => t.about.offers.privateLabel.title, text: (t: Dictionary) => t.about.offers.privateLabel.text },
-  { id: 'logistics', icon: Boxes, title: (t: Dictionary) => t.about.offers.logistics.title, text: (t: Dictionary) => t.about.offers.logistics.text },
+  { id: 'food', title: (t: Dictionary) => t.about.offers.food.title, text: (t: Dictionary) => t.about.offers.food.text },
+  { id: 'litter', title: (t: Dictionary) => t.about.offers.litter.title, text: (t: Dictionary) => t.about.offers.litter.text },
+  { id: 'accessories', title: (t: Dictionary) => t.about.offers.accessories.title, text: (t: Dictionary) => t.about.offers.accessories.text },
+  { id: 'private-label', title: (t: Dictionary) => t.about.offers.privateLabel.title, text: (t: Dictionary) => t.about.offers.privateLabel.text },
+  { id: 'logistics', title: (t: Dictionary) => t.about.offers.logistics.title, text: (t: Dictionary) => t.about.offers.logistics.text },
 ]
 
 /** The Ultra Pet advantages listed in the About section's dark panel. */
-export const ABOUT_ADVANTAGES: { id: string; icon: LucideIcon; label: Label }[] = [
-  { id: 'import', icon: Truck, label: (t: Dictionary) => t.about.advantages.import },
-  { id: 'prices', icon: Tag, label: (t: Dictionary) => t.about.advantages.prices },
-  { id: 'support', icon: Package, label: (t: Dictionary) => t.about.advantages.support },
+export const ABOUT_ADVANTAGES: { id: string; label: Label }[] = [
+  { id: 'import', label: (t: Dictionary) => t.about.advantages.import },
+  { id: 'prices', label: (t: Dictionary) => t.about.advantages.prices },
+  { id: 'support', label: (t: Dictionary) => t.about.advantages.support },
 ]
 
 /** Every logo file in src/assets/brands/, keyed by path; a brand's logo is the file named after its slug. */
@@ -272,20 +271,20 @@ export const HEADER_LOGIN = {
 export const whatsappUrl = (number: string) => `https://wa.me/${number.replace(/\D/g, '')}`
 
 /**
- * A contact card: icon, label, sub-line and its value: one of the contact details staff edit (`detail`, from the API,
+ * A contact card: label, sub-line and its value: one of the contact details staff edit (`detail`, from the API,
  * with the link `href` builds from it) or a dictionary text (`value`; no link, e.g. the opening hours).
  */
-export type ContactMethod = { id: string; icon: LucideIcon; label: Label; sub: Label } & (
+export type ContactMethod = { id: string; label: Label; sub: Label } & (
   | { detail: keyof ContactDetails; href: (value: string) => string }
   | { detail?: undefined; value: Label }
 )
 
 /** The contact cards of the Contact section, in display order (the details come from fetchContact). */
 export const CONTACT_METHODS: ContactMethod[] = [
-  { id: 'phone', icon: Phone, label: (t: Dictionary) => t.contact.methods.phone.label, sub: (t: Dictionary) => t.contact.methods.phone.sub, detail: 'phone', href: (phone) => `tel:${phone.replace(/[^\d+]/g, '')}` },
-  { id: 'whatsapp', icon: MessageCircle, label: (t: Dictionary) => t.contact.methods.whatsapp.label, sub: (t: Dictionary) => t.contact.methods.whatsapp.sub, detail: 'whatsapp', href: whatsappUrl },
-  { id: 'email', icon: Mail, label: (t: Dictionary) => t.contact.methods.email.label, sub: (t: Dictionary) => t.contact.methods.email.sub, detail: 'email', href: (email) => `mailto:${email}` },
-  { id: 'hours', icon: Clock, label: (t: Dictionary) => t.contact.methods.hours.label, sub: (t: Dictionary) => t.contact.methods.hours.sub, value: (t: Dictionary) => t.contact.methods.hours.value },
+  { id: 'phone', label: (t: Dictionary) => t.contact.methods.phone.label, sub: (t: Dictionary) => t.contact.methods.phone.sub, detail: 'phone', href: (phone) => `tel:${phone.replace(/[^\d+]/g, '')}` },
+  { id: 'whatsapp', label: (t: Dictionary) => t.contact.methods.whatsapp.label, sub: (t: Dictionary) => t.contact.methods.whatsapp.sub, detail: 'whatsapp', href: whatsappUrl },
+  { id: 'email', label: (t: Dictionary) => t.contact.methods.email.label, sub: (t: Dictionary) => t.contact.methods.email.sub, detail: 'email', href: (email) => `mailto:${email}` },
+  { id: 'hours', label: (t: Dictionary) => t.contact.methods.hours.label, sub: (t: Dictionary) => t.contact.methods.hours.sub, value: (t: Dictionary) => t.contact.methods.hours.value },
 ]
 
 /** Text in every language that has it; Hebrew is always present and is the fallback. */

@@ -46,7 +46,7 @@ function activeIndex(page: Page) {
 }
 
 test.describe('layout', () => {
-  test('fills the space below the header, with the text on the start side (desktop)', async ({ page, isMobile }) => {
+  test('sits in an inset rounded frame just below the header, with the text on the start side (desktop)', async ({ page, isMobile }) => {
     test.skip(isMobile, 'desktop layout only')
     for (const [path, side] of [
       ['/', 'right'],
@@ -55,7 +55,12 @@ test.describe('layout', () => {
       await page.goto(path)
       const hero = await page.locator('#home').boundingBox()
       const headerBottom = await page.getByRole('banner').evaluate((el) => el.getBoundingClientRect().bottom)
-      expect(Math.round(hero!.y), `hero top (${path})`).toBe(Math.round(headerBottom))
+      const pageWidth = await page.evaluate(() => document.documentElement.clientWidth)
+      // The frame: 12px under the header, 16px from both window edges (lg), with rounded corners.
+      expect(Math.round(hero!.y), `hero top (${path})`).toBe(Math.round(headerBottom) + 12)
+      expect(Math.round(hero!.x), `hero start gap (${path})`).toBe(16)
+      expect(Math.round(pageWidth - hero!.x - hero!.width), `hero end gap (${path})`).toBe(16)
+      await expect(page.locator('#home')).toHaveCSS('border-top-left-radius', '28px')
       expect(hero!.height, `hero height (${path})`).toBeGreaterThanOrEqual(600)
 
       const title = (await page.getByRole('heading', { level: 1 }).boundingBox())!
