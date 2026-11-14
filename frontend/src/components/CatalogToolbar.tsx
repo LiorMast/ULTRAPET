@@ -13,6 +13,7 @@ import { ArrowUpDown, ChevronDown, X } from 'lucide-react'
 import { cn } from 'cn'
 import { CATALOG_SORTS, type Brand, type CatalogSearch, type CatalogSort, type ProductPage } from '@/api'
 import { formatPrice } from '@/components/CatalogCard'
+import { textLinkVariants } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
 import { inputVariants } from '@/components/ui/input'
 import {
@@ -26,17 +27,22 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useI18n } from '@/i18n'
 
-/** The look of a toolbar button (the same chip look as the category chips); `active` = it holds a value. */
-const triggerVariants = cva(
-  'inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap border px-4 text-sm font-medium outline-none transition-[color,background-color,border-color,scale] active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 data-[state=open]:border-brand-charcoal',
+/**
+ * The catalog's chip look, shared by the toolbar buttons and the category chips (Catalog.tsx): a pill, filled charcoal
+ * when `active` (it holds a value / is the current filter); `size` md (44px, the toolbar, as tall as its inputs) or sm
+ * (40px, the category row).
+ */
+export const chipVariants = cva(
+  'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm font-medium outline-none transition-[color,background-color,border-color,scale] duration-300 active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 data-[state=open]:border-brand-charcoal',
   {
     variants: {
       active: {
         true: 'border-brand-charcoal bg-brand-charcoal text-white',
         false: 'border-neutral-200 bg-white text-brand-charcoal hover:border-brand-red hover:text-brand-red-dark',
       },
+      size: { md: 'h-11', sm: 'h-10' },
     },
-    defaultVariants: { active: false },
+    defaultVariants: { active: false, size: 'md' },
   },
 )
 
@@ -69,7 +75,7 @@ function ToolbarTrigger({
   ...props
 }: { label: string; icon?: ReactNode; active?: boolean; ref?: Ref<HTMLButtonElement> } & ComponentProps<'button'>) {
   return (
-    <button ref={ref} type="button" {...props} className={cn(triggerVariants({ active }), className)}>
+    <button ref={ref} type="button" {...props} className={cn(chipVariants({ active }), className)}>
       {icon}
       {label}
       <ChevronDown aria-hidden="true" className="size-4" />
@@ -91,7 +97,7 @@ function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }
         type="button"
         onClick={onRemove}
         aria-label={t.catalog.removeFilter.replace('{name}', label)}
-        className="inline-flex min-h-9 items-center gap-2 border border-neutral-200 bg-neutral-50 px-3 text-sm text-brand-charcoal outline-none transition-[color,border-color,scale] hover:border-brand-red hover:text-brand-red-dark active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2"
+        className="inline-flex min-h-9 items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 ps-3.5 pe-3 text-sm text-brand-charcoal outline-none transition-[color,border-color,scale] duration-300 hover:border-brand-red hover:text-brand-red-dark active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 starting:scale-95 starting:opacity-0"
       >
         {label}
         <X aria-hidden="true" className="size-3.5" />
@@ -328,7 +334,7 @@ export function CatalogToolbar({ results, brands, canUsePrices, className }: { r
           <button
             type="button"
             onClick={() => removeFilter({ brand: undefined, min: undefined, max: undefined })}
-            className="min-h-9 px-2 text-sm font-semibold text-brand-red-dark underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-brand-red/60"
+            className={cn(textLinkVariants(), 'mx-2')}
           >
             {t.catalog.clearAll}
           </button>

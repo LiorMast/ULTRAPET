@@ -109,11 +109,11 @@ function NotFound() {
   const { t } = useI18n()
   return (
     <section className="mx-auto max-w-3xl px-6 py-32 text-center">
-      <h1 className="font-heading text-3xl font-bold text-brand-charcoal">{t.page.notFoundTitle}</h1>
+      <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.page.notFoundTitle}</h1>
       <p className="mt-4 text-brand-charcoal-muted">{t.page.notFoundBody}</p>
-      <Link to="/" className="mt-8 inline-block font-heading text-xs font-semibold uppercase tracking-widest text-brand-red hover:underline">
-        {t.page.backHome}
-      </Link>
+      <Button asChild className="mt-8">
+        <Link to="/">{t.page.backHome}</Link>
+      </Button>
     </section>
   )
 }
@@ -140,7 +140,7 @@ export function LoadError() {
 
   return (
     <section className="mx-auto max-w-3xl px-6 py-32 text-center">
-      <h1 className="font-heading text-3xl font-bold text-brand-charcoal">{t.page.loadErrorTitle}</h1>
+      <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.page.loadErrorTitle}</h1>
       <p className="mt-4 text-brand-charcoal-muted">{t.page.loadErrorBody}</p>
       <Button className="mt-8" loading={retrying} onClick={() => void handleRetry()}>
         {t.page.retry}

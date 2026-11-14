@@ -10,10 +10,10 @@
  * article dates, plus BlogPosting and BreadcrumbList JSON-LD (eligible for rich results).
  */
 import { createFileRoute, Link, linkOptions } from '@tanstack/react-router'
-import { ArrowRight, MapPin } from 'lucide-react'
 import { ArticleCard, ArticleMeta } from '@/components/ArticleCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { CategoryCard } from '@/components/CategoryCard'
+import { TextLink } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
 import { fetchArticle, fetchArticles, rethrowNotFound, type Article, type ArticleBlock } from '@/api'
 import { articleImage, CATEGORIES, localized } from '@/config'
@@ -143,7 +143,7 @@ function ArticlePage() {
               width={1280}
               height={720}
               fetchPriority="high"
-              className="aspect-[16/9] w-full bg-neutral-150 object-cover"
+              className="aspect-[16/9] w-full rounded-3xl bg-neutral-150 object-cover"
             />
           </figure>
         )}
@@ -155,8 +155,8 @@ function ArticlePage() {
         </div>
       </article>
 
-      <aside aria-labelledby="article-cta-title" className="bg-brand-charcoal px-6 py-14 lg:px-10">
-        <div className="mx-auto flex max-w-5xl flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
+      <aside aria-labelledby="article-cta-title" className="px-3 sm:px-6 lg:px-10">
+        <div className="mx-auto flex max-w-5xl flex-col items-start gap-6 rounded-3xl bg-brand-charcoal px-6 py-12 md:flex-row md:items-center md:justify-between lg:px-12">
           <div>
             <h2 id="article-cta-title" className="font-display text-2xl font-bold text-white lg:text-3xl">
               {t.articles.ctaTitle}
@@ -165,7 +165,6 @@ function ArticlePage() {
           </div>
           <Button asChild>
             <Link to="/where-to-buy">
-              <MapPin aria-hidden="true" />
               {t.articles.ctaButton}
             </Link>
           </Button>
@@ -196,13 +195,7 @@ function ArticlePage() {
             <h2 id="more-articles-title" className="font-display text-3xl font-bold text-brand-charcoal">
               {t.articles.moreArticles}
             </h2>
-            <Link
-              to="/articles"
-              className="flex items-center gap-2 font-heading text-xs font-bold uppercase tracking-widest text-brand-red hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
-            >
-              {t.articles.allArticles}
-              <ArrowRight aria-hidden="true" className="size-4 rtl:rotate-180" />
-            </Link>
+            <TextLink link={linkOptions({ to: '/articles' })}>{t.articles.allArticles}</TextLink>
           </div>
           <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {more.map((other) => (

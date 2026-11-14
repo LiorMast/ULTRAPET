@@ -13,12 +13,13 @@ import { cva } from "class-variance-authority"
 
 /** The field's look, by size (see the header). */
 export const inputVariants = cva(
-  "block w-full rounded-lg border border-neutral-300 bg-neutral-50 text-sm text-brand-charcoal transition-[color,background-color,border-color,box-shadow] duration-150 placeholder:text-brand-charcoal-muted hover:border-neutral-400 focus:border-brand-red focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-red/15 disabled:cursor-not-allowed disabled:text-brand-charcoal-muted aria-[invalid=true]:border-brand-red",
+  "block w-full border border-neutral-300 bg-neutral-50 text-sm text-brand-charcoal transition-[color,background-color,border-color,box-shadow] duration-150 placeholder:text-brand-charcoal-muted hover:border-neutral-400 focus:border-brand-red focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-red/15 disabled:cursor-not-allowed disabled:text-brand-charcoal-muted aria-[invalid=true]:border-brand-red",
   {
     variants: {
+      // Each size sets its own corners (one rounded-* class only: two would fight on CSS order).
       size: {
-        default: "px-4 py-3",
-        compact: "h-11 px-3",
+        default: "rounded-lg px-4 py-3",
+        compact: "h-11 rounded-lg px-3",
         search: "h-12 rounded-full ps-12 pe-4",
       },
     },

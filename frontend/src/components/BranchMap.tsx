@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
-import { Maximize2, Minimize2, Phone } from 'lucide-react'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import type { Branch } from '@/api'
 import { useReducedMotion } from '@/components/useReducedMotion'
@@ -96,7 +96,7 @@ function FullscreenButton({ target }: { target: React.RefObject<HTMLDivElement |
       onClick={toggle}
       aria-label={label}
       title={label}
-      className="absolute bottom-8 start-3 z-[1000] flex size-10 items-center justify-center bg-white text-brand-charcoal shadow-premium-sm transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red/60"
+      className="absolute bottom-8 start-3 z-[1000] flex size-10 items-center justify-center rounded-full bg-white text-brand-charcoal shadow-premium-sm transition-[background-color,scale] duration-300 hover:bg-neutral-100 active:scale-[0.94] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red/60"
     >
       <Icon aria-hidden="true" className="size-5" />
     </button>
@@ -130,7 +130,7 @@ export function BranchMap({
   const markers = useRef(new Map<string, L.Marker>())
 
   return (
-    <div ref={wrapper} className={`relative bg-neutral-100 ${className ?? ''}`}>
+    <div ref={wrapper} className={`relative overflow-hidden rounded-2xl bg-neutral-100 ${className ?? ''}`}>
       <div role="region" aria-label={t.whereToBuy.mapLabel} dir="ltr" className="size-full">
       <MapContainer center={ISRAEL_CENTER} zoom={8} scrollWheelZoom={false} className="size-full">
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -153,8 +153,7 @@ export function BranchMap({
                 <p className="mt-1 text-xs text-brand-charcoal-muted">{[branch.address, branch.city].filter(Boolean).join(', ')}</p>
                 {branch.approximate && <p className="mt-1 text-xs text-brand-charcoal-muted">{t.whereToBuy.approximate}</p>}
                 {branch.phone && (
-                  <a href={`tel:${branch.phone.replace(/[^\d+]/g, '')}`} className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-brand-red-dark hover:underline" dir="ltr">
-                    <Phone aria-hidden="true" className="size-3.5" />
+                  <a href={`tel:${branch.phone.replace(/[^\d+]/g, '')}`} className="mt-2 block text-xs font-semibold text-brand-red-dark hover:underline" dir="ltr">
                     {branch.phone}
                   </a>
                 )}

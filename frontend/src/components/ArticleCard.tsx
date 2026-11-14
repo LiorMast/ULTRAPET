@@ -1,18 +1,19 @@
 /**
- * ArticleCard.tsx — A card for one article: photo, topic, date and reading time, title, summary and a
- * "read the article" arrow; the whole card is one link to the article page. Two looks (`variant`):
+ * ArticleCard.tsx — A rounded card for one article: photo (fades in once loaded, zooms a little on hover), topic,
+ * date and reading time, title, summary and a "read the article" line that underlines on hover; the whole card is one
+ * link to the article page. Two looks (`variant`):
  * `default` for grids, `featured` (photo beside the text on large screens) for the latest article.
  * Used by the articles list page and the "more articles" row of an article page.
  *
  * Also exports ArticleMeta, the topic · date · reading-time line, shared with the article page header.
  */
 import { Link } from '@tanstack/react-router'
-import { ArrowRight } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from 'cn'
 import type { Article } from '@/api'
 import { articleImage, localized } from '@/config'
 import { useI18n, type Locale } from '@/i18n'
+import { imgFade } from '@/motion'
 
 /** Reading speed used for the "N min read" estimate, in words per minute. */
 const WORDS_PER_MINUTE = 200
@@ -41,7 +42,7 @@ export function ArticleMeta({ article, className }: { article: Article; classNam
   const date = new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeZone: 'Asia/Jerusalem' }).format(new Date(article.publishedAt))
   return (
     <p className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 font-heading text-xs font-semibold text-brand-charcoal-muted', className)}>
-      <span className="uppercase tracking-widest text-brand-red-dark">{t.articles.topics[article.topic]}</span>
+      <span className="text-brand-red-dark">{t.articles.topics[article.topic]}</span>
       <span aria-hidden="true">·</span>
       <time dateTime={article.publishedAt}>{date}</time>
       <span aria-hidden="true">·</span>
@@ -52,7 +53,7 @@ export function ArticleMeta({ article, className }: { article: Article; classNam
 
 const cardVariants = cva(
   [
-    'group flex flex-col overflow-hidden border border-neutral-200 bg-white outline-none',
+    'group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white outline-none',
     'transition-[box-shadow,translate,scale] duration-300 hover:-translate-y-1 hover:shadow-premium-sm',
     'active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100',
     'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
@@ -100,7 +101,8 @@ export function ArticleCard({
             height={800}
             loading={priority ? 'eager' : 'lazy'}
             fetchPriority={priority ? 'high' : undefined}
-            className="absolute inset-0 size-full object-cover transition-transform duration-700 group-hover:scale-105"
+            {...imgFade}
+            className="img-fade absolute inset-0 size-full object-cover group-hover:scale-[1.03]"
           />
         )}
       </div>
@@ -110,9 +112,8 @@ export function ArticleCard({
           {localized(article.title, locale)}
         </Heading>
         <p className="mt-3 flex-1 text-sm leading-relaxed text-brand-charcoal-muted">{localized(article.description, locale)}</p>
-        <span className="mt-6 flex items-center gap-2 font-heading text-xs font-bold uppercase tracking-widest text-brand-red">
+        <span className="mt-6 w-fit font-heading text-sm font-semibold text-brand-red-dark underline decoration-transparent underline-offset-4 transition-[text-decoration-color] duration-300 group-hover:decoration-current">
           {t.articles.readMore}
-          <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-300 group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
         </span>
       </div>
     </Link>

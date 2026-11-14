@@ -11,7 +11,7 @@
  */
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { Check, PackageX, ShoppingCart } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { CART_TARGET_ATTR, useCart, type CartProduct } from '@/cart'
@@ -72,7 +72,7 @@ export function flyToCart(image: HTMLImageElement, target: Element, launcher?: E
   const flyer = document.createElement('img')
   flyer.src = image.currentSrc || image.src
   flyer.alt = ''
-  flyer.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#fff;box-shadow:var(--shadow-premium-sm)'
+  flyer.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#fff;border-radius:var(--radius-lg);box-shadow:var(--shadow-premium-sm)'
   across.append(flyer)
   document.body.append(across)
 
@@ -93,8 +93,8 @@ export function flyToCart(image: HTMLImageElement, target: Element, launcher?: E
 const addVariants = cva('relative', {
   variants: {
     size: {
-      sm: 'w-full px-3 py-2.5 text-2xs',
-      lg: 'px-8 py-4 text-xs',
+      sm: 'w-full px-3 py-2.5 text-sm',
+      lg: 'px-8 py-3.5 text-sm',
     },
   },
   defaultVariants: { size: 'sm' },
@@ -155,7 +155,6 @@ export function AddToCartButton({
   if (!available) {
     return (
       <Button type="button" variant="action" disabled className={cn(addVariants({ size }), 'h-auto', className)}>
-        <PackageX aria-hidden="true" className="size-4" />
         {t.cart.soldOut}
       </Button>
     )
@@ -165,7 +164,6 @@ export function AddToCartButton({
     <>
       <Button type="button" onClick={handleClick} data-added={added || undefined} className={cn(addVariants({ size }), 'grid', className)}>
         <span className={cn(LABEL_CLASS, added ? 'scale-90 opacity-0' : 'scale-100 opacity-100')}>
-          <ShoppingCart aria-hidden="true" className="size-4" />
           {t.cart.add}
         </span>
         <span aria-hidden="true" className={cn(LABEL_CLASS, added ? 'scale-100 opacity-100' : 'scale-90 opacity-0')}>

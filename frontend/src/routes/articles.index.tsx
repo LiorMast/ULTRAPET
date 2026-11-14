@@ -8,6 +8,7 @@
 import { createFileRoute, linkOptions } from '@tanstack/react-router'
 import { ArticleCard } from '@/components/ArticleCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { SectionHeading } from '@/components/SectionHeading'
 import { fetchArticles } from '@/api'
 import { articleImage, localized } from '@/config'
 import { dictionaryFor, localizePath, useI18n } from '@/i18n'
@@ -60,11 +61,7 @@ function ArticlesPage() {
   return (
     <section aria-labelledby="articles-title" className="mx-auto max-w-7xl px-6 py-16 lg:px-10 lg:py-20">
       <Breadcrumbs items={[{ label: t.articles.home, link: linkOptions({ to: '/' }) }, { label: t.nav.articles }]} />
-      <p className="mt-10 font-heading text-xs font-bold uppercase tracking-widest text-brand-red">{t.articles.eyebrow}</p>
-      <h1 id="articles-title" className="mt-4 font-display text-4xl font-bold text-brand-charcoal lg:text-5xl">
-        {t.articles.title}
-      </h1>
-      <p className="mt-5 max-w-2xl text-lg text-brand-charcoal-muted">{t.articles.description}</p>
+      <SectionHeading as="h1" id="articles-title" eyebrow={t.articles.eyebrow} title={t.articles.title} intro={t.articles.description} className="mt-10" />
 
       {latest && <ArticleCard article={latest} variant="featured" headingLevel="h2" priority className="mt-12" />}
       {others.length > 0 && (

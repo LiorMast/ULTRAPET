@@ -5,7 +5,6 @@
  * page (routes/products.$slug.tsx).
  */
 import { useState } from 'react'
-import { ImageOff } from 'lucide-react'
 import { cn } from 'cn'
 import type { ProductDetail } from '@/api'
 import { useI18n } from '@/i18n'
@@ -24,7 +23,7 @@ export function ProductGallery({ images, name, className }: { images: ProductDet
 
   return (
     <div role="group" aria-label={t.product.galleryLabel} className={cn('flex flex-col gap-3', className)}>
-      <div className="relative aspect-square overflow-hidden border border-neutral-200 bg-neutral-50">
+      <div className="relative aspect-square overflow-hidden rounded-3xl bg-neutral-100">
         {image ? (
           <img
             key={image.src}
@@ -37,8 +36,7 @@ export function ProductGallery({ images, name, className }: { images: ProductDet
             className="size-full object-contain p-6 mix-blend-multiply animate-in fade-in duration-500 sm:p-10"
           />
         ) : (
-          <div className="flex size-full flex-col items-center justify-center gap-3 text-brand-charcoal-muted">
-            <ImageOff aria-hidden="true" className="size-10" />
+          <div className="flex size-full items-center justify-center text-brand-charcoal-muted">
             <p className="text-sm">{t.product.noPhoto}</p>
           </div>
         )}
@@ -54,8 +52,8 @@ export function ProductGallery({ images, name, className }: { images: ProductDet
                 aria-label={t.product.showPhoto.replace('{n}', String(index + 1)).replace('{total}', String(images.length))}
                 onClick={() => setActive(index)}
                 className={cn(
-                  'block aspect-square w-full border bg-neutral-50 transition-[border-color,box-shadow,scale] duration-300 active:scale-[0.97] active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/60',
-                  index === active ? 'border-brand-red shadow-premium-sm' : 'border-neutral-200 hover:border-neutral-400',
+                  'block aspect-square w-full overflow-hidden rounded-xl border-2 bg-neutral-100 transition-[border-color,box-shadow,scale] duration-300 active:scale-[0.97] active:duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red/60',
+                  index === active ? 'border-brand-red shadow-premium-sm' : 'border-transparent hover:border-neutral-300',
                 )}
               >
                 <img

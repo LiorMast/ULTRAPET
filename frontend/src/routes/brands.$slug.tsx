@@ -12,17 +12,16 @@
  * SEO: its `head` sets the brand's title, a description from its text (else its tagline), the canonical and hreflang
  * links, og:image (the logo), and Brand + BreadcrumbList JSON-LD.
  */
-import type { ReactNode } from 'react'
 import { createFileRoute, Link, linkOptions } from '@tanstack/react-router'
-import { ArrowRight } from 'lucide-react'
 import { fetchBrand, fetchBrands, fetchCategories, fetchProducts, rethrowNotFound, type Brand } from '@/api'
 import { useCustomerPrices } from '@/auth'
 import { BrandCard } from '@/components/BrandCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { Carousel } from '@/components/Carousel'
 import { CatalogCard, priceFor, stockFor } from '@/components/CatalogCard'
+import { TextLink } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
-import { brandLogo, HERO_LINKS, localized, type AppLink } from '@/config'
+import { brandLogo, HERO_LINKS, localized } from '@/config'
 import { dictionaryFor, localizePath, useI18n } from '@/i18n'
 import { absoluteUrl, breadcrumbJsonLd, metaDescription, pageHead } from '@/seo'
 
@@ -98,34 +97,16 @@ function BrandLogoPanel({ brand }: { brand: Brand }) {
   const logo = logoOf(brand)
   const accent = brand.accent ?? 'var(--color-brand-red)'
   return (
-    <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-neutral-50 p-10">
+    <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-3xl bg-neutral-100 p-10">
       {logo ? (
         <img src={logo} alt="" width={480} height={360} className="max-h-full w-auto max-w-[70%] object-contain" />
       ) : (
-        <span aria-hidden="true" className="text-center font-heading text-4xl font-bold uppercase tracking-widest lg:text-5xl" style={{ color: accent }}>
+        <span aria-hidden="true" className="text-center font-display text-4xl font-bold lg:text-5xl" style={{ color: accent }}>
           {brand.name}
         </span>
       )}
       <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1" style={{ backgroundColor: accent }} />
     </div>
-  )
-}
-
-/**
- * A secondary call to action: red uppercase text with an arrow that points along the reading direction.
- * @param props.link - Where it goes (linkOptions).
- * @param props.children - The text.
- * @returns The link.
- */
-function ArrowLink({ link, children }: { link: AppLink; children: ReactNode }) {
-  return (
-    <Link
-      {...link}
-      className="group inline-flex items-center gap-2 font-heading text-xs font-bold uppercase tracking-widest text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
-    >
-      {children}
-      <ArrowRight aria-hidden="true" className="size-4 transition-transform duration-300 group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
-    </Link>
   )
 }
 
@@ -160,9 +141,9 @@ function BrandPage() {
 
           <div className="flex flex-col">
             {brand.tagline && (
-              <p className="font-heading text-xs font-bold uppercase tracking-widest text-brand-red-dark">{localized(brand.tagline, locale)}</p>
+              <p className="font-heading text-sm font-semibold text-brand-red-dark">{localized(brand.tagline, locale)}</p>
             )}
-            <h1 id="brand-title" className="mt-4 font-display text-3xl font-bold text-brand-charcoal lg:text-4xl">
+            <h1 id="brand-title" className="mt-3 font-display text-3xl font-bold text-brand-charcoal lg:text-4xl">
               {brand.name}
             </h1>
             {paragraphs.map((paragraph, index) => (
@@ -201,7 +182,7 @@ function BrandPage() {
                   <Link {...catalogLink}>{t.brandPage.viewAll.replace('{n}', String(products.total))}</Link>
                 </Button>
               )}
-              <ArrowLink link={HERO_LINKS.business.link}>{HERO_LINKS.business.label(t)}</ArrowLink>
+              <TextLink link={HERO_LINKS.business.link}>{HERO_LINKS.business.label(t)}</TextLink>
             </div>
             <p className="mt-4 text-sm text-brand-charcoal-muted">{t.product.wholesale}</p>
           </div>
@@ -216,7 +197,7 @@ function BrandPage() {
                 {t.brandPage.productsTitle.replace('{brand}', brand.name)}
               </h2>
               {products.total > products.items.length && (
-                <ArrowLink link={catalogLink}>{t.brandPage.viewAllShort}</ArrowLink>
+                <TextLink link={catalogLink}>{t.brandPage.viewAllShort}</TextLink>
               )}
             </div>
             <ul className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">

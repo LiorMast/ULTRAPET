@@ -1,5 +1,6 @@
 /**
- * CatalogCard.tsx — One product in a catalog: photo, category, name, and a price slot. The card knows
+ * CatalogCard.tsx — One product in a catalog, as a rounded card: the photo in an inset rounded well (it fades in once
+ * loaded and zooms a little on hover), category, name, and a price slot. The card knows
  * nothing about who is signed in; the caller decides through props whether the price is shown, still
  * loading, or hidden behind a "log in to see the price" link. Two layouts (`variant`): `grid` (a tile) and
  * `list` (a horizontal row, e.g. for a list view or the B2B order screen).
@@ -11,15 +12,16 @@
  * helpers the product page and the cart share (priceFor, stockFor, PriceSlot, formatPrice).
  */
 import { Link } from '@tanstack/react-router'
-import { Lock } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from 'cn'
 import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
 import { DiscountRibbon } from '@/components/DiscountRibbon'
+import { textLinkVariants } from '@/components/TextLink'
 import type { Product, StockStatus } from '@/api'
 import type { CustomerPrices } from '@/auth'
 import { localized } from '@/config'
 import { useI18n, type Locale } from '@/i18n'
+import { imgFade } from '@/motion'
 
 /** The price slot: hidden (signed out), loading, or the price in shekels. */
 export type PriceState = { status: 'hidden' } | { status: 'loading' } | { status: 'shown'; price: number }
@@ -58,7 +60,7 @@ export function formatPrice(locale: Locale, amount: number, { whole = false }: {
   return new Intl.NumberFormat(locale, { style: 'currency', currency: 'ILS', ...(whole && { maximumFractionDigits: 0 }) }).format(amount)
 }
 
-const cardVariants = cva('group relative flex border border-neutral-200 bg-white transition-[box-shadow,translate,scale] duration-300 hover:-translate-y-0.5 hover:shadow-premium-sm active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100', {
+const cardVariants = cva('group relative flex rounded-2xl border border-neutral-200 bg-white p-2 transition-[box-shadow,translate,scale,border-color] duration-300 hover:-translate-y-1 hover:border-neutral-300 hover:shadow-premium-sm active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100', {
   variants: {
     variant: {
       grid: 'flex-col',
@@ -68,11 +70,11 @@ const cardVariants = cva('group relative flex border border-neutral-200 bg-white
   defaultVariants: { variant: 'grid' },
 })
 
-const photoVariants = cva('relative shrink-0 overflow-hidden bg-neutral-50', {
+const photoVariants = cva('relative shrink-0 overflow-hidden rounded-xl bg-neutral-100', {
   variants: {
     variant: {
-      grid: 'aspect-square w-full border-b border-neutral-150',
-      list: 'aspect-square w-28 border-e border-neutral-150 sm:w-36',
+      grid: 'aspect-square w-full',
+      list: 'aspect-square w-28 sm:w-36',
     },
   },
   defaultVariants: { variant: 'grid' },
@@ -90,16 +92,15 @@ export function PriceSlot({ state, size = 'sm' }: { state: PriceState; size?: 's
     return (
       <Link
         to="/login"
-        className="relative z-10 inline-flex items-center gap-2 text-xs font-semibold text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
+        className={cn(textLinkVariants(), 'relative z-10', size === 'lg' ? 'text-base' : 'text-xs')}
       >
-        <Lock aria-hidden="true" className="size-3.5" />
         {t.catalog.loginToSee}
       </Link>
     )
   }
   if (state.status === 'loading') {
     return (
-      <span className="block h-6 w-24 animate-pulse bg-neutral-150">
+      <span className="block h-6 w-24 animate-pulse rounded-md bg-neutral-150">
         <span className="sr-only">{t.catalog.loadingPrice}</span>
       </span>
     )
@@ -157,18 +158,19 @@ export function CatalogCard({
             height={300}
             loading="lazy"
             decoding="async"
-            className="size-full object-contain p-3 mix-blend-multiply sm:p-4 transition-transform duration-500 group-hover:scale-105"
+            {...imgFade}
+            className="img-fade size-full object-contain p-3 mix-blend-multiply group-hover:scale-[1.03] sm:p-4"
           />
         )}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-3 p-3 sm:p-5">
-        {categoryName && <p className="font-heading text-2xs font-bold uppercase tracking-widest text-brand-red-dark">{categoryName}</p>}
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-2 pt-3 sm:p-3 sm:pt-4">
+        {categoryName && <p className="font-heading text-xs font-semibold text-brand-red-dark">{categoryName}</p>}
         <Heading className="line-clamp-3 flex-1 text-sm font-semibold leading-snug text-brand-charcoal">
           {/* The stretched link: its ::after covers the card, so the whole card opens the product. */}
           <Link
             to="/products/$slug"
             params={{ slug: product.slug }}
-            className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand-red/60 group-hover:text-brand-red-dark"
+            className="transition-colors duration-300 after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-brand-red/60 group-hover:text-brand-red-dark"
           >
             {localized(product.name, locale)}
           </Link>

@@ -22,13 +22,13 @@ export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: 
   const { t } = useI18n()
   return (
     <nav aria-label={t.articles.breadcrumbLabel} className={className}>
-      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 font-heading text-xs font-semibold text-brand-charcoal-muted">
+      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 font-heading text-sm font-medium text-brand-charcoal-muted">
         {items.map((item, index) => {
           const current = index === items.length - 1
           return (
             <li key={index} className="flex min-w-0 items-center gap-2">
               {item.link && !current ? (
-                <Link {...item.link} className="hover:text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60">
+                <Link {...item.link} className="link-underline rounded-sm transition-colors duration-300 hover:text-brand-red-dark focus-visible:ring-2 focus-visible:ring-brand-red/60">
                   {item.label}
                 </Link>
               ) : (

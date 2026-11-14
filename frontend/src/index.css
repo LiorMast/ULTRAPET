@@ -561,15 +561,15 @@ html:lang(he) {
 }
 
 /*
- * Stored HTML text (RichText.tsx): the sanitized subset p, h2-h4, ul/ol/li, table, strong/em, br. Headings are small
- * uppercase labels in the brand red, like the section eyebrows; a wide table scrolls sideways instead of
- * widening the page.
+ * Stored HTML text (RichText.tsx): the sanitized subset p, h2-h4, ul/ol/li, table, strong/em, br. Headings are
+ * sentence-case semibold labels in the dark brand red, like the section eyebrows; tables have rounded corners, and a
+ * wide one scrolls sideways instead of widening the page.
  */
 .rich-text {
   @apply space-y-4 text-base leading-relaxed text-brand-charcoal;
 }
 .rich-text :is(h2, h3, h4) {
-  @apply pt-4 font-heading text-xs font-bold uppercase tracking-widest text-brand-red-dark;
+  @apply pt-4 font-heading text-base font-semibold text-brand-red-dark;
 }
 .rich-text > :first-child {
   @apply pt-0;
@@ -583,11 +583,26 @@ html:lang(he) {
 .rich-text ol {
   @apply list-decimal space-y-1.5 ps-6 marker:font-bold marker:text-brand-red;
 }
+/* The Where to Buy map's zoom buttons (Leaflet's own bar, BranchMap.tsx) in the site's rounded, shadowed look. */
+.leaflet-bar.leaflet-control {
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-premium-sm);
+}
+
+/* Tables get rounded corners: separate borders (a collapsed table cannot round), each cell drawing its bottom and end. */
 .rich-text table {
-  @apply block max-w-full overflow-x-auto border-collapse text-sm;
+  @apply block max-w-full overflow-x-auto rounded-xl border border-separate border-spacing-0 border-neutral-200 text-sm;
 }
 .rich-text :is(th, td) {
-  @apply border border-neutral-200 px-3 py-2 text-start align-top;
+  @apply border-e border-b border-neutral-200 px-3 py-2 text-start align-top;
+}
+.rich-text tr > :is(th, td):last-child {
+  @apply border-e-0;
+}
+.rich-text tr:last-child > :is(th, td) {
+  @apply border-b-0;
 }
 .rich-text th,
 .rich-text tr:first-child > td {

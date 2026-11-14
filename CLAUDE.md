@@ -58,7 +58,8 @@ frontend/
                         admin.discounts = every price rule in one table, general or for one customer;
                         admin.customers = the business customers' accounts + each one's own discounts)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm, Logo,
-                        Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, InlineEditor,
+                        Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, TextLink (the secondary text link: sentence case,
+                        sweeping underline, no arrow; `link` or `href`, textLinkVariants for a button), InlineEditor,
                         CatalogCard (links to its product page; PriceSlot, priceFor, stockFor), ProductGallery, RichText
                         (stored sanitized HTML, styled by `.rich-text` in index.css),
                         EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
@@ -396,6 +397,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   heading is editable). A card that is a link and has editable texts renders as a `<div>` while editing (Contact cards); a section whose content holds another form wraps its texts in `<form className="contents">`
   (Contact). The FAQ adds its heading keys to its list draft with `sectionFields`. Button labels, carousel and form
   labels stay in the dictionaries.
+- **Secondary links** ("download the catalog", "view all", "all articles", a category above a product name) are
+  `<TextLink link|href>` (TextLink.tsx), never hand-made red uppercase links with arrows. The catalog's chips (category
+  row, toolbar buttons) share `chipVariants` (CatalogToolbar.tsx); while a filter / search / page loads, the results stay,
+  dim and are aria-busy.
 - **Section headings**: a section opens with `<SectionHeading id eyebrow title intro />` (red eyebrow, display
   title, muted intro; `as="h1"` for a page heading; `tone="dark"` on a black section; `edit={field}` for an editable
   section), never with copied heading markup.

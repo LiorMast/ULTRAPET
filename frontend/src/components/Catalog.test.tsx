@@ -8,7 +8,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { pageWindow } from '@/components/Pagination'
-import { TEST_USER } from '@/test/api'
+import { holdRequests, TEST_USER } from '@/test/api'
 import { renderPage } from '@/test/utils'
 import products from '@/stubs/products.json'
 import prices from '@/stubs/prices.json'
@@ -85,6 +85,22 @@ describe('Catalog page', () => {
     await user.click(screen.getByRole('link', { name: 'ניקוי הסינון' }))
     await waitFor(() => expect(screen.getByRole('searchbox', { name: 'חיפוש מוצר' })).toHaveValue(''))
     expect(cards()).toHaveLength(24)
+  })
+
+  it('keeps the results while a search loads, dimmed and aria-busy, and keeps the search box focused', async () => {
+    const { user } = await renderPage('/en/catalog')
+    const held = holdRequests((path) => path === '/api/products')
+    const list = screen.getByRole('list', { name: 'Products' })
+    const box = screen.getByRole('searchbox', { name: 'Search products' })
+    await user.type(box, 'i')
+    await waitFor(() => expect(held.calls.length).toBeGreaterThan(0))
+    await waitFor(() => expect(list).toHaveAttribute('aria-busy', 'true'))
+    expect(list).toHaveClass('opacity-50')
+    expect(cards()).toHaveLength(24)
+    expect(box).toHaveFocus()
+    held.release()
+    await waitFor(() => expect(list).not.toHaveAttribute('aria-busy'))
+    expect(list).not.toHaveClass('opacity-50')
   })
 
   it('shows the English translation of every product on English pages', async () => {

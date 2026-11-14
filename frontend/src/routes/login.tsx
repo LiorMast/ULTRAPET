@@ -23,10 +23,12 @@ function LoginPage() {
   const { t } = useI18n()
   const { user } = useAuth()
   return (
-    <section className="mx-auto max-w-md px-6 py-24 lg:px-10">
-      <h1 className="font-display text-3xl font-bold text-brand-charcoal">{user ? t.login.account : t.login.title}</h1>
-      <p className="mb-8 mt-2 text-sm text-brand-charcoal-muted">{t.login.subtitle}</p>
-      {user ? <AccountPanel user={user} /> : <LoginForm />}
+    <section className="mx-auto max-w-md px-4 py-16 sm:px-6 lg:py-24">
+      <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-soft sm:p-10">
+        <h1 className="font-display text-3xl font-bold text-brand-charcoal">{user ? t.login.account : t.login.title}</h1>
+        <p className="mb-8 mt-2 text-sm text-brand-charcoal-muted">{t.login.subtitle}</p>
+        {user ? <AccountPanel user={user} /> : <LoginForm />}
+      </div>
     </section>
   )
 }

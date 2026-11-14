@@ -5,7 +5,11 @@
  * The map (Leaflet) is loaded lazily, so the rest of the site does not download it.
  */
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
-import { LocateFixed, MapPin, Navigation, Phone, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
+import { cn } from 'cn'
+import { SectionHeading } from '@/components/SectionHeading'
+import { textLinkVariants } from '@/components/TextLink'
+import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 import { inputVariants } from '@/components/ui/input'
 import type { Branch } from '@/api'
@@ -33,8 +37,8 @@ function distanceKm(a: LatLng, b: LatLng) {
 }
 
 /**
- * One store in the list: a pin with the distance (when known), the name, address, and call / navigate /
- * website links. The whole card is selectable; the links work on their own.
+ * One store in the list: the name, address, distance (when known), and call / navigate / website links (no pin or
+ * link icons: the words say it). The whole card is selectable; the links work on their own.
  * @param props.branch - The store to show.
  * @param props.distance - Distance from the visitor in km, or undefined when the location is unknown.
  * @param props.selected - Whether the store is the selected one (highlighted).
@@ -43,34 +47,28 @@ function distanceKm(a: LatLng, b: LatLng) {
  */
 function BranchCard({ branch, distance, selected, onSelect }: { branch: Branch; distance?: number; selected: boolean; onSelect: () => void }) {
   const { t } = useI18n()
-  const linkClass = 'inline-flex items-center gap-1.5 text-xs font-semibold text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60'
+  const linkClass = cn(textLinkVariants(), 'text-xs')
   return (
-    <li className={`border-b border-neutral-150 transition-colors ${selected ? 'bg-brand-red-muted' : 'bg-white'}`}>
+    <li className={cn('border-b border-neutral-150 transition-colors duration-300 last:border-b-0', selected ? 'bg-brand-red-muted' : 'bg-white hover:bg-neutral-50')}>
       <button
         type="button"
         onClick={onSelect}
         aria-pressed={selected}
-        className="flex w-full items-start gap-4 px-5 pt-5 text-start focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red/60"
+        className="block w-full px-5 pt-5 text-start focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red/60"
       >
-        <span className="flex w-14 shrink-0 flex-col items-center text-brand-red">
-          <MapPin aria-hidden="true" className="size-7" />
-          {distance !== undefined && <span className="mt-1 font-heading text-sm font-bold text-brand-charcoal">{distance.toFixed(1)}</span>}
-        </span>
-        <span className="block min-w-0 flex-1">
-          <span className="block font-heading text-base font-bold text-brand-charcoal">{branch.name}</span>
+        <span className="block min-w-0">
+          <span className="block font-heading text-base font-semibold text-brand-charcoal">{branch.name}</span>
           <span className="mt-1 block text-sm text-brand-charcoal-muted">{[branch.address, branch.city].filter(Boolean).join(', ')}</span>
           {distance !== undefined && <span className="mt-0.5 block text-xs text-brand-charcoal-muted">{t.whereToBuy.distance.replace('{km}', distance.toFixed(1))}</span>}
         </span>
       </button>
-      <div className="flex flex-wrap gap-x-5 gap-y-2 pe-5 pb-5 ps-[5.75rem] pt-3">
+      <div className="flex flex-wrap gap-x-5 gap-y-2 px-5 pb-5 pt-3">
         {branch.phone && (
           <a href={`tel:${branch.phone.replace(/[^\d+]/g, '')}`} className={linkClass}>
-            <Phone aria-hidden="true" className="size-3.5" />
             <span dir="ltr">{branch.phone}</span>
           </a>
         )}
         <a href={`https://waze.com/ul?ll=${branch.lat},${branch.lng}&navigate=yes`} target="_blank" rel="noopener noreferrer" className={linkClass}>
-          <Navigation aria-hidden="true" className="size-3.5" />
           {t.whereToBuy.navigate}
         </a>
         {branch.website && (
@@ -145,11 +143,7 @@ export function WhereToBuy({ branches }: { branches: Branch[] }) {
 
   return (
     <section aria-labelledby="where-to-buy-title" className="mx-auto max-w-7xl px-6 py-16 lg:px-10 lg:py-20">
-      <p className="font-heading text-xs font-bold uppercase tracking-widest text-brand-red">{t.whereToBuy.eyebrow}</p>
-      <h1 id="where-to-buy-title" className="mt-4 font-display text-4xl font-bold text-brand-charcoal lg:text-5xl">
-        {t.whereToBuy.title}
-      </h1>
-      <p className="mt-5 max-w-2xl text-lg text-brand-charcoal-muted">{t.whereToBuy.description}</p>
+      <SectionHeading as="h1" id="where-to-buy-title" eyebrow={t.whereToBuy.eyebrow} title={t.whereToBuy.title} intro={t.whereToBuy.description} />
 
       <form onSubmit={handleSubmit} role="search" aria-label={t.whereToBuy.searchLabel} className="mt-10 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
@@ -168,7 +162,6 @@ export function WhereToBuy({ branches }: { branches: Branch[] }) {
           />
         </div>
         <Button type="button" onClick={handleNearest} loading={location.status === 'locating'}>
-          <LocateFixed aria-hidden="true" />
           {t.whereToBuy.nearest}
         </Button>
       </form>
@@ -178,7 +171,7 @@ export function WhereToBuy({ branches }: { branches: Branch[] }) {
       </p>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className={`${PANE_HEIGHT} overflow-y-auto border border-neutral-200`}>
+        <div className={`${PANE_HEIGHT} overflow-y-auto rounded-2xl border border-neutral-200`}>
           {shown.length === 0 ? (
             <p className="p-8 text-center text-brand-charcoal-muted">{t.whereToBuy.noResults}</p>
           ) : (
@@ -189,7 +182,7 @@ export function WhereToBuy({ branches }: { branches: Branch[] }) {
             </ul>
           )}
         </div>
-        <Suspense fallback={<div className={`${PANE_HEIGHT} flex items-center justify-center bg-neutral-100 text-sm text-brand-charcoal-muted`}>{t.whereToBuy.mapLoading}</div>}>
+        <Suspense fallback={<div className={`${PANE_HEIGHT} flex items-center justify-center gap-3 rounded-2xl bg-neutral-100 text-sm text-brand-charcoal-muted`}><Spinner label={false} className="text-brand-red" />{t.whereToBuy.mapLoading}</div>}>
           <BranchMap branches={shownBranches} selectedId={activeId} onSelect={setSelectedId} userLocation={position} className={PANE_HEIGHT} />
         </Suspense>
       </div>

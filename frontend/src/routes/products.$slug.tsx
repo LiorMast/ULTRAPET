@@ -15,7 +15,6 @@
  */
 import { useState } from 'react'
 import { createFileRoute, Link, linkOptions } from '@tanstack/react-router'
-import { RotateCcw, Truck, type LucideIcon } from 'lucide-react'
 import { fetchProduct, rethrowNotFound, type ProductDetail } from '@/api'
 import { useCustomerPrices } from '@/auth'
 import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
@@ -25,6 +24,7 @@ import { DiscountRibbon, STOCK_RIBBONS } from '@/components/DiscountRibbon'
 import { ProductGallery } from '@/components/ProductGallery'
 import { QuantityStepper } from '@/components/QuantityStepper'
 import { RichText } from '@/components/RichText'
+import { TextLink } from '@/components/TextLink'
 import { localized } from '@/config'
 import { dictionaryFor, localizePath, useI18n, type Locale } from '@/i18n'
 import { absoluteUrl, breadcrumbJsonLd, metaDescription, pageHead } from '@/seo'
@@ -107,20 +107,16 @@ function plainText(html: string) {
 }
 
 /**
- * One row of the shipping and returns notes.
- * @param props.icon - Its lucide icon.
+ * One row of the shipping and returns notes: its title over the note (no icon: the title says it).
  * @param props.title - The note's title, e.g. "Shipping".
  * @param props.text - The note.
  * @returns The row (a <div> of the notes' <dl>, holding only its <dt> and <dd>, as HTML requires).
  */
-function ServiceNote({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
+function ServiceNote({ title, text }: { title: string; text: string }) {
   return (
-    <div className="py-4">
-      <dt className="flex items-center gap-4 font-heading text-xs font-bold uppercase tracking-widest text-brand-charcoal">
-        <Icon aria-hidden="true" className="size-5 shrink-0 text-brand-red" />
-        {title}
-      </dt>
-      <dd className="mt-1 ps-9 text-sm text-brand-charcoal-muted">{text}</dd>
+    <div className="py-4 first:pt-0 last:pb-0">
+      <dt className="font-heading text-sm font-semibold text-brand-charcoal">{title}</dt>
+      <dd className="mt-1 text-sm text-brand-charcoal-muted">{text}</dd>
     </div>
   )
 }
@@ -169,13 +165,8 @@ function ProductPage() {
           <ProductGallery images={product.images} name={name} />
 
           <div className="flex flex-col">
-            <Link
-              {...categoryLink}
-              className="self-start font-heading text-xs font-bold uppercase tracking-widest text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
-            >
-              {categoryName}
-            </Link>
-            <h1 id="product-title" className="mt-4 font-display text-3xl font-bold text-brand-charcoal lg:text-4xl">
+            <TextLink link={categoryLink}>{categoryName}</TextLink>
+            <h1 id="product-title" className="mt-3 font-display text-3xl font-bold text-brand-charcoal lg:text-4xl">
               {name}
             </h1>
 
@@ -206,7 +197,7 @@ function ProductPage() {
               </dl>
             )}
 
-            <div className="mt-8 border-y border-neutral-150 py-6">
+            <div className="mt-8 border-t border-neutral-150 pt-6">
               <PriceSlot state={price} size="lg" />
               {price.status === 'shown' && stock && <DiscountRibbon kind={STOCK_RIBBONS[stock]} message={t.stock[stock]} className="mt-3" />}
               <p className="mt-3 text-sm text-brand-charcoal-muted">{t.product.wholesale}</p>
@@ -225,9 +216,9 @@ function ProductPage() {
               )}
             </div>
 
-            <dl className="divide-y divide-neutral-150 border-b border-neutral-150">
-              <ServiceNote icon={Truck} title={t.product.shippingTitle} text={t.product.shippingText} />
-              <ServiceNote icon={RotateCcw} title={t.product.returnsTitle} text={t.product.returnsText} />
+            <dl className="mt-8 divide-y divide-neutral-200 rounded-2xl bg-neutral-100 p-6">
+              <ServiceNote title={t.product.shippingTitle} text={t.product.shippingText} />
+              <ServiceNote title={t.product.returnsTitle} text={t.product.returnsText} />
             </dl>
           </div>
         </div>

@@ -4,17 +4,19 @@
  * categories, brands and prices it is given (the server filters, sorts and pages, see fetchProducts), and keeps its
  * state (page, category, brands, search, sort, price range) in
  * the URL of the route that renders it, so every filtered page is a real, shareable, crawlable link; the
- * route reloads the results when the URL changes. Prices are shown only when the caller passes `prices`
+ * route reloads the results when the URL changes, meanwhile the current results dim and are aria-busy. Prices are shown only when the caller passes `prices`
  * (routes/catalog.tsx does that for signed-in customers), with each card's stock status; otherwise every card shows
  * "log in to see the price".
  */
 import { useState } from 'react'
-import { Link, linkOptions, useNavigate } from '@tanstack/react-router'
-import { Download, Lock, Search } from 'lucide-react'
+import { Link, linkOptions, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Search } from 'lucide-react'
 import { cn } from 'cn'
 import { CatalogCard, priceFor, stockFor } from '@/components/CatalogCard'
-import { CatalogToolbar } from '@/components/CatalogToolbar'
+import { CatalogToolbar, chipVariants } from '@/components/CatalogToolbar'
 import { Pagination } from '@/components/Pagination'
+import { SectionHeading } from '@/components/SectionHeading'
+import { TextLink } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
 import { inputVariants } from '@/components/ui/input'
 import type { Brand, CatalogSearch, ProductCategory, ProductPage } from '@/api'
@@ -37,10 +39,7 @@ function CategoryChip({ label, count, category, active }: { label: string; count
       to="."
       search={(prev: CatalogSearch) => ({ ...prev, category, page: undefined })}
       activeOptions={{ exact: true }}
-      className={cn(
-        'inline-flex shrink-0 items-center gap-2 whitespace-nowrap border px-4 py-2 text-sm font-medium outline-none transition-[color,background-color,border-color,scale] active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
-        active ? 'border-brand-charcoal bg-brand-charcoal text-white' : 'border-neutral-200 bg-white text-brand-charcoal hover:border-brand-red hover:text-brand-red-dark',
-      )}
+      className={chipVariants({ active, size: 'sm' })}
     >
       {label}
       <span aria-hidden="true" className={cn('text-xs', active ? 'text-neutral-300' : 'text-brand-charcoal-muted')}>{count}</span>
@@ -55,13 +54,10 @@ function CategoryChip({ label, count, category, active }: { label: string; count
 function PricesHiddenBanner() {
   const { t } = useI18n()
   return (
-    <div className="mt-10 flex flex-col gap-4 border-s-4 border-brand-red bg-neutral-50 p-6 md:flex-row md:items-center md:justify-between">
-      <div className="flex gap-4">
-        <Lock aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-red" />
-        <div>
-          <p className="font-heading text-sm font-bold text-brand-charcoal">{t.catalog.pricesHiddenTitle}</p>
-          <p className="mt-1 text-sm text-brand-charcoal-muted">{t.catalog.pricesHiddenText}</p>
-        </div>
+    <div className="mt-10 flex flex-col gap-4 rounded-2xl bg-neutral-100 p-6 md:flex-row md:items-center md:justify-between md:px-8">
+      <div>
+        <p className="font-heading text-base font-semibold text-brand-charcoal">{t.catalog.pricesHiddenTitle}</p>
+        <p className="mt-1 text-sm text-brand-charcoal-muted">{t.catalog.pricesHiddenText}</p>
       </div>
       <div className="flex shrink-0 flex-wrap gap-3">
         <Button asChild size="sm">
@@ -101,6 +97,8 @@ export function Catalog({
 }) {
   const { t, locale } = useI18n()
   const navigate = useNavigate()
+  // While a filter, search or page change loads, the current results stay but dim (after 200ms) and are aria-busy.
+  const loading = useRouterState({ select: (state) => state.status === 'pending' })
   const [query, setQuery] = useState(search.q ?? '')
   // When ?q= changes from outside the box (clear filters, back button), show the new value.
   const [syncedQ, setSyncedQ] = useState(search.q)
@@ -126,22 +124,10 @@ export function Catalog({
   return (
     <section aria-labelledby="catalog-title" className="mx-auto max-w-screen-2xl px-6 py-16 lg:px-10 lg:py-20">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="font-heading text-xs font-bold uppercase tracking-widest text-brand-red">{t.catalog.eyebrow}</p>
-          <h1 id="catalog-title" className="mt-4 font-display text-4xl font-bold text-brand-charcoal lg:text-5xl">
-            {t.catalog.title}
-          </h1>
-          <p className="mt-5 max-w-2xl text-lg text-brand-charcoal-muted">{t.catalog.description}</p>
-        </div>
-        <a
-          href={catalogPdfUrl(locale)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex shrink-0 items-center gap-2 font-heading text-xs font-bold uppercase tracking-widest text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
-        >
-          <Download aria-hidden="true" className="size-4" />
+        <SectionHeading as="h1" id="catalog-title" eyebrow={t.catalog.eyebrow} title={t.catalog.title} intro={t.catalog.description} />
+        <TextLink href={catalogPdfUrl(locale)} external className="shrink-0">
           {t.catalog.download}
-        </a>
+        </TextLink>
       </div>
 
       {!prices && <PricesHiddenBanner />}
@@ -195,12 +181,16 @@ export function Catalog({
       {items.length === 0 ? (
         <div className="py-24 text-center">
           <p className="text-lg text-brand-charcoal-muted">{t.catalog.empty}</p>
-          <Link to="." search={{}} className="mt-4 inline-block text-sm font-semibold text-brand-red-dark underline underline-offset-4">
+          <TextLink link={linkOptions({ to: '.', search: {} })} className="mx-auto mt-4 block">
             {t.catalog.clearFilters}
-          </Link>
+          </TextLink>
         </div>
       ) : (
-        <ul aria-label={t.catalog.listLabel} className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+        <ul
+          aria-label={t.catalog.listLabel}
+          aria-busy={loading || undefined}
+          className={cn('mt-8 grid grid-cols-2 gap-3 transition-opacity duration-300 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4', loading && 'opacity-50 delay-200')}
+        >
           {items.map((product) => (
             <li key={product.id} className="flex">
               <CatalogCard product={product} categoryName={categoryName.get(product.category)} price={priceFor(prices, product.id)} stock={stockFor(prices, product.id)} className="w-full" />
