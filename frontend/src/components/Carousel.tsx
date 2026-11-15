@@ -4,9 +4,9 @@
  * one slide. Used by the home page Categories and Brands sections.
  * Native scrolling does the work, so touch swipe, trackpads and keyboard focus keep working; the arrows
  * scroll the row by almost one view, flip direction in RTL, and are disabled at the ends (hidden when
- * everything fits). The arrows are round buttons outside the two ends of the row, centered on its height.
+ * everything fits). The arrows sit outside the two ends of the row and span its full height.
  * Paged mode (`pageSize`): the children are grouped into pages of that many items, each page is one full-width
- * snap slide holding a grid of its items, the arrows move exactly one page, and a row of dots below (the current one stretched into a pill) shows the
+ * snap slide holding a grid of its items, the arrows move exactly one page, and a row of dots below (the current one stretched into a short bar) shows the
  * current page and jumps to any page. Used by the home page Brands section.
  */
 import { Children, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -19,10 +19,10 @@ import { useI18n } from '@/i18n'
 /** Which parts of the row can still be scrolled to. */
 type ScrollState = { overflow: boolean; atStart: boolean; atEnd: boolean; page: number }
 
-/** Both arrows per tone: a round button beside the row, vertically centered; dims when disabled. */
+/** Both arrows per tone: a narrow squircle button beside the row, as tall as the row; dims when disabled. */
 const ARROW_CLASSES = {
-  light: 'size-11 shrink-0 self-center border-neutral-200 bg-white text-brand-charcoal shadow-soft hover:border-brand-red hover:bg-brand-red hover:text-white disabled:opacity-40 sm:size-12',
-  dark: 'size-11 shrink-0 self-center border-white/30 bg-transparent text-white hover:border-brand-red hover:bg-brand-red hover:text-white disabled:opacity-40 sm:size-12',
+  light: 'h-auto w-12 shrink-0 self-stretch border-neutral-200 bg-white text-brand-charcoal hover:border-brand-red hover:bg-brand-red hover:text-white disabled:opacity-40 sm:w-16',
+  dark: 'h-auto w-12 shrink-0 self-stretch border-white/30 bg-transparent text-white hover:border-brand-red hover:bg-brand-red hover:text-white disabled:opacity-40 sm:w-16',
 }
 
 /** The grid of one page in paged mode: 1, 2 or 3 columns depending on the screen width. */
@@ -126,7 +126,7 @@ export function Carousel({
       <div className="flex items-stretch gap-3 sm:gap-4">
         {state.overflow && (
           <Button variant="outline" size="icon-lg" aria-label={t.carousel.previous} disabled={state.atStart} onClick={() => scrollPage(-1)} className={ARROW_CLASSES[tone]}>
-            <ChevronLeft aria-hidden="true" strokeWidth={2.25} className="size-6 rtl:rotate-180" />
+            <ChevronLeft aria-hidden="true" strokeWidth={2.25} className="size-7 rtl:rotate-180" />
           </Button>
         )}
         <ul
@@ -157,7 +157,7 @@ export function Carousel({
         </ul>
         {state.overflow && (
           <Button variant="outline" size="icon-lg" aria-label={t.carousel.next} disabled={state.atEnd} onClick={() => scrollPage(1)} className={ARROW_CLASSES[tone]}>
-            <ChevronRight aria-hidden="true" strokeWidth={2.25} className="size-6 rtl:rotate-180" />
+            <ChevronRight aria-hidden="true" strokeWidth={2.25} className="size-7 rtl:rotate-180" />
           </Button>
         )}
       </div>

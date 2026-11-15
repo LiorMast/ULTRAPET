@@ -27,7 +27,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LoginPopover } from '@/components/LoginPopover'
 import { Logo } from '@/components/Logo'
 import { MobileMenu } from '@/components/MobileMenu'
-import { NAV_TEXT } from '@/components/NavText'
+import { NAV_TEXT, Underline } from '@/components/NavText'
 import { SubNavDrawer, useSubNavDrawer } from '@/components/SubNavDrawer'
 import {
   DropdownMenu,
@@ -68,7 +68,7 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
           <Logo className="h-8 sm:h-14" />
         </Link>
 
-        <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-0.5 xl:flex 2xl:gap-1.5">
+        <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
           {items.map((item) => (
             <DesktopNavItem key={item.id} item={item} />
           ))}
@@ -173,6 +173,7 @@ function DesktopNavItem({ item }: { item: NavItem }) {
     return (
       <Link {...item.link} activeOptions={{ exact: true, includeHash: true }} className={NAV_TEXT}>
         {item.label(t)}
+        <Underline />
       </Link>
     )
   }
@@ -241,7 +242,8 @@ function DesktopNavItem({ item }: { item: NavItem }) {
           onKeyDown={handleLabelKey}
         >
           {item.label(t)}
-          <ChevronDown size={15} aria-hidden="true" className={cn('transition-transform duration-300', open && 'rotate-180')} />
+          <ChevronDown size={15} aria-hidden="true" className={cn('transition-transform duration-200', open && 'rotate-180')} />
+          <Underline />
         </Link>
       </DropdownMenuTrigger>
       <DropdownMenuContent

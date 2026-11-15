@@ -70,10 +70,10 @@ frontend/
                         minimum order), AddToCartButton (adds to the cart, "✓ Added" morph; `available={false}` = a
                         disabled "Out of stock"), QuantityStepper (− n +),
                         StockDialog (a product's stock in the admin: record a movement, the history; stockAction,
-                        StockCell, StockSummary, stockStatus), DiscountRibbon (a pill badge: short message on a color; kinds
+                        StockCell, StockSummary, stockStatus), DiscountRibbon (a small squircle badge: short message on a color; kinds
                         discount / sale and the stock statuses: STOCK_RIBBONS; an `icon` only when asked),
                         SegmentedSwitch (the multi-choice switch: a radio group drawn as one bar with a sliding thumb),
-                        Toast (a short pill notification at the top center: icon, message, color; `kind` success / error / warning
+                        Toast (a compact squircle notification at the top center: icon, bold message, close X; `kind` success / error / warning
                         presets them (TOAST_KINDS; tokens `success`, `warning`); shows 2 s, fades, then onDone; above everything, z-[100]),
                         PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button),
                         CatalogPdfDialog (the "PDF catalog" button + dialog of /admin/products: the generated PDF
@@ -313,7 +313,7 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   page = a route `admin.<resource>.tsx` whose loader calls `fetchStaffRows` and a `DataColumn[]` config (key = the
   staff API's camelCase field, `type`, `required`, `pattern`, `ltr`, `inTable`/`inForm`). The same config drives the
   cells, sorting/search and the generated edit form; editing is our Radix dialog (not the paid DataTables Editor);
-  omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons (text-only pills like Edit / Delete: no icons) that open its dialog
+  omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons (each with its `icon`, like Edit / Delete) that open its dialog
   (e.g. "Discounts"); `formDialog` replaces the column-driven form for Add and Edit with the page's own dialog (it
   gets the row and `FormDialogProps`: `onSave` goes through `onCreate`/`onUpdate`), and `canEdit(row)` hides Edit on
   rows that form cannot edit (the Discounts page: DiscountDialog with `scope`, Edit hidden on fixed prices); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
@@ -442,7 +442,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Toasts** (`src/toast.tsx`, `Toast`): a confirmation with no place of its own on the page is a toast:
   `useToast().success(t...)` (the admin tables' add/save/delete/reorder, the discount dialogs, in-place and hero saves,
   signing in and out), `.warning` (signing out dropped an in-place draft), `.error` (a failure with no form to show it
-  in). One at a time, top center just under the header (`top-20`, `sm:top-[6.5rem]`); every toast stays 2 s (`TOAST_SHOW_MS`; errors and warnings use `TOAST_ALERT_MS`, also 2 s), above everything (z-[100]). Form and
+  in). One at a time, top center just under the header (`top-20`, `sm:top-[6.5rem]`); every toast stays 2 s (`TOAST_SHOW_MS`; errors and warnings use `TOAST_ALERT_MS`, also 2 s), above everything (z-[100]). Look:
+  a compact `rounded-lg` squircle on the kind's color (success `#26744D`), its icon, the message in bold, and a close X
+  (`t.common.closeNotification`) at the end that dismisses it at once; hovering pauses its timer; the live region holds
+  only the icon and the words. Form and
   field errors stay inline next to their fields (`role="alert"`), not in toasts. Never add a hand-made "Saved" status line.
 - **Loading states**: a button whose action waits on the server gets `loading={pending}` (`ui/button`): its label
   cross-fades into a `Spinner` in the same box (after 150ms), it is aria-busy + aria-disabled (never `disabled`, so the
@@ -462,10 +465,14 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
   (global rule in `index.css`). An accessible name must contain the visible label (WCAG 2.5.3); avoid building
   names from several spans that rely on whitespace.
-- **Icons**: lucide-react only; logos are SVG assets. Use them sparingly: an icon stays only when it *is* the
-  control (close, menu, chevrons, carousel arrows, cart, play/pause, password eye, drag grip, stepper −/+, the search
-  field's magnifier, map locate) or a state signal (a toast's kind, a sent form's check). No icon beside a label that
-  already says the same thing, and no arrow appended to link or button text.
+- **Icons**: lucide-react only; logos are SVG assets. An **action button** leads with its icon (aria-hidden, before
+  the label): Edit `Pencil`, Delete / Remove `Trash2`, Add `Plus`, Change order `ArrowUpDown`, Discounts `Percent`,
+  Stock `Boxes`, End discount now `CalendarX2`, PDF catalog `FileText`, Upload `Upload`, Edit on page `Pencil`, Add
+  to cart `ShoppingCart`, Out of stock `PackageX`, Find the nearest store `LocateFixed`, Login `UserRound`, Admin panel
+  `ShieldCheck`, Log out `LogOut`, To the catalog `LayoutGrid`; a download link too (`TextLink icon={Download}`).
+  Controls that are icons stay (close, menu, chevrons, carousel arrows, cart, play/pause, password eye, drag grip,
+  stepper −/+, the search magnifier), and state signals (a toast's kind, a sent form's check). Labels, cards,
+  headings, navigation CTAs ("Our brands", "Get a quote") and plain text links have no icon, and no arrow appended.
 - **Images**: SVG / WebP / AVIF with explicit sizes; lazy-load below the fold.
 
 ## i18n
@@ -502,12 +509,16 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   tailwind-merge drops a line height that comes before a size.
 - `text-2xs` (0.65rem); shadows `shadow-soft` (a resting card or menu), `shadow-premium-sm` (lifted, hover),
   `shadow-premium` (floating panels: dialogs, sheets, toasts), `shadow-red`.
-- **Corners** (soft and rounded; the radius follows the element's rank, never one radius for all): `rounded-md` 8px
-  (tags, thumbnails), `rounded-lg` 12px (inputs, menu items, small tiles), `rounded-2xl` 20px (cards, dialogs,
-  popovers, menus), `rounded-3xl` 28px (large panels, the side sheets' inner edge), `rounded-full` (buttons, chips,
-  filter pills, switches, steppers, badges, toasts). A rounded thing inside another gets the outer radius minus the gap.
-- **Buttons**: `<Button>` is a pill (rounded-full) with a sentence-case semibold label; the default variant is brand
-  red and lifts with a red glow on hover; `size="sm"` (40px) for dialogs and the header; `loading` (see Loading states).
+- **Corners** are **squircles**, never pills: `index.css` gives every element `corner-shape: squircle` where the
+  browser supports it (Chromium), with radii set for it (`--r-*`); other browsers get slightly smaller round corners.
+  The radius follows the element's rank, never one radius for all: `rounded-md` (tags, badges, thumbnails, the small
+  close buttons), `rounded-lg` (every control: buttons, inputs, chips, icon buttons, toasts, segmented switch, stepper,
+  pagination, switch track), `rounded-2xl` (cards, dialogs, popovers, menus), `rounded-3xl` (large panels, the side
+  sheets' inner edge). `rounded-full` only for tiny dots, thin progress bars, the slider thumb and the cart count badge.
+  A rounded thing inside another gets the outer radius minus the gap.
+- **Buttons**: `<Button>` is a squircle (`rounded-lg`) with a sentence-case semibold label; the default variant is
+  brand red; `size="sm"` (40px) for dialogs and the header; `loading` (see Loading states); action buttons lead with
+  their icon (see Icons).
 - **Form fields**: `ui/input` (`inputVariants` default / compact / search, `INPUT_CLASS` under a label, `LABEL_CLASS`):
   rounded-lg, light grey fill, white with a red border and a faint red halo when focused; never copy field classes.
 - **Logo**: `<Logo className="h-14" />` — horizontal lockup traced from `legacy/public/UltraPet_Logo.pdf`.
@@ -517,25 +528,26 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   hash follows the `<section id>` being read (history replace; none on the hero), so `includeHash` links light up.
 - **Motion** (Apple fluid-interface rules): every transition uses `--ease-spring` (a critically damped spring as CSS
   `linear()`, the Tailwind default timing function). Controls react on press (`active:scale-[0.97]
-  active:duration-100`); clickable cards lift on hover and settle on press (`transition-[box-shadow,translate,scale]`;
-  Tailwind v4 moves with `translate`/`scale`, so `transition-[transform]` would not animate them). The mobile drawer
+  active:duration-100`); clickable cards never move: on hover their border darkens and they gain a soft shadow
+  (`transition-[box-shadow,border-color]`), and photos don't zoom (calm, corporate). Tailwind v4 moves with
+  `translate`/`scale`, so `transition-[transform]` would not animate those. The mobile drawer
   can be swiped closed (`onSwipeClose` on `SheetContent`). Reduced motion keeps fades and drops movement (see the
   `prefers-reduced-motion` block in `index.css`). Subtle motion wherever it answers an action, in three durations
-  (150ms press / color, 300ms hover lift / menus / pills, 500ms panels / photos), never more than ~8px of travel or
-  1.03 scale, never looping (except a Spinner or the progress bar while something loads): shared utilities `img-fade`
+  (150ms press / color, 300ms hover / menus, 500ms panels / photos), never more than ~8px of travel, never looping (except a Spinner or the progress bar while something loads): shared utilities `img-fade`
   (a photo fades in once loaded), `link-underline` (an underline that sweeps in), `animate-spinner`,
   `animate-route-progress`, `animate-fade-in`; a change of page cross-fades through a view transition (`router.ts`,
   only when the path changes). No scroll-triggered reveals: content below the fold must be visible in screenshots
   and to axe.
 - **Type**: Inter with optical sizing (`opsz`); sizes from `text-xl` up carry size-specific negative tracking
   (`--text-*--letter-spacing`, milder in Hebrew); `tracking-display` for the hero headline; headings balance.
-- **Home hero**: from `sm` up an inset rounded frame (`sm:mx-3 sm:mt-3 sm:rounded-3xl lg:mx-4`, full-bleed on phones);
-  its slideshow controls sit at the inline start (the inline end is the WhatsApp button's), raised above the
+- **Home hero**: full-bleed (edge to edge under the header, square corners); its slideshow controls sit at the inline
+  start (the inline end is the WhatsApp button's), raised above the
   scroll-down arrow on phones.
-- **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (2px gaps between
-  the entries' pills, short language label "EN"/"עב"). Menu entries (`NAV_TEXT` in NavText.tsx) are sentence-case
-  pills: grey background on hover / while a dropdown is open, light brand red on the active page (no underline); the
-  account buttons are text-only outlined pills; the header row spans the full window (logo at the start edge; the business customers' cart icon, language and login at the end edge; the menu centered). Re-run the e2e overflow test
+- **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,
+  short language label "EN"/"עב"). Menu entries (`NAV_TEXT` + `Underline` in NavText.tsx) are sentence-case grey text
+  that turns brand red on hover / focus while a thin red underline grows from the reading start; the active page and an
+  open dropdown keep it red and underlined (keyboard focus adds a squircle ring). The language button and the cart turn
+  red on hover; the account buttons are outlined squircles with their icon that fill red on hover; the header row spans the full window (logo at the start edge; the business customers' cart icon, language and login at the end edge; the menu centered). Re-run the e2e overflow test
   after adding menu items.
 - **Look and feel**: like Royal Canin / Purina / Hill's / Hamilton — a large international distributor, **not a pet
   shop**. Clean, minimal and premium; large typography, high-end photography, elegant animations; beautiful and

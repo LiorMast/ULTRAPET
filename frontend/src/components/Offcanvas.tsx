@@ -137,7 +137,7 @@ export function Offcanvas({
           </div>
           <SheetClose
             aria-label={closeLabel ?? t.offcanvas.close}
-            className="-me-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
+            className="-me-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
           >
             <X size={20} aria-hidden="true" />
           </SheetClose>

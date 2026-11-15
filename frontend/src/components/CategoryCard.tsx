@@ -11,8 +11,8 @@ import type { AppLink } from '@/config'
 import { imgFade } from '@/motion'
 
 /**
- * One category card. A real link (crawlable, keyboard-focusable); the card lifts and the photo zooms
- * slightly on hover, and it settles back the instant it is pressed. A dark veil keeps the white name legible
+ * One category card. A real link (crawlable, keyboard-focusable); on hover its shadow deepens and the photo's veil
+ * darkens (nothing moves). A dark veil keeps the white name legible
  * on any photo, which fades in once loaded; without a photo the name turns brand red on hover.
  * @param props.name - The category's name in the page language (the card's heading and accessible name).
  * @param props.image - The photo's URL; omitted or null = the plain white card.
@@ -37,8 +37,7 @@ export function CategoryCard({
       className={cn(
         'group relative block aspect-[4/3] w-full overflow-hidden rounded-2xl outline-none',
         image ? 'bg-brand-charcoal' : 'bg-white shadow-soft',
-        'transition-[box-shadow,translate,scale] duration-300 hover:-translate-y-1 hover:shadow-premium-sm',
-        'active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100',
+        'transition-[box-shadow] duration-300 hover:shadow-premium-sm',
         'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
         className,
       )}
@@ -51,7 +50,7 @@ export function CategoryCard({
           height={600}
           loading="lazy"
           {...imgFade}
-          className="img-fade absolute inset-0 size-full object-cover group-hover:scale-[1.03]"
+          className="img-fade absolute inset-0 size-full object-cover"
         />
       )}
       {image && <span aria-hidden="true" className="absolute inset-0 bg-black/50 transition-colors duration-300 group-hover:bg-black/60" />}

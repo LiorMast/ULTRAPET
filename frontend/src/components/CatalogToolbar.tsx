@@ -28,12 +28,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useI18n } from '@/i18n'
 
 /**
- * The catalog's chip look, shared by the toolbar buttons and the category chips (Catalog.tsx): a pill, filled charcoal
+ * The catalog's chip look, shared by the toolbar buttons and the category chips (Catalog.tsx): a squircle, filled charcoal
  * when `active` (it holds a value / is the current filter); `size` md (44px, the toolbar, as tall as its inputs) or sm
  * (40px, the category row).
  */
 export const chipVariants = cva(
-  'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-sm font-medium outline-none transition-[color,background-color,border-color,scale] duration-300 active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 data-[state=open]:border-brand-charcoal',
+  'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-4 text-sm font-medium outline-none transition-[color,background-color,border-color,scale] duration-300 active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 data-[state=open]:border-brand-charcoal',
   {
     variants: {
       active: {
@@ -84,10 +84,10 @@ function ToolbarTrigger({
 }
 
 /**
- * One active filter, shown as a pill with a remove button.
+ * One active filter, shown as a small squircle chip with a remove button (its X).
  * @param props.label - What the filter is (e.g. the brand name).
  * @param props.onRemove - Removes the filter.
- * @returns The pill.
+ * @returns The chip.
  */
 function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }) {
   const { t } = useI18n()
@@ -97,7 +97,7 @@ function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }
         type="button"
         onClick={onRemove}
         aria-label={t.catalog.removeFilter.replace('{name}', label)}
-        className="inline-flex min-h-9 items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 ps-3.5 pe-3 text-sm text-brand-charcoal outline-none transition-[color,border-color,scale] duration-300 hover:border-brand-red hover:text-brand-red-dark active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 starting:scale-95 starting:opacity-0"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 ps-3.5 pe-3 text-sm text-brand-charcoal outline-none transition-[color,border-color,scale] duration-300 hover:border-brand-red hover:text-brand-red-dark active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 starting:scale-95 starting:opacity-0"
       >
         {label}
         <X aria-hidden="true" className="size-3.5" />
@@ -224,7 +224,7 @@ export function CatalogToolbar({ results, brands, canUsePrices, className }: { r
   }
 
   /**
-   * Removes an active filter from its pill and gives the focus to the brand button (the pill is gone).
+   * Removes an active filter from its chip and gives the focus to the brand button (the chip is gone).
    * @param changes - The URL state that removes the filter.
    */
   const removeFilter = (changes: Changes) => {

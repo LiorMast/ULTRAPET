@@ -10,10 +10,11 @@
  * CatalogPdfButton is the button that opens it.
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
+import { Download, FileText } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type CatalogPdfOptions, type CatalogPdfState } from '@/api'
 import { errorMessage } from '@/components/RecordDialog'
-import { textLinkVariants } from '@/components/TextLink'
+import { TextLink } from '@/components/TextLink'
 import { LABEL_CLASS } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -76,6 +77,7 @@ export function CatalogPdfButton({ className, ...handlers }: CatalogPdfHandlers 
   return (
     <>
       <Button ref={button} type="button" variant="outline" size="sm" className={className} onClick={() => setOpen(true)}>
+        <FileText aria-hidden />
         {t.admin.catalogPdf.button}
       </Button>
       {open && <CatalogPdfDialog {...handlers} onClose={() => setOpen(false)} onCloseAutoFocus={handleCloseFocus} />}
@@ -237,14 +239,9 @@ export function CatalogPdfDialog({ load, onGenerate, onClose, onCloseAutoFocus }
                     <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
                       {files.map((language) => (
                         <li key={language}>
-                          <a
-                            href={state.urls[language]}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={textLinkVariants()}
-                          >
+                          <TextLink href={state.urls[language]!} external icon={Download}>
                             {s.file.replace('{language}', LOCALES[language].nativeName)}
-                          </a>
+                          </TextLink>
                         </li>
                       ))}
                     </ul>

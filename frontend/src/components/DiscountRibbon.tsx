@@ -1,5 +1,5 @@
 /**
- * DiscountRibbon.tsx — A small pill badge that shows a discount, a sale or the stock status next to a product: a short
+ * DiscountRibbon.tsx — A small squircle badge that shows a discount, a sale or the stock status next to a product: a short
  * message on a brand color (the words say it, so the ready kinds carry no icon; an `icon` can still be given for a
  * message that needs one). It shares the Toast's color names but it is static page content, not a notification: no
  * portal, no timer, no live region.
@@ -18,7 +18,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from 'cn'
 
-const ribbonVariants = cva('inline-flex w-fit max-w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold leading-none', {
+const ribbonVariants = cva('inline-flex w-fit max-w-full items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold leading-none', {
   variants: {
     color: {
       charcoal: 'bg-brand-charcoal text-white',

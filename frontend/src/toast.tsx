@@ -6,10 +6,12 @@
  * sign-out. Mounted by main.tsx and the test helpers (src/test/utils.tsx), inside LocaleProvider.
  *
  * Every toast stays for TOAST_SHOW_MS (2 seconds); errors and warnings use TOAST_ALERT_MS (the same 2 seconds)
- * to read (WCAG 2.2.1, enough time).
+ * to read (WCAG 2.2.1, enough time); hovering a toast pauses it, and its close button (named in the page's
+ * language, t.common.closeNotification) dismisses it at once.
  */
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Toast, TOAST_SHOW_MS, type ToastKind } from '@/components/Toast'
+import { useI18n } from '@/i18n'
 
 /** How long an error or a warning toast stays, in ms: a message that matters must be readable. */
 export const TOAST_ALERT_MS = 2000
@@ -27,6 +29,7 @@ const ToastContext = createContext<ToastValue | null>(null)
  * @returns The children and the current toast, if any.
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const [toast, setToast] = useState<{ id: number; kind: ToastKind; message: string } | null>(null)
   const nextId = useRef(0)
 
@@ -58,6 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           kind={toast.kind}
           message={toast.message}
           duration={DURATIONS[toast.kind]}
+          closeLabel={t.common.closeNotification}
           onDone={() => setToast((current) => (current?.id === toast.id ? null : current))}
         />
       )}

@@ -6,7 +6,7 @@
 import { cn } from 'cn'
 
 /**
- * Renders a pill-shaped message bubble. It is hidden from assistive tech (the trigger carries the name).
+ * Renders a squircle message bubble. It is hidden from assistive tech (the trigger carries the name).
  * @param props.message - The text to show.
  * @param props.color - Any CSS background color (e.g. "#1A1A1A"); the text is white, so pick a dark color.
  * @param props.className - Extra classes for position and visibility, merged after the defaults.
@@ -17,7 +17,7 @@ export function Popover({ message, color, className }: { message: string; color:
     <span
       aria-hidden="true"
       style={{ backgroundColor: color }}
-      className={cn('pointer-events-none whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium text-white shadow-premium-sm', className)}
+      className={cn('pointer-events-none whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium text-white shadow-premium-sm', className)}
     >
       {message}
     </span>

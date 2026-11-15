@@ -91,7 +91,7 @@ export function About({
   const section = useEditableSection<string>({ content, ...aboutTexts(t, { pillars, offers, advantages }), styled: HEADING_KEYS, onSave: onSave && ((next) => onSave(next)) })
   const { field } = section
   return (
-    <section id="about" aria-labelledby="about-title" className="bg-white px-6 py-24 lg:px-10 lg:py-32">
+    <section id="about" aria-labelledby="about-title" className="bg-white px-6 py-20 lg:px-10 lg:py-24">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.about.eyebrow} className="bg-white" />}
         <form {...section.formProps}>

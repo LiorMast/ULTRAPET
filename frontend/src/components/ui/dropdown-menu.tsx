@@ -5,7 +5,7 @@
  * Enter / Space / ArrowDown), arrow-key navigation, typeahead, Escape, returning focus to the trigger,
  * and right-to-left layouts (the direction comes from the Direction.Provider in src/i18n/index.tsx).
  * Each part below wraps the Radix part of the same name and adds the default styles; pass `className`
- * to adjust them. Look: a white rounded panel (rounded-2xl, soft shadow) whose items are rounded-lg pills of
+ * to adjust them. Look: a white rounded panel (rounded-2xl, soft shadow) whose items are rounded-lg squircles of
  * highlight; it fades, zooms and drifts in from its trigger.
  */
 import * as React from "react"

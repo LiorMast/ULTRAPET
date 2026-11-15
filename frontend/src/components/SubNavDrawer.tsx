@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
-import { NAV_TEXT } from '@/components/NavText'
+import { NAV_TEXT, Underline } from '@/components/NavText'
 import type { NavLink } from '@/config'
 import { useI18n } from '@/i18n'
 
@@ -146,11 +146,12 @@ export function SubNavDrawer({
           }}
           className="mx-auto max-w-screen-2xl -translate-y-3 px-6 opacity-0 transition-[opacity,translate] duration-200 group-data-[state=open]/drawer:translate-y-0 group-data-[state=open]/drawer:opacity-100 group-data-[state=open]/drawer:delay-75 group-data-[state=open]/drawer:duration-500 lg:px-10 xl:px-6 2xl:px-10"
         >
-          <ul ref={listRef} className="mt-4 flex flex-wrap items-center justify-center gap-x-0.5 gap-y-2 border-t border-neutral-150 pt-3 pb-1 2xl:gap-x-1.5">
+          <ul ref={listRef} className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-3 border-t border-neutral-150 pt-4 pb-1 rtl:gap-x-7 2xl:gap-x-7">
             {items.map((item) => (
               <li key={item.id}>
                 <Link {...item.link} className={NAV_TEXT}>
                   {item.label(t)}
+                  <Underline />
                 </Link>
               </li>
             ))}

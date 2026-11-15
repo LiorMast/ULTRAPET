@@ -1,7 +1,7 @@
 /**
- * SegmentedSwitch.tsx — The site's multi-choice switch: two or more options drawn as one pill-shaped bar, the chosen
- * one under a pill thumb that slides between them (on the shared spring; reduced motion drops the slide). The thumb
- * span fills its option's slot; the visible pill is a real inner span inset 4px (not a ::before: contrast checkers
+ * SegmentedSwitch.tsx — The site's multi-choice switch: two or more options drawn as one squircle bar, the chosen
+ * one under a squircle thumb that slides between them (on the shared spring; reduced motion drops the slide). The thumb
+ * span fills its option's slot; the visible thumb is a real inner span inset 4px (not a ::before: contrast checkers
  * such as axe cannot see a pseudo-element's background), so the slot geometry stays simple.
  *
  * Under the look it is a native radio group (a <fieldset> with a <legend> and sr-only radio inputs), so the arrow
@@ -18,7 +18,7 @@ import { LABEL_CLASS } from '@/components/ui/input'
 /** One choice of the switch: its value, visible label, optional lucide icon (before the label), and whether it is off. */
 export type SegmentedOption<Value extends string> = { value: Value; label: string; icon?: LucideIcon; disabled?: boolean }
 
-const barVariants = cva('relative grid auto-cols-fr grid-flow-col rounded-full border', {
+const barVariants = cva('relative grid auto-cols-fr grid-flow-col rounded-lg border', {
   variants: {
     tone: {
       light: 'border-neutral-300 bg-neutral-50',
@@ -28,8 +28,8 @@ const barVariants = cva('relative grid auto-cols-fr grid-flow-col rounded-full b
   defaultVariants: { tone: 'light' },
 })
 
-/** The thumb's visible pill: its color for a light or a dark background. */
-const thumbVariants = cva('block size-full rounded-full', {
+/** The thumb's visible shape: its color for a light or a dark background. */
+const thumbVariants = cva('block size-full rounded-md', {
   variants: {
     tone: {
       light: 'bg-brand-charcoal shadow-premium-sm',
@@ -40,7 +40,7 @@ const thumbVariants = cva('block size-full rounded-full', {
 })
 
 const optionVariants = cva(
-  'relative z-10 flex cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-center font-medium transition-[color,scale] duration-300 not-has-disabled:active:scale-[0.97] not-has-disabled:active:duration-100 has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:outline-2 has-focus-visible:-outline-offset-2 has-focus-visible:outline-brand-red',
+  'relative z-10 flex cursor-pointer items-center justify-center gap-2 rounded-md px-4 text-center font-medium transition-[color,scale] duration-300 not-has-disabled:active:scale-[0.97] not-has-disabled:active:duration-100 has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:outline-2 has-focus-visible:-outline-offset-2 has-focus-visible:outline-brand-red',
   {
     variants: {
       tone: {

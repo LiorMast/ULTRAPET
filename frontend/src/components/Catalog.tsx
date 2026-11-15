@@ -10,7 +10,7 @@
  */
 import { useState } from 'react'
 import { Link, linkOptions, useNavigate, useRouterState } from '@tanstack/react-router'
-import { Search } from 'lucide-react'
+import { Download, Search } from 'lucide-react'
 import { cn } from 'cn'
 import { CatalogCard, priceFor, stockFor } from '@/components/CatalogCard'
 import { CatalogToolbar, chipVariants } from '@/components/CatalogToolbar'
@@ -125,7 +125,7 @@ export function Catalog({
     <section aria-labelledby="catalog-title" className="mx-auto max-w-screen-2xl px-6 py-16 lg:px-10 lg:py-20">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <SectionHeading as="h1" id="catalog-title" eyebrow={t.catalog.eyebrow} title={t.catalog.title} intro={t.catalog.description} />
-        <TextLink href={catalogPdfUrl(locale)} external className="shrink-0">
+        <TextLink href={catalogPdfUrl(locale)} external icon={Download} className="shrink-0">
           {t.catalog.download}
         </TextLink>
       </div>

@@ -38,7 +38,7 @@ describe('DiscountRibbon', () => {
   ] as const)('a %s ribbon has its own color, a pill shape and no icon', (kind, colorClass) => {
     render(<DiscountRibbon kind={kind} message="-20%" />)
     expect(ribbon()).toHaveAttribute('data-kind', kind)
-    expect(ribbon()).toHaveClass(colorClass, 'rounded-full')
+    expect(ribbon()).toHaveClass(colorClass, 'rounded-md')
     expect(ribbon()).toHaveTextContent('-20%')
     expect(ribbon().querySelector('svg')).toBeNull()
   })

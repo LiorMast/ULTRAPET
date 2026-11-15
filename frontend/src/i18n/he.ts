@@ -725,6 +725,8 @@ export const he = {
   common: {
     /** The Spinner's spoken label while something loads. */
     loading: 'טוען…',
+    /** The close button of a toast. */
+    closeNotification: 'סגירת ההודעה',
   },
   page: {
     comingSoon: 'העמוד הזה בבנייה ויעלה בקרוב.',

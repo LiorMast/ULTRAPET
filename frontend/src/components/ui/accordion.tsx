@@ -90,7 +90,7 @@ function AccordionTrigger({ className, children, ...props }: React.ComponentProp
         <span>{children}</span>
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-brand-charcoal transition-[background-color,color,scale] duration-300 group-hover/trigger:bg-brand-red-muted group-hover/trigger:text-brand-red group-active/trigger:scale-[0.92] group-active/trigger:duration-100 group-data-[state=open]/trigger:bg-brand-red group-data-[state=open]/trigger:text-white"
+          className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-brand-charcoal transition-[background-color,color,scale] duration-300 group-hover/trigger:bg-brand-red-muted group-hover/trigger:text-brand-red group-active/trigger:scale-[0.92] group-active/trigger:duration-100 group-data-[state=open]/trigger:bg-brand-red group-data-[state=open]/trigger:text-white"
         >
           <ChevronDownIcon className="size-5 transition-[rotate] duration-500 group-data-[state=open]/trigger:rotate-180" />
         </span>

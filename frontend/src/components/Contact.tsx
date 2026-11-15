@@ -54,7 +54,7 @@ type Field = 'name' | 'phone' | 'email' | 'message'
 
 /**
  * One contact card: a rounded link (tel/mailto/WhatsApp) or plain text, with its label, value and sub-line (no icon:
- * the label names the method). A link card lifts on hover and its value turns brand red.
+ * the label names the method). On hover a link card's border warms, it gains a soft shadow and its value turns red.
  * @param props.label - Its label's EditableText props.
  * @param props.value - Its value's EditableText props.
  * @param props.sub - Its sub-line's EditableText props.
@@ -78,7 +78,7 @@ function ContactCard({ label, value, sub, href, inputMode }: { label: EditableFi
         <a
           href={href}
           {...(href.startsWith('http') && { target: '_blank', rel: 'noopener noreferrer' })}
-          className={cn(className, 'hover:-translate-y-0.5 hover:border-brand-red/30 hover:shadow-premium-sm active:translate-y-0 active:scale-[0.99] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red/40')}
+          className={cn(className, 'hover:border-brand-red/30 hover:shadow-soft focus-visible:ring-2 focus-visible:ring-brand-red/40')}
         >
           {body}
         </a>
@@ -258,7 +258,7 @@ export function Contact({
   })
   const { field, editing } = section
   return (
-    <section id="contact" aria-labelledby="contact-title" className="bg-neutral-50 px-6 py-24 lg:px-10 lg:py-32">
+    <section id="contact" aria-labelledby="contact-title" className="bg-neutral-50 px-6 py-20 lg:px-10 lg:py-24">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.contact.eyebrow} className="bg-neutral-50" />}
         <div className="grid gap-x-10 lg:grid-cols-2">

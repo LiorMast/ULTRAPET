@@ -173,6 +173,14 @@ describe('DataTable on /admin/brands', () => {
     expect(remove).not.toHaveAttribute('aria-disabled')
   })
 
+  it('leads every action button with its icon, keeping the names', async () => {
+    await renderPage('/en/admin/brands', { staff: TEST_STAFF })
+    for (const name of [`Edit ${brands[0].name}`, `Delete ${brands[0].name}`, 'Add', 'Change order']) {
+      const button = screen.getByRole('button', { name })
+      expect(button.querySelector('svg'), name).toHaveAttribute('aria-hidden', 'true')
+    }
+  })
+
   it('is right-to-left with Hebrew texts on the Hebrew page', async () => {
     const { user } = await renderPage('/admin/brands', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'מותגים' })).toBeInTheDocument()

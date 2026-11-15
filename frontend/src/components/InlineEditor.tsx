@@ -33,7 +33,7 @@
  * into its new list of questions).
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Pencil } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type FontKey, type SizeStep } from '@/api'
 import { errorMessage } from '@/components/RecordDialog'
@@ -322,6 +322,7 @@ export function InlineEditBar({ editing, formId, pending, error, editButton, onE
         </>
       ) : (
         <Button ref={editButton} type="button" size="sm" aria-label={label ? t.inlineEdit.editSection.replace('{section}', label) : undefined} onClick={onEdit}>
+          <Pencil size={14} aria-hidden="true" />
           {t.inlineEdit.edit}
         </Button>
       )}

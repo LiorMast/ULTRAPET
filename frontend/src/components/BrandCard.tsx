@@ -1,7 +1,7 @@
 /**
  * BrandCard.tsx — A minimalist rounded card for one brand: logo (the brand's logoUrl, else the logo file bundled
  * with the site, else a text wordmark) on a soft panel, name and tagline. The whole card is one link to the brand's
- * page; it lifts and brightens on hover, and the logo fades in once loaded and grows a little on hover.
+ * page; it brightens on hover (nothing moves), and the logo fades in once loaded.
  * Used by the home page Brands section; reusable on a future all-brands page.
  */
 import { Link } from '@tanstack/react-router'
@@ -28,8 +28,7 @@ export function BrandCard({ brand, className }: { brand: Brand; className?: stri
       params={{ slug: brand.slug }}
       className={cn(
         'group relative flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-white/5 p-6 outline-none sm:p-7',
-        'transition-[box-shadow,translate,scale,background-color] duration-300 hover:-translate-y-1 hover:bg-white/10 hover:shadow-premium-sm',
-        'active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100',
+        'transition-[background-color,border-color] duration-300 hover:border-white/30 hover:bg-white/10',
         'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
         className,
       )}
@@ -43,7 +42,7 @@ export function BrandCard({ brand, className }: { brand: Brand; className?: stri
             height={144}
             loading="lazy"
             {...imgFade}
-            className="img-fade max-h-28 w-auto max-w-[75%] object-contain group-hover:scale-[1.03]"
+            className="img-fade max-h-28 w-auto max-w-[75%] object-contain"
           />
         ) : (
           <span aria-hidden="true" className="font-display text-2xl font-bold text-white">

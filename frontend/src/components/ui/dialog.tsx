@@ -65,7 +65,7 @@ function DialogContent({
         {closeLabel && (
           <DialogPrimitive.Close
             aria-label={closeLabel}
-            className="absolute end-3 top-3 flex size-9 items-center justify-center rounded-full text-brand-charcoal-muted transition-[color,background-color,scale] duration-150 hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:outline-2 focus-visible:outline-brand-red active:scale-[0.94] active:duration-100"
+            className="absolute end-3 top-3 flex size-9 items-center justify-center rounded-lg text-brand-charcoal-muted transition-[color,background-color,scale] duration-150 hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:outline-2 focus-visible:outline-brand-red active:scale-[0.94] active:duration-100"
           >
             <XIcon className="size-5" aria-hidden />
           </DialogPrimitive.Close>

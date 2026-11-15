@@ -11,6 +11,7 @@
  * caller gives the group label (a <fieldset> legend), the hint and the form errors, like with SearchableField.
  */
 import { useEffect, useId, useRef, useState, type ChangeEvent, type ComponentProps } from 'react'
+import { Trash2, Upload } from 'lucide-react'
 import { ApiError, uploadImage, type UploadFolder } from '@/api'
 import { Button } from '@/components/ui/button'
 import type { Dictionary } from '@/i18n/he'
@@ -152,10 +153,12 @@ export function ImageUploadField({
             aria-describedby={[describedBy, problem && problemId].filter(Boolean).join(' ') || undefined}
             onClick={() => fileInput.current?.click()}
           >
+            <Upload aria-hidden />
             {value ? t.admin.upload.replace : t.admin.upload.choose}
           </Button>
           {value && (
             <Button type="button" variant="ghost" size="sm" disabled={disabled || busy} onClick={handleRemove}>
+              <Trash2 aria-hidden />
               {t.admin.upload.remove}
             </Button>
           )}

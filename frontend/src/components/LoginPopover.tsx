@@ -7,7 +7,7 @@
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, LogOut, ShieldCheck, UserRound } from 'lucide-react'
 import { useAuth, useSignOut } from '@/auth'
 import { LoginForm } from '@/components/LoginForm'
 import type { DrawerTriggerProps } from '@/components/SubNavDrawer'
@@ -15,9 +15,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { HEADER_LOGIN } from '@/config'
 import { useI18n } from '@/i18n'
 
-/** Style of the header's pill buttons (login popover trigger, admin panel link, log out): text only, sentence case. */
-const PILL_CLASS =
-  'inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-neutral-300 px-5 py-2.5 font-heading text-nav-button font-semibold text-brand-charcoal outline-none transition-[color,background-color,border-color,scale] duration-300 active:scale-[0.97] active:duration-100 hover:border-brand-red hover:bg-brand-red hover:text-white focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 data-[state=open]:border-brand-red data-[state=open]:bg-brand-red data-[state=open]:text-white'
+/** Style of the header's account buttons (login popover trigger, admin panel, log out): outlined squircles with an icon, filled red on hover. */
+const ACCOUNT_BUTTON_CLASS =
+  'inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-neutral-300 px-5 py-2.5 font-heading text-nav-button font-semibold text-brand-charcoal outline-none transition-[color,background-color,border-color,scale] duration-300 active:scale-[0.97] active:duration-100 hover:border-brand-red hover:bg-brand-red hover:text-white focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 data-[state=open]:border-brand-red data-[state=open]:bg-brand-red data-[state=open]:text-white'
 
 /**
  * The header's account buttons: signed out = the login button with its popover (title, form and a link to
@@ -37,16 +37,19 @@ export function LoginPopover({ adminToggle }: { adminToggle?: DrawerTriggerProps
       <>
         {user.kind === 'staff' &&
           (adminToggle ? (
-            <button type="button" {...adminToggle} className={PILL_CLASS}>
+            <button type="button" {...adminToggle} className={ACCOUNT_BUTTON_CLASS}>
+              <ShieldCheck size={18} aria-hidden="true" />
               {t.nav.adminPanel}
               <ChevronDown size={16} aria-hidden="true" className="transition-transform duration-300 in-data-[state=open]:rotate-180" />
             </button>
           ) : (
-            <Link to="/admin" className={PILL_CLASS}>
+            <Link to="/admin" className={ACCOUNT_BUTTON_CLASS}>
+              <ShieldCheck size={18} aria-hidden="true" />
               {t.nav.adminPanel}
             </Link>
           ))}
-        <button type="button" onClick={handleSignOut} className={PILL_CLASS}>
+        <button type="button" onClick={handleSignOut} className={ACCOUNT_BUTTON_CLASS}>
+          <LogOut size={18} aria-hidden="true" />
           {t.login.signOut}
         </button>
       </>
@@ -54,7 +57,8 @@ export function LoginPopover({ adminToggle }: { adminToggle?: DrawerTriggerProps
   }
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className={PILL_CLASS}>
+      <PopoverTrigger className={ACCOUNT_BUTTON_CLASS}>
+        <UserRound size={18} aria-hidden="true" />
         {HEADER_LOGIN.label(t)}
       </PopoverTrigger>
       <PopoverContent aria-label={t.login.title}>

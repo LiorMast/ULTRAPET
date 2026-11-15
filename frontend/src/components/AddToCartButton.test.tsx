@@ -56,6 +56,8 @@ describe('Add to cart', () => {
     const { user, router } = await renderPage('/en/catalog', { user: TEST_USER })
     const { button, name } = await firstCard()
 
+    // The action leads with the cart icon, decorative: the name stays "Add to cart".
+    expect(button.querySelector('svg.lucide-shopping-cart')).toHaveAttribute('aria-hidden', 'true')
     await user.click(button)
     expect(button).toHaveAttribute('data-added')
     expect(within(button).getByText('Added')).toHaveClass('opacity-100')

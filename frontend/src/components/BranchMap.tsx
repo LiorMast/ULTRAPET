@@ -96,7 +96,7 @@ function FullscreenButton({ target }: { target: React.RefObject<HTMLDivElement |
       onClick={toggle}
       aria-label={label}
       title={label}
-      className="absolute bottom-8 start-3 z-[1000] flex size-10 items-center justify-center rounded-full bg-white text-brand-charcoal shadow-premium-sm transition-[background-color,scale] duration-300 hover:bg-neutral-100 active:scale-[0.94] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red/60"
+      className="absolute bottom-8 start-3 z-[1000] flex size-10 items-center justify-center rounded-lg bg-white text-brand-charcoal shadow-premium-sm transition-[background-color,scale] duration-300 hover:bg-neutral-100 active:scale-[0.94] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red/60"
     >
       <Icon aria-hidden="true" className="size-5" />
     </button>

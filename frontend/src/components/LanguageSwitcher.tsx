@@ -8,8 +8,8 @@
  * "coming soon".
  *
  * Variants:
- *  - "dropdown": globe button + menu, for the desktop header (a pill whose grey background fades in on hover).
- *  - "buttons":  a row of pill language buttons, for the mobile drawer.
+ *  - "dropdown": globe button + menu, for the desktop header (its text turns brand red on hover).
+ *  - "buttons":  a row of squircle language buttons, for the mobile drawer.
  *  - "toggle":   one compact link to the other language, for the mobile header bar.
  */
 import { useId } from 'react'
@@ -55,7 +55,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
         hrefLang={other}
         lang={other}
         aria-label={`${LOCALES[other].shortName} – ${LOCALES[other].nativeName}`}
-        className="flex items-center gap-1.5 rounded-full p-3 font-heading text-nav-button font-semibold text-neutral-700 transition-[color,background-color] duration-300 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red"
+        className="flex items-center gap-1.5 rounded-lg p-3 font-heading text-nav-button font-semibold text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red"
       >
         <Globe size={22} aria-hidden="true" />
         {LOCALES[other].shortName}
@@ -82,7 +82,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
               dir={LOCALES[l].dir}
               aria-current={l === locale ? 'true' : undefined}
               className={cn(
-                'flex-1 rounded-full border py-2.5 text-center font-heading text-sm font-semibold transition-[color,background-color,border-color] duration-300',
+                'flex-1 rounded-lg border py-2.5 text-center font-heading text-sm font-semibold transition-[color,background-color,border-color] duration-300',
                 l === locale
                   ? 'border-brand-red bg-brand-red text-white'
                   : 'border-neutral-200 text-neutral-600 hover:border-brand-red hover:text-brand-red',
@@ -99,7 +99,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
-        className="group flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 font-heading text-nav-button font-medium text-neutral-700 transition-[color,background-color] duration-300 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red data-[state=open]:bg-neutral-100 data-[state=open]:text-brand-charcoal"
+        className="group flex items-center gap-2.5 whitespace-nowrap rounded-lg px-5 py-3 font-heading text-nav-button font-semibold text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red data-[state=open]:text-brand-red"
       >
         <Globe size={18} aria-hidden="true" />
         {/* Accessible name = "Language: " + whichever label is visible (short below 2xl, full above),
@@ -131,7 +131,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
             <span lang={l} dir={LOCALES[l].dir}>
               {LOCALES[l].nativeName}
             </span>
-            <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-2xs font-semibold">{t.lang.comingSoon}</span>
+            <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-2xs font-semibold">{t.lang.comingSoon}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

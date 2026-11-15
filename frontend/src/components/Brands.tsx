@@ -32,7 +32,7 @@ export function Brands({ brands, content, onSave }: { brands: Brand[]; content?:
     onSave: onSave && ((next) => onSave(next)),
   })
   return (
-    <section id="brands" aria-labelledby="brands-title" className="bg-black px-6 py-24 lg:px-10 lg:py-32">
+    <section id="brands" aria-labelledby="brands-title" className="bg-black px-6 py-20 lg:px-10 lg:py-24">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.brands.eyebrow} tone="dark" className="bg-black" />}
         <form {...section.formProps}>

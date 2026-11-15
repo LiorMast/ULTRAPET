@@ -1,8 +1,9 @@
 /**
  * ui/button.tsx — The site's button (shadcn/ui, restyled for UltraPet).
  *
- * Every button is a pill (rounded-full) with a sentence-case semibold label. The default variant is the brand-red
- * primary action, lifting slightly with a red glow on hover. Every variant reacts the instant it is pressed (scales to
+ * Every button is a squircle (rounded-lg, see the corner system in index.css) with a sentence-case semibold label. The
+ * default variant is the brand-red primary action, darkening on hover (no lift, no glow: calm and corporate). An action
+ * button leads with its lucide icon (Edit = Pencil, Delete = Trash2, Add = Plus ...). Every variant reacts the instant it is pressed (scales to
  * 97% in 100ms) and springs back on release, so a press never feels dead. Sizes: "default" (48px tall) and "sm" (40px,
  * dialogs and the header). The "ghostWhite" variant is the white-outline button for dark photo backgrounds (hero). The
  * "action" variant with size "action" is a record's action (the admin tables' Edit / Discounts / Delete): outlined,
@@ -24,14 +25,14 @@ import { Slot } from "radix-ui"
 import { SpinnerRing } from "@/components/ui/spinner"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:not-data-loading:scale-[0.97] active:not-aria-[haspopup]:duration-100 disabled:pointer-events-none disabled:opacity-50 data-loading:cursor-progress aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:not-data-loading:scale-[0.97] active:not-aria-[haspopup]:duration-100 disabled:pointer-events-none disabled:opacity-50 data-loading:cursor-progress aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default:
-          "bg-primary font-heading font-semibold text-primary-foreground duration-300 hover:not-data-loading:-translate-y-0.5 hover:bg-brand-red-dark hover:shadow-red active:translate-y-0",
+          "bg-primary font-heading font-semibold text-primary-foreground duration-200 hover:bg-brand-red-dark",
         ghostWhite:
-          "border-white/50 font-heading font-semibold text-white duration-300 hover:-translate-y-0.5 hover:border-white hover:bg-white/10 active:translate-y-0",
+          "border-white/50 font-heading font-semibold text-white duration-200 hover:border-white hover:bg-white/10",
         outline:
           "border-neutral-300 bg-background font-semibold duration-300 hover:border-brand-charcoal hover:bg-neutral-50 hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:

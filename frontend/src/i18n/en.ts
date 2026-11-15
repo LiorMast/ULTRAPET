@@ -718,6 +718,8 @@ export const en: Dictionary = {
   common: {
     /** The Spinner's spoken label while something loads. */
     loading: 'Loading…',
+    /** The close button of a toast. */
+    closeNotification: 'Close notification',
   },
   page: {
     comingSoon: 'This page is under construction and will be available soon.',

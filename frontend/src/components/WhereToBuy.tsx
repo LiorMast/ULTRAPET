@@ -5,7 +5,7 @@
  * The map (Leaflet) is loaded lazily, so the rest of the site does not download it.
  */
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
-import { Search } from 'lucide-react'
+import { LocateFixed, Search } from 'lucide-react'
 import { cn } from 'cn'
 import { SectionHeading } from '@/components/SectionHeading'
 import { textLinkVariants } from '@/components/TextLink'
@@ -162,6 +162,7 @@ export function WhereToBuy({ branches }: { branches: Branch[] }) {
           />
         </div>
         <Button type="button" onClick={handleNearest} loading={location.status === 'locating'}>
+          <LocateFixed aria-hidden="true" />
           {t.whereToBuy.nearest}
         </Button>
       </form>

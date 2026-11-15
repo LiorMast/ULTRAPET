@@ -1,5 +1,5 @@
 /**
- * ArticleCard.tsx — A rounded card for one article: photo (fades in once loaded, zooms a little on hover), topic,
+ * ArticleCard.tsx — A rounded card for one article: photo (fades in once loaded), topic,
  * date and reading time, title, summary and a "read the article" line that underlines on hover; the whole card is one
  * link to the article page. Two looks (`variant`):
  * `default` for grids, `featured` (photo beside the text on large screens) for the latest article.
@@ -54,8 +54,7 @@ export function ArticleMeta({ article, className }: { article: Article; classNam
 const cardVariants = cva(
   [
     'group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white outline-none',
-    'transition-[box-shadow,translate,scale] duration-300 hover:-translate-y-1 hover:shadow-premium-sm',
-    'active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100',
+    'transition-[box-shadow,border-color] duration-300 hover:border-neutral-300 hover:shadow-soft',
     'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
   ],
   {
@@ -70,7 +69,7 @@ const cardVariants = cva(
 )
 
 /**
- * One article card. A real link (crawlable, keyboard-focusable); the photo zooms slightly on hover.
+ * One article card. A real link (crawlable, keyboard-focusable); on hover its border darkens and it gains a soft shadow.
  * @param props.article - The article to show.
  * @param props.variant - `default` (grid card) or `featured` (wide card, photo beside the text).
  * @param props.headingLevel - The title's heading tag, so the card fits the page outline; default "h3".
@@ -102,7 +101,7 @@ export function ArticleCard({
             loading={priority ? 'eager' : 'lazy'}
             fetchPriority={priority ? 'high' : undefined}
             {...imgFade}
-            className="img-fade absolute inset-0 size-full object-cover group-hover:scale-[1.03]"
+            className="img-fade absolute inset-0 size-full object-cover"
           />
         )}
       </div>

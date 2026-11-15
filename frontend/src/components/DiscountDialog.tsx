@@ -25,6 +25,7 @@
  * once), and closes.
  */
 import { useId, useState, type FormEvent } from 'react'
+import { CalendarX2 } from 'lucide-react'
 import { cn } from 'cn'
 import { ApiError, type StaffCategory, type StaffProduct } from '@/api'
 import { localized } from '@/config'
@@ -645,6 +646,7 @@ function DiscountForm({
         <DialogFooter>
           {canEnd && (
             <Button type="button" variant="outline" size="sm" className="sm:me-auto" loading={pending === 'end'} disabled={pending === 'save'} onClick={handleEndNow}>
+              <CalendarX2 aria-hidden />
               {d.endNow}
             </Button>
           )}

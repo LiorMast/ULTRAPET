@@ -4,7 +4,8 @@
  * shows a visible focus ring (rounded shapes must not swallow it); with reduced motion nothing moves (no rising text,
  * nudging hint or turning spinner) and every section shows; a button that waits on the server shows its spinner, keeps
  * its size and focus, and sends one request however often it is pressed (sign-in, an admin save); a slow navigation
- * keeps the page and runs the top progress bar; and the 404 page passes axe.
+ * keeps the page and runs the top progress bar; controls are squircles (corner-shape), never pills; a toast closes
+ * with its X; and the 404 page passes axe.
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
@@ -168,6 +169,40 @@ test('a slow navigation keeps the page, marks it busy and runs the progress bar'
   await expect(page.locator('#stats')).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: 'Pet care guides and tips' })).toBeVisible()
   await expect(page.getByRole('main')).not.toHaveAttribute('aria-busy')
+})
+
+test('buttons, fields and cards have squircle corners, never pill ends', async ({ page }) => {
+  await page.goto('/en/catalog')
+  await page.getByRole('main').locator('h1').waitFor()
+  const main = page.getByRole('main')
+  for (const [name, locator] of [
+    ['button', main.getByRole('link', { name: 'Log in', exact: true })],
+    ['search field', main.getByRole('searchbox', { name: 'Search products' })],
+    ['category chip', main.getByRole('navigation', { name: /categor/i }).getByRole('link').first()],
+    ['card', main.locator('article').first()],
+  ] as const) {
+    const corner = await locator.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { shape: style.getPropertyValue('corner-shape'), radius: parseFloat(style.borderTopLeftRadius), height: el.getBoundingClientRect().height }
+    })
+    expect(corner.shape, `${name} corner shape`).toMatch(/squircle|superellipse/)
+    expect(corner.radius, `${name} radius`).toBeGreaterThan(0)
+    expect(corner.radius, `${name} is not a pill`).toBeLessThan(corner.height / 2)
+  }
+})
+
+test('a toast closes with its X', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'one run is enough')
+  await page.goto('/en/admin/brands')
+  await page.getByLabel('Email').fill(process.env.SEED_ADMIN_EMAIL ?? '')
+  await page.getByLabel('Password', { exact: true }).fill(process.env.SEED_ADMIN_PASSWORD ?? '')
+  await page.getByRole('main').getByRole('button', { name: 'Log in' }).click()
+  const toast = page.locator('[data-slot="toast-box"]')
+  // Hovering pauses its 2-second timer, so the test does not race it.
+  await toast.hover()
+  await expect(toast).toContainText('You are signed in.')
+  await toast.getByRole('button', { name: 'Close notification' }).click()
+  await expect(toast).toHaveCount(0)
 })
 
 test('the 404 page has no accessibility violations', async ({ page }) => {

@@ -83,7 +83,7 @@ export function CartDrawer({ className }: { className?: string }) {
           {...{ [CART_TARGET_ATTR]: '' }}
           aria-label={label}
           className={cn(
-            'relative rounded-full p-2 text-brand-charcoal sm:p-3 transition-[color,background-color,scale] duration-300 outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100',
+            'relative rounded-lg p-2 text-brand-charcoal sm:p-3 transition-[color,scale] outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.97] active:duration-100',
             className,
           )}
         >
@@ -214,7 +214,7 @@ function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNaviga
             type="button"
             aria-label={t.cart.remove.replace('{name}', name)}
             onClick={onRemove}
-            className="-me-1.5 -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-brand-red-muted hover:text-brand-red-dark focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
+            className="-me-1.5 -mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-brand-red-muted hover:text-brand-red-dark focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
           >
             <Trash2 aria-hidden="true" className="size-4" />
           </button>

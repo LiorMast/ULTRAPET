@@ -18,6 +18,7 @@
  *   text (words only; its button keeps its label). One Save stores the list, then the texts.
  */
 import { useRef } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { FaqItem, FaqItemInput, SectionContent } from '@/api'
 import { fieldLabel, mergeSection, SectionEditBar, sectionFields, type SectionOptions } from '@/components/EditableSection'
@@ -220,7 +221,7 @@ export function Faq({
   const hint = (texts: Texts | undefined, prompt: string) => Object.entries(texts ?? {}).find(([language, text]) => language !== locale && text?.trim())?.[1] ?? prompt
 
   return (
-    <section id="faq" aria-labelledby="faq-title" className="bg-white px-6 py-24 lg:px-10 lg:py-32">
+    <section id="faq" aria-labelledby="faq-title" className="bg-white px-6 py-20 lg:px-10 lg:py-24">
       {/* One form for the whole section: the questions and the section's texts are saved together. */}
       <form {...inline.formProps} className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
         <div className="lg:sticky lg:top-32 lg:self-start">
@@ -278,6 +279,7 @@ export function Faq({
                         />
                       </div>
                       <Button type="button" variant="ghost" size="xs" aria-label={t.admin.deleteRow.replace('{name}', label)} onClick={() => removeQuestion(entry)}>
+                        <Trash2 aria-hidden="true" />
                         {t.admin.delete}
                       </Button>
                     </li>
@@ -286,6 +288,7 @@ export function Faq({
               </ol>
               {/* data-focus-fallback: the focus lands here when the last question is deleted. */}
               <Button type="button" variant="outline" size="sm" className="mt-6" data-focus-fallback onClick={addQuestion}>
+                <Plus aria-hidden="true" />
                 {e.add}
               </Button>
             </div>

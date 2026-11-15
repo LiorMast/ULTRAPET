@@ -2,8 +2,7 @@
  * Hero.tsx — The home page hero: a slideshow of photos with a dark gradient on the text side, the "Ultra Pet"
  * headline, a short pitch and a button. Rebuilt from legacy/src/components/Hero.tsx.
  *
- * - The page's one bold shape: from `sm` up the hero is an inset frame (a 12-16px margin, rounded-3xl corners) under
- *   the header; on phones it stays full-bleed.
+ * - Full-bleed: edge to edge right under the header, filling the rest of the first screen.
  * - The photos come from the folder src/assets/hero (see HERO_IMAGES in src/config.ts): drop files there
  *   and they appear, in filename order. Photos are decorative; the headline carries the meaning.
  * - Each photo fades in over 1.6s while slowly zooming in (styles: .hero-slide in src/index.css).
@@ -231,7 +230,7 @@ export function Hero({
     <section
       id="home"
       className={cn(
-        'relative isolate h-[calc(100svh-5.5rem)] max-h-[960px] min-h-[600px] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3 sm:mx-3 sm:mt-3 sm:h-[calc(100svh-6.25rem)] sm:rounded-3xl lg:mx-4',
+        'relative isolate h-[calc(100svh-5.5rem)] max-h-[960px] min-h-[600px] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3',
         // While editing, the boxes' frames and a wrapped bar can add height: the hero grows instead of cutting off.
         editing && 'h-auto max-h-none py-28',
       )}
@@ -387,7 +386,7 @@ export function Hero({
                 type="button"
                 aria-label={userPaused ? t.hero.play : t.hero.pause}
                 onClick={() => setUserPaused(!userPaused)}
-                className="ms-3 flex size-9 items-center justify-center rounded-full border border-white/40 text-white/80 outline-none transition-[color,border-color,scale] hover:border-white hover:text-white focus-visible:ring-2 focus-visible:ring-white active:scale-90 active:duration-100"
+                className="ms-3 flex size-9 items-center justify-center rounded-lg border border-white/40 text-white/80 outline-none transition-[color,border-color,scale] hover:border-white hover:text-white focus-visible:ring-2 focus-visible:ring-white active:scale-90 active:duration-100"
               >
                 {userPaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}
               </button>

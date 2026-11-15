@@ -4,6 +4,7 @@
  * the /login page.
  */
 import { Link } from '@tanstack/react-router'
+import { LayoutGrid, LogOut, ShieldCheck } from 'lucide-react'
 import type { User } from '@/api'
 import { useSignOut } from '@/auth'
 import { Button } from '@/components/ui/button'
@@ -25,17 +26,20 @@ export function AccountPanel({ user }: { user: User }) {
       </p>
       <Button asChild className="w-full">
         <Link to="/catalog">
+          <LayoutGrid aria-hidden="true" />
           {t.login.toCatalog}
         </Link>
       </Button>
       {user.kind === 'staff' && (
         <Button asChild variant="outline" className="w-full">
           <Link to="/admin">
+            <ShieldCheck aria-hidden="true" />
             {t.nav.adminPanel}
           </Link>
         </Button>
       )}
       <Button type="button" variant="outline" className="w-full" onClick={handleSignOut}>
+        <LogOut aria-hidden="true" />
         {t.login.signOut}
       </Button>
     </div>

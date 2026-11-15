@@ -68,7 +68,7 @@ function AdminLayout() {
               <li key={id}>
                 <Link
                   {...link}
-                  className="block rounded-full px-3.5 py-2 font-heading text-sm font-medium text-neutral-700 outline-none transition-[color,background-color] duration-300 hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red aria-[current=page]:bg-brand-red-muted aria-[current=page]:text-brand-red-dark"
+                  className="block rounded-lg px-3.5 py-2 font-heading text-sm font-medium text-neutral-700 outline-none transition-[color,background-color] duration-300 hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red aria-[current=page]:bg-brand-red-muted aria-[current=page]:text-brand-red-dark"
                 >
                   {label(t)}
                 </Link>

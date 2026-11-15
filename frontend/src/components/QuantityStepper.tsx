@@ -16,7 +16,7 @@ import { cn } from 'cn'
 import { MAX_QUANTITY, MIN_QUANTITY } from '@/cart'
 import { useI18n } from '@/i18n'
 
-const stepperVariants = cva('inline-flex items-stretch overflow-hidden rounded-full border border-neutral-300 bg-white transition-[border-color] duration-150 focus-within:border-brand-red', {
+const stepperVariants = cva('inline-flex items-stretch overflow-hidden rounded-lg border border-neutral-300 bg-white transition-[border-color] duration-150 focus-within:border-brand-red', {
   variants: {
     size: {
       sm: 'h-9 [&_button]:w-9 [&_input]:w-10 [&_input]:text-sm',
@@ -28,7 +28,7 @@ const stepperVariants = cva('inline-flex items-stretch overflow-hidden rounded-f
 
 /** Style of the minus and plus buttons. */
 const BUTTON_CLASS =
-  'flex shrink-0 items-center justify-center rounded-full text-brand-charcoal transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-red focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red active:scale-[0.97] active:duration-100 disabled:pointer-events-none disabled:opacity-40'
+  'flex shrink-0 items-center justify-center rounded-md text-brand-charcoal transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-red focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red active:scale-[0.97] active:duration-100 disabled:pointer-events-none disabled:opacity-40'
 
 /**
  * The quantity field.

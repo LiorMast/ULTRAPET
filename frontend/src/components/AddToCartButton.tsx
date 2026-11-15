@@ -11,7 +11,7 @@
  */
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { Check } from 'lucide-react'
+import { Check, PackageX, ShoppingCart } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
 import { CART_TARGET_ATTR, useCart, type CartProduct } from '@/cart'
@@ -155,6 +155,7 @@ export function AddToCartButton({
   if (!available) {
     return (
       <Button type="button" variant="action" disabled className={cn(addVariants({ size }), 'h-auto', className)}>
+        <PackageX aria-hidden="true" className="size-4" />
         {t.cart.soldOut}
       </Button>
     )
@@ -164,6 +165,7 @@ export function AddToCartButton({
     <>
       <Button type="button" onClick={handleClick} data-added={added || undefined} className={cn(addVariants({ size }), 'grid', className)}>
         <span className={cn(LABEL_CLASS, added ? 'scale-90 opacity-0' : 'scale-100 opacity-100')}>
+          <ShoppingCart aria-hidden="true" className="size-4" />
           {t.cart.add}
         </span>
         <span aria-hidden="true" className={cn(LABEL_CLASS, added ? 'scale-100 opacity-100' : 'scale-90 opacity-0')}>

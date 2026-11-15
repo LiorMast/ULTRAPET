@@ -1,6 +1,6 @@
 /**
  * CatalogCard.tsx — One product in a catalog, as a rounded card: the photo in an inset rounded well (it fades in once
- * loaded and zooms a little on hover), category, name, and a price slot. The card knows
+ * loaded; on hover the card's border darkens and it gains a soft shadow, nothing moves), category, name, and a price slot. The card knows
  * nothing about who is signed in; the caller decides through props whether the price is shown, still
  * loading, or hidden behind a "log in to see the price" link. Two layouts (`variant`): `grid` (a tile) and
  * `list` (a horizontal row, e.g. for a list view or the B2B order screen).
@@ -60,7 +60,7 @@ export function formatPrice(locale: Locale, amount: number, { whole = false }: {
   return new Intl.NumberFormat(locale, { style: 'currency', currency: 'ILS', ...(whole && { maximumFractionDigits: 0 }) }).format(amount)
 }
 
-const cardVariants = cva('group relative flex rounded-2xl border border-neutral-200 bg-white p-2 transition-[box-shadow,translate,scale,border-color] duration-300 hover:-translate-y-1 hover:border-neutral-300 hover:shadow-premium-sm active:translate-y-0 active:scale-[0.99] active:shadow-none active:duration-100', {
+const cardVariants = cva('group relative flex rounded-2xl border border-neutral-200 bg-white p-2 transition-[box-shadow,border-color] duration-300 hover:border-neutral-300 hover:shadow-soft', {
   variants: {
     variant: {
       grid: 'flex-col',
@@ -159,7 +159,7 @@ export function CatalogCard({
             loading="lazy"
             decoding="async"
             {...imgFade}
-            className="img-fade size-full object-contain p-3 mix-blend-multiply group-hover:scale-[1.03] sm:p-4"
+            className="img-fade size-full object-contain p-3 mix-blend-multiply sm:p-4"
           />
         )}
       </div>

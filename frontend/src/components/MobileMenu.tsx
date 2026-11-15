@@ -11,7 +11,7 @@
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ChevronDown, Menu, X } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, ShieldCheck, UserRound, X } from 'lucide-react'
 import { cn } from 'cn'
 import { useAuth, useSignOut } from '@/auth'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -47,11 +47,11 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
       <SheetTrigger
         aria-label={t.header.openMenu}
         className={cn(
-          'rounded-full p-2.5 transition-[background-color,scale] duration-300 outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100',
+          'rounded-lg p-3 transition-colors outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red',
           'text-brand-charcoal',
         )}
       >
-        <Menu size={28} aria-hidden="true" />
+        <Menu size={32} aria-hidden="true" />
       </SheetTrigger>
 
       <SheetContent
@@ -68,7 +68,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
           </Link>
           <SheetClose
             aria-label={t.header.closeMenu}
-            className="-me-2 flex size-9 items-center justify-center rounded-full text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
+            className="-me-2 flex size-9 items-center justify-center rounded-lg text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
           >
             <X size={20} aria-hidden="true" />
           </SheetClose>
@@ -112,7 +112,8 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
             ))}
             {user?.kind === 'staff' && (
               <li>
-                <Link to="/admin" onClick={close} className={ENTRY_CLASS}>
+                <Link to="/admin" onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2.5')}>
+                  <ShieldCheck size={18} aria-hidden="true" />
                   {t.nav.adminPanel}
                 </Link>
               </li>
@@ -125,12 +126,14 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
                     close()
                     handleSignOut()
                   }}
-                  className={ENTRY_CLASS}
+                  className={cn(ENTRY_CLASS, 'flex items-center gap-2.5')}
                 >
+                  <LogOut size={18} aria-hidden="true" />
                   {t.login.signOut}
                 </button>
               ) : (
-                <Link {...HEADER_LOGIN.link} onClick={close} className={ENTRY_CLASS}>
+                <Link {...HEADER_LOGIN.link} onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2.5')}>
+                  <UserRound size={18} aria-hidden="true" />
                   {HEADER_LOGIN.label(t)}
                 </Link>
               )}

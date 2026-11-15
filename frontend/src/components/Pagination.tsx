@@ -12,7 +12,7 @@ import { useI18n } from '@/i18n'
 
 /** Shared look of a page entry (number or arrow): a round button that dips slightly the instant it is pressed. */
 const ITEM =
-  'flex size-11 items-center justify-center rounded-full border font-heading text-sm font-semibold outline-none transition-[color,background-color,border-color,scale] duration-300 active:scale-95 active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2'
+  'flex size-11 items-center justify-center rounded-lg border font-heading text-sm font-semibold outline-none transition-[color,background-color,border-color,scale] duration-300 active:scale-95 active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2'
 
 /**
  * The page numbers to show: always the first and last, the current page with `siblings` pages on each side,

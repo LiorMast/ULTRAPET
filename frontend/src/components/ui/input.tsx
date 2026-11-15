@@ -4,7 +4,7 @@
  *
  * A soft rounded field (rounded-lg) on a light grey fill that turns white with a red border and a faint red halo
  * when focused, and red-bordered when `aria-invalid`. Sizes: `default` (a form field under its label), `compact`
- * (44px, toolbars: the catalog's price range), `search` (48px pill with room for the magnifier icon at the start:
+ * (44px, toolbars: the catalog's price range), `search` (48px, with room for the magnifier icon at the start:
  * the catalog and Where to Buy searches). It is a class (not a component) because native <select>, <textarea> and the
  * password / searchable fields all wear it. Used by LoginForm, Contact, RecordDialog and every admin dialog,
  * CatalogToolbar, Catalog and WhereToBuy.
@@ -20,7 +20,7 @@ export const inputVariants = cva(
       size: {
         default: "rounded-lg px-4 py-3",
         compact: "h-11 rounded-lg px-3",
-        search: "h-12 rounded-full ps-12 pe-4",
+        search: "h-12 rounded-lg ps-12 pe-4",
       },
     },
     defaultVariants: { size: "default" },

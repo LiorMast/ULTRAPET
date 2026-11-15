@@ -22,7 +22,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import DataTableLib, { type DataTableSlots } from 'datatables.net-react'
 import DT, { type ColumnOptions, type Options } from 'datatables.net-dt'
 import 'datatables.net-dt/css/dataTables.dataTables.css'
-import { Check, X } from 'lucide-react'
+import { ArrowUpDown, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { ApiError, type UploadFolder } from '@/api'
 import { localized, type Localized } from '@/config'
 import { RecordDialog, errorMessage } from '@/components/RecordDialog'
@@ -84,6 +84,7 @@ export type RowValues = Record<string, unknown>
  * A button of the caller's own on every row, between Edit and Delete, that opens the caller's dialog for the row.
  * - `name`: tells the buttons apart (their `data-action`), e.g. "discounts". `label`: the visible text.
  * - `rowLabel`: the button's accessible name for a row name, e.g. "Discounts: Paw" (it must contain `label`).
+ * - `icon`: the action's lucide icon (aria-hidden), shown before the label like Edit's pencil.
  * - `dialog`: renders the open dialog for the row, always its latest version (after the rows reload). The dialog
  *   calls `onClose` when it closes and passes `onCloseAutoFocus` to its DialogContent, so the focus goes back
  *   to the row's button.
@@ -92,6 +93,7 @@ export type RowAction<Row> = {
   name: string
   label: string
   rowLabel: (name: string) => string
+  icon: ReactNode
   dialog: (row: Row, props: { onClose: () => void; onCloseAutoFocus: (event: Event) => void }) => ReactNode
 }
 
@@ -240,16 +242,19 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
     <span className="flex gap-2">
       {onUpdate && (canEdit?.(row) ?? true) && (
         <Button variant="action" size="action" data-row={key} data-action="edit" aria-label={t.admin.editRow.replace('{name}', name)} onClick={() => onOpen({ mode: 'edit', row })}>
+          <Pencil aria-hidden />
           {t.admin.edit}
         </Button>
       )}
       {rowActions.map((action) => (
         <Button key={action.name} variant="action" size="action" data-row={key} data-action={action.name} aria-label={action.rowLabel(name)} onClick={() => onOpen({ mode: 'action', name: action.name, row })}>
+          {action.icon}
           {action.label}
         </Button>
       ))}
       {onDelete && (
         <Button variant="actionDanger" size="action" data-row={key} data-action="delete" aria-label={t.admin.deleteRow.replace('{name}', name)} onClick={() => onOpen({ mode: 'delete', row })}>
+          <Trash2 aria-hidden />
           {t.admin.delete}
         </Button>
       )}
@@ -393,11 +398,13 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
         <div className="flex flex-wrap gap-2">
           {onReorder && rows.length > 1 && (
             <Button size="sm" variant="outline" data-action="reorder" onClick={() => setOpen({ mode: 'reorder' })}>
+              <ArrowUpDown aria-hidden />
               {t.admin.reorder.button}
             </Button>
           )}
           {onCreate && (
             <Button size="sm" data-action="create" onClick={() => setOpen({ mode: 'create' })}>
+              <Plus aria-hidden />
               {t.admin.add}
             </Button>
           )}
