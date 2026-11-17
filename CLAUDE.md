@@ -770,7 +770,7 @@ content exists in each language, and the layout flips direction automatically.
       Pet, FAQ (dictionary questions + FAQPage JSON-LD), closing CTA; in the sitemap. The copy (from legacy + new FAQ
       answers) awaits the owner's review
 - [x] Home section: Business Customers (`BusinessCustomers`, `#business`, after Private Label): who we supply, trust
-      indicators, how an account is opened (`FlowchartList`), and the request form (`postLead` → `POST /api/leads`;
+      indicators, and the request form (`postLead` → `POST /api/leads`;
       customers cannot register: staff are emailed and open the account in `/admin/requests`); texts editable in place
       (page_sections "business"; the form's texts stay in the dictionaries)
 - [x] Customer profile (`CustomerProfile`): "My account" (`/account`, the header's button for a signed-in customer)

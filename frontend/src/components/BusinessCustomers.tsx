@@ -1,13 +1,13 @@
 /**
  * BusinessCustomers.tsx — The home page "Business Customers" section (anchor #business, the header's and the hero's
- * "Become a business customer" target): who Ultra Pet supplies, why, how an account is opened, and the request form.
+ * "Become a business customer" target): who Ultra Pet supplies, why, and the request form.
  *
  * Customers cannot register themselves: the form sends a request for an account (postLead → POST /api/leads), staff
  * are emailed, review it in /admin/requests and open the account. Used by routes/index.tsx, which passes the
  * section's saved texts (page_sections "business").
  *
  * With `onSave`, staff edit the section's texts in place (EditableSection, the page's language): the heading's words,
- * font and size, and the words of the audience cards, the trust list and the steps. The form's own texts (title,
+ * font and size, and the words of the audience cards and the trust list. The form's own texts (title,
  * labels, button) stay in the dictionaries. The edit form wraps the explanation column only (display: contents), so
  * it never contains the request form.
  */
@@ -15,18 +15,17 @@ import { useRef, useState, type FormEvent } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { ApiError, postLead, type LeadInput, type SectionContent } from '@/api'
 import { fieldLabel, SectionEditBar, useEditableSection, type EditableField } from '@/components/EditableSection'
-import { FLOWCHART_TEXT_CLASS, FLOWCHART_TITLE_CLASS, FlowchartCard, FlowchartList } from '@/components/Flowchart'
 import { FormField } from '@/components/FormField'
 import { EditableText } from '@/components/InlineEditor'
 import { HEADING_KEYS, headingLabels, SectionHeading } from '@/components/SectionHeading'
 import { Button } from '@/components/ui/button'
-import { BUSINESS_AUDIENCES, BUSINESS_STEPS, BUSINESS_TRUST, type AboutItem } from '@/config'
+import { BUSINESS_AUDIENCES, BUSINESS_TRUST, type AboutItem } from '@/config'
 import type { Dictionary } from '@/i18n/he'
 import { useI18n } from '@/i18n'
 import { useToast } from '@/toast'
 
 /** The section's own titles besides the heading and the lists. */
-const BLOCK_KEYS = ['audienceTitle', 'trustTitle', 'processTitle'] as const
+const BLOCK_KEYS = ['audienceTitle', 'trustTitle'] as const
 
 /** The request form's text fields (the message is optional; the honeypot `website` is not a field people see). */
 type Field = 'companyName' | 'contactPerson' | 'phone' | 'email' | 'city' | 'message'
@@ -231,11 +230,10 @@ function AudienceCard({ title, text }: { title: EditableField; text: EditableFie
 /**
  * The built-in words and box names of every editable text of the section, in the page language.
  * @param t - The dictionary.
- * @param lists - The audiences, trust indicators and steps shown.
- * @returns `defaults` and `labels` by text key: the heading's, BLOCK_KEYS, "audience.<id>.title|text", "trust.<id>"
- *   and "step.<id>.title|text".
+ * @param lists - The audiences and trust indicators shown.
+ * @returns `defaults` and `labels` by text key: the heading's, BLOCK_KEYS, "audience.<id>.title|text", and "trust.<id>".
  */
-function businessTexts(t: Dictionary, lists: { audiences: AboutItem[]; trust: typeof BUSINESS_TRUST; steps: typeof BUSINESS_STEPS }) {
+function businessTexts(t: Dictionary, lists: { audiences: AboutItem[]; trust: typeof BUSINESS_TRUST }) {
   const b = t.business
   const defaults: Record<string, string> = { eyebrow: b.eyebrow, title: b.title, intro: b.intro }
   const labels: Record<string, string> = headingLabels(t)
@@ -243,13 +241,11 @@ function businessTexts(t: Dictionary, lists: { audiences: AboutItem[]; trust: ty
     defaults[key] = b[key]
     labels[key] = fieldLabel(t, 'title', b[key])
   }
-  for (const [prefix, items] of [['audience', lists.audiences], ['step', lists.steps]] as const) {
-    for (const item of items) {
-      defaults[`${prefix}.${item.id}.title`] = item.title(t)
-      defaults[`${prefix}.${item.id}.text`] = item.text(t)
-      labels[`${prefix}.${item.id}.title`] = fieldLabel(t, 'title', item.title(t))
-      labels[`${prefix}.${item.id}.text`] = fieldLabel(t, 'text', item.title(t))
-    }
+  for (const item of lists.audiences) {
+    defaults[`audience.${item.id}.title`] = item.title(t)
+    defaults[`audience.${item.id}.text`] = item.text(t)
+    labels[`audience.${item.id}.title`] = fieldLabel(t, 'title', item.title(t))
+    labels[`audience.${item.id}.text`] = fieldLabel(t, 'text', item.title(t))
   }
   for (const item of lists.trust) {
     defaults[`trust.${item.id}`] = item.label(t)
@@ -262,26 +258,23 @@ function businessTexts(t: Dictionary, lists: { audiences: AboutItem[]; trust: ty
  * The Business Customers section.
  * @param props.audiences - Who Ultra Pet supplies; defaults to BUSINESS_AUDIENCES in config.ts.
  * @param props.trust - The trust indicators; defaults to BUSINESS_TRUST.
- * @param props.steps - How an account is opened; defaults to BUSINESS_STEPS.
  * @param props.content - The texts staff saved (see businessTexts for the keys); null or omitted = the dictionary's.
  * @param props.onSave - Stores new content (rejects with an ApiError on refusal); given = staff can edit in place.
- * @returns The <section> with the explanation, the steps and the request form.
+ * @returns The <section> with the explanation and the request form.
  */
 export function BusinessCustomers({
   audiences = BUSINESS_AUDIENCES,
   trust = BUSINESS_TRUST,
-  steps = BUSINESS_STEPS,
   content,
   onSave,
 }: {
   audiences?: AboutItem[]
   trust?: typeof BUSINESS_TRUST
-  steps?: typeof BUSINESS_STEPS
   content?: SectionContent | null
   onSave?: (content: SectionContent) => Promise<unknown>
 }) {
   const { t } = useI18n()
-  const section = useEditableSection<string>({ content, ...businessTexts(t, { audiences, trust, steps }), styled: HEADING_KEYS, onSave: onSave && ((next) => onSave(next)) })
+  const section = useEditableSection<string>({ content, ...businessTexts(t, { audiences, trust }), styled: HEADING_KEYS, onSave: onSave && ((next) => onSave(next)) })
   const { field } = section
   return (
     <section id="business" aria-labelledby="business-title" className="bg-white px-6 py-20 lg:px-10 lg:py-24">
@@ -309,21 +302,8 @@ export function BusinessCustomers({
                 </ul>
               </div>
             </div>
-            <div className="lg:col-start-1">
-              <EditableText as="h3" wrap {...field('processTitle')} className="font-display text-2xl font-bold text-brand-charcoal" />
-              <FlowchartList orientation="vertical" label={t.business.processLabel} className="mt-8">
-                {steps.map((step) => (
-                  <FlowchartCard
-                    key={step.id}
-                    media={<step.icon aria-hidden="true" />}
-                    title={<EditableText as="h4" wrap {...field(`step.${step.id}.title`)} className={FLOWCHART_TITLE_CLASS} />}
-                    description={<EditableText multiline {...field(`step.${step.id}.text`)} className={`mt-2 ${FLOWCHART_TEXT_CLASS}`} />}
-                  />
-                ))}
-              </FlowchartList>
-            </div>
           </form>
-          <div className="self-start rounded-3xl border border-neutral-150 bg-white shadow-soft lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="self-start rounded-3xl border border-neutral-150 bg-white shadow-soft lg:col-start-2 lg:row-start-1">
             <RequestForm />
           </div>
         </div>

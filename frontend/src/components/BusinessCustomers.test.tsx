@@ -34,12 +34,12 @@ async function fillForm(user: Awaited<ReturnType<typeof renderPage>>['user'], ch
 }
 
 describe('Business Customers section', () => {
-  it('explains who we supply and how an account is opened (Hebrew)', async () => {
+  it('explains who we supply, without a how-it-works list (Hebrew)', async () => {
     await renderPage('/')
     const s = section()
     expect(s.getByRole('heading', { level: 2, name: 'פתיחת חשבון עסקי' })).toBeInTheDocument()
     expect(s.getByRole('heading', { level: 4, name: 'חנויות חיות מחמד' })).toBeInTheDocument()
-    expect(within(s.getByRole('list', { name: 'שלבי פתיחת חשבון עסקי' })).getAllByRole('listitem')).toHaveLength(3)
+    expect(s.queryByRole('heading', { name: 'איך זה עובד' })).not.toBeInTheDocument()
     expect(s.getByRole('button', { name: 'שליחת בקשה' })).toBeInTheDocument()
     expect(s.getByText('החשבונות נפתחים על ידי הצוות שלנו בלבד, אחרי בדיקת הבקשה.')).toBeInTheDocument()
   })
@@ -120,7 +120,7 @@ describe('Business Customers section', () => {
 
   it('renders custom lists given by props', async () => {
     const one: AboutItem[] = [{ id: 'x', title: () => 'Vets', text: () => 'Clinics' }]
-    renderComponent(<BusinessCustomers audiences={one} trust={[]} steps={[]} />, 'en')
+    renderComponent(<BusinessCustomers audiences={one} trust={[]} />, 'en')
     expect(await screen.findByRole('heading', { level: 4, name: 'Vets' })).toBeInTheDocument()
   })
 })

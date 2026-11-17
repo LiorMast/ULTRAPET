@@ -12,7 +12,7 @@
  * doesn't exist is a type error.
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
-import { Award, ClipboardList, Factory, FlaskConical, Globe, Handshake, KeyRound, Lightbulb, Package, Palette, SearchCheck, Send, Ship, ShieldCheck, Truck, type LucideIcon } from 'lucide-react'
+import { Award, ClipboardList, Factory, FlaskConical, Globe, Handshake, Lightbulb, Package, Palette, Ship, ShieldCheck, Truck, type LucideIcon } from 'lucide-react'
 import type { ContactDetails, FontKey, ProductCategory, SizeStep } from '@/api'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
@@ -120,13 +120,6 @@ export const BUSINESS_TRUST: { id: string; label: Label }[] = [
   { id: 'partners', label: (t: Dictionary) => t.business.trust.partners },
   { id: 'quality', label: (t: Dictionary) => t.business.trust.quality },
   { id: 'logistics', label: (t: Dictionary) => t.business.trust.logistics },
-]
-
-/** How a business account is opened (the Business Customers section's flowchart): send a request, review, account. */
-export const BUSINESS_STEPS: (AboutItem & { icon: LucideIcon })[] = [
-  { id: 'request', icon: Send, title: (t: Dictionary) => t.business.steps.request.title, text: (t: Dictionary) => t.business.steps.request.text },
-  { id: 'review', icon: SearchCheck, title: (t: Dictionary) => t.business.steps.review.title, text: (t: Dictionary) => t.business.steps.review.text },
-  { id: 'open', icon: KeyRound, title: (t: Dictionary) => t.business.steps.open.title, text: (t: Dictionary) => t.business.steps.open.text },
 ]
 
 /** The three vision-and-mission pillars of the About section. */
