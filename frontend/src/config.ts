@@ -1,7 +1,8 @@
 /**
  * config.ts — Site content and settings that are not translations and do not come from the API: the main
  * menu, the home page category cards, the labels of the stats figures, the header buttons, external links,
- * the contact cards (their phone, WhatsApp and email come from the API), the photos bundled with the site (hero, brand logos, article photos) and the fonts and size steps
+ * the contact cards (their phone, WhatsApp and email come from the API), the Private Label process's built-in steps and
+ * the icons a flow step can have (PRIVATE_LABEL_STEPS, STEP_ICONS), the photos bundled with the site (hero, brand logos, article photos) and the fonts and size steps
  * staff can pick for editable texts (FONTS, SIZE_STEPS). Components take
  * their defaults from here, so changing the menu is a data change, not a component change. Data from the
  * database (catalog, brands, stats values, contact details, FAQ, articles, resellers) comes from src/api.ts.
@@ -11,6 +12,7 @@
  * doesn't exist is a type error.
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
+import { Award, ClipboardList, Factory, FlaskConical, Globe, Handshake, KeyRound, Lightbulb, Package, Palette, SearchCheck, Send, Ship, ShieldCheck, Truck, type LucideIcon } from 'lucide-react'
 import type { ContactDetails, FontKey, ProductCategory, SizeStep } from '@/api'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
@@ -104,6 +106,29 @@ export const STAT_LABELS: Record<string, Label> = {
 /** An item of the About section (a vision pillar or an offering): title and description. */
 export type AboutItem = { id: string; title: Label; text: Label }
 
+/** Who the Business Customers section says Ultra Pet supplies. */
+export const BUSINESS_AUDIENCES: AboutItem[] = [
+  { id: 'stores', title: (t: Dictionary) => t.business.audiences.stores.title, text: (t: Dictionary) => t.business.audiences.stores.text },
+  { id: 'chains', title: (t: Dictionary) => t.business.audiences.chains.title, text: (t: Dictionary) => t.business.audiences.chains.text },
+  { id: 'distributors', title: (t: Dictionary) => t.business.audiences.distributors.title, text: (t: Dictionary) => t.business.audiences.distributors.text },
+  { id: 'wholesalers', title: (t: Dictionary) => t.business.audiences.wholesalers.title, text: (t: Dictionary) => t.business.audiences.wholesalers.text },
+]
+
+/** The trust indicators of the Business Customers section. */
+export const BUSINESS_TRUST: { id: string; label: Label }[] = [
+  { id: 'retail', label: (t: Dictionary) => t.business.trust.retail },
+  { id: 'partners', label: (t: Dictionary) => t.business.trust.partners },
+  { id: 'quality', label: (t: Dictionary) => t.business.trust.quality },
+  { id: 'logistics', label: (t: Dictionary) => t.business.trust.logistics },
+]
+
+/** How a business account is opened (the Business Customers section's flowchart): send a request, review, account. */
+export const BUSINESS_STEPS: (AboutItem & { icon: LucideIcon })[] = [
+  { id: 'request', icon: Send, title: (t: Dictionary) => t.business.steps.request.title, text: (t: Dictionary) => t.business.steps.request.text },
+  { id: 'review', icon: SearchCheck, title: (t: Dictionary) => t.business.steps.review.title, text: (t: Dictionary) => t.business.steps.review.text },
+  { id: 'open', icon: KeyRound, title: (t: Dictionary) => t.business.steps.open.title, text: (t: Dictionary) => t.business.steps.open.text },
+]
+
 /** The three vision-and-mission pillars of the About section. */
 export const ABOUT_PILLARS: AboutItem[] = [
   { id: 'expertise', title: (t: Dictionary) => t.about.pillars.expertise.title, text: (t: Dictionary) => t.about.pillars.expertise.text },
@@ -125,6 +150,40 @@ export const ABOUT_ADVANTAGES: { id: string; label: Label }[] = [
   { id: 'import', label: (t: Dictionary) => t.about.advantages.import },
   { id: 'prices', label: (t: Dictionary) => t.about.advantages.prices },
   { id: 'support', label: (t: Dictionary) => t.about.advantages.support },
+]
+
+/**
+ * The icons staff can give a step of an editable flow (the Private Label process), by the key stored with the step
+ * (FlowStep.icon); their names are t.privateLabel.icons.
+ */
+export const STEP_ICONS = {
+  lightbulb: Lightbulb,
+  palette: Palette,
+  flask: FlaskConical,
+  factory: Factory,
+  ship: Ship,
+  truck: Truck,
+  shield: ShieldCheck,
+  clipboard: ClipboardList,
+  package: Package,
+  globe: Globe,
+  award: Award,
+  handshake: Handshake,
+} satisfies Record<string, LucideIcon>
+
+/** A key of STEP_ICONS. */
+export type StepIconKey = keyof typeof STEP_ICONS
+
+/** The icon of a step whose stored icon is unknown, and of a step staff add. */
+export const DEFAULT_STEP_ICON: StepIconKey = 'package'
+
+/** The built-in steps of the Private Label process, in order; their texts are t.privateLabel.steps.<id>. */
+export const PRIVATE_LABEL_STEPS: { id: keyof Dictionary['privateLabel']['steps']; icon: StepIconKey }[] = [
+  { id: 'idea', icon: 'lightbulb' },
+  { id: 'design', icon: 'palette' },
+  { id: 'development', icon: 'flask' },
+  { id: 'production', icon: 'factory' },
+  { id: 'shipping', icon: 'ship' },
 ]
 
 /** Every logo file in src/assets/brands/, keyed by path; a brand's logo is the file named after its slug. */
@@ -163,7 +222,7 @@ export const mainNav = (categories: ProductCategory[], locale: Locale): NavItem[
       { id: 'catalog', label: (t: Dictionary) => t.nav.catalog, href: catalogPdfUrl(locale) },
     ],
   },
-  { id: 'private-label', label: (t: Dictionary) => t.nav.privateLabel, link: linkOptions({ to: '/', hash: 'private-label' }) },
+  { id: 'private-label', label: (t: Dictionary) => t.nav.privateLabel, link: linkOptions({ to: '/private-label' }) },
   { id: 'where-to-buy', label: (t: Dictionary) => t.nav.whereToBuy, link: linkOptions({ to: '/where-to-buy' }) },
   { id: 'articles', label: (t: Dictionary) => t.nav.articles, link: linkOptions({ to: '/articles' }) },
   { id: 'about', label: (t: Dictionary) => t.nav.about, link: linkOptions({ to: '/', hash: 'about' }) },
@@ -247,6 +306,7 @@ export const HEADER_CTA = {
  * drawer (SubNavDrawer, opened by the Admin panel button) both list these. A new admin page = one entry here.
  */
 export const ADMIN_NAV: NavLink[] = [
+  { id: 'requests', label: (t: Dictionary) => t.admin.navRequests, link: linkOptions({ to: '/admin/requests' }) },
   { id: 'products', label: (t: Dictionary) => t.admin.navProducts, link: linkOptions({ to: '/admin/products' }) },
   { id: 'categories', label: (t: Dictionary) => t.admin.navCategories, link: linkOptions({ to: '/admin/categories' }) },
   { id: 'discounts', label: (t: Dictionary) => t.admin.navDiscounts, link: linkOptions({ to: '/admin/discounts' }) },
@@ -261,6 +321,12 @@ export const MIN_ORDER_AMOUNT = 2000
 export const HEADER_LOGIN = {
   label: (t: Dictionary) => t.nav.login,
   link: linkOptions({ to: '/login' }),
+}
+
+/** The header's "My account" link of a signed-in business customer (their profile: details, orders, discounts). */
+export const HEADER_ACCOUNT = {
+  label: (t: Dictionary) => t.login.account,
+  link: linkOptions({ to: '/account' }),
 }
 
 /**

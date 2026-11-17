@@ -3,7 +3,7 @@
  * useInlineDraft) on a small test section with two texts and an accent word that follows the heading's style: read
  * mode, edit mode (labelled boxes, one PropBar that follows the selected box, live font and size), one Save for
  * every text, Cancel and Escape, a refused save, where the keyboard focus goes, and moving the PropBar (drag and
- * arrow keys, kept inside its section). A second test section is a list (like the FAQ): adding and removing texts
+ * arrow keys, kept inside its section). A second test section is a list (like the FAQ): adding, removing and reordering texts
  * and where the focus goes then, a refusal by the section itself (InlineEditError), the light bar named after its
  * section, and the wrapping one-line box. The body text is resizable: its width handle (drag and slider keys, also
  * right to left), the width saved with the draft and applied in read mode.
@@ -269,6 +269,11 @@ function TestList({ onSave }: { onSave: (draft: Record<string, TextValue>) => Pr
               <button type="button" onClick={() => inline.remove([key], keys[i + 1] ?? keys[i - 1])}>
                 Remove item {i + 1}
               </button>
+              {i > 0 && (
+                <button type="button" onClick={() => inline.reorder([...keys.slice(0, i - 1), key, keys[i - 1], ...keys.slice(i + 1)])}>
+                  Move item {i + 1} up
+                </button>
+              )}
             </div>
           ))}
           <button
@@ -388,6 +393,21 @@ describe('inline editing of a list', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(onSave).toHaveBeenCalledWith({ new1: item('Second'), new2: item('Third') })
     expect(Object.keys(onSave.mock.calls[0][0])).toEqual(['new1', 'new2'])
+  })
+
+  it('reorders the texts and saves them in the new order', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    const { user } = renderComponent(<TestList onSave={onSave} />, 'en')
+    await user.click(await screen.findByRole('button', { name: 'Edit on page: List' }))
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.type(screen.getByRole('textbox', { name: 'Item 2' }), 'Second')
+
+    await user.click(screen.getByRole('button', { name: 'Move item 2 up' }))
+    expect(screen.getByRole('textbox', { name: 'Item 1' })).toHaveValue('Second')
+    expect(screen.getByRole('textbox', { name: 'Item 2' })).toHaveValue('First')
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(Object.keys(onSave.mock.calls[0][0])).toEqual(['new1', 'a'])
   })
 
   it('focuses the first control when the last text is removed', async () => {

@@ -4,10 +4,11 @@ Public, no sign-in (/products also reads an optional customer sign-in for its pr
     GET /categories, /products, /products/<slug>, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
     /articles, /articles/<slug>, /resellers, /sitemap.xml, /media/<key> (stored files: the S3 stub's objects),
     /catalog.pdf?lang= (redirects to the generated PDF catalog in the file storage, see app/catalog_pdf.py)
+    POST /leads (a request for a business account: stored for staff, who are emailed; app/mailer.py)
 Sign-in, shared by business customers and staff (JWT cookies, see app/auth.py):
     POST /auth/login, /auth/refresh, /auth/logout; GET /auth/me
 Business customers only:
-    GET /prices
+    GET /prices, /account (the customer's own profile, app/accounts.py)
 
 JSON keys are camelCase, in the shapes the frontend types in src/api.ts (the same shapes as its stub fixtures).
 Only active rows are shown. Pictures are stored as object keys and answered as URLs (storage.url_of /
@@ -15,6 +16,7 @@ storage.srcset_urls). The public routes never return a price: prices come only f
 the signed-in customer by app.pricing (with the stock status of the tracked products, app.inventory).
 """
 import math
+import re
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import quote
@@ -25,13 +27,14 @@ from flask_jwt_extended import current_user, get_jwt, verify_jwt_in_request
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import contains_eager, selectinload
 
-from app import inventory, storage
+from app import inventory, mailer, storage
+from app.accounts import profile_json
 from app.auth import authenticate, clear_tokens, issue_tokens, read_credentials, refresh_access, require_user, user_type
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.settings import Setting, get_setting
-from app.database.models.users import AppUser, BusinessUser
+from app.database.models.users import AppUser, BusinessLead, BusinessUser
 from app.database.wordpress import sanitize_html
 from app.pricing import ISRAEL, customer_prices
 
@@ -53,7 +56,14 @@ CONTACT_FIELDS = ("phone", "whatsapp", "email")
 RELATED_COUNT = 4
 # Sitemap: the URL prefix of each served language (Hebrew, the default, has none) and the pages always listed.
 SITEMAP_LOCALES = {"he": "", "en": "/en"}
-SITEMAP_PAGES = ("/", "/where-to-buy", "/catalog", "/articles")
+SITEMAP_PAGES = ("/", "/where-to-buy", "/catalog", "/articles", "/private-label")
+# The request for a business account: its required text fields (JSON key -> column), the longest text a field
+# takes, the longest message, and the hidden honeypot field (filled = a bot: answered as if stored, nothing stored).
+LEAD_FIELDS = {"companyName": "company_name", "contactPerson": "contact_person", "phone": "phone", "email": "email", "city": "city"}
+LEAD_MAX_LENGTH = 200
+LEAD_MAX_MESSAGE = 2000
+LEAD_HONEYPOT = "website"
+LEAD_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def image_json(image: ProductImage) -> dict[str, str]:
@@ -456,15 +466,48 @@ def get_contact() -> dict[str, str]:
     return {field: str(values.get(f"contact_{field}") or "") for field in CONTACT_FIELDS}
 
 
+def section_json(key: str, content: Any) -> Any:
+    """A section's saved content as the site gets it: the steps of "private_label_steps" also get the URL of their
+    picture (`imageUrl`, built from the stored object key `image`; a value that is not one of our keys gets none).
+
+    Args:
+        key: The section name, e.g. "private_label_steps".
+        content: Its stored content.
+
+    Returns:
+        The content to answer (the stored one, untouched, for every other section).
+    """
+    if key != "private_label_steps" or not isinstance(content, dict) or not isinstance(content.get("steps"), list):
+        return content
+
+    def step_json(step: Any) -> Any:
+        """One step with the URL of its picture.
+
+        Args:
+            step: The stored step.
+
+        Returns:
+            The step, plus `imageUrl` when its `image` is one of our object keys.
+        """
+        if not isinstance(step, dict) or not isinstance(step.get("image"), str):
+            return step
+        try:
+            return {**step, "imageUrl": storage.public_url(storage.object_key(step["image"]))}
+        except ValueError:
+            return step
+
+    return {**content, "steps": [step_json(step) for step in content["steps"]]}
+
+
 @bp.get("/sections")
 def list_sections() -> dict[str, Any]:
     """The content staff saved for every editable home page section, for the home page's one loader call.
 
     Returns:
-        {<key>: content} of every saved section; a section never edited is missing (the site shows its built-in
-        texts).
+        {<key>: content} of every saved section (see section_json); a section never edited is missing (the site shows
+        its built-in texts).
     """
-    return {section.key: section.content for section in db.session.scalars(select(PageSection))}
+    return {section.key: section_json(section.key, section.content) for section in db.session.scalars(select(PageSection))}
 
 
 @bp.get("/sections/<key>")
@@ -480,7 +523,7 @@ def get_section(key: str) -> dict[str, Any]:
     section = db.session.get(PageSection, key)
     if section is None:
         abort(404)
-    return {"key": section.key, "content": section.content, "updatedAt": section.updated_at.astimezone(ISRAEL).isoformat()}
+    return {"key": section.key, "content": section_json(section.key, section.content), "updatedAt": section.updated_at.astimezone(ISRAEL).isoformat()}
 
 
 @bp.get("/faq")
@@ -754,3 +797,118 @@ def prices() -> dict[str, Any]:
         "prices": {str(product_id): price for product_id, price in customer_prices(user.id).items()},
         "stock": {str(product_id): status for product_id, status in inventory.customer_stock().items()},
     }
+
+
+def lead_error(error: str, field: str) -> tuple[Response, int]:
+    """The answer to a refused request for an account.
+
+    Args:
+        error: "required" or "invalid".
+        field: The JSON key of the refused field.
+
+    Returns:
+        400 {error, field}.
+    """
+    return jsonify(error=error, field=field), 400
+
+
+def read_lead(data: dict[str, Any]) -> dict[str, Any] | tuple[Response, int]:
+    """Checks a request for an account and turns it into BusinessLead columns.
+
+    Args:
+        data: The JSON body.
+
+    Returns:
+        The columns (trimmed; the email lowercased; an empty message = None), or the 400 answer of the first refused
+        field: a missing one is "required"; too long, a badly shaped email, a phone with fewer than 6 digits or an
+        unknown locale is "invalid".
+    """
+    values: dict[str, Any] = {}
+    for key, column in LEAD_FIELDS.items():
+        value = data.get(key)
+        if value is not None and not isinstance(value, str):
+            return lead_error("invalid", key)
+        value = (value or "").strip()
+        if not value:
+            return lead_error("required", key)
+        if len(value) > LEAD_MAX_LENGTH:
+            return lead_error("invalid", key)
+        values[column] = value
+    if not LEAD_EMAIL.match(values["email"]):
+        return lead_error("invalid", "email")
+    values["email"] = values["email"].lower()
+    if not re.fullmatch(r"\+?[\d\s()-]+", values["phone"]) or len(re.sub(r"\D", "", values["phone"])) < 6:
+        return lead_error("invalid", "phone")
+    message = data.get("message")
+    if message is not None and (not isinstance(message, str) or len(message) > LEAD_MAX_MESSAGE):
+        return lead_error("invalid", "message")
+    values["message"] = (message or "").strip() or None
+    locale = data.get("locale", "he")
+    if locale not in LOCALES:
+        return lead_error("invalid", "locale")
+    values["locale"] = locale
+    return values
+
+
+def notify_staff(lead: BusinessLead) -> None:
+    """Emails staff about a new request for an account (app/mailer.py; never fails the request).
+
+    Args:
+        lead: The stored request.
+    """
+    site = current_app.config.get("SITE_URL", "").rstrip("/")
+    lines = [
+        "A business asked for an account on the website. / עסק ביקש לפתוח חשבון באתר.",
+        "",
+        f"Company / חברה: {lead.company_name}",
+        f"Contact person / איש קשר: {lead.contact_person}",
+        f"Phone / טלפון: {lead.phone}",
+        f"Email / אימייל: {lead.email}",
+        f"City / עיר: {lead.city}",
+        f"Language / שפה: {lead.locale}",
+    ]
+    if lead.message:
+        lines += ["", "Message / הודעה:", lead.message]
+    lines += ["", f"Review it and open the account: {site}/admin/requests"]
+    mailer.send_mail(
+        mailer.staff_recipients(),
+        f"New account request: {lead.company_name} / בקשה לפתיחת חשבון",
+        "\n".join(lines),
+        reply_to=lead.email,
+    )
+
+
+@bp.post("/leads")
+def create_lead() -> tuple[Response, int]:
+    """Stores a request for a business account (the home page's registration form) and emails staff. Customers
+    cannot register: staff review the request in /admin/requests and open the account. Body: {companyName,
+    contactPerson, phone, email, city, message?, locale?, website (the hidden honeypot, must stay empty)}.
+
+    Returns:
+        201 {ok: true} (also when the honeypot is filled: nothing is then stored or sent); 400 {error: "required" |
+        "invalid", field} for a refused field. Whether the email already has an account is never revealed.
+    """
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return lead_error("invalid", "body")
+    if data.get(LEAD_HONEYPOT):
+        return jsonify(ok=True), 201
+    values = read_lead(data)
+    if not isinstance(values, dict):
+        return values
+    lead = BusinessLead(**values)
+    db.session.add(lead)
+    db.session.commit()
+    notify_staff(lead)
+    return jsonify(ok=True), 201
+
+
+@bp.get("/account")
+def account() -> dict[str, Any]:
+    """The signed-in customer's own profile: their details, past orders, own discounts and activity.
+
+    Returns:
+        app.accounts.profile_json (the customer's view: no internal fields, no paused discounts); 401 when signed out,
+        403 for a staff token.
+    """
+    return profile_json(require_user("business"), staff=False)

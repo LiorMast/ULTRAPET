@@ -1,14 +1,15 @@
 /**
  * ImageUploadField.tsx — Edits a picture by uploading a file: a preview of the current picture (or a quiet
  * placeholder) and "Upload / Replace picture" and "Remove picture" buttons. The file goes to the server's file
- * storage (uploadImage in src/api.ts; an S3 stub for now) and the field's value becomes the stored file's URL; the
+ * storage (uploadImage in src/api.ts: the local stub or S3) and the field's value becomes the stored file's URL; the
  * caller saves it with the rest of its form. There is no address input on purpose: every picture the site shows
  * comes from our storage (or is bundled with the site), never from another site.
  *
  * Only JPEG, PNG, WebP and AVIF pictures of up to 5 MB are sent (the server checks again). Upload progress and
  * results are announced in a live region; while a file uploads, `onBusyChange(true)` lets the form hold its Save.
- * Used by the admin forms (RecordDialog, column type "image", e.g. a category's picture on the home carousel); the
- * caller gives the group label (a <fieldset> legend), the hint and the form errors, like with SearchableField.
+ * Used by the admin forms (RecordDialog, column type "image", e.g. a category's picture on the home carousel) and the
+ * Private Label section's step editor (`item` names the step in the buttons); ImageListField (a list of pictures)
+ * reuses its limits and error messages. The caller gives the group label (a <fieldset> legend), the hint and the form errors, like with SearchableField.
  */
 import { useEffect, useId, useRef, useState, type ChangeEvent, type ComponentProps } from 'react'
 import { Trash2, Upload } from 'lucide-react'
@@ -29,7 +30,7 @@ export const UPLOAD_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'ima
  * @param t - The dictionary.
  * @returns The translated message: the wrong type, too large, or a general failure.
  */
-function uploadErrorMessage(error: unknown, t: Dictionary): string {
+export function uploadErrorMessage(error: unknown, t: Dictionary): string {
   const code = error instanceof ApiError ? error.code : undefined
   if (code === 'unsupported_type') return t.admin.errors.fileType
   if (code === 'too_large' || code === 'request_entity_too_large') return t.admin.errors.fileTooLarge
@@ -40,8 +41,9 @@ function uploadErrorMessage(error: unknown, t: Dictionary): string {
 type ImageUploadFieldProps = Pick<ComponentProps<'button'>, 'className' | 'disabled' | 'aria-invalid' | 'aria-describedby'> & {
   id: string
   value: string
-  onChange: (url: string) => void
+  onChange: (url: string, key?: string) => void
   folder: UploadFolder
+  item?: string
   onBusyChange?: (busy: boolean) => void
 }
 
@@ -49,7 +51,9 @@ type ImageUploadFieldProps = Pick<ComponentProps<'button'>, 'className' | 'disab
  * The picture field.
  * @param props.id - The upload button's id (the form's error focus target).
  * @param props.value - The current picture URL; "" = none.
- * @param props.onChange - Called with the new URL: the uploaded file's, or "" after "Remove".
+ * @param props.onChange - Called with the new URL: the uploaded file's (and its storage key), or "" after "Remove".
+ * @param props.item - What the picture belongs to, when a form has several (e.g. "Step 2"): added to the buttons'
+ *   accessible names ("Upload picture: Step 2") and the preview's alt text.
  * @param props.folder - The storage folder the files go to, e.g. "categories".
  * @param props.onBusyChange - Told true when an upload starts and false when it ends (the form disables Save).
  * @param props.className - Classes of the wrapper (outer spacing).
@@ -64,6 +68,7 @@ export function ImageUploadField({
   value,
   onChange,
   folder,
+  item,
   onBusyChange,
   className,
   disabled,
@@ -79,6 +84,13 @@ export function ImageUploadField({
   const [status, setStatus] = useState('')
   const [problem, setProblem] = useState('')
   const problemId = `${id}-upload-error`
+
+  /**
+   * A control's name with the item the picture belongs to.
+   * @param label - The visible words, e.g. "Upload picture".
+   * @returns E.g. "Upload picture: Step 2", or the words alone without `item`.
+   */
+  const named = (label: string) => (item ? t.inlineEdit.fieldOf.replace('{field}', label).replace('{item}', item) : label)
 
   // Closing the form mid-upload drops the upload.
   useEffect(() => () => controller.current?.abort(), [])
@@ -110,8 +122,8 @@ export function ImageUploadField({
     const { signal } = controller.current
     changeBusy(true)
     try {
-      const { url } = await uploadImage(folder, file, signal)
-      onChange(url)
+      const { url, key } = await uploadImage(folder, file, signal)
+      onChange(url, key)
       setStatus(t.admin.upload.uploaded)
     } catch (error) {
       if (signal.aborted) return
@@ -135,7 +147,7 @@ export function ImageUploadField({
       <div className="mt-2 flex flex-wrap items-center gap-4">
         <div className="flex aspect-[4/3] w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-100">
           {value ? (
-            <img src={value} alt={t.admin.upload.preview} width={160} height={120} className="size-full object-cover" />
+            <img src={value} alt={named(t.admin.upload.preview)} width={160} height={120} className="size-full object-cover" />
           ) : (
             <span className="px-3 text-center text-xs text-brand-charcoal-muted">{t.admin.upload.none}</span>
           )}
@@ -150,6 +162,7 @@ export function ImageUploadField({
             disabled={disabled}
             loading={busy}
             aria-invalid={invalid}
+            aria-label={item ? named(value ? t.admin.upload.replace : t.admin.upload.choose) : undefined}
             aria-describedby={[describedBy, problem && problemId].filter(Boolean).join(' ') || undefined}
             onClick={() => fileInput.current?.click()}
           >
@@ -157,7 +170,7 @@ export function ImageUploadField({
             {value ? t.admin.upload.replace : t.admin.upload.choose}
           </Button>
           {value && (
-            <Button type="button" variant="ghost" size="sm" disabled={disabled || busy} onClick={handleRemove}>
+            <Button type="button" variant="ghost" size="sm" disabled={disabled || busy} aria-label={item ? named(t.admin.upload.remove) : undefined} onClick={handleRemove}>
               <Trash2 aria-hidden />
               {t.admin.upload.remove}
             </Button>
@@ -170,7 +183,7 @@ export function ImageUploadField({
         id={fileId}
         type="file"
         accept={UPLOAD_IMAGE_TYPES.join(',')}
-        aria-label={value ? t.admin.upload.replace : t.admin.upload.choose}
+        aria-label={named(value ? t.admin.upload.replace : t.admin.upload.choose)}
         tabIndex={-1}
         hidden
         disabled={disabled || busy}

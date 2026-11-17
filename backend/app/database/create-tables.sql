@@ -36,6 +36,7 @@ CREATE TABLE app_users (
   phone         TEXT,                                     -- contact phone; NULL = not given
   is_active     BOOLEAN     NOT NULL DEFAULT true,        -- false = blocked from signing in (deactivate instead of deleting)
   last_login_at TIMESTAMPTZ,                              -- last successful sign-in; NULL = never signed in
+  last_seen_at  TIMESTAMPTZ,                              -- last API request while signed in (written at most once a minute; "online" = recent); NULL = never
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),       -- when the account was created
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()        -- last change to the account
 );
@@ -59,8 +60,9 @@ CREATE TABLE business_users (
   notes              TEXT                                 -- internal staff notes, never shown to the customer
 );
 
--- business_leads — Submissions of the "become a business customer" form on the public site. Staff follow them up
--- and may turn one into a business user.
+-- business_leads — Requests for a business account, sent with the home page's registration form (POST /api/leads;
+-- customers cannot register themselves). Staff follow them up in /admin/requests and may open the account from one
+-- (POST /api/staff/leads/<id>/convert), which links it here.
 CREATE TABLE business_leads (
   id               UUID DEFAULT gen_random_uuid() PRIMARY KEY, -- lead id
   company_name     TEXT        NOT NULL,                  -- business name as typed in the form
@@ -69,6 +71,7 @@ CREATE TABLE business_leads (
   email            TEXT        NOT NULL,                  -- contact email
   city             TEXT        NOT NULL,                  -- the business's city
   message          TEXT,                                  -- free text from the form; NULL = none
+  notes            TEXT,                                  -- staff follow-up notes, never shown to the business; NULL = none
   locale           TEXT        NOT NULL DEFAULT 'he' CHECK (locale IN ('he', 'en', 'ru', 'ar')), -- site language the form was sent from (the language to answer in)
   status           TEXT        NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'contacted', 'converted', 'rejected')), -- follow-up state: new -> contacted -> converted (became a customer) or rejected
   business_user_id UUID      REFERENCES business_users (id) ON DELETE SET NULL, -- the customer account this lead became; NULL = not converted (or the account was deleted)

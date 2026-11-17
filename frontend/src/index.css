@@ -8,8 +8,9 @@
  * - Maps the shadcn/ui color variables (--primary, --accent ...) onto the brand palette.
  * - Squircle corners (continuous superellipse corners, CSS `corner-shape: squircle`) whose size follows the element's
  *   rank (the t-shirt radius tokens): rounded-md for tags, badges and thumbnails, rounded-lg for every control
- *   (buttons, inputs, chips, nav items, icon buttons, toasts, switches), rounded-2xl for cards, dialogs and menus,
- *   rounded-3xl for large panels; rounded-full only for tiny dots and thin bars. No pills. A rounded thing inside
+ *   (buttons, inputs, chips, nav items, icon buttons, toasts, segmented switches), rounded-2xl for cards, dialogs and
+ *   menus, rounded-3xl for large panels; rounded-full only for tiny dots, thin bars, the slider thumb and the on/off
+ *   switch (these two also `corner-shape: round`: true circles). No pills. A rounded thing inside
  *   another gets the outer radius minus the gap between them. Browsers without corner-shape get plain round corners
  *   a little smaller (a squircle corner looks smaller than a round one of the same radius): see --r-* below.
  * - One type family per language: Inter (with optical sizing) for every English text, labels included (sentence
@@ -266,6 +267,8 @@
 /*
  * Squircle corners where the browser draws them: every rounded corner becomes a superellipse, and the radii grow so
  * the corners look as big as the round fallback above (a squircle's curve starts later and bends tighter).
+ * The `*` rule sits in the base layer: unlayered CSS beats every layer, so outside it a utility such as
+ * `[corner-shape:round]` (the slider thumb, the on/off switch) could never override it.
  */
 @supports (corner-shape: squircle) {
   :root {
@@ -277,10 +280,12 @@
     --r-3xl: 1.625rem;
     --r-4xl: 2rem;
   }
-  *,
-  ::before,
-  ::after {
-    corner-shape: squircle;
+  @layer base {
+    *,
+    ::before,
+    ::after {
+      corner-shape: squircle;
+    }
   }
 }
 

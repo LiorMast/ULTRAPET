@@ -1,8 +1,9 @@
-# compose.yaml — Local development services: PostgreSQL 17 and the Flask backend.
+# compose.yaml — Local development services: PostgreSQL 17, the Flask backend and Mailpit (a fake mail server).
 #
 #   docker compose up -d --build        start both (http://localhost:5000/api/health; BACKEND_PORT in .env changes 5000)
 #   docker compose exec backend pytest  run the backend tests
 #   docker compose exec backend flask seed
+#   http://localhost:8025               Mailpit: every email the backend sends in dev lands here (nothing is delivered)
 #
 # Secrets come from .env (copy .env.example). A fresh `pgdata` volume runs backend/app/database/create-tables.sql once; later
 # schema changes are applied with `flask reset-db --yes`. Both services are on the network `internal`
@@ -41,9 +42,23 @@ services:
       SEED_CUSTOMER_PASSWORD: ${SEED_CUSTOMER_PASSWORD:-}
       # Plain http in dev; set to 1 behind https so the sign-in cookies are sent over https only.
       JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-0}
-      # The S3 bucket and region the picture URLs are built from (empty = the local stub at /api/media/).
+      # The file storage (backend/app/storage.py): "local" (default: files in backend/media, served at /api/media/)
+      # or "s3" (the bucket below; see .env.example).
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
       S3_BUCKET: ${S3_BUCKET:-}
       S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      # Email (backend/app/mailer.py): dev sends everything to Mailpit, unless .env names a real SMTP server.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_TLS: ${SMTP_TLS:-false}
+      MAIL_FROM: ${MAIL_FROM:-}
+      LEADS_NOTIFY_TO: ${LEADS_NOTIFY_TO:-}
     volumes:
       # Source code (reloads on change), plus the seed data at the same paths relative to backend/ as in the repo.
       - ./backend:/srv/backend
@@ -56,6 +71,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks: [internal]
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      # The inbox in the browser; the backend reaches its SMTP port (1025) over the internal network.
+      - "127.0.0.1:8025:8025"
     networks: [internal]
 
 volumes:

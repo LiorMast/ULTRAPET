@@ -6,15 +6,17 @@ name `content_test`, created on first use. The schema is built once per run from
 create-tables.sql (the same way `flask reset-db` does), and every table is emptied after each database test.
 Tests that need the database take the `database` fixture; the pure pricing tests do not. API tests take `client`
 (signed out), `customer_client` or `staff_client` (signed in through the real login routes, so they hold the JWT
-cookies), and `csrf` for the X-CSRF-TOKEN header that POST/PATCH/DELETE with a token need. Uploads (the S3 stub)
-go to a temporary folder.
+cookies), `outbox` for the emails sent (kept in memory), and `csrf` for the X-CSRF-TOKEN header that POST/PATCH/DELETE with a token need. Uploads (the local
+storage stub) go to a temporary folder; `s3` switches the file storage to its S3 driver over moto's fake S3.
 """
 import os
 from collections.abc import Callable, Iterator
 
 import psycopg
+import boto3
 import pytest
 from flask import Flask
+from moto import mock_aws
 from flask.testing import FlaskClient
 from psycopg import sql
 from sqlalchemy import text
@@ -26,6 +28,9 @@ from app.database.db import db
 from app.database.models.users import BusinessUser, StaffUser
 from app.database.seed import CREATE_TABLES_SQL, DROP_TABLES_SQL, run_sql_file
 
+# The fake bucket of the `s3` fixture.
+S3_TEST_BUCKET = "ultrapet-test-media"
+S3_TEST_REGION = "eu-central-1"
 # The sign-in of the users the fixtures create.
 CUSTOMER = {"email": "shop@example.com", "password": "customer-password"}
 STAFF = {"email": "admin@ultrapet.co.il", "password": "staff-password"}
@@ -78,6 +83,9 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> Flask:
             "MEDIA_ROOT": str(tmp_path_factory.mktemp("media")),
             # No PDF catalog rebuilds after staff changes (test_catalog_pdf.py switches them on, inline).
             "CATALOG_REBUILD": "off",
+            # Emails are kept in app.extensions["outbox"] (the `outbox` fixture), never sent.
+            "MAIL_BACKEND": "memory",
+            "LEADS_NOTIFY_TO": "",
         }
     )
     with application.app_context():
@@ -183,6 +191,22 @@ def staff_client(client: FlaskClient, staff: StaffUser) -> FlaskClient:
 
 
 @pytest.fixture
+def outbox(app: Flask) -> Iterator[list]:
+    """The emails the app sends during the test (MAIL_BACKEND=memory), emptied before and after it.
+
+    Args:
+        app: The application.
+
+    Yields:
+        The list of sent email.message.EmailMessage objects.
+    """
+    messages = app.extensions.setdefault("outbox", [])
+    messages.clear()
+    yield messages
+    messages.clear()
+
+
+@pytest.fixture
 def csrf() -> Callable[..., dict[str, str]]:
     """Builds the CSRF header a client must send with POST/PATCH/DELETE that need a token.
 
@@ -204,3 +228,28 @@ def csrf() -> Callable[..., dict[str, str]]:
         return {"X-CSRF-TOKEN": cookie.value if cookie else ""}
 
     return headers
+
+
+@pytest.fixture
+def s3(app: Flask, monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
+    """Switches the file storage to its S3 driver (STORAGE_BACKEND=s3) over moto's in-memory S3, with an empty bucket.
+
+    Args:
+        app: The session-wide application (its storage settings are restored afterwards).
+        monkeypatch: Sets the fake credentials and the settings.
+
+    Yields:
+        A boto3 S3 client of the fake S3, to look at the bucket S3_TEST_BUCKET.
+    """
+    for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+        monkeypatch.setenv(name, "testing")
+    monkeypatch.setitem(app.config, "STORAGE_BACKEND", "s3")
+    monkeypatch.setitem(app.config, "S3_BUCKET", S3_TEST_BUCKET)
+    monkeypatch.setitem(app.config, "S3_REGION", S3_TEST_REGION)
+    # A driver made under an earlier fake S3 would talk to that one: make a new one inside this mock, and drop it after.
+    app.extensions.pop("storage", None)
+    with mock_aws():
+        client = boto3.client("s3", region_name=S3_TEST_REGION)
+        client.create_bucket(Bucket=S3_TEST_BUCKET, CreateBucketConfiguration={"LocationConstraint": S3_TEST_REGION})
+        yield client
+    app.extensions.pop("storage", None)

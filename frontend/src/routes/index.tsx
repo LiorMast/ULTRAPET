@@ -1,7 +1,7 @@
 /**
  * routes/index.tsx — The home page ("/" in Hebrew, "/en" in English). Its loader fetches the brands, the
  * stats figures, the content staff saved for every editable section (page_sections, one row per section: "hero",
- * "stats", "brands", "categories", "about", "faq", "contact"), the FAQ questions (faq_items) and the contact details
+ * "stats", "brands", "categories", "private_label" + "private_label_steps", "business", "about", "faq", "contact"), the FAQ questions (faq_items) and the contact details
  * from the API (the catalog categories, shown as the Categories cards, and the contact details come with the root
  * route's data). Signed-in staff edit every section in place
  * ("Edit on page", the page's language, one section at a time; EditableSection.tsx), the hero also in the
@@ -9,24 +9,22 @@
  * (saveSection; the stats numbers and contact details go to the settings) and reloads the page data. The head
  * carries the questions the page language shows as schema.org FAQPage data.
  *
- * The hero, Brands, Stats, Categories, About, FAQ and Contact are real components. The other sections are TEMPORARY placeholders
- * (Private Label, Business Customers — see the roadmap in CLAUDE.md): each is
- * an empty block carrying the anchor id that the navbar and the hero link to, until the real section
- * replaces it.
+ * Sections in order: the hero, Stats, Brands, Categories, Private Label, Business Customers (#business: the request
+ * for a business account, the header's and the hero's "Become a business customer" target), About, FAQ and Contact.
  */
 import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
-import { fetchBrands, fetchFaq, fetchSections, fetchStats, replaceStaffRows, saveSection, saveSetting, type FaqItemInput, type HeroContent, type SectionContent } from '@/api'
+import { fetchBrands, fetchFaq, fetchSections, fetchStats, replaceStaffRows, saveSection, saveSetting, type FaqItemInput, type FlowStep, type FlowStepsContent, type HeroContent, type SectionContent } from '@/api'
 import { useAuth } from '@/auth'
 import { About } from '@/components/About'
 import { Brands } from '@/components/Brands'
+import { BusinessCustomers } from '@/components/BusinessCustomers'
 import { Categories } from '@/components/Categories'
 import { Contact } from '@/components/Contact'
 import { Faq, shownFaq } from '@/components/Faq'
 import { Hero } from '@/components/Hero'
 import { HeroEditor } from '@/components/HeroEditor'
+import { PrivateLabel } from '@/components/PrivateLabel'
 import { Stats } from '@/components/Stats'
-import type { Dictionary } from '@/i18n/he'
-import { useI18n } from '@/i18n'
 import { faqJsonLd, pageHead } from '@/seo'
 
 /** The root route, whose loader has the catalog categories and the contact details (shared with the header and the WhatsApp button). */
@@ -46,32 +44,9 @@ export const Route = createFileRoute('/')({
   component: HomePage,
 })
 
-/** The placeholder section anchors the navbar and the hero link to, in page order. */
-const SECTIONS: { id: string; title: (t: Dictionary) => string }[] = [
-  { id: 'private-label', title: (t) => t.nav.privateLabel },
-  { id: 'business', title: (t) => t.nav.businessCta },
-]
-
 /**
- * One empty placeholder section.
- * @param section - Its anchor id and title (see SECTIONS).
- * @returns The placeholder <section>.
- */
-function Placeholder({ section }: { section: (typeof SECTIONS)[number] }) {
-  const { t } = useI18n()
-  return (
-    <section id={section.id} className="px-6 py-12 lg:px-10 lg:py-16">
-      <div className="mx-auto flex min-h-[50vh] max-w-7xl flex-col justify-center rounded-3xl bg-neutral-100 p-8 lg:p-14">
-        <h2 className="font-heading text-3xl font-bold text-brand-charcoal">{section.title(t)}</h2>
-        <p className="mt-4 text-brand-charcoal-muted">{t.page.comingSoon}</p>
-      </div>
-    </section>
-  )
-}
-
-/**
- * The home page: the hero, Stats, Brands, Categories, About, the FAQ and Contact (each editable by staff), and one
- * empty placeholder per remaining anchor.
+ * The home page: the hero, Stats, Brands, Categories, Private Label, Business Customers, About, the FAQ and Contact
+ * (each editable by staff).
  * @returns The page content.
  */
 function HomePage() {
@@ -119,16 +94,29 @@ function HomePage() {
     await router.invalidate()
   }
 
+  /**
+   * Stores the Private Label section staff edited: its steps (one row, in order), then its heading's texts, and reloads
+   * the page data.
+   * @param steps - The steps in flow order.
+   * @param content - The heading's new texts (page_sections "private_label").
+   * @returns Resolves when saved and reloaded; rejects with the server's ApiError.
+   */
+  const savePrivateLabel = async (steps: FlowStep[], content: SectionContent) => {
+    await saveSection('private_label_steps', { steps } satisfies FlowStepsContent, 'private_label_steps' in sections)
+    await saveSection('private_label', content, 'private_label' in sections)
+    await router.invalidate()
+  }
+
   const saveHero = saver('hero')
+  const privateLabelSteps = (sections.private_label_steps as FlowStepsContent | undefined)?.steps ?? null
   return (
     <>
       <Hero content={hero} onSave={saveHero} editor={saveHero && <HeroEditor content={hero} onSave={saveHero} />} />
       <Stats stats={stats} content={contentOf('stats')} onSave={saver('stats')} />
       <Brands brands={brands} content={contentOf('brands')} onSave={saver('brands')} />
       <Categories categories={categories} content={contentOf('categories')} onSave={saver('categories')} />
-      {SECTIONS.slice(0, 2).map((section) => (
-        <Placeholder key={section.id} section={section} />
-      ))}
+      <PrivateLabel steps={privateLabelSteps} content={contentOf('private_label')} onSave={staff ? savePrivateLabel : undefined} />
+      <BusinessCustomers content={contentOf('business')} onSave={saver('business')} />
       <About content={contentOf('about')} onSave={saver('about')} />
       <Faq items={faq} content={contentOf('faq')} onSave={staff ? saveFaq : undefined} />
       <Contact details={contact} content={contentOf('contact')} onSave={saver('contact')} />

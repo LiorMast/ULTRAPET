@@ -1,9 +1,9 @@
 """test_auth.py — JWT sign-in (app/auth.py) through the shared /api/auth routes (customers and staff).
 
 Cookies and their flags, "remember me", wrong credentials, expiry and refresh, the CSRF double-submit check,
-deactivated users, tokens of the wrong user type, tampered tokens and sign-out.
+deactivated users, tokens of the wrong user type, tampered tokens, sign-out, and the activity record (last_seen_at).
 """
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from flask_jwt_extended import create_access_token
@@ -48,6 +48,29 @@ def test_login_records_the_time(client, customer, database):
     client.post("/api/auth/login", json={**CUSTOMER, "email": " Shop@Example.com "})
     database.refresh(customer)
     assert customer.last_login_at is not None
+    assert customer.last_seen_at == customer.last_login_at
+
+
+def test_a_signed_in_request_records_the_activity_at_most_once_a_minute(customer_client, customer, database):
+    long_ago = datetime.now(UTC) - timedelta(hours=3)
+    customer.last_seen_at = long_ago
+    database.commit()
+    assert customer_client.get("/api/categories").status_code == 200  # any /api request counts, public ones too
+    database.refresh(customer)
+    seen = customer.last_seen_at
+    assert seen > long_ago + timedelta(hours=2)
+
+    customer_client.get("/api/auth/me")
+    database.refresh(customer)
+    assert customer.last_seen_at == seen  # within a minute of the last write: nothing written
+
+
+def test_activity_is_not_recorded_without_a_valid_sign_in(client, customer, database):
+    client.get("/api/categories")
+    client.set_cookie("access_token_cookie", "not-a-token", path="/api/")
+    assert client.get("/api/categories").status_code == 200  # a bad token never breaks a public route
+    database.refresh(customer)
+    assert customer.last_seen_at is None
 
 
 @pytest.mark.parametrize(

@@ -17,6 +17,12 @@
  * another table, 409 duplicate or in use, 404) and its cascade (a deleted category's or product's price rules go with
  * it). The customers table starts with STAFF_CUSTOMERS: a new one needs a password (8+ characters, write-only: never
  * stored nor answered), the email is lowercased and unique, and DELETE is 405 (customers are never deleted).
+ * Requests for an account: POST /api/leads checks the form like the server (required / invalid with the field; a filled
+ * honeypot `website` is answered 201 and dropped) and adds a row to the staff table "leads" (STAFF_LEADS at first:
+ * status and notes editable, POST 405); POST /api/staff/leads/<id>/convert opens the account (the customers table's
+ * checks; 409 "converted" for a request already converted). Profiles: GET /api/account (the signed-in customer's row
+ * of the customers table, found by email) and GET /api/staff/customers/<id>/profile answer the customer's details,
+ * FAKE_ORDERS (the test customer's) and their own price rules (the customer's view leaves out paused ones).
  * A product's stock (the server's app/inventory.py): `stockQuantity` is read-only in the products table (null = not
  * tracked, as every seeded product starts) and changes only through GET/POST /api/staff/products/<id>/stock, which keep
  * an in-memory ledger with the server's rules and errors (only a count starts tracking; "insufficient_stock" when
@@ -24,8 +30,9 @@
  * their public id, the WooCommerce id). setFakeStock is a test's shortcut for a stock staff counted.
  * The generated PDF catalog: GET/POST /api/staff/catalog-pdf keep its options and answer a build as finished at once
  * (setFakeCatalogPdf sets another state, e.g. "building").
- * POST /api/staff/uploads fakes the S3-stub upload (staff only; folder "categories" or "brands"; JPEG/PNG/WebP/AVIF by the
- * file's type, at most 5 MB; answers `/api/media/<folder>/fake-<n>.<ext>`, nothing is stored; the server names it
+ * POST /api/staff/uploads fakes the upload (staff only; folder "categories", "brands", "private-label" or "products";
+ * JPEG/PNG/WebP/AVIF by the file's type, at most 5 MB; answers `/api/media/<folder>/fake-<n>.<ext>`, and for "products"
+ * also the thumbnail `/api/media/products/fake-<n>-thumb.webp`; nothing is stored; the server names it
  * `<folder>/<UTC timestamp>_<uuid>.<ext>`). A picture field
  * (`media`, e.g. a category's imageUrl) takes only one of our objects, like the server's media_key: an object key or
  * its `/api/media/` URL ("" = none); anything else (another site's URL, "../x") is 400 invalid. The server stores the
@@ -37,7 +44,7 @@
  * test can see a button wait on the server (its spinner) and count that a second click sent nothing.
  */
 import { CATALOG_SORTS, type CatalogSort } from '@/api'
-import type { Brand, Branch, CatalogPdfOptions, CatalogPdfState, ContactDetails, ProductCategory, ProductDetail, ProductImage, ProductPage, ProductStock, Stat, StaffCustomer, StockMovement, StockStatus, User } from '@/api'
+import type { Brand, Branch, CatalogPdfOptions, CatalogPdfState, ContactDetails, CustomerProfile, ProductCategory, ProductDetail, ProductImage, ProductPage, ProductStock, ProfileOrder, Stat, StaffCustomer, StaffLead, StockMovement, StockStatus, User } from '@/api'
 import type { Localized } from '@/config'
 import articles from '@/stubs/articles.json'
 import branches from '@/stubs/branches.json'
@@ -58,12 +65,43 @@ export const STAFF_CUSTOMERS: StaffCustomer[] = [
   {
     id: '00000000-0000-4000-8000-000000000001', companyName: TEST_USER.companyName ?? '', fullName: TEST_USER.fullName, email: TEST_USER.email,
     phone: '03-5551234', businessNumber: '512345678', city: 'Tel Aviv', address: null, rivhitCustomerId: null, notes: null, isActive: true,
-    lastLoginAt: '2026-11-01T08:00:00.000Z', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    lastLoginAt: '2026-11-01T08:00:00.000Z', lastSeenAt: '2026-11-01T09:15:00.000Z', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
   },
   {
     id: '00000000-0000-4000-8000-000000000002', companyName: 'Zoo Haifa', fullName: 'Noa Levi', email: 'zoo@example.com',
     phone: null, businessNumber: null, city: 'Haifa', address: null, rivhitCustomerId: null, notes: null, isActive: false,
-    lastLoginAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+    lastLoginAt: null, lastSeenAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+]
+
+/** The requests for an account the staff table "leads" starts with: a new one, and one that became Zoo Haifa's account. */
+export const STAFF_LEADS: StaffLead[] = [
+  {
+    id: '00000000-0000-4000-8009-000000000001', companyName: 'Happy Paws', contactPerson: 'Dana Cohen', phone: '052-1234567', email: 'dana@happypaws.co.il',
+    city: 'Haifa', message: 'We run two stores.', locale: 'he', status: 'new', notes: null, businessUserId: null,
+    createdAt: '2026-11-10T09:00:00.000Z', updatedAt: '2026-11-10T09:00:00.000Z',
+  },
+  {
+    id: '00000000-0000-4000-8009-000000000002', companyName: 'Zoo Haifa', contactPerson: 'Noa Levi', phone: '04-8123456', email: 'zoo@example.com',
+    city: 'Haifa', message: null, locale: 'en', status: 'converted', notes: 'Opened on the phone', businessUserId: '00000000-0000-4000-8000-000000000002',
+    createdAt: '2026-10-01T09:00:00.000Z', updatedAt: '2026-10-02T09:00:00.000Z',
+  },
+]
+
+/** The test customer's past orders (newest first), as GET /api/account answers them. */
+export const FAKE_ORDERS: ProfileOrder[] = [
+  {
+    id: '7d1f0c2a-0000-4000-8000-000000000002', createdAt: '2026-11-05T10:30:00.000Z', status: 'shipped', paymentStatus: 'paid',
+    paymentMethod: { he: 'כרטיס אשראי', en: 'Credit card' }, subtotal: 2400, total: 2832,
+    items: [
+      { productName: { he: 'עצם לעיסה', en: 'Chew bone' }, sku: 'B-100', quantity: 10, unitPrice: 120, lineTotal: 1200, productSlug: 'chew-bone' },
+      { productName: { he: 'מוצר שנמחק' }, sku: null, quantity: 4, unitPrice: 300, lineTotal: 1200, productSlug: null },
+    ],
+  },
+  {
+    id: '3a9e5b11-0000-4000-8000-000000000001', createdAt: '2026-09-20T08:00:00.000Z', status: 'delivered', paymentStatus: 'paid',
+    paymentMethod: { he: 'העברה בנקאית', en: 'Bank transfer' }, subtotal: 2100, total: 2478,
+    items: [{ productName: { he: 'חול לחתולים', en: 'Cat litter' }, sku: 'L-7', quantity: 30, unitPrice: 70, lineTotal: 2100, productSlug: null }],
   },
 ]
 
@@ -134,6 +172,14 @@ export function setFakeCatalogPdf(state: Partial<CatalogPdfState>) {
   catalogPdf = { ...catalogPdf, ...state }
 }
 
+/**
+ * The requests for an account the fake holds now (STAFF_LEADS plus those sent with POST /api/leads), for a test to check.
+ * @returns The rows, newest first.
+ */
+export async function fakeLeads(): Promise<StaffLead[]> {
+  return [...(await tableRows('leads'))].sort(STAFF_TABLES.leads.order) as unknown as StaffLead[]
+}
+
 /** Signs the fake out and forgets staff edits; setup.ts calls it after every test. */
 export function resetFakeApi() {
   session = null
@@ -190,9 +236,11 @@ function seedId(table: number, index: number): string {
  * - `convert`: the server's own field converters (e.g. a customer's email and password), run on the request's values
  *   before anything else: changes them in place, or answers the error. `writeOnly`: fields accepted but never stored
  *   nor answered (a password). `deletable` false: DELETE is 405 (customers are switched off, never deleted).
+ * `creatable` false: POST is 405 (the requests for an account come only from the public form).
  */
 type FakeTable = {
   key?: string
+  creatable?: boolean
   convert?: (values: Record<string, unknown>, creating: boolean) => Response | null
   writeOnly?: string[]
   deletable?: boolean
@@ -480,7 +528,7 @@ const STAFF_TABLES: Record<string, FakeTable> = {
   customers: {
     fields: ['email', 'password', 'fullName', 'phone', 'companyName', 'businessNumber', 'city', 'address', 'rivhitCustomerId', 'notes', 'isActive'],
     required: ['email', 'fullName', 'companyName', 'isActive'],
-    defaults: { phone: null, businessNumber: null, city: null, address: null, rivhitCustomerId: null, notes: null, isActive: true, lastLoginAt: null },
+    defaults: { phone: null, businessNumber: null, city: null, address: null, rivhitCustomerId: null, notes: null, isActive: true, lastLoginAt: null, lastSeenAt: null },
     convert: customerFields,
     writeOnly: ['password'],
     deletable: false,
@@ -490,6 +538,15 @@ const STAFF_TABLES: Record<string, FakeTable> = {
       return duplicate(customer, others, 'email', 'app_users_email_key') ?? duplicate(customer, others, 'businessNumber', 'business_users_business_number_key')
     },
     order: (a, b) => String(a.companyName).localeCompare(String(b.companyName)) || String(a.email).localeCompare(String(b.email)),
+  },
+  leads: {
+    creatable: false,
+    fields: ['status', 'notes'],
+    required: ['status'],
+    defaults: {},
+    seed: () => STAFF_LEADS.map((lead) => ({ ...lead })),
+    check: (lead) => (['new', 'contacted', 'converted', 'rejected'].includes(String(lead.status)) ? null : invalid('business_leads_status_check')),
+    order: (a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id),
   },
 }
 
@@ -593,8 +650,27 @@ function orderAnswer(rows: StaffRow[], body: unknown): Response {
   return json(ordered)
 }
 
+/**
+ * A section's content as the server answers it (section_json): the steps of "private_label_steps" also get the URL
+ * of their picture (`imageUrl`) when their `image` is one of our object keys.
+ * @param key - The section name.
+ * @param content - Its stored content.
+ * @returns The content to answer.
+ */
+function sectionJson(key: string, content: unknown): unknown {
+  const steps = (content as { steps?: unknown } | null)?.steps
+  if (key !== 'private_label_steps' || !Array.isArray(steps)) return content
+  return {
+    ...(content as object),
+    steps: steps.map((step: { image?: unknown }) => (typeof step?.image === 'string' && OBJECT_KEY.test(step.image) ? { ...step, imageUrl: `/api/media/${step.image}` } : step)),
+  }
+}
+
 /** The folders the upload route takes (UPLOAD_FOLDERS on the server). */
-const UPLOAD_FOLDERS = ['categories', 'brands']
+const UPLOAD_FOLDERS = ['categories', 'brands', 'private-label', 'products']
+
+/** The folders whose uploads also get a WebP thumbnail (THUMBNAIL_FOLDERS on the server). */
+const THUMBNAIL_FOLDERS = ['products']
 
 /** The picture types the upload route takes, by media type -> extension (IMAGE_TYPES on the server). */
 const UPLOAD_TYPES: Partial<Record<string, string>> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' }
@@ -602,7 +678,8 @@ const UPLOAD_TYPES: Partial<Record<string, string>> = { 'image/jpeg': 'jpg', 'im
 /**
  * Answers POST /api/staff/uploads like the server's upload route (the type is read from the File, not its bytes).
  * @param body - The multipart body: `folder` and `file`.
- * @returns 201 { key, url }, or the server's errors (401/403, invalid folder, required, too_large, unsupported_type).
+ * @returns 201 { key, url } (+ { thumbnailKey, thumbnailUrl } for a product photo), or the server's errors (401/403,
+ *   invalid folder, required, too_large, unsupported_type).
  */
 function uploadAnswer(body: BodyInit | null | undefined): Response {
   if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
@@ -616,7 +693,9 @@ function uploadAnswer(body: BodyInit | null | undefined): Response {
   if (!extension) return json({ error: 'unsupported_type', field: 'file' }, 400)
   uploadCount += 1
   const key = `${folder}/fake-${uploadCount}.${extension}`
-  return json({ key, url: `/api/media/${key}` }, 201)
+  if (!THUMBNAIL_FOLDERS.includes(folder)) return json({ key, url: `/api/media/${key}` }, 201)
+  const thumbnailKey = `${folder}/fake-${uploadCount}-thumb.webp`
+  return json({ key, url: `/api/media/${key}`, thumbnailKey, thumbnailUrl: `/api/media/${thumbnailKey}` }, 201)
 }
 
 /**
@@ -747,6 +826,7 @@ async function staffAnswer(resource: string, method: string, id: string | null, 
     if (method === 'GET') return json([...rows].sort(table.order))
     if (method === 'PUT') return table.replaceable ? replaceAnswer(table, rows, body ? JSON.parse(String(body)) : null) : json({ error: 'method_not_allowed' }, 405)
     if (method !== 'POST') return json({ error: 'not_found' }, 404)
+    if (table.creatable === false) return json({ error: 'method_not_allowed' }, 405)
     // A keyed table's rows keep their key as the fake's internal id, so the lookups below work for both kinds.
     const filled = table.createDefaults ? table.createDefaults(values, rows) : values
     const row = { ...table.defaults, ...filled, id: table.key ? String(values[table.key]) : crypto.randomUUID(), createdAt: now, updatedAt: now } as StaffRow
@@ -774,6 +854,103 @@ async function staffAnswer(resource: string, method: string, id: string | null, 
   if (refused) return refused
   rows[index] = row
   return json(row)
+}
+
+/**
+ * Answers POST /api/leads like the server's create_lead: checks the form and stores it as a new request.
+ * @param body - The JSON body.
+ * @returns 201 {ok: true} (also for a filled honeypot, which stores nothing), or 400 {error, field}.
+ */
+async function leadAnswer(body: BodyInit | null | undefined): Promise<Response> {
+  const data = body ? (JSON.parse(String(body)) as Record<string, unknown>) : {}
+  if (data.website) return json({ ok: true }, 201)
+  const values: Record<string, string> = {}
+  for (const field of ['companyName', 'contactPerson', 'phone', 'email', 'city']) {
+    const value = data[field]
+    if (value !== undefined && value !== null && typeof value !== 'string') return json({ error: 'invalid', field }, 400)
+    const text = (value ?? '').trim()
+    if (!text) return json({ error: 'required', field }, 400)
+    if (text.length > 200) return json({ error: 'invalid', field }, 400)
+    values[field] = text
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(values.email)) return json({ error: 'invalid', field: 'email' }, 400)
+  if (!/^\+?[\d\s()-]+$/.test(values.phone) || values.phone.replace(/\D/g, '').length < 6) return json({ error: 'invalid', field: 'phone' }, 400)
+  const message = typeof data.message === 'string' ? data.message.trim() : ''
+  if (message.length > 2000) return json({ error: 'invalid', field: 'message' }, 400)
+  const locale = data.locale ?? 'he'
+  if (!['he', 'en', 'ru', 'ar'].includes(String(locale))) return json({ error: 'invalid', field: 'locale' }, 400)
+  const now = new Date().toISOString()
+  ;(await tableRows('leads')).push({
+    ...values, email: values.email.toLowerCase(), message: message || null, locale, status: 'new', notes: null, businessUserId: null,
+    id: crypto.randomUUID(), createdAt: now, updatedAt: now,
+  })
+  return json({ ok: true }, 201)
+}
+
+/**
+ * Answers POST /api/staff/leads/<id>/convert like the server's convert_lead: creates the customer (the customers
+ * table's checks) and marks the request converted and linked to it.
+ * @param leadId - The request's id.
+ * @param body - The new customer's fields.
+ * @returns 201 with the customer, or the server's errors (401/403, 404, 409 converted, the customers table's).
+ */
+async function convertAnswer(leadId: string, body: BodyInit | null | undefined): Promise<Response> {
+  if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  const lead = (await tableRows('leads')).find((row) => row.id === leadId)
+  if (!lead) return json({ error: 'not_found' }, 404)
+  if (lead.status === 'converted' || lead.businessUserId) return json({ error: 'converted' }, 409)
+  const created = await staffAnswer('customers', 'POST', null, body)
+  if (created.status !== 201) return created
+  const customer = (await created.clone().json()) as StaffCustomer
+  Object.assign(lead, { status: 'converted', businessUserId: customer.id, updatedAt: new Date().toISOString() })
+  return created
+}
+
+/**
+ * A customer's profile, like the server's profile_json.
+ * @param row - The customer's row of the staff table "customers".
+ * @param staff - true = the staff view (notes, Rivhit id, paused rules).
+ * @returns The profile: the details, FAKE_ORDERS for the test customer (none for others), their own price rules.
+ */
+async function profileJson(row: StaffRow, staff: boolean): Promise<CustomerProfile> {
+  const names = new Map<string, Localized<string>>()
+  for (const resource of ['categories', 'products']) for (const target of await tableRows(resource)) names.set(target.id, target.name as Localized<string>)
+  const rules = (await tableRows('price-rules')).filter((rule) => rule.businessUserId === row.id && (staff || rule.isActive))
+  const { id, companyName, fullName, email, phone, businessNumber, city, address, isActive, createdAt, lastLoginAt, lastSeenAt, notes, rivhitCustomerId } = row as unknown as StaffCustomer
+  return {
+    customer: { id, companyName, fullName, email, phone, businessNumber, city, address, isActive, createdAt, lastLoginAt, lastSeenAt, ...(staff && { notes, rivhitCustomerId }) },
+    orders: id === STAFF_CUSTOMERS[0].id ? FAKE_ORDERS : [],
+    discounts: rules.map((rule) => {
+      const targetId = (rule.productId ?? rule.categoryId) as string | null
+      const type = rule.productId ? 'product' : rule.categoryId ? 'category' : 'all'
+      return {
+        id: rule.id, kind: rule.kind, value: Number(rule.value), minQuantity: rule.minQuantity, startsAt: rule.startsAt, endsAt: rule.endsAt, isActive: rule.isActive,
+        target: { type, name: targetId ? (names.get(targetId) ?? null) : null },
+      } as CustomerProfile['discounts'][number]
+    }),
+  }
+}
+
+/**
+ * Answers GET /api/account (the signed-in customer's own profile; their row is found by email, else the test customer's).
+ * @returns The profile, or 401 / 403.
+ */
+async function accountAnswer(): Promise<Response> {
+  if (session?.kind !== 'business') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  const rows = await tableRows('customers')
+  const row = rows.find((customer) => customer.email === session?.email) ?? rows.find((customer) => customer.id === STAFF_CUSTOMERS[0].id)!
+  return json(await profileJson(row, false))
+}
+
+/**
+ * Answers GET /api/staff/customers/<id>/profile (staff only).
+ * @param customerId - The customer.
+ * @returns The staff view of the profile, or 401 / 403 / 404.
+ */
+async function customerProfileAnswer(customerId: string): Promise<Response> {
+  if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  const row = (await tableRows('customers')).find((customer) => customer.id === customerId)
+  return row ? json(await profileJson(row, true)) : json({ error: 'not_found' }, 404)
 }
 
 /**
@@ -939,6 +1116,10 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
 
   if (path === '/api/staff/uploads' && method === 'POST') return uploadAnswer(init.body)
   if (path === '/api/staff/catalog-pdf') return catalogPdfAnswer(method, init.body)
+  const convertPath = /^\/api\/staff\/leads\/([^/]+)\/convert$/.exec(path)
+  if (convertPath && method === 'POST') return convertAnswer(decodeURIComponent(convertPath[1]), init.body)
+  const profilePath = /^\/api\/staff\/customers\/([^/]+)\/profile$/.exec(path)
+  if (profilePath && method === 'GET') return customerProfileAnswer(decodeURIComponent(profilePath[1]))
   const stockPath = /^\/api\/staff\/products\/([^/]+)\/stock$/.exec(path)
   if (stockPath) return stockAnswer(decodeURIComponent(stockPath[1]), method, init.body)
   const staff = /^\/api\/staff\/([a-z-]+)(?:\/(.+))?$/.exec(path)
@@ -967,7 +1148,7 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
       }
       return json(STATS.flatMap(({ id }) => (values.has(`stat_${id}_value`) ? [{ id, value: values.get(`stat_${id}_value`), suffix: values.get(`stat_${id}_suffix`) ?? '' }] : [])))
     }
-    if (path === '/api/sections') return json(Object.fromEntries((await tableRows('page-sections')).map((row) => [row.key, row.content])))
+    if (path === '/api/sections') return json(Object.fromEntries((await tableRows('page-sections')).map((row) => [row.key, sectionJson(String(row.key), row.content)])))
     if (path === '/api/articles') return json(publishedArticles)
     const article = articles.find((a) => a.slug === slug('/api/articles/'))
     if (article) return json(article)
@@ -976,7 +1157,7 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
       return json(items.map(({ id, question, answer }) => ({ id, question, answer })))
     }
     const section = (await tableRows('page-sections')).find((row) => row.key === slug('/api/sections/'))
-    if (section) return json({ key: section.key, content: section.content, updatedAt: section.updatedAt })
+    if (section) return json({ key: section.key, content: sectionJson(String(section.key), section.content), updatedAt: section.updatedAt })
     if (path === '/api/resellers') return json(branches.map((b) => ({ approximate: false, ...b })) satisfies Branch[])
     if (path === '/api/prices') {
       const { default: prices } = await import('@/stubs/prices.json')
@@ -988,9 +1169,11 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
       }
       return json({ currency: prices.currency, prices: prices.prices, stock })
     }
+    if (path === '/api/account') return accountAnswer()
     if (path === '/api/auth/me') return session ? json({ user: session }) : json({ error: 'unauthorized' }, 401)
   }
   if (method === 'POST') {
+    if (path === '/api/leads') return leadAnswer(init.body)
     if (path === '/api/auth/login') {
       const { email, password } = JSON.parse(String(init.body)) as { email: string; password: string }
       if (password === WRONG_PASSWORD) return json({ error: 'invalid_credentials' }, 401)

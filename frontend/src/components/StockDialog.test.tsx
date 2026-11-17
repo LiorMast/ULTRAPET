@@ -17,15 +17,15 @@ const [first, second] = products
 /** The id the fake gives the first product (seeded rows have fixed ids). */
 const FIRST_PRODUCT_ID = '00000000-0000-4000-8002-000000000001'
 
-/** The stock column: name, SKU, category, brand, list price, then the stock. */
-const STOCK_CELL = 5
+/** The stock column: photo, name, SKU, category, brand, list price, then the stock. */
+const STOCK_CELL = 6
 
 /**
  * The table row of a product.
- * @param name - The product's English name, as in its first cell.
+ * @param name - The product's English name, as in its name cell (the photo comes first).
  * @returns The row.
  */
-const rowOf = (name: string) => screen.getAllByRole('row').find((row) => within(row).queryAllByRole('cell')[0]?.textContent === name)!
+const rowOf = (name: string) => screen.getAllByRole('row').find((row) => within(row).queryAllByRole('cell').some((cell) => cell.textContent === name))!
 
 /**
  * Opens the Stock dialog of a product and waits for its stock to load.

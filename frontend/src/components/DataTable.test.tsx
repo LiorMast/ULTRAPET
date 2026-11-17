@@ -5,7 +5,8 @@
  * deleting with confirmation, server and client errors shown on their field (a table of its own for patterns and
  * duplicates), Hebrew/RTL and English texts, a caller's own Add/Edit dialog (formDialog) with Edit hidden on some
  * rows (canEdit), a read-only table without action buttons, and the busy Save / Delete buttons (spinner, one request
- * however often they are clicked, back to normal after a refusal).
+ * however often they are clicked, back to normal after a refusal), and an "images" column (the main photo's thumbnail,
+ * sorted by the number of photos).
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -316,5 +317,30 @@ describe('DataTable without handlers', () => {
     expect(within(items).getByRole('img', { name: 'Yes' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^(Add|Edit|Delete|Change order)/ })).not.toBeInTheDocument()
     expect(within(items).queryByRole('columnheader', { name: /Actions/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('DataTable with an "images" column', () => {
+  it("shows the main photo's thumbnail (or a dash) and sorts by the number of photos", async () => {
+    type Item = { id: string; name: string; images: { url: string; thumbnailUrl: string | null; srcset: null; alt: null }[] }
+    const photo = (url: string, thumbnailUrl: string | null) => ({ url, thumbnailUrl, srcset: null, alt: null })
+    const columns: DataColumn<Item>[] = [
+      { key: 'name', label: 'Name' },
+      { key: 'images', label: 'Photos', type: 'images', folder: 'products' },
+    ]
+    const rows: Item[] = [
+      { id: '1', name: 'Two', images: [photo('/api/media/products/a.png', '/api/media/products/a-thumb.webp'), photo('/api/media/products/b.png', null)] },
+      { id: '2', name: 'None', images: [] },
+      { id: '3', name: 'One', images: [photo('/api/media/products/c.png', null)] },
+    ]
+    const { user } = renderComponent(<DataTable<Item> rows={rows} columns={columns} caption="Items" rowKey={(item) => item.id} rowLabel={(item) => item.name} />, 'en')
+    const items = await screen.findByRole('table', { name: 'Items' })
+    const cellOf = (name: string) => within(within(items).getByRole('row', { name: new RegExp(`^${name}`) })).getAllByRole('cell')[1]
+    expect(cellOf('Two').querySelector('img')).toHaveAttribute('src', '/api/media/products/a-thumb.webp')
+    expect(cellOf('One').querySelector('img')).toHaveAttribute('src', '/api/media/products/c.png')
+    expect(cellOf('None')).toHaveTextContent('—')
+    await user.click(within(items).getByRole('columnheader', { name: /Photos/ }))
+    const order = within(items).getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell')[0].textContent)
+    expect(order).toEqual(['None', 'One', 'Two'])
   })
 })

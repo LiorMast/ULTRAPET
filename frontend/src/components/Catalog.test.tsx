@@ -254,4 +254,20 @@ describe('Catalog sorting and filters', () => {
     await user.click(within(pills).getAllByRole('button')[0])
     await waitFor(() => expect(router.state.location.search).toEqual({}))
   })
+
+  it('has a two-headed price slider that fills the minimum and maximum inputs', async () => {
+    const { user } = await renderPage('/en/catalog', { user: customer })
+    await user.click(screen.getByRole('button', { name: 'Price' }))
+    const low = await screen.findByRole('slider', { name: 'Minimum price' })
+    const high = screen.getByRole('slider', { name: 'Maximum price' })
+    // Two labelled marks: the cheapest and the dearest price.
+    expect(document.querySelectorAll('[data-slot="slider-mark"]')).toHaveLength(2)
+    low.focus()
+    // The slider is inverted (the cheapest price at the end), so the arrows point the other way.
+    await user.keyboard('{ArrowLeft}{ArrowLeft}')
+    high.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('spinbutton', { name: 'Minimum price' })).toHaveValue(Number(low.getAttribute('aria-valuenow')))
+    expect(screen.getByRole('spinbutton', { name: 'Maximum price' })).toHaveValue(Number(high.getAttribute('aria-valuenow')))
+  })
 })

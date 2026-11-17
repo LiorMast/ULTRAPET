@@ -4,7 +4,8 @@
  *
  * Each column type has its input (text or textarea, a Hebrew + English pair for localized text, number, money,
  * checkbox, select, colour, URL, date and time; a `searchable` select or text column gets a SearchableField; an
- * "image" column an upload-only ImageUploadField, which uploads the file at once and holds Save until it is stored; a
+ * "image" column an upload-only ImageUploadField, which uploads the file at once and holds Save until it is stored, and
+ * an "images" column an ImageListField, the same for an ordered list of pictures (a product's photos); a
  * "password" column a GeneratedPasswordInput, never filled in: required only when adding, and left out of an edit
  * when it stays empty, so the password is kept). The form
  * checks required fields, patterns and numbers before sending; on an edit it sends only the fields that changed. When the server refuses the change, its error lands
@@ -12,9 +13,10 @@
  * buttons when it names none. Used only by DataTable.
  */
 import { useId, useState, type FormEvent } from 'react'
-import { ApiError } from '@/api'
+import { ApiError, type StaffProductImage } from '@/api'
 import type { DataColumn, RowValues } from '@/components/DataTable'
 import { GeneratedPasswordInput, MIN_PASSWORD_LENGTH } from '@/components/GeneratedPasswordInput'
+import { ImageListField } from '@/components/ImageListField'
 import { ImageUploadField } from '@/components/ImageUploadField'
 import { SearchableField } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
@@ -23,8 +25,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import type { Dictionary } from '@/i18n/he'
 import { useI18n } from '@/i18n'
 
-/** A field's value while it is edited: text for most inputs, a pair for localized text, a flag for a checkbox. */
-type FormValue = string | boolean | { he: string; en: string }
+/**
+ * A field's value while it is edited: text for most inputs, a pair for localized text, a flag for a checkbox, the
+ * list of pictures for an "images" column.
+ */
+type FormValue = string | boolean | { he: string; en: string } | StaffProductImage[]
 
 
 /**
@@ -62,6 +67,7 @@ export function errorMessage(code: string | undefined, t: Dictionary): string {
  */
 function toForm<Row>(column: DataColumn<Row>, value: unknown): FormValue {
   if (column.type === 'boolean') return Boolean(value)
+  if (column.type === 'images') return Array.isArray(value) ? (value as StaffProductImage[]) : []
   if (column.type === 'localized') {
     const text = (value ?? {}) as Partial<Record<'he' | 'en', string>>
     return { he: text.he ?? '', en: text.en ?? '' }
@@ -94,6 +100,8 @@ const isRequired = <Row,>(column: DataColumn<Row>, creating: boolean) => Boolean
  */
 function fromForm<Row>(column: DataColumn<Row>, value: FormValue, creating: boolean): { value: unknown } | { error: 'required' | 'invalid' | 'too_short' } {
   if (column.type === 'boolean') return { value }
+  // A list of pictures is sent whole, in its order (never "required"); a new row without any sends nothing.
+  if (Array.isArray(value)) return { value: creating && value.length === 0 ? null : value }
   if (column.type === 'password') {
     // Never trimmed: spaces are part of a password.
     const password = String(value)
@@ -262,7 +270,7 @@ export function RecordDialog<Row>({
  * @param props.error - The error message to show, if any.
  * @param props.creating - True in the Add form (a password is required only there, and its hint differs).
  * @param props.onChange - Called with the new value.
- * @param props.onBusyChange - An "image" field tells when an upload starts (true) and ends (false).
+ * @param props.onBusyChange - An "image" or "images" field tells when an upload starts (true) and ends (false).
  * @returns The field.
  */
 function Field<Row>({
@@ -310,6 +318,18 @@ function Field<Row>({
         </label>
         {footer}
       </div>
+    )
+  }
+
+  if (Array.isArray(value)) {
+    return (
+      <fieldset>
+        <legend className={LABEL_CLASS}>{label}</legend>
+        {column.folder && (
+          <ImageListField id={id} value={value} onChange={onChange} folder={column.folder} onBusyChange={onBusyChange} disabled={common.disabled} aria-invalid={common['aria-invalid']} aria-describedby={described} />
+        )}
+        {footer}
+      </fieldset>
     )
   }
 

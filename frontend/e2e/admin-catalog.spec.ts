@@ -310,7 +310,7 @@ test("records a product's stock with the keyboard, with no accessibility violati
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
   await expect(open).toBeFocused()
-  await expect(page.getByRole('row', { name: new RegExp(PRODUCT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).getByRole('cell').nth(5)).toHaveText(/^25/)
+  await expect(page.getByRole('row', { name: new RegExp(PRODUCT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).getByRole('cell').nth(6)).toHaveText(/^25/)
 })
 
 /** The category the upload test gives a picture: the first seeded one, on the home carousel's first page. */

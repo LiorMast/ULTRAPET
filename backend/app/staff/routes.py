@@ -19,15 +19,21 @@ changes only by recording a movement:
     GET /products/<id>/stock     the product's units on hand, status and latest movements
     POST /products/<id>/stock    record a movement {kind, quantity, note?} (201), which updates the units on hand
 `customers` are the business customers: only staff open accounts (customers cannot register). Their `password` is
-write-only (set on create, changed by sending a new one, never answered), `lastLoginAt` is read-only, and they are
+write-only (set on create, changed by sending a new one, never answered), `lastLoginAt` and `lastSeenAt` are read-only, and they are
 never deleted (DELETE is 405): `isActive` false blocks the sign-in.
+    GET /customers/<id>/profile  a customer's profile: details, orders, own discounts, activity (app/accounts.py)
+`leads` are the requests for a business account sent from the home page (POST /api/leads): staff change their
+`status` and `notes` (the rest is read-only), delete spam, and never create one (POST is 405); the account is opened
+from a request with
+    POST /leads/<id>/convert     the customer's fields (as POST /customers): creates the customer and marks the
+                                 request converted and linked to it, in one transaction (201)
 JSON keys are camelCase (column `sort_order` -> `sortOrder`); a row also carries `id`, `createdAt`, `updatedAt`.
 A new category, brand or product may leave out `slug` and `sortOrder` (the staff panel does not show them): the server
 names it after its (English) name and puts it last (new_row_defaults).
 `page-sections` (the editable home page sections, keyed by the section name) and `faq-items` (the questions of the
 home page FAQ) also record who made the last change (`updatedById`).
-Uploads: POST /uploads stores a picture (multipart `file` + `folder`) in the file storage (app/storage.py, an S3
-stub for now) and returns its key and URL. The staff panel saves the URL in a row (e.g. a category's imageUrl); the
+Uploads: POST /uploads stores a picture (multipart `file` + `folder`) in the file storage (app/storage.py: the local
+stub or the S3 bucket) and returns its key and URL (a product photo also a thumbnail's). The staff panel saves the URL in a row (e.g. a category's imageUrl); the
 row stores only the key (converters media_key, and media_srcset for a product photo's srcset) and every response
 turns it back into a URL (storage.url_of, storage.srcset_urls). A picture field takes nothing but our own objects:
 every file the site loads comes from the storage or is bundled with the frontend.
@@ -39,6 +45,7 @@ Each field checks its JSON type here; the database's constraints (create-tables.
 and their errors become 400 (a failed check, a missing required field, an unknown reference) or 409 (a duplicate,
 or deleting a row others still use, e.g. a category with products).
 """
+import io
 import re
 import uuid
 from collections.abc import Callable
@@ -49,18 +56,20 @@ from typing import Any, NoReturn
 
 from flask import Blueprint, Response, abort, jsonify, request
 from flask_jwt_extended import current_user
+from PIL import Image, ImageOps
 from sqlalchemy import func, select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app import catalog_pdf, inventory, storage
+from app.accounts import profile_json
 from app.auth import require_user
 from app.database.db import db
 from app.database.models.catalog import Brand, Category, Product, ProductImage
 from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.price_rules import PriceRule
 from app.database.models.settings import Setting
-from app.database.models.users import BusinessUser
+from app.database.models.users import BusinessLead, BusinessUser
 from app.pricing import ISRAEL
 
 bp = Blueprint("staff", __name__, url_prefix="/api/staff")
@@ -524,7 +533,8 @@ class Resource:
     `create_defaults` fills a new row's missing values (e.g. new_row_defaults) before it is saved, or refuses the row.
     `write_only` fields are accepted but never answered (a customer's password); `read_only` columns are answered but
     never accepted (a customer's last sign-in). `deletable` False refuses DELETE with 405 (customers are switched off
-    with isActive instead, so their orders and history stay).
+    with isActive instead, so their orders and history stay). `creatable` False refuses POST with 405 (the requests
+    for an account come only from the public form).
     """
 
     model: type[db.Model]
@@ -540,6 +550,7 @@ class Resource:
     write_only: tuple[str, ...] = ()
     read_only: tuple[str, ...] = ()
     deletable: bool = True
+    creatable: bool = True
 
 
 RESOURCES: dict[str, Resource] = {
@@ -612,8 +623,17 @@ RESOURCES: dict[str, Resource] = {
         (BusinessUser.company_name, BusinessUser.email),
         create_defaults=require_password,
         write_only=("password",),
-        read_only=("last_login_at",),
+        read_only=("last_login_at", "last_seen_at"),
         deletable=False,
+    ),
+    # The requests for a business account (POST /api/leads). Staff follow them up (status, notes) and open the
+    # account with POST /leads/<id>/convert; what the business sent is read-only. Spam is deleted.
+    "leads": Resource(
+        BusinessLead,
+        {"status": text, "notes": text},
+        (BusinessLead.created_at.desc(), BusinessLead.id),
+        read_only=("company_name", "contact_person", "phone", "email", "city", "message", "locale", "business_user_id"),
+        creatable=False,
     ),
 }
 
@@ -853,6 +873,8 @@ def create_row(resource: str) -> tuple[dict[str, Any], int]:
         The new row with 201 (errors: see read_fields and commit).
     """
     spec = RESOURCES[resource]
+    if not spec.creatable:
+        abort(405)
     values = read_fields(spec)
     row = spec.model(**(spec.create_defaults(values) if spec.create_defaults else values))
     if spec.stamp_creator:
@@ -918,6 +940,51 @@ def delete_row(resource: str, key: str) -> Response:
     db.session.delete(find_row(spec, key))
     commit()
     return Response(status=204)
+
+
+@bp.post("/leads/<uuid:lead_id>/convert")
+def convert_lead(lead_id: uuid.UUID) -> tuple[dict[str, Any], int]:
+    """Opens the business account a request asked for: creates the customer from the JSON body (the fields of POST
+    /customers, password required) and marks the request converted and linked to the new account, in one
+    transaction (so a refused customer leaves the request as it was).
+
+    Args:
+        lead_id: The request's id.
+
+    Returns:
+        The new customer (as the customers resource answers it) with 201. Errors: 404 for an unknown request; 409
+        {"error": "converted"} when it already became an account; the customers resource's field and database errors
+        (e.g. 409 duplicate for a taken email).
+    """
+    lead = db.session.scalar(select(BusinessLead).where(BusinessLead.id == lead_id).with_for_update())
+    if lead is None:
+        abort(404)
+    if lead.business_user_id is not None or lead.status == "converted":
+        fail(409, error="converted")
+    spec = RESOURCES["customers"]
+    customer = BusinessUser(**require_password(read_fields(spec)))
+    db.session.add(customer)
+    lead.business_user = customer
+    lead.status = "converted"
+    commit()
+    return row_json(spec, customer), 201
+
+
+@bp.get("/customers/<uuid:customer_id>/profile")
+def customer_profile(customer_id: uuid.UUID) -> dict[str, Any]:
+    """A business customer's profile for staff: details (with the internal ones), orders, every own discount (paused
+    ones too) and the last sign-in and activity.
+
+    Args:
+        customer_id: The customer's id.
+
+    Returns:
+        app.accounts.profile_json (the staff view); 404 for an unknown customer.
+    """
+    customer = db.session.get(BusinessUser, customer_id)
+    if customer is None:
+        abort(404)
+    return profile_json(customer, staff=True)
 
 
 @bp.put(f"/{RESOURCE_PATH}")
@@ -1075,25 +1142,53 @@ def record_stock(product_id: uuid.UUID) -> tuple[dict[str, Any], int]:
     return inventory.product_stock_json(product), 201
 
 
-# Uploads (the S3 stub, app/storage.py), each stored as `<folder>/<UTC timestamp>_<uuid>.<ext>`: the folders staff
-# may upload into (one per kind of picture: category photos, brand logos; add "products" with its admin field) and the
-# largest file.
+# Uploads (the file storage, app/storage.py: the local stub or S3), each stored as `<folder>/<UTC timestamp>_<uuid>.<ext>`:
+# the folders staff may upload into (one per kind of picture: category photos, brand logos, the Private Label steps'
+# pictures, product photos) and the largest file.
 # The accepted image types (JPEG, PNG, WebP, AVIF; no SVG) are recognized by their bytes: storage.file_type.
-UPLOAD_FOLDERS = frozenset({"categories", "brands"})
+UPLOAD_FOLDERS = frozenset({"categories", "brands", "private-label", "products"})
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+# The folders whose uploads also get a small copy for cards (the catalog cards load it instead of the full photo):
+# at most THUMBNAIL_SIZE pixels on each side, WebP, stored as `<the photo's key without extension>-thumb.webp`.
+THUMBNAIL_FOLDERS = frozenset({"products"})
+THUMBNAIL_SIZE = 600
+
+
+def thumbnail_webp(body: bytes) -> bytes | None:
+    """A small copy of an uploaded picture for the cards: upright (EXIF orientation), at most THUMBNAIL_SIZE pixels on
+    each side (never enlarged), as WebP.
+
+    Args:
+        body: The uploaded picture's bytes (JPEG, PNG, WebP or AVIF).
+
+    Returns:
+        The WebP bytes; None when Pillow cannot read the picture (the cards then load the full photo).
+    """
+    try:
+        with Image.open(io.BytesIO(body)) as image:
+            picture = ImageOps.exif_transpose(image)
+            picture = picture.convert("RGBA" if "A" in picture.getbands() else "RGB")
+            picture.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE))
+            out = io.BytesIO()
+            picture.save(out, "WEBP", quality=82, method=4)
+            return out.getvalue()
+    except Exception:  # noqa: BLE001 (an unreadable or oversized picture just gets no thumbnail)
+        return None
 
 
 @bp.post("/uploads")
-def upload() -> tuple[dict[str, str], int]:
-    """Stores an uploaded picture (the S3 stub) under a new key, `<folder>/<UTC timestamp>_<uuid>.<ext>` (e.g.
+def upload() -> tuple[dict[str, str | None], int]:
+    """Stores an uploaded picture in the file storage under a new key, `<folder>/<UTC timestamp>_<uuid>.<ext>` (e.g.
     "categories/20261106T132045Z_3f2a....webp"; the browser's file name is never used, the extension comes from the
     file's bytes); the caller saves the returned URL in a row
-    (e.g. a category's imageUrl), which stores it as the key (media_key).
+    (e.g. a category's imageUrl), which stores it as the key (media_key). A product photo (THUMBNAIL_FOLDERS) also
+    gets a small WebP copy for the cards (thumbnail_webp), which the caller saves as the photo's thumbnailUrl.
 
     The body is multipart/form-data: `file` (the image) and `folder` (one of UPLOAD_FOLDERS).
 
     Returns:
-        {"key", "url"} with 201. Errors: 400 {"error": "invalid", "field": "folder"} for an unknown folder; 400
+        {"key", "url"} with 201, plus {"thumbnailKey", "thumbnailUrl"} in THUMBNAIL_FOLDERS (both None when the
+        picture could not be scaled down). Errors: 400 {"error": "invalid", "field": "folder"} for an unknown folder; 400
         {"error": "required", "field": "file"} without a file; 400 {"error": "too_large", "field": "file"} over 5 MB
         (413 "request_entity_too_large" for a body over the app's limit); 400 {"error": "unsupported_type",
         "field": "file"} for anything but a JPEG, PNG, WebP or AVIF image.
@@ -1114,4 +1209,10 @@ def upload() -> tuple[dict[str, str], int]:
         fail(400, error="unsupported_type", field="file")
     extension, media_type = kind
     key = f"{folder}/{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}_{uuid.uuid4().hex}.{extension}"
-    return {"key": key, "url": storage.put_object(key, body, media_type)}, 201
+    answer: dict[str, str | None] = {"key": key, "url": storage.put_object(key, body, media_type)}
+    if folder in THUMBNAIL_FOLDERS:
+        small = thumbnail_webp(body)
+        thumbnail_key = f"{key.rsplit('.', 1)[0]}-thumb.webp" if small else None
+        answer["thumbnailKey"] = thumbnail_key
+        answer["thumbnailUrl"] = storage.put_object(thumbnail_key, small, "image/webp") if small and thumbnail_key else None
+    return answer, 201

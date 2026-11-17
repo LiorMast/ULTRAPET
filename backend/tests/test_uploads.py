@@ -1,6 +1,7 @@
-"""test_uploads.py — Picture uploads: the staff route POST /api/staff/uploads (app/staff/routes.py), the S3 stub that
-stores the files (app/storage.py), the public route that serves them (GET /api/media/<key>), and how a row stores a
-picture: only its object key, the URL being built from S3_BUCKET / S3_REGION.
+"""test_uploads.py — Picture uploads: the staff route POST /api/staff/uploads (app/staff/routes.py), the file storage
+that keeps them (app/storage.py: the local stub, and the S3 driver over moto's fake S3), the public route that serves
+the stub's files (GET /api/media/<key>), product photos with their thumbnails, and how a row stores a picture: only
+its object key, the URL being built by the storage driver (S3: from S3_BUCKET / S3_REGION).
 """
 import io
 import re
@@ -8,9 +9,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from app import storage
 from app.database.models.catalog import Category
+from tests.conftest import S3_TEST_BUCKET
 
 # The first bytes of each accepted image type, padded to a small "file".
 PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 64
@@ -211,10 +214,8 @@ def test_an_empty_picture_is_stored_as_none(database, set_picture, category, val
     assert category.image_url is None
 
 
-def test_urls_are_built_from_the_configured_bucket_and_region(app, client, database, monkeypatch, set_picture, category):
-    monkeypatch.setitem(app.config, "S3_BUCKET", "ultrapet-media")
-    monkeypatch.setitem(app.config, "S3_REGION", "eu-central-1")
-    url = "https://ultrapet-media.s3.eu-central-1.amazonaws.com/categories/abc.webp"
+def test_urls_are_built_from_the_configured_bucket_and_region(client, database, s3, set_picture, category):
+    url = f"https://{S3_TEST_BUCKET}.s3.eu-central-1.amazonaws.com/categories/abc.webp"
     assert set_picture(url).json["imageUrl"] == url
     database.refresh(category)
     assert category.image_url == "categories/abc.webp"
@@ -247,11 +248,18 @@ def test_brand_logos_are_uploaded_into_their_own_folder(upload):
     assert response.json["key"].startswith("brands/")
 
 
+def test_private_label_step_pictures_are_uploaded_into_their_own_folder(upload):
+    response = upload(PNG, folder="private-label")
+    assert response.status_code == 201
+    assert response.json["key"].startswith("private-label/")
+
+
 def test_a_srcset_names_keys_and_is_answered_with_urls(app, monkeypatch):
     stored = "products/a-300x300.jpg 300w, products/a-768x768.jpg 768w"
     with app.app_context():
         assert storage.srcset_urls(stored) == "/api/media/products/a-300x300.jpg 300w, /api/media/products/a-768x768.jpg 768w"
         assert storage.srcset_urls(None) is None
+        monkeypatch.setitem(app.config, "STORAGE_BACKEND", "s3")
         monkeypatch.setitem(app.config, "S3_BUCKET", "ultrapet-media")
         monkeypatch.setitem(app.config, "S3_REGION", "eu-central-1")
         assert storage.srcset_urls("products/a.jpg 500w") == "https://ultrapet-media.s3.eu-central-1.amazonaws.com/products/a.jpg 500w"
@@ -271,3 +279,79 @@ def test_file_type_knows_pdfs_only_when_asked():
     assert storage.file_type(pdf) is None
     assert storage.file_type(pdf, storage.IMAGE_TYPES + storage.DOCUMENT_TYPES) == ("pdf", "application/pdf")
     assert storage.file_type(PNG) == ("png", "image/png")
+
+
+def picture(size: tuple[int, int], kind: str = "JPEG", mode: str = "RGB") -> bytes:
+    """A real picture Pillow can read (the fake headers above cannot be scaled down).
+
+    Args:
+        size: Its width and height in pixels.
+        kind: The Pillow format, e.g. "JPEG", "PNG", "AVIF".
+        mode: The color mode ("RGBA" for a transparent PNG).
+
+    Returns:
+        The file's bytes.
+    """
+    out = io.BytesIO()
+    Image.new(mode, size, (190, 30, 36, 128) if mode == "RGBA" else (190, 30, 36)).save(out, kind)
+    return out.getvalue()
+
+
+@pytest.mark.parametrize(("kind", "mode"), [("JPEG", "RGB"), ("PNG", "RGBA"), ("WEBP", "RGB"), ("AVIF", "RGB")])
+def test_a_product_photo_gets_a_small_webp_copy_for_the_cards(app, upload, kind, mode):
+    response = upload(picture((1600, 1200), kind, mode), folder="products")
+    assert response.status_code == 201
+    key, thumbnail = response.json["key"], response.json["thumbnailKey"]
+    assert key.startswith("products/")
+    assert thumbnail == f"{key.rsplit('.', 1)[0]}-thumb.webp"
+    assert response.json["thumbnailUrl"] == f"/api/media/{thumbnail}"
+    with Image.open(Path(app.config["MEDIA_ROOT"]) / thumbnail) as small:
+        assert small.format == "WEBP"
+        assert small.size == (600, 450)
+
+
+def test_a_small_product_photo_is_never_enlarged(app, upload):
+    thumbnail = upload(picture((300, 200)), folder="products").json["thumbnailKey"]
+    with Image.open(Path(app.config["MEDIA_ROOT"]) / thumbnail) as small:
+        assert small.size == (300, 200)
+
+
+def test_a_product_photo_pillow_cannot_read_is_kept_without_a_thumbnail(upload):
+    response = upload(PNG, folder="products")
+    assert response.status_code == 201
+    assert response.json["thumbnailKey"] is None
+    assert response.json["thumbnailUrl"] is None
+
+
+def test_other_folders_get_no_thumbnail(upload):
+    assert set(upload(picture((800, 800)), folder="categories").json) == {"key", "url"}
+
+
+def test_an_upload_under_the_s3_driver_lands_in_the_bucket(s3, upload):
+    body = picture((900, 900))
+    response = upload(body, folder="products")
+    assert response.status_code == 201
+    key, thumbnail = response.json["key"], response.json["thumbnailKey"]
+    assert response.json["url"] == f"https://{S3_TEST_BUCKET}.s3.eu-central-1.amazonaws.com/{key}"
+    stored = s3.get_object(Bucket=S3_TEST_BUCKET, Key=key)
+    assert stored["Body"].read() == body
+    assert stored["ContentType"] == "image/jpeg"
+    assert s3.head_object(Bucket=S3_TEST_BUCKET, Key=thumbnail)["ContentType"] == "image/webp"
+
+
+def test_uploaded_photos_become_a_products_gallery_in_order(staff_client, csrf, database, upload, category):
+    first, second = (upload(picture((800, 800)), folder="products").json for _ in range(2))
+    gallery = [
+        {"url": second["url"], "thumbnailUrl": second["thumbnailUrl"], "srcset": None, "alt": None},
+        {"url": first["url"], "thumbnailUrl": first["thumbnailUrl"], "srcset": None, "alt": None},
+    ]
+    body = {"name": {"he": "מוצר", "en": "Product"}, "categoryId": str(category.id), "images": gallery}
+    created = staff_client.post("/api/staff/products", json=body, headers=csrf(staff_client))
+    assert created.status_code == 201
+    assert created.json["images"] == gallery
+    swapped = staff_client.patch(
+        f"/api/staff/products/{created.json['id']}", json={"images": gallery[::-1]}, headers=csrf(staff_client)
+    )
+    assert [image["url"] for image in swapped.json["images"]] == [first["url"], second["url"]]
+    shown = staff_client.get(f"/api/products/{created.json['slug']}").json
+    assert shown["images"][0]["thumbnail"] == first["thumbnailUrl"]

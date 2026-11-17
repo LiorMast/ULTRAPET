@@ -6,7 +6,9 @@
  * shows on the catalog at once, the discounts in the customers' prices and the stock in their stock statuses.
  * The stock column shows the units on hand with a Low / Out ribbon, the stock alerts above the table count the
  * products low or out of stock, and the "Stock" row action (StockDialog) records goods received, returns, removals
- * and stock counts and shows the product's history. A product's photos are kept as they are (editing them comes with the product upload page).
+ * and stock counts and shows the product's history. The photos column shows the main photo; the form's photo list
+ * (ImageListField) uploads new photos into the file storage (folder "products", each with a thumbnail for the cards),
+ * reorders them (the first is the main photo) and removes them; Save stores the whole list.
  * The "PDF catalog" button (CatalogPdfDialog) sets the layout of the downloadable PDF catalog the server generates from
  * the products and builds it; the server also rebuilds it after every change made here.
  * The technical fields stay out of the table and the form: the URL name (the server names a new product after its
@@ -77,6 +79,7 @@ function AdminProducts() {
   // The category and brand choices are read when the table mounts (DataTable's rule); a page load refreshes them.
   const columns = useMemo<DataColumn<ProductRow>[]>(
     () => [
+      { key: 'images', label: f.images, type: 'images', folder: 'products', hint: f.imagesHint },
       { key: 'name', label: f.name, type: 'localized', required: true },
       { key: 'sku', label: f.sku, ltr: true },
       {

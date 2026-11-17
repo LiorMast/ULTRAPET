@@ -1,10 +1,10 @@
 """app — The Ultra Pet backend: one Flask application (monolith) over PostgreSQL.
 
 create_app() builds the application: configuration from the environment, the database (app.database.db), JWT
-sign-in (app.auth), the CLI commands (app.database.seed, app.database.legacy_media, app.catalog_pdf) and the routes. The routes are two blueprints, each in its
+sign-in (app.auth), the file storage settings (app.storage), the CLI commands (app.database.seed, app.database.legacy_media, app.catalog_pdf) and the routes. The routes are two blueprints, each in its
 own folder: customers/ (prefix /api: everything the public site and the business customers call) and staff/
 (prefix /api/staff: the staff panel API). Other modules: database/ (schema SQL, SQLAlchemy base, models, seed
-commands), pricing (the customer's price), storage (the stub of the S3 file storage for uploads) and catalog_pdf (builds the
+commands), pricing (the customer's price), storage (the file storage: a local stub or an S3 bucket, storage_s3) and catalog_pdf (builds the
 downloadable PDF catalog from the products).
 
 Run: `flask --app app run --debug` (DATABASE_URL and SECRET_KEY must be set; compose sets them and FLASK_APP).
@@ -21,12 +21,13 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 
+from app import storage
 from app.auth import init_auth
 from app.catalog_pdf import build_catalog_command
 from app.customers.routes import bp as customers_bp
 from app.database import models  # noqa: F401  (registers every model on db.metadata)
 from app.database.db import db
-from app.database.legacy_media import import_media_command
+from app.database.legacy_media import import_media_command, push_media_command
 from app.database.seed import reset_db_command, seed_command
 from app.database.wordpress import export_wordpress_command
 from app.staff.routes import bp as staff_bp
@@ -84,7 +85,8 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         The configured application.
 
     Raises:
-        RuntimeError: No database URL or no secret key is configured.
+        RuntimeError: No database URL or no secret key is configured, or the file storage settings cannot work
+            (storage.check_config).
     """
     app = Flask(__name__)
     app.json = ApiJSONProvider(app)
@@ -93,15 +95,32 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
         SECRET_KEY=os.environ.get("SECRET_KEY"),
         SITE_URL=os.environ.get("SITE_URL", "https://www.ultrapet.co.il"),
-        # The S3 stub's folder (app/storage.py): backend/media, git-ignored, inside compose's bind mount.
+        # Where the stored files live (app/storage.py): "local" (the stub: files under MEDIA_ROOT, served at
+        # /api/media/) or "s3" (the bucket S3_BUCKET in S3_REGION; credentials from boto3's chain, e.g. AWS_* env vars).
+        STORAGE_BACKEND=os.environ.get("STORAGE_BACKEND", "") or "local",
+        # The stub's folder: backend/media, git-ignored, inside compose's bind mount.
         MEDIA_ROOT=os.environ.get("MEDIA_ROOT", os.path.join(os.path.dirname(os.path.dirname(__file__)), "media")),
-        # The S3 bucket and its region: picture URLs are built from them and the stored object keys (app/storage.py).
-        # Empty (dev, until the stub uses a real bucket) = the stub's /api/media/ URLs.
+        # The S3 bucket and its region (used when STORAGE_BACKEND=s3: the objects and their URLs).
         S3_BUCKET=os.environ.get("S3_BUCKET", ""),
         S3_REGION=os.environ.get("S3_REGION", ""),
+        # Optional: the endpoint of an S3-compatible service (empty = AWS), and the public base URL of the objects
+        # when a CDN or custom domain serves the bucket (empty = https://<bucket>.s3.<region>.amazonaws.com/).
+        S3_ENDPOINT_URL=os.environ.get("S3_ENDPOINT_URL", ""),
+        S3_PUBLIC_URL=os.environ.get("S3_PUBLIC_URL", ""),
         # How a change to the catalog rebuilds the PDF catalog (app/catalog_pdf.py): "thread" (in the background),
         # "inline" (before the request answers) or "off".
         CATALOG_REBUILD=os.environ.get("CATALOG_REBUILD", "thread"),
+        # Email (app/mailer.py): MAIL_BACKEND "smtp" / "log" / "memory" / "off" (empty = smtp when SMTP_HOST is set,
+        # else log); the SMTP server and its sign-in; the sender; who gets the staff notifications (comma separated;
+        # empty = the contact_email setting).
+        MAIL_BACKEND=os.environ.get("MAIL_BACKEND", ""),
+        SMTP_HOST=os.environ.get("SMTP_HOST", ""),
+        SMTP_PORT=int(os.environ.get("SMTP_PORT", "") or 587),
+        SMTP_USER=os.environ.get("SMTP_USER", ""),
+        SMTP_PASSWORD=os.environ.get("SMTP_PASSWORD", ""),
+        SMTP_TLS=os.environ.get("SMTP_TLS", "true").lower() in ("1", "true", "yes"),
+        MAIL_FROM=os.environ.get("MAIL_FROM", ""),
+        LEADS_NOTIFY_TO=os.environ.get("LEADS_NOTIFY_TO", ""),
         MAX_CONTENT_LENGTH=MAX_CONTENT_LENGTH,
     )
     if config:
@@ -110,12 +129,14 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         raise RuntimeError("Set DATABASE_URL, e.g. postgresql+psycopg://content:<password>@localhost:5433/content")
     if not app.config["SECRET_KEY"]:
         raise RuntimeError("Set SECRET_KEY (it signs the sign-in tokens); see .env.example")
+    storage.check_config(app.config)
 
     db.init_app(app)
     init_auth(app)
     app.cli.add_command(reset_db_command)
     app.cli.add_command(seed_command)
     app.cli.add_command(import_media_command)
+    app.cli.add_command(push_media_command)
     app.cli.add_command(export_wordpress_command)
     app.cli.add_command(build_catalog_command)
     app.register_error_handler(HTTPException, http_error)

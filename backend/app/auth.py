@@ -11,12 +11,13 @@ that needs a token also send the X-CSRF-TOKEN header, which the frontend copies 
 (or `csrf_refresh_token`) cookie. A cross-site page cannot read that cookie, so it cannot forge the header.
 
 Every protected request loads the user from the database (`load_user`), so deleting or deactivating a user cuts
-them off at once. Errors answer 401 with {"error": "unauthorized" | "csrf" | "token_expired" | "invalid_token"};
+them off at once. `touch_last_seen` (run before every /api request) records when a signed-in user was last active
+(`app_users.last_seen_at`, at most one write a minute), which the customer profile shows as "Online now" / "Last seen". Errors answer 401 with {"error": "unauthorized" | "csrf" | "token_expired" | "invalid_token"};
 the frontend refreshes and retries once on "token_expired".
 """
 import os
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from flask import Flask, Response, abort, jsonify, request
@@ -31,7 +32,9 @@ from flask_jwt_extended import (
     unset_jwt_cookies,
     verify_jwt_in_request,
 )
-from sqlalchemy import func, select
+from flask_jwt_extended.exceptions import JWTExtendedException
+from jwt.exceptions import PyJWTError
+from sqlalchemy import func, select, update
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.database.db import db
@@ -42,6 +45,9 @@ REFRESH_LIFETIME = timedelta(days=30)
 
 # The user model of each `user_type` claim.
 USER_TYPES: dict[str, type[AppUser]] = {"business": BusinessUser, "staff": StaffUser}
+
+# How often a signed-in user's activity is written: a request within this time of the last write writes nothing.
+SEEN_EVERY = timedelta(minutes=1)
 
 # Checked when the email is unknown, so a failed sign-in takes as long whether or not the account exists.
 DUMMY_HASH = generate_password_hash("not-a-real-password")
@@ -67,6 +73,26 @@ def init_auth(app: Flask) -> None:
     }.items():
         app.config.setdefault(key, value)
     jwt.init_app(app)
+    app.before_request(touch_last_seen)
+
+
+def touch_last_seen() -> None:
+    """Records that the signed-in user is active (before every /api request): sets `last_seen_at` to now when it is
+    unset or older than SEEN_EVERY. A missing, expired or invalid token is ignored here (the route itself decides
+    whether it needs one), so this never changes an answer.
+    """
+    if not request.path.startswith("/api/"):
+        return
+    try:
+        if verify_jwt_in_request(optional=True) is None:
+            return
+    except (JWTExtendedException, PyJWTError):
+        return
+    user = current_user
+    if user is None or (user.last_seen_at is not None and datetime.now(UTC) - user.last_seen_at < SEEN_EVERY):
+        return
+    db.session.execute(update(AppUser).where(AppUser.id == user.id).values(last_seen_at=func.now()))
+    db.session.commit()
 
 
 def error_response(error: str, status: int = 401) -> tuple[Response, int]:
@@ -190,7 +216,7 @@ def authenticate(model: type[AppUser], email: str, password: str) -> AppUser | N
     password_ok = check_password_hash(user.password_hash if user else DUMMY_HASH, password)
     if user is None or not password_ok or not isinstance(user, model) or not user.is_active:
         return None
-    user.last_login_at = func.now()
+    user.last_login_at = user.last_seen_at = func.now()
     db.session.commit()
     return user
 

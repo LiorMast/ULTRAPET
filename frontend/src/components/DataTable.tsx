@@ -23,7 +23,7 @@ import DataTableLib, { type DataTableSlots } from 'datatables.net-react'
 import DT, { type ColumnOptions, type Options } from 'datatables.net-dt'
 import 'datatables.net-dt/css/dataTables.dataTables.css'
 import { ArrowUpDown, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { ApiError, type UploadFolder } from '@/api'
+import { ApiError, type StaffProductImage, type UploadFolder } from '@/api'
 import { localized, type Localized } from '@/config'
 import { RecordDialog, errorMessage } from '@/components/RecordDialog'
 import { ReorderDialog } from '@/components/ReorderDialog'
@@ -41,10 +41,11 @@ registerLibrary(DT)
  * How a column's value is shown and edited: plain or multiline `text`, `localized` text ({ he, en }),
  * `integer`, `number` (decimal), `money` (shekels), `boolean`, `select` (one of `options`), `color` ('#RRGGBB'),
  * `url`, `datetime` (an ISO timestamp), `image` (a stored picture's URL: a thumbnail cell, and an upload-only
- * field into the column's `folder`) or `password` (write-only: never a cell, a form field that starts empty with a
+ * field into the column's `folder`), `images` (an ordered list of stored pictures, StaffProductImage[]: the first
+ * one's thumbnail in the cell, sorted by how many there are, and an ImageListField that uploads into `folder`) or `password` (write-only: never a cell, a form field that starts empty with a
  * Generate button; `required` then means only when adding, and an edit that leaves it empty keeps the password).
  */
-export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 'boolean' | 'select' | 'color' | 'url' | 'datetime' | 'image' | 'password'
+export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 'boolean' | 'select' | 'color' | 'url' | 'datetime' | 'image' | 'images' | 'password'
 
 /**
  * One column of a DataTable and one field of its edit form.
@@ -55,7 +56,7 @@ export type FieldType = 'text' | 'localized' | 'integer' | 'number' | 'money' | 
  *   field limited to its options (strict), a "text" column a free field that suggests its options.
  * - `required`: the form refuses an empty value. `pattern` / `hint`: input pattern (regex) and help text.
  * - `ltr`: left-to-right content in any language (slugs, URLs, codes).
- * - `folder`: where an "image" column's uploads are stored (e.g. "categories").
+ * - `folder`: where an "image" or "images" column's uploads are stored (e.g. "categories", "products").
  * - `readOnly`: shown in the form but not editable. `inTable` / `inForm`: false hides it there (default true).
  * - `render`: overrides the cell (the form still uses `type`).
  */
@@ -88,12 +89,15 @@ export type RowValues = Record<string, unknown>
  * - `dialog`: renders the open dialog for the row, always its latest version (after the rows reload). The dialog
  *   calls `onClose` when it closes and passes `onCloseAutoFocus` to its DialogContent, so the focus goes back
  *   to the row's button.
+ * - `available`: whether a row shows the button (e.g. "Open account" only on requests not yet converted); default
+ *   every row.
  */
 export type RowAction<Row> = {
   name: string
   label: string
   rowLabel: (name: string) => string
   icon: ReactNode
+  available?: (row: Row) => boolean
   dialog: (row: Row, props: { onClose: () => void; onCloseAutoFocus: (event: Event) => void }) => ReactNode
 }
 
@@ -151,6 +155,9 @@ function plainValue<Row>(column: DataColumn<Row>, value: unknown, type: string, 
     }
     case 'boolean':
       return value ? 1 : 0
+    case 'images':
+      // Sorted by how many pictures a row has; never matched by a search.
+      return type === 'filter' ? '' : Array.isArray(value) ? value.length : 0
     case 'integer':
     case 'number':
     case 'money':
@@ -200,6 +207,10 @@ function Cell<Row>({ column, value, locale, yes, no }: { column: DataColumn<Row>
       return <>{new Date(String(value)).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}</>
     case 'image':
       return <img src={String(value)} alt="" width={64} height={48} loading="lazy" className="aspect-[4/3] w-16 border border-neutral-300 object-cover" />
+    case 'images': {
+      const main = Array.isArray(value) ? (value[0] as StaffProductImage | undefined) : undefined
+      return main ? <img src={main.thumbnailUrl ?? main.url} alt="" width={64} height={48} loading="lazy" className="aspect-[4/3] w-16 border border-neutral-300 object-cover" /> : <span className="text-brand-charcoal-muted">—</span>
+    }
     default:
       return column.ltr ? <span dir="ltr">{String(value)}</span> : <>{String(value)}</>
   }
@@ -246,7 +257,7 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
           {t.admin.edit}
         </Button>
       )}
-      {rowActions.map((action) => (
+      {rowActions.filter((action) => action.available?.(row) ?? true).map((action) => (
         <Button key={action.name} variant="action" size="action" data-row={key} data-action={action.name} aria-label={action.rowLabel(name)} onClick={() => onOpen({ mode: 'action', name: action.name, row })}>
           {action.icon}
           {action.label}
@@ -304,7 +315,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
       name: column.key,
       title: column.label,
       defaultContent: '',
-      type: ['integer', 'number', 'money', 'boolean'].includes(column.type ?? 'text') ? 'num' : 'string',
+      type: ['integer', 'number', 'money', 'boolean', 'images'].includes(column.type ?? 'text') ? 'num' : 'string',
     }))
     if (hasActions) columns.push({ data: null, name: 'actions', title: t.admin.actions, orderable: false, searchable: false, className: 'dt-actions' })
     const slots: DataTableSlots = {}

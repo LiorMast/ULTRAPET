@@ -15,7 +15,7 @@ describe('Navbar links', () => {
     const nav = screen.getByRole('navigation', { name: 'תפריט ראשי' })
 
     expect(within(nav).getByRole('link', { name: 'מותגים' })).toHaveAttribute('href', '/#brands')
-    expect(within(nav).getByRole('link', { name: 'תווית פרטית' })).toHaveAttribute('href', '/#private-label')
+    expect(within(nav).getByRole('link', { name: 'תווית פרטית' })).toHaveAttribute('href', '/private-label')
     expect(within(nav).getByRole('link', { name: 'משווקים' })).toHaveAttribute('href', '/where-to-buy')
     expect(within(nav).getByRole('link', { name: 'אודות' })).toHaveAttribute('href', '/#about')
     expect(within(nav).getByRole('link', { name: 'צור קשר' })).toHaveAttribute('href', '/#contact')

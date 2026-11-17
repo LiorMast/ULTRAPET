@@ -7,8 +7,8 @@
  *   - a fixed set of texts (the hero: title, tagline, ...): start(values) with one key per text;
  *   - a list that grows and shrinks (the FAQ's questions): every entry owns a few keys (e.g. "<id>:question",
  *     "<id>:answer"); add(values) appends an entry's texts and focuses its first box, remove(keys, next) drops
- *     them and moves the focus to `next` (none: the control marked data-focus-fallback, e.g. the list's "Add"). The draft keeps its keys in the order they were added, so the section
- *     can read its entries' order from Object.keys(draft).
+ *     them and moves the focus to `next` (none: the control marked data-focus-fallback, e.g. the list's "Add"), reorder(keys) moves entries (e.g. the Private Label steps' "Move earlier").
+ *     The draft keeps its keys in list order, so the section can read its entries' order from Object.keys(draft).
  *   A section may refuse a save itself before storing anything by throwing InlineEditError from onSave: the bar
  *   shows its message and the box it names gets the focus. Without onSave (a visitor, or staff who just signed out)
  *   the section cannot edit: an open draft is dropped, so signing out in edit mode leaves edit mode (a warning toast
@@ -93,7 +93,7 @@ export class InlineEditError extends Error {
  *   when the section refuses it itself. Undefined = the user may not edit (not staff, or signed out): edit mode ends
  *   and the draft is thrown away.
  * @returns `editing`, `draft`, `active` (the selected text), `start(values, first?)`, `add(values, first?)`,
- *   `remove(keys, next?)`, `select(key)`, `change(key, partial)`, `cancel()`, `formProps` for the section's <form>,
+ *   `remove(keys, next?)`, `reorder(keys)`, `select(key)`, `change(key, partial)`, `cancel()`, `formProps` for the section's <form>,
  *   `bar` for its InlineEditBar and `propBar(labels)` for its PropBar.
  */
 export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, TextValue>) => Promise<unknown>) | undefined) {
@@ -191,6 +191,19 @@ export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, 
   }
 
   /**
+   * Reorders the texts of the draft (the entries of a list: the draft's key order is the list's order). The focus is
+   * left alone: the section keeps it on the control that moved the entry.
+   * @param keys - The keys to put in this order; the keys not named keep their order, before them.
+   */
+  const reorder = (keys: Key[]) =>
+    setDraft((current) => {
+      if (!current) return current
+      const named = keys.filter((key) => key in current)
+      const others = (Object.keys(current) as Key[]).filter((key) => !keys.includes(key))
+      return Object.fromEntries([...others, ...named].map((key) => [key, current[key]])) as Record<Key, TextValue>
+    })
+
+  /**
    * Changes one text of the draft.
    * @param key - The text.
    * @param change - The changed field(s).
@@ -274,6 +287,7 @@ export function useInlineDraft<Key extends string>(onSave: ((draft: Record<Key, 
     start,
     add,
     remove,
+    reorder,
     select: setActive,
     change,
     cancel,

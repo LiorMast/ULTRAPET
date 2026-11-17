@@ -33,7 +33,55 @@ function Harness({ onChange = () => {}, disabled }: { onChange?: (value: number)
   )
 }
 
+/**
+ * A two-headed price range slider from 10 to 200 that keeps its own state.
+ * @returns The slider.
+ */
+function RangeHarness() {
+  const [range, setRange] = useState([50, 100])
+  return (
+    <Slider
+      heads={2}
+      min={10}
+      max={200}
+      step={1}
+      value={range}
+      onValueChange={setRange}
+      thumbLabels={['Minimum price', 'Maximum price']}
+      thumbValueText={(value) => `${value} shekels`}
+    />
+  )
+}
+
 describe('Slider', () => {
+  it('sticky: a dragged head snaps onto a nearby mark, the arrow keys still step freely', async () => {
+    const onChange = vi.fn()
+    const { user } = renderComponent(
+      <Slider aria-label="Price" min={0} max={100} step={1} value={[48]} sticky marks={[{ value: 50, label: '50' }]} onValueChange={([v]) => onChange(v)} />,
+      'en',
+    )
+    const slider = await screen.findByRole('slider', { name: 'Price' })
+    slider.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(onChange).toHaveBeenLastCalledWith(49)
+  })
+
+  it('with two heads is a range: each head is named and moves on its own', async () => {
+    const { user } = renderComponent(<RangeHarness />, 'en')
+    const low = await screen.findByRole('slider', { name: 'Minimum price' })
+    const high = screen.getByRole('slider', { name: 'Maximum price' })
+    expect(screen.getAllByRole('slider')).toHaveLength(2)
+    expect(low).toHaveAttribute('aria-valuetext', '50 shekels')
+    low.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(low).toHaveAttribute('aria-valuenow', '51')
+    expect(high).toHaveAttribute('aria-valuenow', '100')
+    high.focus()
+    await user.keyboard('{End}')
+    expect(high).toHaveAttribute('aria-valuenow', '200')
+    expect(low).toHaveAttribute('aria-valuenow', '51')
+  })
+
   it('is a named slider with its range and value', async () => {
     renderComponent(<Harness />, 'en')
     const slider = await screen.findByRole('slider', { name: 'Products per page' })

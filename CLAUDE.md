@@ -19,7 +19,8 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
   self-hosted fonts (`@fontsource-variable/*`), @dnd-kit (drag to reorder: `ReorderDialog`), oxlint.
 - **Tests**: Vitest 5 + React Testing Library (jsdom); Playwright (Chromium) + `@axe-core/playwright`.
 - **Backend** (`backend/`): Flask 3 (app factory, one monolith, routes in two blueprints), Flask-SQLAlchemy on
-  SQLAlchemy 2.1 (typed models), Flask-JWT-Extended (sign-in), psycopg 3, PostgreSQL 17, pytest. The schema is `backend/app/database/create-tables.sql` (working rule 5): no Alembic migrations
+  SQLAlchemy 2.1 (typed models), Flask-JWT-Extended (sign-in), psycopg 3, PostgreSQL 17, boto3 (the S3 driver), pytest
+  (+ moto: a fake S3 for the tests). The schema is `backend/app/database/create-tables.sql` (working rule 5): no Alembic migrations
   until there is production data (Alembic is only a test library). Docker Compose (`compose.yaml`) runs Postgres +
   Flask; Vite proxies `/api` to Flask in dev.
 
@@ -28,7 +29,7 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
 ```
 README.md  CLAUDE.md
 WORDPRESS.md            audit of the old WordPress site: what it holds, what was imported (and how), what was not
-compose.yaml            dev services: postgres + backend (project `ultrapet`)
+compose.yaml            dev services: postgres + backend + mailpit (project `ultrapet`)
 .env.example            template of the git-ignored .env (database password, secrets)
 legacy/                 reference only (old site; supabase-export/ = seed data and media)
 requirements/           original prompts
@@ -56,14 +57,24 @@ frontend/
                         admin.tsx = staff panel layout (shows the shared login form to non-staff), admin.<resource>.tsx = one table each
                         (admin.products / admin.categories also manage their discounts through DiscountsDialog;
                         admin.discounts = every price rule in one table, general or for one customer;
-                        admin.customers = the business customers' accounts + each one's own discounts)
+                        admin.customers.index = the business customers' accounts + each one's own discounts;
+                        admin.customers.$id = one customer's profile (staff view); admin.requests = the requests for
+                        an account ("Open account" converts one); account.tsx = "My account" (the customer's profile);
+                        private-label.tsx = the Private Label page; route pages are tested in components/<Name>Page.test.tsx)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm (+ LoginCard, the sign-in pages' card), Logo,
-                        Brands, Stats, Categories, About, Faq, Contact, Hero, SectionHeading, TextLink (the secondary text link: sentence case,
+                        Brands, Stats, Categories, PrivateLabel, BusinessCustomers (#business: the request for an
+                        account + RequestForm), About, Faq, Contact, Hero, SectionHeading, FormField (a public form's
+                        labelled input/textarea + inline role="alert" error: Contact, BusinessCustomers),
+                        CustomerProfile (details, PresenceBadge "Online now"/"Last seen", current + past discounts,
+                        purchase history; view customer | staff), customerColumns (the account form's DataColumns:
+                        customers table + "Open account"),
+                        Flowchart (FlowchartList + FlowchartCard: a process as numbered steps with connectors), TextLink (the secondary text link: sentence case,
                         sweeping underline, no arrow; `link` or `href`, textLinkVariants for a button), InlineEditor,
                         CatalogCard (links to its product page; PriceSlot, priceFor, stockFor), ProductGallery, RichText
                         (stored sanitized HTML, styled by `.rich-text` in index.css),
                         EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
-                        ImageUploadField (picture upload of the admin forms), ReorderDialog (drag a list into order),
+                        ImageUploadField (picture upload of the admin forms), ImageListField (an ordered list of uploaded
+                        pictures: a product's photos), ReorderDialog (drag a list into order),
                         Offcanvas (the reusable side panel on ui/sheet: title, close, `notice` strip, scrolling body, footer;
                         logical side; optional trigger `tooltip`),
                         CartDrawer (the business customers' header cart icon + badge and its Offcanvas: lines, subtotal,
@@ -103,36 +114,52 @@ backend/
                         contact (the contact_* settings), sections + sections/<key> (saved home page section content),
                         faq, articles, resellers, sitemap.xml, media/<key> (the S3 stub's files), catalog.pdf?lang=
                         (redirect to the generated PDF catalog of that language, see catalog_pdf.py), the shared auth
-                        (login/refresh/logout/me: customers AND staff), prices (+ the stock status of tracked products)
+                        (login/refresh/logout/me: customers AND staff), prices (+ the stock status of tracked products),
+                        POST leads (a request for an account: checked, honeypot `website`, stored in business_leads,
+                        staff emailed through mailer.py), account (the signed-in customer's profile, accounts.py)
     staff/routes.py     blueprint `staff` (/api/staff): staff-only generic CRUD (RESOURCES: brands, categories,
                         products+images, price-rules, settings, articles, resellers, page-sections, faq-items (these two
                         stamp updated_by_id), customers (the business users: `write_only` password, `read_only`
-                        last_login_at, `deletable=False`: DELETE is 405, switch isActive off instead)); PUT /<resource> replaces a whole ordered list in one transaction (only
+                        last_login_at / last_seen_at, `deletable=False`: DELETE is 405, switch isActive off instead),
+                        leads (the requests for an account: status + notes editable, the rest `read_only`,
+                        `creatable=False`: POST is 405)); POST /leads/<id>/convert opens the account from a request
+                        (customer + request converted, one transaction; 409 "converted"); GET /customers/<id>/profile
+                        (accounts.py, staff view); PUT /<resource> replaces a whole ordered list in one transaction (only
                         `replaceable` resources: faq-items); PUT /<resource>/order sets the order from every row's id
                         (`orderable`: categories, brands, products); `create_defaults` (new_row_defaults) fill a new
                         row of these three (slug from its English / brand name, last place); DB constraint errors -> 400/409; POST /uploads stores a
-                        picture (multipart file + folder) through storage.py and returns its URL; GET/POST
+                        picture (multipart file + folder) through storage.py and returns its URL (a product photo
+                        also a 600 px WebP thumbnail's); GET/POST
                         /products/<id>/stock reads a product's stock / records a stock movement (products'
                         `stock_quantity` is `read_only`); GET/POST /catalog-pdf = the PDF catalog dialog (options,
                         status, files / save the options and build now); an after_request hook asks for a rebuild of
                         the PDF catalog after a change to products, categories, brands or the contact_* settings
     pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
+    accounts.py         a customer's profile (profile_json: details, orders, own price rules; staff view adds notes,
+                        Rivhit id, paused rules), shared by GET /api/account and the staff profile route
+    mailer.py           send_mail (MAIL_BACKEND smtp / log / memory (tests) / off; SMTP in a background thread, never
+                        fails the request) and staff_recipients (LEADS_NOTIFY_TO, else the contact_email setting)
     inventory.py        the stock ledger: stock_status, apply_movement / record_movement (a movement + the product's
                         units on hand, row locked), product_stock_json (the Stock dialog), customer_stock (/api/prices)
     catalog_pdf.py      the generated PDF catalog (fpdf2 + uharfbuzz + Pillow; fonts and logo in catalog_assets/):
                         catalog_data, render (cover, category title pages, product grid pages, back page), build_catalog
                         (advisory lock, fingerprint skip, new objects per build), request_rebuild (background thread),
                         `flask build-catalog`
-    storage.py          the S3 stub for every stored file: put_object / get_object / delete_object / object_exists write and serve
-                        backend/media (MEDIA_ROOT, git-ignored); rows store object keys, public_url / url_of / srcset_urls
-                        build the URLs from S3_BUCKET + S3_REGION, object_key validates a submitted one, file_type
-                        recognizes a file by its bytes; swap the bodies for boto3 later
+    storage.py          the file storage of every stored file: put_object / get_object / delete_object / object_exists
+                        through the driver STORAGE_BACKEND picks: LocalStorage (default, the stub: backend/media =
+                        MEDIA_ROOT, git-ignored, served by /api/media/) or S3Storage (storage_s3.py, boto3: S3_BUCKET,
+                        S3_REGION, optional S3_ENDPOINT_URL / S3_PUBLIC_URL; /api/media/ then redirects to the bucket);
+                        rows store object keys, public_url / url_of / srcset_urls build the URLs from the driver,
+                        object_key validates a submitted one, file_type recognizes a file by its bytes, check_config
+                        refuses impossible settings at start-up
+    storage_s3.py       S3Storage: the S3 driver (boto3; each object with its ContentType and a year-long immutable cache)
     database/           everything about the database
       create-tables.sql   the schema: every table and column, explained (source of truth, working rule 5)
       drop-tables.sql     drops every table, children first
       db.py               `db`, the declarative base (naming convention, column types), TimestampMixin
       seed.py             `flask reset-db --yes`, `flask seed` (from the frontend stubs)
-      legacy_media.py     `flask import-media`: copies the WordPress files of stubs/legacy-media.json into the storage
+      legacy_media.py     `flask import-media`: copies the WordPress files of stubs/legacy-media.json into the storage;
+                          `flask push-media`: copies the stub's files (MEDIA_ROOT) into the S3 bucket
       wordpress.py        `flask export-wordpress`: refreshes the product / price / media / page stubs from the old
                           site's public APIs (galleries, sanitized HTML descriptions, variations split, sku, barcode, brand)
       models/             the SQLAlchemy models, one module per area (importing the package registers them all):
@@ -166,12 +193,17 @@ backend/
 - `docker compose exec backend flask seed` — fill an empty database from the frontend stubs (plus the staff admin and
   the demo customer when SEED_ADMIN_* / SEED_CUSTOMER_* are set in `.env`).
 - `docker compose exec backend flask import-media` — copy the old site's files (product photos, the PDF catalog; about
-  1,370 files, 215 MB) into the storage (backend/media); skips what is there, so rerun it after a failure. Once the
-  WordPress site is gone, copy the bucket / backend/media instead.
+  1,370 files, 215 MB) into the storage (backend/media, or the bucket under S3); skips what is there, so rerun it after
+  a failure. Once the WordPress site is gone, copy the bucket / backend/media instead.
+- `docker compose exec backend flask push-media [--dry-run]` — with `STORAGE_BACKEND=s3`: copy the stub's files
+  (backend/media) into the S3 bucket, skipping what it has; run it once when switching the site to S3.
 - `docker compose exec backend flask build-catalog [--force]` — build the downloadable PDF catalog (Hebrew + English)
   from the database into the storage; run it after `seed` + `import-media` (about 40 s for the 408 products). Skipped
   when nothing it shows changed, unless `--force` (e.g. after photos were added).
 - `docker compose exec backend flask reset-db --yes` — drop and recreate every table (all data is lost); then `seed`.
+- http://localhost:8025 — Mailpit (compose service `mailpit`): every email the backend sends in dev (the staff
+  notification of a new account request) lands here; nothing is delivered. Production sets `SMTP_*`, `MAIL_FROM`,
+  `LEADS_NOTIFY_TO` in `.env` (see `.env.example`).
 - `docker compose exec backend flask export-wordpress --out /tmp/wp` — re-read the old site's public APIs into the stubs
   (GET only; the container mounts the stubs read-only, so copy /tmp/wp/*.json over; see WORDPRESS.md). It keeps the
   English of unchanged texts and prints the ids whose English must be translated again; then `import-media`.
@@ -313,7 +345,7 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   page = a route `admin.<resource>.tsx` whose loader calls `fetchStaffRows` and a `DataColumn[]` config (key = the
   staff API's camelCase field, `type`, `required`, `pattern`, `ltr`, `inTable`/`inForm`). The same config drives the
   cells, sorting/search and the generated edit form; editing is our Radix dialog (not the paid DataTables Editor);
-  omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons (each with its `icon`, like Edit / Delete) that open its dialog
+  omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons (each with its `icon`, like Edit / Delete; `available(row)` hides one on some rows) that open its dialog
   (e.g. "Discounts"); `formDialog` replaces the column-driven form for Add and Edit with the page's own dialog (it
   gets the row and `FormDialogProps`: `onSave` goes through `onCreate`/`onUpdate`), and `canEdit(row)` hides Edit on
   rows that form cannot edit (the Discounts page: DiscountDialog with `scope`, Edit hidden on fixed prices); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
@@ -329,18 +361,31 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   hot-link another site (the old WordPress files were moved by `flask import-media`; the manifest is
   `stubs/legacy-media.json`). Picture fields are upload-only (no URL input). Links to other sites (wa.me, Waze, the
   resellers' websites) are links, not resources; the Where to Buy map tiles are OpenStreetMap's (a map service).
-- **Uploads** (S3 stub, `backend/app/storage.py`): a picture column (`type: 'image'`, `folder: 'categories'` or
+- **File storage** (`backend/app/storage.py`): one interface (put / get / exists / delete by object key, public URLs),
+  two drivers chosen by `STORAGE_BACKEND` in `.env`: `local` (default: the stub, files in backend/media served at
+  `/api/media/<key>`) or `s3` (`storage_s3.py`, boto3: `S3_BUCKET` + `S3_REGION`, optional `S3_ENDPOINT_URL` for an
+  S3-compatible service and `S3_PUBLIC_URL` for a CDN; credentials from boto3's chain: `AWS_ACCESS_KEY_ID` /
+  `AWS_SECRET_ACCESS_KEY` or an IAM role; the bucket is publicly readable through a bucket policy). Code calls only
+  the module functions, never a driver. Going live on S3 = set the variables, `flask push-media`, restart; no row
+  changes. The tests run both drivers (moto's fake S3: the `s3` fixture in `tests/conftest.py`). Uploads stay
+  through Flask (it checks the bytes); no presigned uploads.
+- **Uploads** (`backend/app/storage.py`): a picture column (`type: 'image'`, `folder: 'categories'` or
   `'brands'`) shows a thumbnail cell and an `ImageUploadField` in the form (preview, Upload/Replace, Remove; no address
-  input; Save waits for the upload). The file goes to `POST /api/staff/uploads` (`uploadImage` in `api.ts`, multipart), which accepts JPEG,
+  input; Save waits for the upload). A list of pictures (`type: 'images'`, `folder: 'products'`: a product's photos,
+  `StaffProductImage[]`) shows the main photo's thumbnail and an `ImageListField` (Add photos (several at once),
+  Earlier / Later / Remove per photo, the first is the main photo; Save sends the whole list; srcset and alt of the
+  photos already there are kept). The file goes to `POST /api/staff/uploads` (`uploadImage` in `api.ts`, multipart), which accepts JPEG,
   PNG, WebP and AVIF by their bytes (no SVG), at most 5 MB, into a folder of `UPLOAD_FOLDERS`, under `<folder>/<UTC timestamp>_<uuid>.<ext>` (never the file's own name), and
-  returns `{ key, url }`; the form saves that URL. **The row stores only the object key** (`categories/<hex>.webp`,
-  converter `media_key` in the staff routes): responses rebuild the URL (`storage.url_of`) from `S3_BUCKET` +
-  `S3_REGION` in `.env` (`https://<bucket>.s3.<region>.amazonaws.com/<key>`; both empty = the stub's `/api/media/<key>`).
+  returns `{ key, url }` (folder `products` also `{ thumbnailKey, thumbnailUrl }`: a WebP of at most 600 px,
+  `<key without extension>-thumb.webp`, made with Pillow; null when Pillow cannot read the file); the form saves that
+  URL. **The row stores only the object key** (`categories/<hex>.webp`,
+  converter `media_key` in the staff routes): responses rebuild the URL (`storage.url_of`) from the driver
+  (`https://<bucket>.s3.<region>.amazonaws.com/<key>` or `S3_PUBLIC_URL` under S3; the stub's `/api/media/<key>`).
   A picture field accepts only a key or one of our URLs; another site's URL is 400 `invalid`. Product photos store keys
   in `product_images.url` / `thumbnail_url` and a srcset of keys (converter `media_srcset`, answered by
   `storage.srcset_urls`). New kind of picture = a folder in `UPLOAD_FOLDERS` + the `UploadFolder` type + the column
-  (converter `media_key`). Real S3 later: change
-  only `storage.py`. Replaced files are not deleted yet.
+  (converter `media_key`). JSON content may hold keys too: a Private Label step's `image` (folder `private-label`;
+  `section_json` in the customers routes answers its `imageUrl`). Replaced files are not deleted yet.
 - **Discounts** (`DiscountDialog`): one dialog for every discount (category, product, customer, payment method):
   percent/amount switch, a positive value (no surcharges), "Bulk discount" + minimum quantity (whole number >= 2),
   start date + time, end date + time or "no end date" (Israel time; times default to 00:00 / 23:59). It returns a `DiscountValue` ({ type, value, minQuantity: null = regular,
@@ -376,7 +421,8 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   **Lists** (a section whose entries staff add and delete, e.g. the FAQ): each entry owns a few draft keys
   (`"<id>:question"`, `"<id>:answer"`; new entries a `new-<n>` id); `add(values)` appends an entry and focuses its first
   box (the plus button), `remove(keys, next)` drops one and focuses `next` (or the control marked `data-focus-fallback`,
-  e.g. "Add", when none is left); the draft keeps insertion order, so the section reads its order from `Object.keys(draft)`. A
+  e.g. "Add", when none is left), `reorder(keys)` moves entries (the section keeps the focus on its move button); the
+  draft keeps list order, so the section reads its order from `Object.keys(draft)`. A
   section without per-text styling omits the PropBar. `onSave` may throw `InlineEditError(message, key)` to refuse a
   save itself (the bar shows the translated message, the named box gets the focus). Give `InlineEditBar` a `label`
   (accessible name "Edit on page: FAQ"; a page can have several editable sections) and `tone="light"` on a white
@@ -404,6 +450,12 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Section headings**: a section opens with `<SectionHeading id eyebrow title intro />` (red eyebrow, display
   title, muted intro; `as="h1"` for a page heading; `tone="dark"` on a black section; `edit={field}` for an editable
   section), never with copied heading markup.
+- **Flowcharts** (`Flowchart.tsx`): a process ("how it works") is a `<FlowchartList>` of `<FlowchartCard>`s, never
+  hand-made step markup. The list renders the `<ol>`, the order, the decorative connectors (`connector` chevrons |
+  line | none; chevrons point along the reading direction) and the ordinals (`numbered`, "01"...; a card's own `ordinal`
+  wins); `orientation` responsive (stacked, a row from `lg`) | vertical. A card = `media` (a lucide icon, SVG or <img>
+  in a charcoal medallion; `mediaLabel` when it carries meaning), `title`, `description` (strings, or nodes styled with
+  `FLOWCHART_TITLE_CLASS` / `FLOWCHART_TEXT_CLASS`, e.g. EditableTexts) and `actions`.
 - **Accordion** (`ui/accordion.tsx`, Radix): `<Accordion type="single" collapsible variant="line|card">` +
   `AccordionItem` / `AccordionTrigger` / `AccordionContent`; the variant reaches the parts through context. Panels
   grow to Radix's measured height on `--ease-spring` while the text fades in; reduced motion opens without resizing
@@ -468,8 +520,8 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Icons**: lucide-react only; logos are SVG assets. An **action button** leads with its icon (aria-hidden, before
   the label): Edit `Pencil`, Delete / Remove `Trash2`, Add `Plus`, Change order `ArrowUpDown`, Discounts `Percent`,
   Stock `Boxes`, End discount now `CalendarX2`, PDF catalog `FileText`, Upload `Upload`, Edit on page `Pencil`, Add
-  to cart `ShoppingCart`, Out of stock `PackageX`, Find the nearest store `LocateFixed`, Login `UserRound`, Admin panel
-  `ShieldCheck`, Log out `LogOut`, To the catalog `LayoutGrid`; a download link too (`TextLink icon={Download}`).
+  to cart `ShoppingCart`, Out of stock `PackageX`, Find the nearest store `LocateFixed`, Login `UserRound`, My account
+  `UserRound`, Open account `UserPlus`, Admin panel `ShieldCheck`, Log out `LogOut`, To the catalog `LayoutGrid`; a download link too (`TextLink icon={Download}`).
   Controls that are icons stay (close, menu, chevrons, carousel arrows, cart, play/pause, password eye, drag grip,
   stepper −/+, the search magnifier), and state signals (a toast's kind, a sent form's check). Labels, cards,
   headings, navigation CTAs ("Our brands", "Get a quote") and plain text links have no icon, and no arrow appended.
@@ -513,8 +565,10 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   browser supports it (Chromium), with radii set for it (`--r-*`); other browsers get slightly smaller round corners.
   The radius follows the element's rank, never one radius for all: `rounded-md` (tags, badges, thumbnails, the small
   close buttons), `rounded-lg` (every control: buttons, inputs, chips, icon buttons, toasts, segmented switch, stepper,
-  pagination, switch track), `rounded-2xl` (cards, dialogs, popovers, menus), `rounded-3xl` (large panels, the side
-  sheets' inner edge). `rounded-full` only for tiny dots, thin progress bars, the slider thumb and the cart count badge.
+  pagination), `rounded-2xl` (cards, dialogs, popovers, menus), `rounded-3xl` (large panels, the side
+  sheets' inner edge). `rounded-full` only for tiny dots, thin progress bars, the slider thumb, the on/off switch
+  (`ui/switch`: capsule track + round thumb) and the cart count badge; the slider thumb and the switch also take
+  `[corner-shape:round]`, so they are true circles, not squircles.
   A rounded thing inside another gets the outer radius minus the gap.
 - **Buttons**: `<Button>` is a squircle (`rounded-lg`) with a sentence-case semibold label; the default variant is
   brand red; `size="sm"` (40px) for dialogs and the header; `loading` (see Loading states); action buttons lead with
@@ -706,7 +760,23 @@ content exists in each language, and the layout flips direction automatically.
       prefilled mailto: until Phase 2 lead endpoints exist)
 - [x] Every home section editable in place by staff (`EditableSection`): Stats (numbers, suffixes, labels), Brands,
       Categories (heading only; the cards are the database's categories), About (every text), FAQ heading, Contact (texts + phone/WhatsApp/email)
-- [ ] Home section: Private Label, Business Customers (each still a placeholder block in `routes/index.tsx`)
+- [x] Home section Private Label (`PrivateLabel`, `#private-label`, after Categories): heading + the process as a
+      `FlowchartList` (5 built-in steps: `PRIVATE_LABEL_STEPS`, icons `STEP_ICONS` in config.ts); staff edit it in place
+      (heading words/font/size, each step's title + description, icon or an uploaded picture (`ImageUploadField`
+      `item`, shown instead of the icon), add / delete / move earlier-later; one Save =
+      page_sections rows `private_label_steps` ({ steps: FlowStep[] }) then `private_label`)
+- [x] Private Label page (`/private-label`, `routes/private-label.tsx`; the menu's "Private Label"): heading + CTAs,
+      approach + capabilities, the process (the home section read-only, `variant="page"`), product categories, why Ultra
+      Pet, FAQ (dictionary questions + FAQPage JSON-LD), closing CTA; in the sitemap. The copy (from legacy + new FAQ
+      answers) awaits the owner's review
+- [x] Home section: Business Customers (`BusinessCustomers`, `#business`, after Private Label): who we supply, trust
+      indicators, how an account is opened (`FlowchartList`), and the request form (`postLead` → `POST /api/leads`;
+      customers cannot register: staff are emailed and open the account in `/admin/requests`); texts editable in place
+      (page_sections "business"; the form's texts stay in the dictionaries)
+- [x] Customer profile (`CustomerProfile`): "My account" (`/account`, the header's button for a signed-in customer)
+      and the staff view (`/admin/customers/$id`, the company name in the customers table): details, online status
+      (`app_users.last_seen_at`, written by `auth.touch_last_seen` at most once a minute; online = seen ≤ 5 min),
+      current and past own discounts, purchase history (the `orders` table: empty until checkout, Phase 4)
 - [x] Home FAQ (`Faq`, `#faq`, between About and Contact) on the reusable `ui/accordion` (spring animation), with
       FAQPage JSON-LD; the questions are rows of `faq_items` (seeded from `stubs/faq.json`), shown in a language only
       when both texts exist in it; staff edit them in place in the page's language ("Edit on page": change, "Add a
@@ -744,8 +814,9 @@ content exists in each language, and the layout flips direction automatically.
       page sections, FAQ items (+ PUT that replaces the FAQ list at once)
 - [x] staff API for price rules (`price-rules`: positive percent/amount discounts, dated)
 - [x] staff API for customers (`customers`: create with a password, edit, reset the password, deactivate; never deleted)
-- [ ] staff API for leads, payment methods and orders (with the admin UI, Phase 3)
-- [ ] lead/contact endpoints (`business_leads`)
+- [x] staff API for leads (`leads`, `POST /leads/<id>/convert`) + `/admin/requests`; [ ] payment methods and orders
+- [x] lead endpoint (`POST /api/leads` → `business_leads` + an email to staff, `mailer.py`); [ ] the Contact form still
+      opens a mailto:
 - [x] serve the PDF catalog (`/api/catalog.pdf`) and every product photo from the storage (`flask import-media`)
 - [x] generate the PDF catalog from the database (`catalog_pdf.py`, `flask build-catalog`), per language, rebuilt
       after every product change; layout set in the "PDF catalog" dialog of `/admin/products`
@@ -755,9 +826,12 @@ content exists in each language, and the layout flips direction automatically.
 - [x] `/admin/products`, `/admin/categories` (+ their general discounts: `DiscountsDialog`, row action "Discounts";
       the categories, brands and products tables hide slug / legacy path / order and set the order in "Change order",
       `ReorderDialog`)
-- [x] Picture uploads (S3 stub `storage.py`, `ImageUploadField`, upload-only): the categories' home carousel pictures,
+- [x] Picture uploads (`storage.py`, `ImageUploadField`, upload-only): the categories' home carousel pictures,
       the brands' logos
-- [ ] Product images in the admin; tables for settings, articles, resellers (a column config + route each)
+- [x] File storage drivers: the local stub and S3 (`storage_s3.py`, boto3, tested with moto), `STORAGE_BACKEND`,
+      `flask push-media`
+- [x] Product photos in the admin (`ImageListField`, column type `images`, folder `products` with thumbnails)
+- [ ] Tables for settings, articles, resellers (a column config + route each)
 - [x] Inventory on `/admin/products`: the stock ledger (`stock_movements`, `app/inventory.py`, `StockDialog`), stock
       column + alerts, low-stock threshold; customers see In stock / Low / Out and cannot add an out-of-stock product
 - [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API

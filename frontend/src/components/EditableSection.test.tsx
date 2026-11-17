@@ -47,6 +47,8 @@ describe('home page sections edited in place', () => {
       'Edit on page: Ultra Pet in numbers',
       'Edit on page: Our Brands',
       'Edit on page: Product Categories',
+      'Edit on page: Private label',
+      'Edit on page: Business customers',
       'Edit on page: About Ultra Pet',
       'Edit on page: FAQ',
       'Edit on page: Contact',

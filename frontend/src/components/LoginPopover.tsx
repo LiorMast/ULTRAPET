@@ -1,8 +1,8 @@
 /**
  * LoginPopover.tsx — The header's account buttons. Signed out: the login button and the popover it opens,
  * holding the login form (the same form customers and staff both use; the mobile drawer links to the /login
- * page instead). Signed in: the login button turns into a Log out button, and staff also get an Admin panel
- * button before it, which opens and closes the header's admin drawer (SubNavDrawer, wired by the Navbar through
+ * page instead). Signed in: the login button turns into a Log out button, a business customer also gets a My account
+ * button (their profile, /account) before it, and staff an Admin panel button, which opens and closes the header's admin drawer (SubNavDrawer, wired by the Navbar through
  * `adminToggle`; without it the button is a plain link to /admin). Used by the desktop Navbar.
  */
 import { useState } from 'react'
@@ -12,7 +12,7 @@ import { useAuth, useSignOut } from '@/auth'
 import { LoginForm } from '@/components/LoginForm'
 import type { DrawerTriggerProps } from '@/components/SubNavDrawer'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { HEADER_LOGIN } from '@/config'
+import { HEADER_ACCOUNT, HEADER_LOGIN } from '@/config'
 import { useI18n } from '@/i18n'
 
 /** Style of the header's account buttons (login popover trigger, admin panel, log out): outlined squircles with an icon, filled red on hover. */
@@ -21,7 +21,8 @@ const ACCOUNT_BUTTON_CLASS =
 
 /**
  * The header's account buttons: signed out = the login button with its popover (title, form and a link to
- * open an account); signed in = a Log out button, preceded by an Admin panel button for staff.
+ * open an account); signed in = a Log out button, preceded by My account for a business customer and by an Admin
+ * panel button for staff.
  * @param props.adminToggle - The admin drawer's toggle props (useSubNavDrawer().trigger): the Admin panel button
  *   then opens and closes the drawer. Without it, Admin panel is a link to /admin.
  * @returns The buttons (and, when open, the popover panel).
@@ -35,6 +36,12 @@ export function LoginPopover({ adminToggle }: { adminToggle?: DrawerTriggerProps
   if (user) {
     return (
       <>
+        {user.kind === 'business' && (
+          <Link {...HEADER_ACCOUNT.link} className={ACCOUNT_BUTTON_CLASS}>
+            <UserRound size={18} aria-hidden="true" />
+            {HEADER_ACCOUNT.label(t)}
+          </Link>
+        )}
         {user.kind === 'staff' &&
           (adminToggle ? (
             <button type="button" {...adminToggle} className={ACCOUNT_BUTTON_CLASS}>

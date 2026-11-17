@@ -1,13 +1,15 @@
 /**
  * AccountPanel.tsx — What a signed-in user sees instead of the login form: who is signed in, a link to the
- * catalog (where a customer's prices show), for staff a link to the admin panel, and a sign-out button. Used by
+ * catalog (where a customer's prices show), for a customer a link to their account (/account), for staff a link to
+ * the admin panel, and a sign-out button. Used by
  * the /login page.
  */
 import { Link } from '@tanstack/react-router'
-import { LayoutGrid, LogOut, ShieldCheck } from 'lucide-react'
+import { LayoutGrid, LogOut, ShieldCheck, UserRound } from 'lucide-react'
 import type { User } from '@/api'
 import { useSignOut } from '@/auth'
 import { Button } from '@/components/ui/button'
+import { HEADER_ACCOUNT } from '@/config'
 import { useI18n } from '@/i18n'
 
 /**
@@ -30,6 +32,14 @@ export function AccountPanel({ user }: { user: User }) {
           {t.login.toCatalog}
         </Link>
       </Button>
+      {user.kind === 'business' && (
+        <Button asChild variant="outline" className="w-full">
+          <Link {...HEADER_ACCOUNT.link}>
+            <UserRound aria-hidden="true" />
+            {HEADER_ACCOUNT.label(t)}
+          </Link>
+        </Button>
+      )}
       {user.kind === 'staff' && (
         <Button asChild variant="outline" className="w-full">
           <Link to="/admin">

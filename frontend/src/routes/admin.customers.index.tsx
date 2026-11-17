@@ -1,19 +1,21 @@
 /**
- * routes/admin.customers.tsx — Staff panel: the business customers (/admin/customers). Customers cannot register on
- * the site: staff open every account here (company, contact person, the sign-in email and a password they type or
- * generate, and the business details), edit it, reset its password, and block it by marking it inactive. Customers
+ * routes/admin.customers.index.tsx — Staff panel: the business customers (/admin/customers). Customers cannot register
+ * on the site: they send a request (the home page form), and staff open every account, here or from the request in
+ * /admin/requests (company, contact person, the sign-in email and a password they type or generate, and the business
+ * details; the shared form of customerColumns.tsx), edit it, reset its password, and block it by marking it inactive. Customers
  * are never deleted (the page has no Delete, and the server refuses it), so their orders and history stay. Each
  * customer's own discounts (on every product, a category or a product, on top of the general ones) are set in the row's
  * "Discounts" dialog (DiscountsDialog with the category and product choices).
  *
  * Everything goes through the staff API (backend/app/staff/routes.py, resources "customers" and "price-rules"): the
  * password is write-only (the form's password field starts empty; left empty on an edit, the password is kept), and
- * the last sign-in is read-only. The page is a DataTable with the customers' column config; after every change it
+ * the last sign-in and activity are read-only. A company name links to the customer's profile (/admin/customers/$id:
+ * details, orders, discounts); "Last online" shows whether they are online now (PresenceBadge). The page is a DataTable with the customers' column config; after every change it
  * reloads the rows and the rules from the server. Loads nothing when signed out (the layout shows the sign-in form
  * instead).
  */
 import { useMemo } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import {
   createStaffRow,
   deleteStaffRow,
@@ -24,12 +26,14 @@ import {
   type StaffPriceRule,
   type StaffProduct,
 } from '@/api'
+import { customerColumns } from '@/components/customerColumns'
+import { PresenceBadge } from '@/components/CustomerProfile'
 import { DataTable, type DataColumn, type RowValues } from '@/components/DataTable'
 import { discountTargets, scopeFields } from '@/components/DiscountDialog'
 import { DiscountsCell, discountFields, discountsAction, withDiscounts, type DescribeTarget, type DiscountRow } from '@/components/DiscountsDialog'
 import { dictionaryFor, useI18n } from '@/i18n'
 
-export const Route = createFileRoute('/admin/customers')({
+export const Route = createFileRoute('/admin/customers/')({
   loader: async ({ context, abortController }) => {
     if (!context.staff) return { customers: [], rules: [], categories: [], products: [] }
     const { signal } = abortController
@@ -75,33 +79,27 @@ function AdminCustomers() {
   const rows = useMemo(() => withDiscounts(customers, rules, 'businessUserId', t, locale, describeTarget), [customers, rules, t, locale, describeTarget])
 
   const columns = useMemo<DataColumn<CustomerRow>[]>(
-    () => [
-      { key: 'companyName', label: f.companyName, required: true },
-      { key: 'fullName', label: f.fullName, required: true },
-      { key: 'email', label: f.email, required: true, ltr: true },
-      { key: 'password', label: f.password, type: 'password', required: true, hint: f.passwordHint },
-      { key: 'phone', label: f.phone, ltr: true },
-      { key: 'businessNumber', label: f.businessNumber, ltr: true, pattern: '[0-9]{9}', hint: f.businessNumberHint },
-      { key: 'city', label: f.city },
-      { key: 'address', label: f.address, inTable: false },
-      { key: 'rivhitCustomerId', label: f.rivhitCustomerId, ltr: true, inTable: false },
-      { key: 'notes', label: f.notes, multiline: true, inTable: false, hint: f.notesHint },
-      { key: 'discountText', label: f.discounts, inForm: false, render: (row) => <DiscountsCell rules={row.discounts} describeTarget={describeTarget} /> },
-      {
-        key: 'lastLoginAt',
-        label: f.lastLoginAt,
-        type: 'datetime',
-        inForm: false,
-        render: (row) =>
-          row.lastLoginAt ? (
-            new Date(row.lastLoginAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })
-          ) : (
-            <span className="text-brand-charcoal-muted">{f.neverSignedIn}</span>
-          ),
-      },
-      { key: 'isActive', label: f.isActive, type: 'boolean', hint: f.isActiveHint },
-    ],
-    [f, locale, describeTarget],
+    () =>
+      customerColumns<CustomerRow>(t, [
+        { key: 'discountText', label: f.discounts, inForm: false, render: (row) => <DiscountsCell rules={row.discounts} describeTarget={describeTarget} /> },
+        { key: 'lastSeenAt', label: f.lastSeenAt, type: 'datetime', inForm: false, render: (row) => <PresenceBadge lastSeenAt={row.lastSeenAt} /> },
+      ]).map((column) =>
+        column.key === 'companyName'
+          ? {
+              ...column,
+              render: (row: CustomerRow) => (
+                <Link
+                  to="/admin/customers/$id"
+                  params={{ id: row.id }}
+                  className="font-semibold text-brand-charcoal underline decoration-brand-red/40 underline-offset-4 transition-colors duration-300 hover:text-brand-red-dark hover:decoration-brand-red-dark"
+                >
+                  {row.companyName}
+                </Link>
+              ),
+            }
+          : column,
+      ),
+    [t, f, describeTarget],
   )
 
   const discounts = discountsAction<CustomerRow>(t, {

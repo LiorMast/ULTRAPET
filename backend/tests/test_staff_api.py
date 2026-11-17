@@ -194,7 +194,7 @@ def test_staff_list_the_business_customers_without_their_password(api, database,
     rows = api("GET", "/customers").get_json()
     assert [(row["companyName"], row["isActive"]) for row in rows] == [("Aquarium Plus", False), ("Pet Corner", True)]
     assert set(rows[0]) == {"id", "email", "fullName", "phone", "companyName", "businessNumber", "city", "address",
-                            "rivhitCustomerId", "notes", "isActive", "lastLoginAt", "createdAt", "updatedAt"}
+                            "rivhitCustomerId", "notes", "isActive", "lastLoginAt", "lastSeenAt", "createdAt", "updatedAt"}
     assert rows[0]["city"] == "Haifa" and rows[0]["lastLoginAt"] is None
 
 

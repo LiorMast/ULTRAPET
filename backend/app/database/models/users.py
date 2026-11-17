@@ -3,7 +3,8 @@
 AppUser is the shared sign-in record (table app_users). StaffUser and BusinessUser inherit from it with joined-table
 inheritance: each subtype has its own table whose primary key is also a foreign key to app_users, and
 `app_users.user_type` says which one a row belongs to. Querying AppUser therefore returns StaffUser and BusinessUser
-objects. BusinessLead is a "become a customer" form submission that staff may convert into a BusinessUser.
+objects. BusinessLead is a request for a business account (customers cannot register themselves) that staff may
+convert into a BusinessUser.
 Column meanings are documented in create-tables.sql.
 """
 from __future__ import annotations
@@ -40,6 +41,7 @@ class AppUser(TimestampMixin, db.Model):
     phone: Mapped[str | None]
     is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
     last_login_at: Mapped[datetime | None]
+    last_seen_at: Mapped[datetime | None]
 
     __mapper_args__ = {"polymorphic_on": "user_type"}
 
@@ -119,7 +121,7 @@ class BusinessUser(AppUser):
 
 
 class BusinessLead(TimestampMixin, db.Model):
-    """A submission of the public "become a business customer" form, followed up by staff."""
+    """A request for a business account (the home page's registration form), followed up by staff."""
 
     __tablename__ = "business_leads"
     __table_args__ = (
@@ -134,6 +136,7 @@ class BusinessLead(TimestampMixin, db.Model):
     email: Mapped[str]
     city: Mapped[str]
     message: Mapped[str | None]
+    notes: Mapped[str | None]
     locale: Mapped[str] = mapped_column(default="he", server_default="he")
     status: Mapped[str] = mapped_column(default="new", server_default="new")
     business_user_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -16,6 +16,7 @@ import { formatPrice } from '@/components/CatalogCard'
 import { textLinkVariants } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
 import { inputVariants } from '@/components/ui/input'
+import { Slider } from '@/components/ui/slider'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -107,7 +108,8 @@ function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }
 }
 
 /**
- * The price range form inside the price popover: minimum and maximum, Apply and Clear.
+ * The price range form inside the price popover: a two-headed slider over the customers' price bounds, the maximum and
+ * minimum inputs (in the slider's order, the same values, for exact amounts), Apply and Clear.
  * @param props.range - The applied range (null = none).
  * @param props.bounds - The customer's cheapest and dearest price among the matches (the inputs' placeholders).
  * @param props.onApply - Applies a range (undefined ends = open).
@@ -122,7 +124,7 @@ function PriceRangeForm({
   bounds: ProductPage['priceBounds']
   onApply: (min: number | undefined, max: number | undefined) => void
 }) {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [min, setMin] = useState(range?.min?.toString() ?? '')
   const [max, setMax] = useState(range?.max?.toString() ?? '')
 
@@ -134,6 +136,22 @@ function PriceRangeForm({
   const read = (value: string) => {
     const amount = value.trim() ? Number(value) : NaN
     return Number.isFinite(amount) && amount >= 0 ? amount : undefined
+  }
+
+  const floor = bounds ? Math.floor(bounds.min) : 0
+  const ceil = bounds ? Math.ceil(bounds.max) : 0
+  // The heads' places: the typed amount, or the bound while the input is empty, kept inside the bounds.
+  const clamp = (amount: number) => Math.min(ceil, Math.max(floor, amount))
+  const low = clamp(read(min) ?? floor)
+  const high = Math.max(low, clamp(read(max) ?? ceil))
+
+  /**
+   * A head moved: writes its two places into the inputs.
+   * @param values - The new [low, high] places.
+   */
+  const handleSlide = ([nextLow, nextHigh]: number[]) => {
+    setMin(String(nextLow))
+    setMax(String(nextHigh))
   }
 
   /**
@@ -148,20 +166,23 @@ function PriceRangeForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <p className="font-heading text-sm font-bold text-brand-charcoal">{t.catalog.priceRangeTitle}</p>
+      {bounds && ceil > floor && (
+        <Slider
+          heads={2}
+          min={floor}
+          max={ceil}
+          step={1}
+          inverted
+          sticky
+          marks={[bounds.min, bounds.max].map((amount) => ({ value: clamp(Math.round(amount)), label: formatPrice(locale, amount, { whole: true }) }))}
+          value={[low, high]}
+          onValueChange={handleSlide}
+          thumbLabels={[t.catalog.priceMin, t.catalog.priceMax]}
+          thumbValueText={(amount) => formatPrice(locale, amount, { whole: true })}
+          className="px-2.5"
+        />
+      )}
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5 text-xs font-medium text-brand-charcoal-muted">
-          {t.catalog.priceMin}
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step="any"
-            value={min}
-            onChange={(e) => setMin(e.target.value)}
-            placeholder={bounds ? String(Math.floor(bounds.min)) : undefined}
-            className={INPUT}
-          />
-        </label>
         <label className="flex flex-col gap-1.5 text-xs font-medium text-brand-charcoal-muted">
           {t.catalog.priceMax}
           <input
@@ -172,6 +193,19 @@ function PriceRangeForm({
             value={max}
             onChange={(e) => setMax(e.target.value)}
             placeholder={bounds ? String(Math.ceil(bounds.max)) : undefined}
+            className={INPUT}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5 text-xs font-medium text-brand-charcoal-muted">
+          {t.catalog.priceMin}
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="any"
+            value={min}
+            onChange={(e) => setMin(e.target.value)}
+            placeholder={bounds ? String(Math.floor(bounds.min)) : undefined}
             className={INPUT}
           />
         </label>

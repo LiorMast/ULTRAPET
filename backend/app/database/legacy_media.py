@@ -1,5 +1,9 @@
-"""legacy_media.py — `flask import-media`: copies the files the old WordPress site served (the 400 products' photos with
-their sized copies, the PDF catalog) into our file storage (app/storage.py: the S3 stub now, the bucket later).
+"""legacy_media.py — Commands that fill the file storage (app/storage.py):
+
+`flask import-media` copies the files the old WordPress site served (the 400 products' photos with their sized copies,
+the PDF catalog) into our file storage (the local stub, or the S3 bucket when STORAGE_BACKEND=s3).
+
+`flask push-media` copies the local stub's files (MEDIA_ROOT) into the S3 bucket, once, when the site moves to S3.
 
 Every resource the new site loads comes from that storage or is bundled with the frontend; nothing is hot-linked
 from www.ultrapet.co.il. The seed (app/database/seed.py) writes the rows with the object keys only; this command
@@ -110,6 +114,75 @@ def import_media_command(manifest_path: Path) -> None:
     """
     stored, skipped, failed = import_media(read_json(manifest_path))
     click.echo(f"Stored {stored} files, {skipped} were already there, {len(failed)} failed.")
+    for key, reason in sorted(failed.items()):
+        click.echo(f"  {key}: {reason}", err=True)
+    if failed:
+        raise click.exceptions.Exit(1)
+
+
+def push_media(workers: int = WORKERS, dry_run: bool = False) -> tuple[int, int, dict[str, str]]:
+    """Copies every file of the local stub (MEDIA_ROOT) that the S3 bucket does not have yet into it, under the same key.
+
+    Args:
+        workers: How many uploads run at once.
+        dry_run: True = only count what would be copied.
+
+    Returns:
+        (copied, skipped, failed): how many files were copied (or would be, in a dry run), how many the bucket already
+        had, and key -> the reason for each file that could not be copied (a name that is not an object key, an
+        upload error).
+    """
+    app = current_app._get_current_object()
+    root = Path(app.config["MEDIA_ROOT"])
+    local = storage.LocalStorage(str(root))
+    keys = sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
+    failed = {key: "not an object key" for key in keys if not storage.KEY_PATTERN.fullmatch(key)}
+    keys = [key for key in keys if key not in failed]
+
+    def copy(key: str) -> str | None:
+        """Uploads one file unless the bucket has it.
+
+        Args:
+            key: The object key (its path under MEDIA_ROOT).
+
+        Returns:
+            "skipped" when the bucket already has it, None when copied (or to copy), else the reason it failed.
+        """
+        with app.app_context():
+            try:
+                if storage.object_exists(key):
+                    return "skipped"
+                if dry_run:
+                    return None
+                body = local.get(key) or b""
+                media_type = storage.MEDIA_TYPES.get(Path(key).suffix.lower()) or "application/octet-stream"
+                storage.put_object(key, body, media_type)
+            except Exception as error:  # noqa: BLE001 (any S3 error is reported and the rest go on)
+                return f"upload failed: {error}"
+        return None
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = dict(zip(keys, pool.map(copy, keys)))
+    copied = sum(1 for reason in results.values() if reason is None)
+    skipped = sum(1 for reason in results.values() if reason == "skipped")
+    failed |= {key: reason for key, reason in results.items() if reason and reason != "skipped"}
+    return copied, skipped, failed
+
+
+@click.command("push-media")
+@click.option("--dry-run", is_flag=True, help="Only count the files that would be copied.")
+def push_media_command(dry_run: bool) -> None:
+    """Copies the local stub's files (MEDIA_ROOT) into the S3 bucket (see push_media); only with STORAGE_BACKEND=s3.
+    Exits with status 1 when any file failed.
+
+    Args:
+        dry_run: Only count, copy nothing.
+    """
+    if not storage.uses_s3():
+        raise click.UsageError("Set STORAGE_BACKEND=s3 (and the bucket's settings) first: push-media copies the local files into S3.")
+    copied, skipped, failed = push_media(dry_run=dry_run)
+    verb = "Would copy" if dry_run else "Copied"
+    click.echo(f"{verb} {copied} files, {skipped} were already in the bucket, {len(failed)} failed.")
     for key, reason in sorted(failed.items()):
         click.echo(f"  {key}: {reason}", err=True)
     if failed:

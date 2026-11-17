@@ -18,7 +18,7 @@
  * every resource (fetchStaffRows, createStaffRow, updateStaffRow, deleteStaffRow), used by the /admin pages and the
  * in-place editors; a resource edited as one ordered list (the FAQ) is saved whole with replaceStaffRows, and the
  * order of a table staff drag into order (categories, brands, products) with reorderStaffRows.
- * Pictures are uploaded with uploadImage (multipart; the server stores them in its S3 stub and returns their URL).
+ * Pictures are uploaded with uploadImage (multipart; the server stores them in its file storage, a local stub or S3, and returns their URL).
  * A product's stock (the stock ledger, backend/app/inventory.py) is read with fetchProductStock and changed only by
  * recording a movement with recordStockMovement.
  * The generated PDF catalog (backend/app/catalog_pdf.py): fetchCatalogPdf reads its layout options, the last build's
@@ -55,8 +55,8 @@ export type PriceRange = { min: number | null; max: number | null }
 /**
  * One page of catalog results. `total` counts every product matching all the filters; `category`, `brands`,
  * `sort` and `priceRange` are what the server applied (null / [] = none: unknown slugs are ignored, and the price
- * sorts and range apply only for a signed-in business customer). `priceBounds` is the customer's cheapest and
- * dearest price among the matches before the price range (null for visitors). `categoryCounts` gives, per category
+ * sorts and range apply only for a signed-in business customer). `priceBounds` is the customer's cheapest and dearest
+ * price among the matches before the price range (null for visitors). `categoryCounts` gives, per category
  * slug, the matches of every filter but the category (the numbers on the chips; "All" is their sum), and
  * `brandCounts`, per active brand slug, the matches of every filter but the brand.
  */
@@ -203,6 +203,17 @@ export type SectionText = {
  * "pillar.expertise.text"). A missing key shows the dictionary's text.
  */
 export type SectionContent = Partial<Record<string, SectionText>>
+
+/**
+ * One step of an editable flow (the Private Label process): its id, its icon (a STEP_ICONS key in config.ts; an
+ * unknown one shows the default icon), its picture (`image` = the object key of an uploaded file, shown instead of the
+ * icon; `imageUrl` = its URL, answered by the server, never stored) and its title and description per language. A missing text of a built-in step
+ * (an id of PRIVATE_LABEL_STEPS) shows the dictionary's; a step with no title in a language is not shown in it.
+ */
+export type FlowStep = { id: string; icon: string; image?: string; imageUrl?: string; title?: Partial<Record<Locale, string>>; text?: Partial<Record<Locale, string>> }
+
+/** The saved steps of an editable flow (page_sections row "private_label_steps"), in order; missing = the built-in ones. */
+export type FlowStepsContent = { steps?: FlowStep[] }
 
 /**
  * The hero's saved content (page_sections row "hero"): the title (`text` = the white words, `accent` = the red
@@ -479,6 +490,25 @@ export const fetchArticle = (slug: string, signal?: AbortSignal) => apiFetch<Art
  */
 export const fetchResellers = (signal?: AbortSignal) => apiFetch<Branch[]>('/api/resellers', { signal })
 
+/** A request for a business account, as the home page's form sends it (`website` = the hidden honeypot, empty). */
+export type LeadInput = {
+  companyName: string
+  contactPerson: string
+  phone: string
+  email: string
+  city: string
+  message: string
+  locale: Locale
+  website: string
+}
+
+/**
+ * Sends a request for a business account (customers cannot register: staff review it and open the account).
+ * @param lead - The form's values.
+ * @returns Resolves when stored; throws ApiError 400 "required" / "invalid" with the refused `field`.
+ */
+export const postLead = (lead: LeadInput) => apiFetch<{ ok: true }>('/api/leads', { method: 'POST', body: lead })
+
 /**
  * Who is signed in, according to the server (the JWT cookies).
  * @param signal - Aborts the request.
@@ -509,7 +539,7 @@ export async function postSignIn(credentials: { email: string; password: string;
 export const postSignOut = () => apiFetch<void>('/api/auth/logout', { method: 'POST' })
 
 /** The tables the staff API edits (RESOURCES in backend/app/staff/routes.py). */
-export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections' | 'faq-items' | 'customers'
+export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections' | 'faq-items' | 'customers' | 'leads'
 
 /** The staff resources edited as one ordered list, which replaceStaffRows saves whole (`replaceable` on the server). */
 export type StaffListResource = 'faq-items'
@@ -629,9 +659,10 @@ export type StaffPriceRule = StaffRowBase & {
 
 /**
  * A business customer as the staff API returns it (resource "customers"; every account, active or not). Only staff
- * open accounts: customers cannot register. A new one is created with a `password` (write-only: sent to set or
- * reset it, never returned); `lastLoginAt` is read-only (null = never signed in). Customers are never deleted:
- * `isActive` false blocks the sign-in.
+ * open accounts: customers cannot register (they send a request, StaffLead). A new one is created with a `password`
+ * (write-only: sent to set or reset it, never returned); `lastLoginAt` (the last sign-in) and `lastSeenAt` (the last
+ * request while signed in) are read-only (null = never). Customers are never deleted: `isActive` false blocks the
+ * sign-in.
  */
 export type StaffCustomer = StaffRowBase & {
   id: string
@@ -646,7 +677,110 @@ export type StaffCustomer = StaffRowBase & {
   notes: string | null
   isActive: boolean
   lastLoginAt: string | null
+  lastSeenAt: string | null
 }
+
+/** Where a request for an account stands: new, contacted, converted (the account was opened) or rejected. */
+export type LeadStatus = 'new' | 'contacted' | 'converted' | 'rejected'
+
+/**
+ * A request for a business account as the staff API returns it (resource "leads"): what the business sent
+ * (read-only), its follow-up `status` and staff `notes` (editable), and the account it became (`businessUserId`,
+ * null until converted). Staff never create one; they open the account with convertLead.
+ */
+export type StaffLead = StaffRowBase & {
+  id: string
+  companyName: string
+  contactPerson: string
+  phone: string
+  email: string
+  city: string
+  message: string | null
+  locale: Locale
+  status: LeadStatus
+  notes: string | null
+  businessUserId: string | null
+}
+
+/**
+ * Opens the business account a request asked for: creates the customer (the fields of a new StaffCustomer, with a
+ * password) and marks the request converted, in one transaction (staff only).
+ * @param leadId - The request.
+ * @param values - The new customer's fields.
+ * @returns The new customer; throws ApiError 409 "converted" (already an account) or "duplicate" (the email is
+ *   taken), 400 for a refused field, 404 for an unknown request.
+ */
+export const convertLead = (leadId: string, values: Record<string, unknown>) =>
+  apiFetch<StaffCustomer>(`/api/staff/leads/${encodeURIComponent(leadId)}/convert`, { method: 'POST', body: values })
+
+/**
+ * A customer's profile (CustomerProfile.tsx): their details, past orders (newest first), own discounts and activity.
+ * The staff view (fetchCustomerProfile) adds `notes` and `rivhitCustomerId` and lists the paused discounts too; the
+ * customer's own (fetchAccount) never does.
+ */
+export type CustomerProfile = {
+  customer: {
+    id: string
+    companyName: string
+    fullName: string
+    email: string
+    phone: string | null
+    businessNumber: string | null
+    city: string | null
+    address: string | null
+    isActive: boolean
+    createdAt: string
+    lastLoginAt: string | null
+    lastSeenAt: string | null
+    notes?: string | null
+    rivhitCustomerId?: string | null
+  }
+  orders: ProfileOrder[]
+  discounts: ProfileDiscount[]
+}
+
+/** One past order: amounts in shekels as copied when it was placed, its lines (a deleted product has no slug). */
+export type ProfileOrder = {
+  id: string
+  createdAt: string
+  status: 'submitted' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded'
+  paymentMethod: Localized<string>
+  subtotal: number
+  total: number
+  items: { productName: Localized<string>; sku: string | null; quantity: number; unitPrice: number; lineTotal: number; productSlug: string | null }[]
+}
+
+/**
+ * One of the customer's own price rules, with what it applies to (`target.name` translated; null for every product).
+ * Dates are ISO times (null = open); `isActive` false = paused by staff (only the staff view has those).
+ */
+export type ProfileDiscount = {
+  id: string
+  kind: 'percent' | 'amount' | 'fixed_price'
+  value: number
+  minQuantity: number | null
+  startsAt: string | null
+  endsAt: string | null
+  isActive: boolean
+  target: { type: 'all' | 'category' | 'product'; name: Localized<string> | null }
+}
+
+/**
+ * The signed-in customer's own profile.
+ * @param signal - Aborts the request.
+ * @returns The profile; throws ApiError 401 when signed out, 403 for staff.
+ */
+export const fetchAccount = (signal?: AbortSignal) => apiFetch<CustomerProfile>('/api/account', { signal })
+
+/**
+ * Any customer's profile, staff view (internal fields, paused discounts).
+ * @param id - The customer.
+ * @param signal - Aborts the request.
+ * @returns The profile; throws ApiError 404 for an unknown customer, 401/403 without a staff sign-in.
+ */
+export const fetchCustomerProfile = (id: string, signal?: AbortSignal) =>
+  apiFetch<CustomerProfile>(`/api/staff/customers/${encodeURIComponent(id)}/profile`, { signal })
 
 /**
  * Every row of a staff resource, active or not, in display order.
@@ -797,15 +931,20 @@ export const recordStockMovement = (productId: string, movement: StockMovementIn
   apiFetch<ProductStock>(`/api/staff/products/${encodeURIComponent(productId)}/stock`, { method: 'POST', body: movement })
 
 /** The folders pictures are uploaded into (UPLOAD_FOLDERS in backend/app/staff/routes.py), one per kind of picture. */
-export type UploadFolder = 'categories' | 'brands'
-
-/** An uploaded file: its storage key and its URL (save the URL in a row; the server stores only the key and answers the URL). */
-export type UploadedFile = { key: string; url: string }
+export type UploadFolder = 'categories' | 'brands' | 'private-label' | 'products'
 
 /**
- * Uploads a picture to the file storage (an S3 stub on the server for now); save the returned URL in the row it
- * belongs to (e.g. a category's imageUrl). The row stores the object key; the server builds the URL from its S3
- * bucket and region, and refuses a picture URL that is not one of its own objects (400 "invalid").
+ * An uploaded file: its storage key and its URL (save the URL in a row; the server stores only the key and answers the
+ * URL). A product photo (folder "products") also has a small WebP copy for the cards: `thumbnailKey` / `thumbnailUrl`
+ * (null when the server could not scale the picture down; the cards then load the full photo).
+ */
+export type UploadedFile = { key: string; url: string; thumbnailKey?: string | null; thumbnailUrl?: string | null }
+
+/**
+ * Uploads a picture to the server's file storage (its local stub, or the S3 bucket); save the returned URL in the row
+ * it belongs to (e.g. a category's imageUrl, a product photo's url + thumbnailUrl). The row stores the object key; the
+ * server builds the URL (the stub's /api/media/ or the bucket's), and refuses a picture URL that is not one of its own
+ * objects (400 "invalid").
  * @param folder - Where it goes, e.g. "categories".
  * @param file - A JPEG, PNG, WebP or AVIF image of at most 5 MB.
  * @param signal - Aborts the upload.

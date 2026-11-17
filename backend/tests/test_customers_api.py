@@ -393,6 +393,20 @@ def test_sections_lists_every_saved_section_by_key(client, database):
     assert client.get("/api/sections").get_json() == {"hero": {"a": 1}, "about": {"b": 2}}
 
 
+def test_sections_answer_the_url_of_each_private_label_step_picture(client, database):
+    steps = [
+        {"id": "idea", "icon": "lightbulb", "image": "private-label/20261117T120000Z_ab12.webp"},
+        {"id": "x", "icon": "truck", "image": "https://evil.example/a.png"},
+        {"id": "y", "icon": "ship"},
+    ]
+    database.add(PageSection(key="private_label_steps", content={"steps": steps}))
+    database.commit()
+    for content in (client.get("/api/sections").get_json()["private_label_steps"], client.get("/api/sections/private_label_steps").get_json()["content"]):
+        assert content["steps"][0]["imageUrl"] == "/api/media/private-label/20261117T120000Z_ab12.webp"
+        assert "imageUrl" not in content["steps"][1]  # not one of our objects
+        assert content["steps"][2] == {"id": "y", "icon": "ship"}
+
+
 def test_contact_reads_the_settings(client, database):
     assert client.get("/api/contact").get_json() == {"phone": "", "whatsapp": "", "email": ""}
     database.add_all(
@@ -445,6 +459,7 @@ def test_the_sitemap_lists_the_pages_and_published_articles_in_each_language(cli
     assert response.mimetype == "application/xml"
     xml = response.get_data(as_text=True)
     for loc in ["https://www.ultrapet.co.il/", "https://www.ultrapet.co.il/en", "https://www.ultrapet.co.il/catalog",
+                "https://www.ultrapet.co.il/private-label", "https://www.ultrapet.co.il/en/private-label",
                 "https://www.ultrapet.co.il/en/articles", "https://www.ultrapet.co.il/articles/older",
                 "https://www.ultrapet.co.il/en/articles/newer"]:
         assert f"<loc>{loc}</loc>" in xml

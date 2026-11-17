@@ -18,7 +18,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Logo } from '@/components/Logo'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { HEADER_CTA, HEADER_LOGIN, type NavItem } from '@/config'
+import { HEADER_ACCOUNT, HEADER_CTA, HEADER_LOGIN, type NavItem } from '@/config'
 import { useI18n } from '@/i18n'
 
 /** Style of the drawer's top-level entries: sentence-case rows whose grey background fades in on hover; the active page is light brand red. */
@@ -110,6 +110,14 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
                 )}
               </li>
             ))}
+            {user?.kind === 'business' && (
+              <li>
+                <Link {...HEADER_ACCOUNT.link} onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2.5')}>
+                  <UserRound size={18} aria-hidden="true" />
+                  {HEADER_ACCOUNT.label(t)}
+                </Link>
+              </li>
+            )}
             {user?.kind === 'staff' && (
               <li>
                 <Link to="/admin" onClick={close} className={cn(ENTRY_CLASS, 'flex items-center gap-2.5')}>

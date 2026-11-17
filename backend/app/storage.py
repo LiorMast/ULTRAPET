@@ -1,41 +1,57 @@
-"""storage.py — A stub of the S3 file storage: every file the site serves that is not bundled with the frontend
-(uploaded category pictures, the product photos and the PDF catalog moved from the WordPress site by
-`flask import-media`, later brand logos) is kept on the local disk until the site has a real S3 bucket.
+"""storage.py — The file storage of every file the site serves that is not bundled with the frontend (uploaded
+category, brand, Private Label and product pictures; the product photos and the PDF catalog moved from the WordPress
+site by `flask import-media`; the generated PDF catalog). Two drivers share one interface, S3's:
+
+    STORAGE_BACKEND=local (default)  LocalStorage: a stub that keeps the objects on the local disk, under MEDIA_ROOT
+                                     (default backend/media, git-ignored), served by GET /api/media/<key>.
+    STORAGE_BACKEND=s3               S3Storage (app/storage_s3.py): an S3 bucket through boto3 (S3_BUCKET, S3_REGION; S3_ENDPOINT_URL for an
+                                     S3-compatible service; S3_PUBLIC_URL for a CDN or custom domain in front of it).
+
+Callers (the staff upload route in app/staff/routes.py, `flask import-media` / `flask push-media` in
+app/database/legacy_media.py, the PDF catalog builder in app/catalog_pdf.py) use only the module functions below
+(put_object, get_object, object_exists, delete_object, public_url, ...), never a driver, so switching drivers is a
+setting. `flask push-media` copies the stub's files into the bucket before the switch.
 
 The database stores only an object's **key** (its path in the bucket, e.g. "categories/3f2a....webp"), never a URL:
-responses build the URL with public_url / url_of, from the app config S3_BUCKET and S3_REGION (.env), so moving the
-files to another bucket or region changes no rows. object_key turns a value staff submit (a key, or one of our own
-URLs) back into a key and refuses anything else (another site's URL, "../x").
+responses build the URL with public_url / url_of from the driver's base URL ("/api/media/" for the stub, the bucket's
+or S3_PUBLIC_URL for S3), so moving the files to another bucket, region or CDN changes no rows. object_key turns a
+value staff submit (a key, or one of our own URLs) back into a key and refuses anything else (another site's URL,
+"../x").
 
-The interface is S3's: put an object under a key, delete it, and the object's public URL. Callers (the staff upload
-route in app/staff/routes.py, `flask import-media` in app/database/legacy_media.py, the PDF catalog builder in app/catalog_pdf.py) use only these functions, so moving to S3 changes this module alone:
-    put_object    -> boto3 `s3.put_object(Bucket=..., Key=key, Body=body, ContentType=content_type)`
-    delete_object -> `s3.delete_object(Bucket=..., Key=key)`
-    object_exists -> `s3.head_object(Bucket=..., Key=key)` (False on a 404)
-    get_object    -> `s3.get_object(Bucket=..., Key=key)["Body"].read()` (None on a 404)
-    public_url    -> already builds the bucket's URL once S3_BUCKET and S3_REGION are set
-    send_object   -> not needed any more (S3 serves the files); drop the /api/media route with it.
-Until then leave S3_BUCKET / S3_REGION empty: the stub keeps the files on disk and they are served from /api/media/.
+The bucket (S3): objects are public to read (a bucket policy allowing s3:GetObject on arn:aws:s3:::<bucket>/*; ACLs
+stay disabled) and written by the server only. Credentials come from boto3's default chain: AWS_ACCESS_KEY_ID /
+AWS_SECRET_ACCESS_KEY in the environment, or the instance's IAM role; the role needs s3:PutObject, s3:GetObject and
+s3:DeleteObject on the objects (and s3:ListBucket on the bucket, so HeadObject answers 404 rather than 403 for a
+missing key). Every object is written with its ContentType and a year-long immutable Cache-Control, since a key
+never changes content (a new upload gets a new key). With S3, GET /api/media/<key> redirects to the bucket (old links
+keep working).
 
-The stub writes `<MEDIA_ROOT>/<key>` (MEDIA_ROOT: app config, default backend/media, git-ignored) and the public
-route GET /api/media/<key> (app/customers/routes.py) serves it. Keys are built by the server
-(`<folder>/<UTC timestamp>_<random hex>.<ext>`, e.g. categories/20261106T132045Z_3f2a....webp, for an upload; the
-imported files' keys are listed in frontend/src/stubs/legacy-media.json), never taken from a request, and every path
-is checked to stay inside MEDIA_ROOT.
+Keys are built by the server (`<folder>/<UTC timestamp>_<random hex>.<ext>`, e.g.
+categories/20261106T132045Z_3f2a....webp, for an upload; the imported files' keys are listed in
+frontend/src/stubs/legacy-media.json), never taken from a request; the stub checks every path to stay inside
+MEDIA_ROOT.
 
 file_type recognizes a file by its first bytes (the upload route and the import accept only what it knows).
 """
 import re
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from flask import Response, abort, current_app, send_from_directory
+from flask import Response, abort, current_app, redirect, send_from_directory
 from werkzeug.security import safe_join
+
+if TYPE_CHECKING:
+    from app.storage_s3 import S3Storage
 
 # Where the stub's objects are served (the bucket's URL, for S3).
 MEDIA_URL = "/api/media/"
 # Object keys never change content (a new upload gets a new key), so browsers may cache them for a year.
 CACHE_MAX_AGE = 365 * 24 * 60 * 60
+# The Cache-Control the S3 driver stores with every object (the stub's send_object answers the same).
+CACHE_CONTROL = f"public, max-age={CACHE_MAX_AGE}, immutable"
+# The drivers STORAGE_BACKEND may name.
+BACKENDS = ("local", "s3")
 # The media type the stub serves per extension (S3 keeps each object's ContentType; the stub reads it from the key,
 # since the system's type table may not know newer formats such as WebP and AVIF).
 MEDIA_TYPES = {
@@ -75,32 +91,144 @@ def file_type(body: bytes, types: tuple[tuple[str, str, Callable[[bytes], bool]]
     return next(((extension, media) for extension, media, test in types if test(body[:16])), None)
 
 
-def object_path(key: str) -> Path:
-    """The file that holds an object.
+class LocalStorage:
+    """The stub driver: each object is the file `<root>/<key>` on the local disk."""
+
+    def __init__(self, root: str) -> None:
+        """Keeps the folder of the objects.
+
+        Args:
+            root: MEDIA_ROOT.
+        """
+        self.root = root
+
+    def path(self, key: str) -> Path:
+        """The file that holds an object.
+
+        Args:
+            key: The object key, e.g. "categories/3f2a....webp".
+
+        Returns:
+            The path under the root.
+
+        Raises:
+            404 when the key would point outside the root (e.g. "../x").
+        """
+        path = safe_join(self.root, key)
+        if path is None:
+            abort(404)
+        return Path(path)
+
+    def put(self, key: str, body: bytes, content_type: str) -> None:
+        """Writes an object, replacing one with the same key.
+
+        Args:
+            key: The object key.
+            body: The file's bytes.
+            content_type: Its media type (unused: the stub serves files by their extension, MEDIA_TYPES).
+        """
+        path = self.path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
+
+    def get(self, key: str) -> bytes | None:
+        """Reads an object.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            Its bytes; None when there is no such object.
+        """
+        path = self.path(key)
+        return path.read_bytes() if path.is_file() else None
+
+    def exists(self, key: str) -> bool:
+        """Whether an object exists.
+
+        Args:
+            key: The object key.
+
+        Returns:
+            True when it does.
+        """
+        return self.path(key).is_file()
+
+    def delete(self, key: str) -> None:
+        """Deletes an object; a missing one is not an error.
+
+        Args:
+            key: The object key.
+        """
+        self.path(key).unlink(missing_ok=True)
+
+
+def check_config(config: Any) -> None:
+    """Refuses a storage configuration that cannot work (called by create_app at start-up).
 
     Args:
-        key: The object key, e.g. "categories/3f2a....webp".
-
-    Returns:
-        The path under MEDIA_ROOT.
+        config: The app config (STORAGE_BACKEND, S3_BUCKET, S3_REGION).
 
     Raises:
-        404 when the key would point outside MEDIA_ROOT (e.g. "../x").
+        RuntimeError: STORAGE_BACKEND is unknown, or "s3" without S3_BUCKET and S3_REGION.
     """
-    path = safe_join(str(current_app.config["MEDIA_ROOT"]), key)
-    if path is None:
-        abort(404)
-    return Path(path)
+    backend = config.get("STORAGE_BACKEND")
+    if backend not in BACKENDS:
+        raise RuntimeError(f"STORAGE_BACKEND must be one of {', '.join(BACKENDS)}, not {backend!r}")
+    if backend == "s3" and not (config.get("S3_BUCKET") and config.get("S3_REGION")):
+        raise RuntimeError("STORAGE_BACKEND=s3 needs S3_BUCKET and S3_REGION (see .env.example)")
+
+
+def driver() -> "LocalStorage | S3Storage":
+    """The current app's storage driver, made once per settings (a test that changes them gets a new one).
+
+    Returns:
+        LocalStorage or S3Storage, by STORAGE_BACKEND.
+    """
+    config = current_app.config
+    settings = (
+        config.get("STORAGE_BACKEND", "local"),
+        str(config.get("MEDIA_ROOT", "")),
+        config.get("S3_BUCKET", ""),
+        config.get("S3_REGION", ""),
+        config.get("S3_ENDPOINT_URL", ""),
+    )
+    cached = current_app.extensions.get("storage")
+    if cached is None or cached[0] != settings:
+        backend, root, bucket, region, endpoint = settings
+        if backend == "s3":
+            from app.storage_s3 import S3Storage  # boto3 loads only when S3 is used
+
+            cached = (settings, S3Storage(bucket, region, endpoint))
+        else:
+            cached = (settings, LocalStorage(root))
+        current_app.extensions["storage"] = cached
+    return cached[1]
+
+
+def uses_s3() -> bool:
+    """Whether the objects are in an S3 bucket.
+
+    Returns:
+        True when STORAGE_BACKEND is "s3".
+    """
+    return current_app.config.get("STORAGE_BACKEND", "local") == "s3"
 
 
 def base_url() -> str:
     """The URL the object keys are appended to.
 
     Returns:
-        "https://<S3_BUCKET>.s3.<S3_REGION>.amazonaws.com/" when both are configured, else the stub's "/api/media/".
+        With S3: S3_PUBLIC_URL (with a trailing "/") when set, else "https://<S3_BUCKET>.s3.<S3_REGION>.amazonaws.com/".
+        With the stub: "/api/media/".
     """
-    bucket, region = current_app.config.get("S3_BUCKET"), current_app.config.get("S3_REGION")
-    return f"https://{bucket}.s3.{region}.amazonaws.com/" if bucket and region else MEDIA_URL
+    if not uses_s3():
+        return MEDIA_URL
+    config = current_app.config
+    public = config.get("S3_PUBLIC_URL")
+    if public:
+        return public.rstrip("/") + "/"
+    return f"https://{config['S3_BUCKET']}.s3.{config['S3_REGION']}.amazonaws.com/"
 
 
 def public_url(key: str) -> str:
@@ -110,7 +238,7 @@ def public_url(key: str) -> str:
         key: The object key, e.g. "categories/3f2a....webp".
 
     Returns:
-        The bucket's URL of the key (see base_url), e.g. "/api/media/categories/3f2a....webp" in dev.
+        The key appended to base_url, e.g. "/api/media/categories/3f2a....webp" in dev.
     """
     return f"{base_url()}{key}"
 
@@ -146,8 +274,8 @@ def object_key(value: str) -> str:
     """Turns a picture value staff submit (an object key, or a URL of one of our objects) into the key to store.
 
     Args:
-        value: The key ("categories/3f2a.png") or our URL of it ("/api/media/categories/3f2a.png", or the bucket's
-            https URL once S3 is configured).
+        value: The key ("categories/3f2a.png") or our URL of it (base_url's, or the stub's "/api/media/...", which
+            keeps redirecting to the bucket under S3).
 
     Returns:
         The key.
@@ -170,15 +298,12 @@ def put_object(key: str, body: bytes, content_type: str) -> str:
     Args:
         key: The object key, e.g. "categories/3f2a....png".
         body: The file's bytes.
-        content_type: Its media type, e.g. "image/png" (the stub serves files by their extension, MEDIA_TYPES, which
-            matches the type the upload route chose).
+        content_type: Its media type, e.g. "image/png".
 
     Returns:
         The object's public URL.
     """
-    path = object_path(key)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(body)
+    driver().put(key, body, content_type)
     return public_url(key)
 
 
@@ -191,7 +316,7 @@ def object_exists(key: str) -> bool:
     Returns:
         True when the object exists.
     """
-    return object_path(key).is_file()
+    return driver().exists(key)
 
 
 def get_object(key: str) -> bytes | None:
@@ -203,8 +328,7 @@ def get_object(key: str) -> bytes | None:
     Returns:
         The file's bytes; None when there is no such object.
     """
-    path = object_path(key)
-    return path.read_bytes() if path.is_file() else None
+    return driver().get(key)
 
 
 def delete_object(key: str) -> None:
@@ -213,18 +337,24 @@ def delete_object(key: str) -> None:
     Args:
         key: The object key.
     """
-    object_path(key).unlink(missing_ok=True)
+    driver().delete(key)
 
 
 def send_object(key: str) -> Response:
-    """Answers a request for an object (what S3 does for a public bucket).
+    """Answers GET /api/media/<key>: the stub serves the file (what S3 does for a public bucket); with S3 the request
+    is redirected to the object's bucket URL, so links saved before the switch keep working.
 
     Args:
         key: The object key from the URL.
 
     Returns:
-        The file, cached for a year and never type-sniffed; 404 when there is no such object.
+        The file, cached for a year and never type-sniffed, or a 301 to the bucket; 404 when there is no such object
+        (the stub) or the key is not a valid key (S3).
     """
+    if uses_s3():
+        if not KEY_PATTERN.fullmatch(key):
+            abort(404)
+        return redirect(public_url(key), 301)
     mimetype = MEDIA_TYPES.get(Path(key).suffix.lower())
     response = send_from_directory(current_app.config["MEDIA_ROOT"], key, mimetype=mimetype, max_age=CACHE_MAX_AGE)
     response.cache_control.public = True

@@ -15,11 +15,11 @@ import { CheckCircle2 } from 'lucide-react'
 import { cn } from 'cn'
 import type { ContactDetails, SectionContent } from '@/api'
 import { fieldLabel, SectionEditBar, useEditableSection, type EditableField } from '@/components/EditableSection'
+import { FormField } from '@/components/FormField'
 import { EditableText, InlineEditError } from '@/components/InlineEditor'
 import { HEADING_KEYS, headingLabels, SectionHeading } from '@/components/SectionHeading'
 import type { SettingChanges } from '@/components/Stats'
 import { Button } from '@/components/ui/button'
-import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { CONTACT_METHODS, type ContactMethod } from '@/config'
 import { useI18n } from '@/i18n'
 
@@ -150,45 +150,33 @@ function ContactForm({ email }: { email: string }) {
       <p className="mt-1 text-sm text-brand-charcoal-muted">{t.contact.formSubtitle}</p>
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
         {fields.map((f) => (
-          <div key={f.name}>
-            <label htmlFor={`contact-${f.name}`} className={LABEL_CLASS}>
-              {f.label}{f.required && ' *'}
-            </label>
-            <input
-              id={`contact-${f.name}`}
-              name={f.name}
-              type={f.type}
-              autoComplete={f.autoComplete}
-              placeholder={f.placeholder}
-              value={values[f.name]}
-              onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
-              aria-required={f.required}
-              aria-invalid={!!errors[f.name]}
-              aria-describedby={errors[f.name] ? `contact-${f.name}-error` : undefined}
-              dir={f.type === 'text' ? undefined : 'auto'}
-              className={INPUT_CLASS}
-            />
-            {errors[f.name] && <p id={`contact-${f.name}-error`} className="mt-1 text-xs font-medium text-brand-red-dark">{errors[f.name]}</p>}
-          </div>
-        ))}
-        <div>
-          <label htmlFor="contact-message" className={LABEL_CLASS}>
-            {t.contact.fieldMessage} *
-          </label>
-          <textarea
-            id="contact-message"
-            name="message"
-            rows={5}
-            placeholder={t.contact.fieldMessagePH}
-            value={values.message}
-            onChange={(e) => setValues((v) => ({ ...v, message: e.target.value }))}
-            aria-required
-            aria-invalid={!!errors.message}
-            aria-describedby={errors.message ? 'contact-message-error' : undefined}
-            className={INPUT_CLASS}
+          <FormField
+            key={f.name}
+            id={`contact-${f.name}`}
+            label={f.label}
+            required={f.required}
+            error={errors[f.name]}
+            name={f.name}
+            type={f.type}
+            autoComplete={f.autoComplete}
+            placeholder={f.placeholder}
+            value={values[f.name]}
+            onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
+            dir={f.type === 'text' ? undefined : 'auto'}
           />
-          {errors.message && <p id="contact-message-error" className="mt-1 text-xs font-medium text-brand-red-dark">{errors.message}</p>}
-        </div>
+        ))}
+        <FormField
+          multiline
+          id="contact-message"
+          label={t.contact.fieldMessage}
+          required
+          error={errors.message}
+          name="message"
+          rows={5}
+          placeholder={t.contact.fieldMessagePH}
+          value={values.message}
+          onChange={(e) => setValues((v) => ({ ...v, message: e.target.value }))}
+        />
         <Button type="submit" className="w-full sm:w-auto">{t.contact.send}</Button>
       </form>
     </div>

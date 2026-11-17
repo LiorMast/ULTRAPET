@@ -57,7 +57,7 @@ def test_files_are_copied_once_and_failures_are_reported(app):
         assert (stored, skipped) == (2, 0)
         assert set(failed) == {"products/import-missing.png", "products/import-page.png"}
         assert failed["products/import-page.png"] == "not a picture or a PDF"
-        assert storage.object_path("products/import-a.png").read_bytes() == PNG
+        assert storage.get_object("products/import-a.png") == PNG
         assert storage.object_exists("catalog/import-catalog.pdf")
         assert not storage.object_exists("products/import-page.png")
 

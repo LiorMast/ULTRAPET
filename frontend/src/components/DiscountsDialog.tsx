@@ -28,6 +28,9 @@ import type { Dictionary } from '@/i18n/he'
 /** A table row with its discounts and their words (what the table's search and sorting see). */
 export type DiscountRow<Row> = Row & { discounts: StaffPriceRule[]; discountText: string }
 
+/** The terms of a rule: what ruleDiscount and ruleState read (a staff rule, or a discount of a customer's profile). */
+export type RuleTerms = Pick<StaffPriceRule, 'kind' | 'value' | 'minQuantity' | 'startsAt' | 'endsAt' | 'isActive'>
+
 /** Names what a rule applies to, for the lines of a customer's discounts (e.g. "Category: Dry dog food"). */
 export type DescribeTarget = (rule: StaffPriceRule) => string
 
@@ -37,7 +40,7 @@ export type DescribeTarget = (rule: StaffPriceRule) => string
  * @returns The discount, its period as Israel times; a rule without a start gets an empty `startsAt` (in effect since
  *   it was made).
  */
-export function ruleDiscount(rule: StaffPriceRule): DiscountValue {
+export function ruleDiscount(rule: RuleTerms): DiscountValue {
   return {
     type: rule.kind === 'amount' ? 'amount' : 'percent',
     value: rule.value,
@@ -78,7 +81,7 @@ export type RuleState = 'active' | 'upcoming' | 'ended' | 'paused'
  * @param now - The current Israel time ("2026-11-03T14:32:07", see israelNow).
  * @returns "paused" when switched off, else "ended", "upcoming" or "active" by its dates.
  */
-export function ruleState(rule: StaffPriceRule, now: string): RuleState {
+export function ruleState(rule: RuleTerms, now: string): RuleState {
   if (!rule.isActive) return 'paused'
   // The end is exclusive: a rule that ends now has ended.
   if (rule.endsAt !== null && israelTime(rule.endsAt) <= now) return 'ended'

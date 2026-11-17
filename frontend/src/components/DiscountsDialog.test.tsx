@@ -34,10 +34,10 @@ const SEEDED = `\u206610%\u2069 off, from ${todayText()}, with no end date`
 
 /**
  * The table row of a record.
- * @param name - The record's name, as in its first cell.
+ * @param name - The record's name, as in one of its cells (the name; the products table has the photo first).
  * @returns The row.
  */
-const rowOf = (name: string) => screen.getAllByRole('row').find((row) => within(row).queryAllByRole('cell')[0]?.textContent === name)!
+const rowOf = (name: string) => screen.getAllByRole('row').find((row) => within(row).queryAllByRole('cell').some((cell) => cell.textContent === name))!
 
 /**
  * The request bodies sent with a method.
@@ -53,7 +53,7 @@ describe('/admin/categories', () => {
     await renderPage('/en/admin/categories', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'Categories' })).toBeInTheDocument()
     const menu = screen.getByRole('navigation', { name: 'Admin' })
-    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Products', 'Categories', 'Discounts', 'Customers', 'Brands'])
+    expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual(['Account requests', 'Products', 'Categories', 'Discounts', 'Customers', 'Brands'])
     expect(within(menu).getByRole('link', { name: 'Categories' })).toHaveAttribute('aria-current', 'page')
     const table = screen.getByRole('table', { name: 'Categories' })
     expect(within(table).getAllByRole('row')).toHaveLength(categories.length + 1)
@@ -259,8 +259,8 @@ describe('/admin/products', () => {
     await renderPage('/en/admin/products', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'Products' })).toBeInTheDocument()
     const cells = within(rowOf(first.name.en)).getAllByRole('cell')
-    expect(cells[2]).toHaveTextContent(categories.find((category) => category.slug === first.category)!.name.en)
-    expect(cells[4]).toHaveTextContent('₪303.90')
+    expect(cells[3]).toHaveTextContent(categories.find((category) => category.slug === first.category)!.name.en)
+    expect(cells[5]).toHaveTextContent('₪303.90')
     expect(screen.getByText(`Showing 1–25 of ${products.length}`)).toBeInTheDocument()
   })
 
@@ -279,8 +279,8 @@ describe('/admin/products', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(bodies(fetchSpy, 'PATCH')).toEqual([{ categoryId: FIRST_CATEGORY_ID, listPrice: '299.5' }])
     const cells = within(rowOf(first.name.en)).getAllByRole('cell')
-    expect(cells[2]).toHaveTextContent(categories[0].name.en)
-    expect(cells[4]).toHaveTextContent('₪299.50')
+    expect(cells[3]).toHaveTextContent(categories[0].name.en)
+    expect(cells[5]).toHaveTextContent('₪299.50')
   })
 
   it('adds a product in the first category by default', async () => {
@@ -313,7 +313,7 @@ describe('/admin/products', () => {
     expect(bodies(fetchSpy, 'POST')[0]).toMatchObject({ productId: '00000000-0000-4000-8002-000000000001', kind: 'percent', value: 7.5 })
     await user.click(within(dialog).getAllByRole('button', { name: 'Close' })[0])
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    // Name, SKU, category, brand, list price, stock, then the discounts.
-    expect(within(rowOf(first.name.en)).getAllByRole('cell')[6]).toHaveTextContent(/7\.5%.+off/)
+    // Photo, name, SKU, category, brand, list price, stock, then the discounts.
+    expect(within(rowOf(first.name.en)).getAllByRole('cell')[7]).toHaveTextContent(/7\.5%.+off/)
   })
 })

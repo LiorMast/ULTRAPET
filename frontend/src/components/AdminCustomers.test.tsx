@@ -1,6 +1,6 @@
 /**
- * AdminCustomers.test.tsx — Tests for the staff panel's customers page (/admin/customers, routes/admin.customers.tsx)
- * against the fake staff API (src/test/api.ts): the menu link and the table (last sign-in, no Delete: customers are
+ * AdminCustomers.test.tsx — Tests for the staff panel's customers page (/admin/customers, routes/admin.customers.index.tsx)
+ * against the fake staff API (src/test/api.ts): the menu link and the table (last online, the profile link, no Delete: customers are
  * never deleted), opening an account with a generated password (what is sent, the password never shown in the
  * table), the password rules (required when adding, at least 8 characters, kept when an edit leaves it empty, reset
  * when one is typed), a taken email, switching an account off, the customer's own discounts (add on a category, edit
@@ -62,7 +62,7 @@ async function seedRules(...rules: Record<string, unknown>[]) {
 
 // The page loads the 400-product list, which renders slowly when the whole suite runs at once.
 describe('/admin/customers', { timeout: 20_000 }, () => {
-  it('lists every customer, active or not, with their last sign-in and no Delete', async () => {
+  it('lists every customer, active or not, with their last activity, a link to their profile and no Delete', async () => {
     await renderPage('/en/admin/customers', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'Business customers' })).toBeInTheDocument()
     const menu = screen.getByRole('navigation', { name: 'Admin' })
@@ -72,8 +72,9 @@ describe('/admin/customers', { timeout: 20_000 }, () => {
       [CUSTOMER.companyName, CUSTOMER.fullName, CUSTOMER.email, CUSTOMER.phone, CUSTOMER.businessNumber, CUSTOMER.city],
       [INACTIVE.companyName, INACTIVE.fullName, INACTIVE.email, '—', '—', INACTIVE.city],
     ])
-    expect(rows[1]).toContain('Never')
-    expect(screen.getByRole('columnheader', { name: /Last sign-in/ })).toBeInTheDocument()
+    expect(rows[1]).toContain('Never signed in')
+    expect(screen.getByRole('columnheader', { name: /Last online/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: CUSTOMER.companyName })).toHaveAttribute('href', `/en/admin/customers/${CUSTOMER.id}`)
     expect(screen.queryByRole('columnheader', { name: /Password/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: `Edit ${CUSTOMER.companyName}` })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument()
@@ -273,7 +274,7 @@ describe('/admin/customers', { timeout: 20_000 }, () => {
     const { user } = await renderPage('/admin/customers', { staff: TEST_STAFF })
     expect(screen.getByRole('heading', { level: 1, name: 'לקוחות עסקיים' })).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'ניהול' })).getByRole('link', { name: 'לקוחות' })).toHaveAttribute('aria-current', 'page')
-    expect(tableCells('לקוחות עסקיים')[1]).toContain('טרם נכנס')
+    expect(tableCells('לקוחות עסקיים')[1]).toContain('טרם התחבר')
     await user.click(screen.getByRole('button', { name: 'הוספה' }))
     const form = await screen.findByRole('dialog')
     expect(within(form).getByLabelText('סיסמה *')).toHaveAttribute('dir', 'ltr')
