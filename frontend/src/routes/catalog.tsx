@@ -10,15 +10,20 @@
  * the customer's prices separately and passes them to <Catalog>; signed-out visitors get "log in
  * to see the price" on every card.
  *
+ * Staff manage mode (readManageMode / useManage in auth.tsx): the loader also asks for the products hidden from
+ * customers (`all`) and loads the staff data (loadProductAdmin, manage.ts) for the cards' staff strips; switching the
+ * mode reloads the page (useManageReload).
+ *
  * SEO: title, description, canonical (keeps category and page, drops the search text, brands, sort and prices), hreflang and
  * CollectionPage + BreadcrumbList JSON-LD. No price ever appears in the head tags.
  */
 import { useEffect, useRef } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { CATALOG_SORTS, fetchBrands, fetchCategories, fetchProducts, type CatalogSearch, type CatalogSort } from '@/api'
-import { useAuth, useCustomerPrices } from '@/auth'
+import { readManageMode, useAuth, useCustomerPrices, useManageReload } from '@/auth'
 import { Catalog } from '@/components/Catalog'
 import { dictionaryFor, localizePath } from '@/i18n'
+import { loadProductAdmin } from '@/manage'
 import { absoluteUrl, breadcrumbJsonLd, pageHead } from '@/seo'
 
 /** What a category slug in the URL may look like (the server ignores slugs it does not know). */
@@ -71,8 +76,14 @@ export const Route = createFileRoute('/catalog')({
   loaderDeps: ({ search }) => search,
   loader: async ({ deps, context, abortController }) => {
     const { signal } = abortController
-    const [categories, brands, results] = await Promise.all([fetchCategories(signal), fetchBrands(signal), fetchProducts(deps, context.locale, signal)])
-    return { categories, brands, results }
+    const manage = readManageMode()
+    const [categories, brands, results, admin] = await Promise.all([
+      fetchCategories(signal),
+      fetchBrands(signal),
+      fetchProducts(deps, context.locale, signal, undefined, manage),
+      manage ? loadProductAdmin(context.locale) : null,
+    ])
+    return { categories, brands, results, admin }
   },
   head: ({ match, loaderData }) => {
     const { locale } = match.context
@@ -106,17 +117,19 @@ export const Route = createFileRoute('/catalog')({
 
 /**
  * The catalog page: loads prices when a customer is signed in, reloads the results when the signed-in customer
- * changes (their price sorts and range), then renders the catalog.
- * @returns The Catalog with the page of products, the categories, the brands, the URL state and (signed in) prices.
+ * changes (their price sorts and range) or manage mode is switched, then renders the catalog.
+ * @returns The Catalog with the page of products, the categories, the brands, the URL state, (signed in) prices and
+ *   (manage mode) the staff data.
  */
 function CatalogPage() {
   const search = Route.useSearch()
-  const { categories, brands, results } = Route.useLoaderData()
+  const { categories, brands, results, admin } = Route.useLoaderData()
   const prices = useCustomerPrices()
   const router = useRouter()
   const { user } = useAuth()
   const customer = user?.kind === 'business' ? user.email : null
   const shownFor = useRef(customer)
+  useManageReload()
 
   useEffect(() => {
     if (shownFor.current === customer) return
@@ -124,5 +137,5 @@ function CatalogPage() {
     void router.invalidate()
   }, [customer, router])
 
-  return <Catalog results={results} categories={categories} brands={brands} search={search} prices={prices} />
+  return <Catalog results={results} categories={categories} brands={brands} search={search} prices={prices} admin={admin} />
 }

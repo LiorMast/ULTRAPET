@@ -19,10 +19,15 @@
  * - SectionEditBar: the section's "Edit on page" / Save / Cancel and its PropBar, at the top end of the section; it
  *   stays in reach below the header while editing.
  * - fieldLabel: the accessible name of a text box ("Title", or "Title: Cat litter" for a card's text).
+ * - useSectionSaver(sections): the save handlers of a page's editable sections for staff (undefined for everyone
+ *   else): `saver(key)` for one section, `saveAll(rows)` for several rows saved together (the Private Label steps and
+ *   heading). Used by the home page and the /private-label page.
  */
 import type { ComponentProps } from 'react'
+import { useRouter } from '@tanstack/react-router'
 import { cn } from 'cn'
-import type { SectionContent, SectionText } from '@/api'
+import { saveSection, saveSetting, type SectionContent, type SectionText } from '@/api'
+import { useAuth } from '@/auth'
 import { EditableText, InlineEditBar, MIN_WIDTH, PropBar, useInlineDraft, type TextValue } from '@/components/InlineEditor'
 import { FONTS, SIZE_STEPS } from '@/config'
 import type { Dictionary } from '@/i18n/he'
@@ -250,9 +255,44 @@ export function SectionEditBar({ edit, label, tone = 'light', className }: { edi
  * @param t - The dictionary.
  * @param field - What the text is, e.g. "title".
  * @param item - The card or list item it belongs to (its built-in name), if any.
- * @returns E.g. "Title", or "Title: Cat litter".
+ * @param n - The text's number among several of the same kind in the item (e.g. the second product format), if any.
+ * @returns E.g. "Title", "Title: Cat litter" or "Product format 2: Dry food".
  */
-export function fieldLabel(t: Dictionary, field: keyof Dictionary['inlineEdit']['fields'], item?: string): string {
-  const name = t.inlineEdit.fields[field]
+export function fieldLabel(t: Dictionary, field: keyof Dictionary['inlineEdit']['fields'], item?: string, n?: number): string {
+  const name = n === undefined ? t.inlineEdit.fields[field] : `${t.inlineEdit.fields[field]} ${n}`
   return item ? t.inlineEdit.fieldOf.replace('{field}', name).replace('{item}', item) : name
+}
+
+/** The saved content of a page's sections, by page_sections key (GET /api/sections). */
+type SavedSections = Partial<Record<string, unknown>>
+
+/**
+ * The save handlers of a page's editable sections (see the file header). Each stores the changed settings first (the
+ * stats numbers, the contact details; one request each, so a failed save can simply be sent again), then the rows in
+ * the given order (creating a row on its first save), and reloads the page data.
+ * @param sections - The page's saved sections (from its loader), to tell a first save (create) from an update.
+ * @returns `staff` (whether the user may edit), `saveAll(rows, settings?)` (undefined for everyone else; resolves when
+ *   saved and reloaded, rejects with the server's ApiError) and `saver(key)` (the one-section handler
+ *   (content, settings?) of the sections' `onSave`, undefined for everyone else, so the section is not editable).
+ */
+export function useSectionSaver(sections: SavedSections) {
+  const { user } = useAuth()
+  const router = useRouter()
+  const staff = user?.kind === 'staff'
+  /**
+   * Stores settings, then rows, and reloads the page data.
+   * @param rows - The content of each page_sections row, by key, in saving order.
+   * @param settings - The changed settings, by key; default none.
+   * @returns Resolves when saved and reloaded.
+   */
+  const saveAll = async (rows: Record<string, object>, settings: Record<string, unknown> = {}) => {
+    for (const [setting, value] of Object.entries(settings)) await saveSetting(setting, value)
+    for (const [key, content] of Object.entries(rows)) await saveSection(key, content, key in sections)
+    await router.invalidate()
+  }
+  return {
+    staff,
+    saveAll: staff ? saveAll : undefined,
+    saver: (key: string) => (staff ? (content: object, settings?: Record<string, unknown>) => saveAll({ [key]: content }, settings) : undefined),
+  }
 }

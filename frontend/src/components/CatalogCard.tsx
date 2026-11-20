@@ -8,9 +8,13 @@
  * price is shown (a signed-in customer), the "Add to cart" button (AddToCartButton, adds 1) stay clickable above it.
  * With the price, the caller may pass the product's stock status: "low" adds a "Low stock" ribbon under the price,
  * "out" turns the button into a disabled "Out of stock" one (untracked products and "in" show nothing extra).
+ * Staff in manage mode (ProductManager.tsx): the caller passes `manage`, the product's staff strip, which takes the
+ * price slot's place (rendered in a Suspense, since the strip is loaded lazily), and `inactive` for a product hidden
+ * from customers (its photo dims and a "Hidden from customers" ribbon sits in the corner).
  * Used by the Catalog component and the product page's "You may also like" row. Also exports the price and stock
  * helpers the product page and the cart share (priceFor, stockFor, PriceSlot, formatPrice).
  */
+import { Suspense, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from 'cn'
@@ -123,6 +127,10 @@ export function PriceSlot({ state, size = 'sm' }: { state: PriceState; size?: 's
  *   "Add to cart" button.
  * @param props.stock - The product's stock status (stockFor), used only with a shown price: "low" adds a ribbon,
  *   "out" disables the button; undefined = not tracked.
+ * @param props.manage - The staff's management strip (manage mode), shown instead of the price slot; omit for the
+ *   customer view.
+ * @param props.inactive - The product is hidden from customers (manage mode shows it anyway): dims the photo and adds
+ *   the "Hidden from customers" ribbon.
  * @param props.variant - `grid` (tile, default) or `list` (row).
  * @param props.headingLevel - The name's heading tag, so the card fits the page outline; default "h3".
  * @param props.className - Extra classes for the card.
@@ -133,6 +141,8 @@ export function CatalogCard({
   categoryName,
   price = { status: 'hidden' },
   stock,
+  manage,
+  inactive = false,
   variant,
   headingLevel: Heading = 'h3',
   className,
@@ -141,13 +151,16 @@ export function CatalogCard({
   categoryName?: string
   price?: PriceState
   stock?: StockStatus
+  manage?: ReactNode
+  inactive?: boolean
   headingLevel?: 'h2' | 'h3'
   className?: string
 } & VariantProps<typeof cardVariants>) {
   const { t, locale } = useI18n()
   return (
     <article {...{ [CART_FLY_SOURCE_ATTR]: '' }} className={cn(cardVariants({ variant }), className)}>
-      <div className={photoVariants({ variant })}>
+      {inactive && <DiscountRibbon kind="hidden" message={t.manage.hidden} placement="corner" />}
+      <div className={cn(photoVariants({ variant }), inactive && 'opacity-50')}>
         {product.image && (
           <img
             src={product.image.thumbnail}
@@ -176,14 +189,20 @@ export function CatalogCard({
           </Link>
         </Heading>
         <div className="border-t border-neutral-150 pt-3">
-          <PriceSlot state={price} />
-          {price.status === 'shown' && stock === 'low' && <DiscountRibbon kind="lowStock" message={t.stock.low} className="mt-2" />}
-          {price.status === 'shown' && (
-            <AddToCartButton
-              product={{ id: product.id, slug: product.slug, name: product.name, image: product.image?.thumbnail ?? null, unitPrice: price.price }}
-              available={stock !== 'out'}
-              className="z-10 mt-3"
-            />
+          {manage ? (
+            <Suspense fallback={null}>{manage}</Suspense>
+          ) : (
+            <>
+              <PriceSlot state={price} />
+              {price.status === 'shown' && stock === 'low' && <DiscountRibbon kind="lowStock" message={t.stock.low} className="mt-2" />}
+              {price.status === 'shown' && (
+                <AddToCartButton
+                  product={{ id: product.id, slug: product.slug, name: product.name, image: product.image?.thumbnail ?? null, unitPrice: price.price }}
+                  available={stock !== 'out'}
+                  className="z-10 mt-3"
+                />
+              )}
+            </>
           )}
         </div>
       </div>

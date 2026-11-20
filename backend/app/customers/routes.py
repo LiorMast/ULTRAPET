@@ -1,6 +1,8 @@
 """routes.py — Blueprint `customers` (prefix /api): everything the public site and the business customers call.
 
-Public, no sign-in (/products also reads an optional customer sign-in for its price sorts and price range):
+Public, no sign-in (/products also reads an optional customer sign-in for its price sorts and price range; /products
+and /products/<slug> answer `?all=1` from a signed-in staff member with the inactive products too, for the staff's
+manage mode on the catalog and product pages):
     GET /categories, /products, /products/<slug>, /brands, /brands/<slug>, /stats, /contact, /sections, /sections/<key>, /faq,
     /articles, /articles/<slug>, /resellers, /sitemap.xml, /media/<key> (stored files: the S3 stub's objects),
     /catalog.pdf?lang= (redirects to the generated PDF catalog in the file storage, see app/catalog_pdf.py)
@@ -22,7 +24,7 @@ from typing import Any
 from urllib.parse import quote
 from xml.sax.saxutils import escape
 
-from flask import Blueprint, Response, abort, current_app, jsonify, redirect, request
+from flask import Blueprint, Response, abort, after_this_request, current_app, jsonify, redirect, request
 from flask_jwt_extended import current_user, get_jwt, verify_jwt_in_request
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import contains_eager, selectinload
@@ -154,6 +156,37 @@ def signed_in_customer() -> BusinessUser | None:
     return current_user if get_jwt().get("user_type") == "business" else None
 
 
+def staff_wants_all() -> bool:
+    """Whether a catalog request asks for the inactive products too: `?all=1` from a signed-in staff member (manage mode).
+
+    The answer then holds rows customers never see, so it is marked not to be stored by any cache.
+
+    Returns:
+        True for `all=1` with a valid staff access token; False for anyone else (visitors and customers get the
+        public answer). An expired or invalid token is still answered 401 (the client refreshes it and asks again).
+    """
+    if request.args.get("all") != "1":
+        return False
+    verify_jwt_in_request(optional=True)
+    if get_jwt().get("user_type") != "staff":
+        return False
+
+    @after_this_request
+    def no_store(response: Response) -> Response:
+        """Marks the staff answer private and never stored.
+
+        Args:
+            response: The answer.
+
+        Returns:
+            The same answer with `Cache-Control: private, no-store`.
+        """
+        response.headers["Cache-Control"] = "private, no-store"
+        return response
+
+    return True
+
+
 def read_amount(name: str) -> Decimal | None:
     """Reads a shekel amount from the query string (the catalog's price range).
 
@@ -221,7 +254,8 @@ def list_products() -> dict[str, Any]:
     order), `lang` (the language of the name sorts, default he), `min` / `max` (a price range in shekels), `page` (from
     1; clamped to the last page), `pageSize` (1-100, default 24). The price sorts and the price range apply only for a
     signed-in business customer (their own prices, see app.pricing); for anyone else they are ignored, so the order
-    and the matches never reveal a price.
+    and the matches never reveal a price. `all=1` from a signed-in staff member also lists the inactive products (of
+    the active categories; see staff_wants_all).
 
     Returns:
         {items, page, pageSize, pageCount, total, category, brands, sort, priceRange, priceBounds, categoryCounts,
@@ -235,7 +269,8 @@ def list_products() -> dict[str, Any]:
     page_size = min(max(request.args.get("pageSize", PAGE_SIZE, type=int), 1), MAX_PAGE_SIZE)
     customer = signed_in_customer()
     prices = customer_prices(customer.id) if customer else None
-    base = [Product.is_active, Category.is_active, *search_conditions(request.args.get("q", ""))]
+    shown = [Category.is_active] if staff_wants_all() else [Product.is_active, Category.is_active]
+    base = [*shown, *search_conditions(request.args.get("q", ""))]
 
     category_slugs = db.session.scalars(select(Category.slug).where(Category.is_active).order_by(Category.sort_order, Category.slug))
     brand_slugs = db.session.scalars(select(Brand.slug).where(Brand.is_active).order_by(Brand.sort_order, Brand.name))
@@ -314,32 +349,37 @@ def list_products() -> dict[str, Any]:
     }
 
 
-def related_products(product: Product) -> list[Product]:
+def related_products(product: Product, include_inactive: bool = False) -> list[Product]:
     """The products a product page suggests: the next active ones of its category in catalog order, wrapping round.
 
     Args:
-        product: The product of the page (its category is active).
+        product: The product of the page.
+        include_inactive: True = suggest inactive products too (staff manage mode); the page's own product is then
+            always among the siblings.
 
     Returns:
-        Up to RELATED_COUNT other active products of the same category, with their category and images loaded.
+        Up to RELATED_COUNT other products of the same category, with their category and images loaded.
     """
+    shown = [] if include_inactive else [Product.is_active]
     siblings = list(
         db.session.scalars(
             select(Product)
-            .where(Product.category_id == product.category_id, Product.is_active)
+            .where(Product.category_id == product.category_id, *shown)
             .options(selectinload(Product.category), selectinload(Product.images))
             .order_by(Product.sort_order, Product.id)
         )
     )
-    index = next(i for i, sibling in enumerate(siblings) if sibling.id == product.id)
-    return (siblings[index + 1:] + siblings[:index])[:RELATED_COUNT]
+    index = next((i for i, sibling in enumerate(siblings) if sibling.id == product.id), -1)
+    return [sibling for sibling in siblings[index + 1:] + siblings[:index] if sibling.id != product.id][:RELATED_COUNT]
 
 
-def product_detail_json(product: Product) -> dict[str, Any]:
+def product_detail_json(product: Product, include_inactive: bool = False) -> dict[str, Any]:
     """Shapes a product for its own page (still no price: prices come only from /prices).
 
     Args:
-        product: An active product of an active category, with its category, brand and images loaded.
+        product: The product (active, of an active category, unless staff asked), with its category, brand and
+            images loaded.
+        include_inactive: True = its related products may be inactive too (staff manage mode).
 
     Returns:
         {id, slug, name, description, sku, barcode, legacyPath, updatedAt, category {slug, name}, brand {slug, name} or
@@ -365,7 +405,7 @@ def product_detail_json(product: Product) -> dict[str, Any]:
         "category": {"slug": product.category.slug, "name": product.category.name},
         "brand": {"slug": brand.slug, "name": brand.name} if brand and brand.is_active else None,
         "images": [{**image_json(image), "alt": image.alt} for image in product.images],
-        "related": [product_json(other) for other in related_products(product)],
+        "related": [product_json(other) for other in related_products(product, include_inactive)],
     }
 
 
@@ -376,18 +416,23 @@ def get_product(slug: str) -> dict[str, Any]:
     Args:
         slug: The product's URL name.
 
+    Query args: `all=1` from a signed-in staff member also answers an inactive product, or one of an inactive
+    category (manage mode, see staff_wants_all).
+
     Returns:
         The product (see product_detail_json); 404 when it is unknown, inactive or in an inactive category.
     """
+    include_inactive = staff_wants_all()
+    shown = [] if include_inactive else [Product.is_active, Category.is_active]
     product = db.session.scalar(
         select(Product)
         .join(Product.category)
-        .where(Product.slug == slug, Product.is_active, Category.is_active)
+        .where(Product.slug == slug, *shown)
         .options(contains_eager(Product.category), selectinload(Product.brand), selectinload(Product.images))
     )
     if product is None:
         abort(404)
-    return product_detail_json(product)
+    return product_detail_json(product, include_inactive)
 
 
 def brand_json(brand: Brand) -> dict[str, Any]:

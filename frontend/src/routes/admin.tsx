@@ -6,19 +6,22 @@
  * `context.staff` (null unless a staff member), so their loaders fetch data only for staff. Signed out (or signed
  * in as a business customer), every /admin page shows the site's one sign-in form (LoginForm); the header's
  * login and log out buttons work here too. Whenever the session changes (here or in the header) the routes
- * reload. Signing out is the header's Log out button. The panel is not for search engines: robots noindex, robots.txt
+ * reload. Signing out is the header's Log out button. Entering the panel drops the manage mode's cached staff rows
+ * (manage.ts), since they may be changed here. The panel is not for search engines: robots noindex, robots.txt
  * Disallow and no sitemap entry. The data pages (e.g. admin.brands.tsx) show their table in the <Outlet />.
  */
 import { useEffect, useRef } from 'react'
 import { createFileRoute, Link, Outlet, useRouter } from '@tanstack/react-router'
 import { fetchSession, type User } from '@/api'
 import { useAuth } from '@/auth'
+import { clearProductAdmin } from '@/manage'
 import { LoginCard, LoginForm } from '@/components/LoginForm'
 import { ADMIN_NAV } from '@/config'
 import { dictionaryFor, useI18n } from '@/i18n'
 
 export const Route = createFileRoute('/admin')({
   beforeLoad: async ({ abortController }) => {
+    clearProductAdmin()
     const user = await fetchSession(abortController.signal)
     return { staff: user?.kind === 'staff' ? user : null }
   },

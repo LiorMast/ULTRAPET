@@ -47,7 +47,10 @@ frontend/
     motion.ts           imgFade: the handlers of a photo that fades in once loaded (with the `img-fade` class)
     seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
     auth.tsx            AuthProvider/useAuth: the session of a business customer or a staff member (one sign-in through the API, JWT cookies);
-                        useCustomerPrices (the signed-in customer's prices, for the catalog and product pages)
+                        useCustomerPrices (the signed-in customer's prices, for the catalog and product pages);
+                        the staff's manage mode switch (useManage, readManageMode / setManageMode, useManageReload)
+    manage.ts           the manage mode's staff data (loadProductAdmin: cached staff rows, clearProductAdmin), the lazy
+                        ManageBar / ManageStrip and cardManagement (a CatalogCard's staff props)
     cart.tsx            CartProvider/useCart: the signed-in business customer's cart (lines, count, subtotal, add /
                         setQuantity / remove, addedTick), kept in localStorage per customer until the Phase 4 server cart
     toast.tsx           ToastProvider/useToast: one Toast at a time (`success` / `error` / `warning`); useSignOut (auth.tsx)
@@ -60,7 +63,7 @@ frontend/
                         admin.customers.index = the business customers' accounts + each one's own discounts;
                         admin.customers.$id = one customer's profile (staff view); admin.requests = the requests for
                         an account ("Open account" converts one); account.tsx = "My account" (the customer's profile);
-                        private-label.tsx = the Private Label page; route pages are tested in components/<Name>Page.test.tsx)
+                        private-label.tsx = the Private Label page (every section editable in place, components/PrivateLabelPage.tsx); route pages are tested in components/<Name>Page.test.tsx)
     components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm (+ LoginCard, the sign-in pages' card), Logo,
                         Brands, Stats, Categories, PrivateLabel, BusinessCustomers (#business: the request for an
                         account + RequestForm), About, Faq, Contact, Hero, SectionHeading, FormField (a public form's
@@ -72,7 +75,8 @@ frontend/
                         sweeping underline, no arrow; `link` or `href`, textLinkVariants for a button), InlineEditor,
                         CatalogCard (links to its product page; PriceSlot, priceFor, stockFor), ProductGallery, RichText
                         (stored sanitized HTML, styled by `.rich-text` in index.css),
-                        EditableSection (the shared in-place editing of the home sections), DataTable, RecordDialog,
+                        EditableSection (the shared in-place editing of the home and Private Label page sections;
+                        useSectionSaver = a page's save handlers), PrivateLabelPage (the Private Label page's sections), DataTable, RecordDialog (+ DeleteDialog),
                         ImageUploadField (picture upload of the admin forms), ImageListField (an ordered list of uploaded
                         pictures: a product's photos), ReorderDialog (drag a list into order),
                         Offcanvas (the reusable side panel on ui/sheet: title, close, `notice` strip, scrolling body, footer;
@@ -87,6 +91,8 @@ frontend/
                         Toast (a compact squircle notification at the top center: icon, bold message, close X; `kind` success / error / warning
                         presets them (TOAST_KINDS; tokens `success`, `warning`); shows 2 s, fades, then onDone; above everything, z-[100]),
                         PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button),
+                        productColumns (the product's DataColumns + useProductHandlers: shared by /admin/products and
+                        manage mode), ProductManager (manage mode: ProductManageBar, ProductManageStrip),
                         CatalogPdfDialog (the "PDF catalog" button + dialog of /admin/products: the generated PDF
                         catalog's layout, status, files and "Generate now"; catalogPdfGrid), ...)
                         + their tests
@@ -443,6 +449,13 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   heading is editable). A card that is a link and has editable texts renders as a `<div>` while editing (Contact cards); a section whose content holds another form wraps its texts in `<form className="contents">`
   (Contact). The FAQ adds its heading keys to its list draft with `sectionFields`. Button labels, carousel and form
   labels stay in the dictionaries.
+  **The Private Label page** (`/private-label`) is edited the same way: each section (`PrivateLabelPage.tsx`: intro,
+  approach + capabilities, categories, why, CTA) is a `page_sections` row `private_label_page_<section>`; the process
+  is the home `PrivateLabel` section (same rows, so an edit on either page shows on both); the FAQ is the shared `Faq`
+  (`id`, `heading`, `contactBox={false}`, `variant="card"`) with its questions in the row
+  `private_label_page_faq_items` ({ items }, built-in `defaultPageFaq()` until the first save). A page's save handlers
+  come from `useSectionSaver(sections)` (`saver(key)`, `saveAll(rows)`), used by the home route too. In read mode a
+  heading's empty intro is hidden (staff can add one while editing).
 - **Secondary links** ("download the catalog", "view all", "all articles", a category above a product name) are
   `<TextLink link|href>` (TextLink.tsx), never hand-made red uppercase links with arrows. The catalog's chips (category
   row, toolbar buttons) share `chipVariants` (CatalogToolbar.tsx); while a filter / search / page loads, the results stay,
@@ -491,6 +504,20 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   disabled "Out of stock" button and no quantity stepper. Lines already in a cart are not checked; checkout (Phase 4)
   must re-check stock on the server and decide when an order takes units out (a movement kind `order`); a Rivhit sync
   would record kind `sync` (add the kinds to the CHECK).
+- **Manage mode** (`ProductManager.tsx`, `manage.ts`, the switch in `auth.tsx`): a second product manager on the
+  customer views, in addition to `/admin/products` and able to do all it does. Only staff get the "Manage mode" `Switch`
+  (`ProductManageBar`: catalog, product and brand pages); it is kept in localStorage (`ultrapet.manage`) and turned off
+  by signing out. Off = staff see the customer view. On: every `CatalogCard` (catalog, brand page, "You may also like")
+  replaces its price slot with `ProductManageStrip` (list price, SKU, `StockCell`, active discounts, an "Active"
+  switch, and icon buttons with tooltips: Edit = `RecordDialog` with `productColumns`, Stock = `StockDialog`,
+  Discounts = `DiscountsDialog`, Delete = `DeleteDialog`); the product page's price block becomes the same strip
+  `size="lg"` (labelled buttons; Delete goes back to the catalog); the catalog's bar adds the stock alerts, "Change
+  order", "PDF catalog" and "Add product". Products hidden from customers show (dimmed, `DiscountRibbon kind="hidden"`):
+  the loaders send `all=1` (`fetchProducts` / `fetchProduct`), which the server answers only to staff
+  (`staff_wants_all`, `Cache-Control: private, no-store`; products of inactive categories stay out of the list). The
+  staff rows come from `loadProductAdmin` in the same loaders (joined to the cards by slug, cached 30 s, cleared by every
+  change and on entering /admin). Both managers share `productColumns` + `useProductHandlers`: never fork them. The
+  layer is lazy-loaded (customers never download it).
 - **Toasts** (`src/toast.tsx`, `Toast`): a confirmation with no place of its own on the page is a toast:
   `useToast().success(t...)` (the admin tables' add/save/delete/reorder, the discount dialogs, in-place and hero saves,
   signing in and out), `.warning` (signing out dropped an in-place draft), `.error` (a failure with no form to show it
@@ -767,8 +794,8 @@ content exists in each language, and the layout flips direction automatically.
       page_sections rows `private_label_steps` ({ steps: FlowStep[] }) then `private_label`)
 - [x] Private Label page (`/private-label`, `routes/private-label.tsx`; the menu's "Private Label"): heading + CTAs,
       approach + capabilities, the process (the home section read-only, `variant="page"`), product categories, why Ultra
-      Pet, FAQ (dictionary questions + FAQPage JSON-LD), closing CTA; in the sitemap. The copy (from legacy + new FAQ
-      answers) awaits the owner's review
+      Pet, FAQ (+ FAQPage JSON-LD), closing CTA; in the sitemap. Staff edit every section in place like the home page
+      (`PrivateLabelPage.tsx`; the FAQ a full list). The copy (from legacy + new FAQ answers) awaits the owner's review
 - [x] Home section: Business Customers (`BusinessCustomers`, `#business`, after Private Label): who we supply, trust
       indicators, and the request form (`postLead` → `POST /api/leads`;
       customers cannot register: staff are emailed and open the account in `/admin/requests`); texts editable in place
@@ -835,6 +862,8 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Inventory on `/admin/products`: the stock ledger (`stock_movements`, `app/inventory.py`, `StockDialog`), stock
       column + alerts, low-stock threshold; customers see In stock / Low / Out and cannot add an out-of-stock product
 - [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API
+- [x] Manage mode on the customer views (`ProductManager`): staff manage products from the catalog cards, the brand
+      pages and the product page (everything `/admin/products` does), hidden products included; the admin table stays
 - [x] `/admin/discounts`: every discount in one table (general and per customer; the `customers` resource)
 - [x] `/admin/customers`: staff open and edit the business accounts (customers cannot register), set or generate the
       password (`PasswordInput` / `GeneratedPasswordInput`), deactivate (never delete), and set each customer's own

@@ -6,7 +6,8 @@
  *
  * Ready kinds (RIBBON_KINDS): `kind="discount"` (brand red), `kind="sale"` (charcoal), and the stock statuses
  * `inStock` (green), `lowStock` (amber) and `outOfStock` (charcoal), which the catalog, the product page and the staff
- * products table share (STOCK_RIBBONS); or any color of your own. `placement="corner"` floats the badge 12px inside
+ * products table share (STOCK_RIBBONS), and `hidden` (outlined: a product hidden from customers, on the staff's manage
+ * mode cards); or any color of your own. `placement="corner"` floats the badge 12px inside
  * the top inline-start corner of its nearest positioned parent (give the card `relative`, as CatalogCard has); the
  * default `inline` leaves it in the flow, e.g. beside a price. Logical classes only, so it flips in RTL.
  *
@@ -42,7 +43,7 @@ export type RibbonColor = NonNullable<VariantProps<typeof ribbonVariants>['color
 export type RibbonPlacement = NonNullable<VariantProps<typeof ribbonVariants>['placement']>
 
 /** The kinds of ribbon: each presets a color. */
-export type RibbonKind = 'discount' | 'sale' | 'inStock' | 'lowStock' | 'outOfStock'
+export type RibbonKind = 'discount' | 'sale' | 'inStock' | 'lowStock' | 'outOfStock' | 'hidden'
 
 /** The preset of each kind. */
 export const RIBBON_KINDS: Record<RibbonKind, { color: RibbonColor }> = {
@@ -51,6 +52,7 @@ export const RIBBON_KINDS: Record<RibbonKind, { color: RibbonColor }> = {
   inStock: { color: 'success' },
   lowStock: { color: 'warning' },
   outOfStock: { color: 'charcoal' },
+  hidden: { color: 'light' },
 }
 
 /** The ribbon kind of each stock status (StockStatus in api.ts: "in", "low", "out"). */
@@ -58,7 +60,7 @@ export const STOCK_RIBBONS = { in: 'inStock', low: 'lowStock', out: 'outOfStock'
 
 /**
  * The discount ribbon.
- * @param props.kind - A RibbonKind ('discount', 'sale', 'inStock', 'lowStock', 'outOfStock'): presets the color
+ * @param props.kind - A RibbonKind ('discount', 'sale', 'inStock', 'lowStock', 'outOfStock', 'hidden'): presets the color
  *   (RIBBON_KINDS); an explicit `color` still wins. Without a kind: red.
  * @param props.icon - A lucide icon shown before the message (decorative), or none.
  * @param props.message - The text of the ribbon (already translated, e.g. "-15%" or "Sale").

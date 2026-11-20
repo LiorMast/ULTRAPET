@@ -15,32 +15,20 @@
  * English name and never renames it), the old site address and the order number; the order is set in "Change order"
  * (DataTable's onReorder: ReorderDialog) and the table lists the products in it, the catalog's order.
  *
- * The page is a DataTable with the products' column config (the category and brand are picked from the current
- * lists, by typing to search: SearchableField) and the "Stock" (StockDialog) and "Discounts" (DiscountsDialog) row
- * actions; after every change it reloads the rows and the rules from the server. Loads nothing when signed out (the layout shows the sign-in form instead).
+ * The page is a DataTable with the products' column config (productColumns.tsx, shared with the manage mode of the
+ * catalog cards; the category and brand are picked from the current lists, by typing to search: SearchableField) and
+ * the "Stock" (StockDialog) and "Discounts" (DiscountsDialog) row actions; every change goes through
+ * useProductHandlers (the same as the manage mode's), which reloads the rows and the rules from the server. Loads nothing when signed out (the layout shows the sign-in form instead).
  */
 import { useMemo } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
-import {
-  createStaffRow,
-  deleteStaffRow,
-  fetchCatalogPdf,
-  fetchProductStock,
-  generateCatalogPdf,
-  fetchStaffRows,
-  recordStockMovement,
-  reorderStaffRows,
-  updateStaffRow,
-  type StaffBrand,
-  type StaffCategory,
-  type StaffPriceRule,
-  type StaffProduct,
-} from '@/api'
+import { createFileRoute } from '@tanstack/react-router'
+import { fetchCatalogPdf, generateCatalogPdf, fetchStaffRows, type StaffBrand, type StaffCategory, type StaffPriceRule, type StaffProduct } from '@/api'
 import { localized } from '@/config'
 import { CatalogPdfButton } from '@/components/CatalogPdfDialog'
-import { DataTable, type DataColumn } from '@/components/DataTable'
-import { DiscountsCell, discountFields, discountsAction, withDiscounts, type DiscountRow } from '@/components/DiscountsDialog'
-import { StockCell, StockSummary, stockAction } from '@/components/StockDialog'
+import { DataTable } from '@/components/DataTable'
+import { discountsAction, withDiscounts } from '@/components/DiscountsDialog'
+import { newProductRow, productColumns, useProductHandlers, type ProductRow } from '@/components/productColumns'
+import { StockSummary, stockAction } from '@/components/StockDialog'
 import { dictionaryFor, useI18n } from '@/i18n'
 
 export const Route = createFileRoute('/admin/products')({
@@ -62,9 +50,6 @@ export const Route = createFileRoute('/admin/products')({
   component: AdminProducts,
 })
 
-/** A product row of the table: the product with its discounts. */
-type ProductRow = DiscountRow<StaffProduct>
-
 /**
  * The products page: its title, the PDF catalog button and the products table.
  * @returns The page.
@@ -72,58 +57,22 @@ type ProductRow = DiscountRow<StaffProduct>
 function AdminProducts() {
   const { products, categories, brands, rules } = Route.useLoaderData()
   const { t, locale } = useI18n()
-  const router = useRouter()
-  const f = t.admin.productFields
+  const handlers = useProductHandlers()
   const rows = useMemo(() => withDiscounts(products, rules, 'productId', t, locale), [products, rules, t, locale])
 
   // The category and brand choices are read when the table mounts (DataTable's rule); a page load refreshes them.
-  const columns = useMemo<DataColumn<ProductRow>[]>(
-    () => [
-      { key: 'images', label: f.images, type: 'images', folder: 'products', hint: f.imagesHint },
-      { key: 'name', label: f.name, type: 'localized', required: true },
-      { key: 'sku', label: f.sku, ltr: true },
-      {
-        key: 'categoryId',
-        label: f.category,
-        type: 'select',
-        searchable: true,
-        required: true,
-        options: categories.map((category) => ({ value: category.id, label: localized(category.name, locale) })),
-      },
-      { key: 'brandId', label: f.brand, type: 'select', searchable: true, options: brands.map((brand) => ({ value: brand.id, label: brand.name })) },
-      { key: 'listPrice', label: f.listPrice, type: 'money', hint: f.listPriceHint },
-      // The units on hand change only through the "Stock" action (a recorded movement), never in the form.
-      { key: 'stockQuantity', label: f.stock, type: 'integer', inForm: false, render: (row) => <StockCell quantity={row.stockQuantity} threshold={row.lowStockThreshold} /> },
-      { key: 'lowStockThreshold', label: f.lowStockThreshold, type: 'integer', hint: f.lowStockThresholdHint, inTable: false },
-      { key: 'discountText', label: f.discounts, inForm: false, render: (row) => <DiscountsCell rules={row.discounts} /> },
-      { key: 'isActive', label: f.isActive, type: 'boolean' },
-      { key: 'barcode', label: f.barcode, ltr: true, inTable: false },
-      { key: 'description', label: f.description, type: 'localized', multiline: true, inTable: false },
-    ],
-    [f, categories, brands, locale],
-  )
+  const columns = useMemo(() => productColumns(t, locale, categories, brands), [t, locale, categories, brands])
 
   const stock = stockAction<ProductRow>(t, {
     target: (row) => localized(row.name, locale),
-    load: (row, signal) => fetchProductStock(row.id, signal),
-    onSave: async (row, movement) => {
-      const saved = await recordStockMovement(row.id, movement)
-      await router.invalidate()
-      return saved
-    },
+    load: (row, signal) => handlers.loadStock(row.id, signal),
+    onSave: (row, movement) => handlers.recordStock(row.id, movement),
   })
 
   const discounts = discountsAction<ProductRow>(t, {
     target: (row) => localized(row.name, locale),
-    onSave: async (row, discount, rule) => {
-      if (rule) await updateStaffRow('price-rules', rule.id, discountFields(discount))
-      else await createStaffRow('price-rules', { productId: row.id, ...discountFields(discount) })
-      await router.invalidate()
-    },
-    onDelete: async (rule) => {
-      await deleteStaffRow('price-rules', rule.id)
-      await router.invalidate()
-    },
+    onSave: (row, discount, rule) => handlers.saveDiscount(row.id, discount, rule),
+    onDelete: handlers.deleteDiscount,
   })
 
   return (
@@ -142,23 +91,11 @@ function AdminProducts() {
         caption={t.admin.productsTitle}
         rowKey={(product) => product.id}
         rowLabel={(product) => localized(product.name, locale)}
-        newRow={{ isActive: true, categoryId: categories[0]?.id }}
-        onCreate={async (values) => {
-          await createStaffRow('products', values)
-          await router.invalidate()
-        }}
-        onUpdate={async (id, changes) => {
-          await updateStaffRow('products', id, changes)
-          await router.invalidate()
-        }}
-        onDelete={async (id) => {
-          await deleteStaffRow('products', id)
-          await router.invalidate()
-        }}
-        onReorder={async (ids) => {
-          await reorderStaffRows('products', ids)
-          await router.invalidate()
-        }}
+        newRow={newProductRow(categories)}
+        onCreate={handlers.create}
+        onUpdate={handlers.update}
+        onDelete={handlers.remove}
+        onReorder={handlers.reorder}
         rowActions={[stock, discounts]}
       />
     </section>

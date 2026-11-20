@@ -46,6 +46,7 @@ export default defineConfig({
   // sign-in cookies stay first-party); the sitemap is built by the backend from the database.
   server: {
     allowedHosts: ['.trycloudflare.com'],
+    host: true, // Exposes to all local network addresses
     proxy: {
       '/api': BACKEND_URL,
       '/sitemap.xml': { target: BACKEND_URL, rewrite: () => '/api/sitemap.xml' },

@@ -15,13 +15,14 @@
  *   "Later" to reorder it, Delete, and a picture upload (ImageUploadField, folder "private-label": a step's picture is
  *   shown in its medallion instead of the icon; the step stores the object key `image`, the server answers its
  *   `imageUrl`); "Add a step" appends one. Save waits for running uploads (it says so instead of saving). A step with a description but no title is refused
- *   before saving; a new step left without any title is dropped. One Save stores the steps, then the heading.
+ *   before saving; a new step left without any title is dropped. One Save stores the steps, then the heading
+ *   (privateLabelSaver: the same handler on both pages, so an edit on either changes both).
  */
 import { useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import { Link, linkOptions } from '@tanstack/react-router'
 import { cn } from 'cn'
-import type { FlowStep, SectionContent } from '@/api'
+import type { FlowStep, FlowStepsContent, SectionContent } from '@/api'
 import { mergeSection, SectionEditBar, sectionFields, type SectionOptions } from '@/components/EditableSection'
 import { FLOWCHART_TEXT_CLASS, FLOWCHART_TITLE_CLASS, FlowchartCard, FlowchartList } from '@/components/Flowchart'
 import { EditableText, InlineEditError, useInlineDraft, type TextValue } from '@/components/InlineEditor'
@@ -181,6 +182,15 @@ export function mergeSteps(
     return [{ id: step?.id ?? newId(), icon: icons[entry] ?? iconKey(step?.icon ?? ''), ...(image && { image }), title, text }]
   })
 }
+
+/**
+ * The section's onSave, built from a page's useSectionSaver().saveAll: stores the steps (one row, in order), then the
+ * heading's texts, and reloads the page data.
+ * @param saveAll - The page's saveAll; undefined (not staff) = no handler.
+ * @returns The handler (steps, heading content), or undefined so the section is not editable.
+ */
+export const privateLabelSaver = (saveAll?: (rows: Record<string, object>) => Promise<unknown>) =>
+  saveAll && ((steps: FlowStep[], content: SectionContent) => saveAll({ private_label_steps: { steps } satisfies FlowStepsContent, private_label: content }))
 
 /**
  * The Private Label section (see the file header).

@@ -299,6 +299,41 @@ def test_a_product_page_is_404_when_unknown_inactive_or_in_a_hidden_category(cli
     assert client.get(f"/api/products/{slug}").status_code == 404
 
 
+def test_staff_asking_for_all_products_see_the_inactive_ones_too(staff_client, catalog):
+    response = staff_client.get("/api/products?all=1")
+    data = response.get_json()
+    # The inactive product is listed and counted; a hidden category's products stay out (managed with the category).
+    assert set(slugs(response)) == {"dog-treat", "salmon-cat-food", "beef-dog-food", "dog-chew", "old-salmon"}
+    assert data["categoryCounts"] == {"dogs": 4, "cats": 1}
+    assert response.headers["Cache-Control"] == "private, no-store"
+
+
+@pytest.mark.parametrize("who", ["client", "customer_client"])
+def test_all_products_is_ignored_without_a_staff_sign_in(request, catalog, who):
+    response = request.getfixturevalue(who).get("/api/products?all=1")
+    assert slugs(response) == ["dog-treat", "salmon-cat-food", "beef-dog-food", "dog-chew"]
+    assert "no-store" not in response.headers.get("Cache-Control", "")
+
+
+@pytest.mark.parametrize("slug", ["old-salmon", "hidden-salmon"])
+def test_staff_asking_for_all_open_an_inactive_product_page(staff_client, catalog, slug):
+    response = staff_client.get(f"/api/products/{slug}?all=1")
+    assert response.status_code == 200
+    assert response.get_json()["slug"] == slug
+    assert response.headers["Cache-Control"] == "private, no-store"
+
+
+def test_an_inactive_product_suggests_its_category_to_staff(staff_client, catalog):
+    related = [item["slug"] for item in staff_client.get("/api/products/old-salmon?all=1").get_json()["related"]]
+    assert "old-salmon" not in related
+    assert set(related) <= {"dog-treat", "beef-dog-food", "dog-chew"} and len(related) == 3
+
+
+@pytest.mark.parametrize("who", ["client", "customer_client"])
+def test_an_inactive_product_page_stays_404_without_a_staff_sign_in(request, catalog, who):
+    assert request.getfixturevalue(who).get("/api/products/old-salmon?all=1").status_code == 404
+
+
 def test_brands_lists_the_active_ones_and_finds_one(client, database):
     database.add_all(
         [

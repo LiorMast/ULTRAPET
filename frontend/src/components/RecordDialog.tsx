@@ -10,7 +10,10 @@
  * when it stays empty, so the password is kept). The form
  * checks required fields, patterns and numbers before sending; on an edit it sends only the fields that changed. When the server refuses the change, its error lands
  * on the field it names (`field`, or the column in a constraint name such as "brands_slug_key"), or above the
- * buttons when it names none. Used only by DataTable.
+ * buttons when it names none. Used by DataTable and by the manage mode's product cards (ProductManager.tsx).
+ *
+ * DeleteDialog, the confirmation before deleting a record (with the server's reason when it refuses), lives here
+ * too: the same two callers delete records.
  */
 import { useId, useState, type FormEvent } from 'react'
 import { ApiError, type StaffProductImage } from '@/api'
@@ -435,5 +438,66 @@ function Field<Row>({
       {input}
       {footer}
     </div>
+  )
+}
+
+/**
+ * Asks before deleting a row, and shows why the server refused (e.g. other rows still use it).
+ * @param props.name - The row's name, in the title.
+ * @param props.onConfirm - Deletes the row (rejects with ApiError on refusal).
+ * @param props.onClose - Closes the dialog without deleting.
+ * @param props.onCloseAutoFocus - Where the focus goes after closing (the row and its button are gone).
+ * @returns The confirmation dialog.
+ */
+export function DeleteDialog({
+  name,
+  onConfirm,
+  onClose,
+  onCloseAutoFocus,
+}: {
+  name: string
+  onConfirm: () => Promise<void>
+  onClose: () => void
+  onCloseAutoFocus: (event: Event) => void
+}) {
+  const { t } = useI18n()
+  const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
+
+  /** Runs the delete; on failure keeps the dialog open with the server's reason. */
+  const handleConfirm = async () => {
+    if (pending) return
+    setPending(true)
+    setError('')
+    try {
+      await onConfirm()
+    } catch (caught) {
+      setError(errorMessage(caught instanceof ApiError ? caught.code : undefined, t))
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent role="alertdialog" closeLabel={t.admin.close} onCloseAutoFocus={onCloseAutoFocus}>
+        <DialogHeader>
+          <DialogTitle>{t.admin.deleteTitle.replace('{name}', name)}</DialogTitle>
+          <DialogDescription>{t.admin.deleteBody}</DialogDescription>
+        </DialogHeader>
+        {error && (
+          <p role="alert" className="px-6 pt-4 text-sm font-medium text-brand-red-dark">
+            {error}
+          </p>
+        )}
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            {t.admin.cancel}
+          </Button>
+          <Button size="sm" loading={pending} onClick={handleConfirm}>
+            {t.admin.delete}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

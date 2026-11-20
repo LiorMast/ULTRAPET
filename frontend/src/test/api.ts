@@ -202,6 +202,35 @@ export async function setFakeStock(publicId: string, quantity: number | null, lo
 }
 
 /**
+ * Changes a stub product's staff row as if staff had edited it (a test's shortcut), e.g. `{ isActive: false }` hides it
+ * from the public routes.
+ * @param slug - The product's slug.
+ * @param changes - The fields to change (staff API names).
+ */
+export async function setFakeProduct(slug: string, changes: Record<string, unknown>) {
+  const row = (await tableRows('products')).find((product) => product.slug === slug)
+  if (!row) throw new Error(`No stub product ${slug}`)
+  Object.assign(row, changes)
+}
+
+/**
+ * The slugs of the products staff made inactive, which the public routes hide unless a staff member asks for `all`
+ * (as the server's staff_wants_all). An untouched products table is all active (nothing is seeded for it).
+ * @returns The slugs.
+ */
+async function inactiveSlugs(): Promise<Set<string>> {
+  if (!staffRows.products) return new Set()
+  return new Set((await tableRows('products')).filter((row) => !row.isActive).map((row) => String(row.slug)))
+}
+
+/**
+ * Whether a public product request asks for the inactive products too and may have them: `all=1` from staff.
+ * @param params - The query string.
+ * @returns True for a staff session with all=1.
+ */
+const staffWantsAll = (params: URLSearchParams) => params.get('all') === '1' && session?.kind === 'staff'
+
+/**
  * Signs a user in to the fake (renderPage's `user` and `staff` options).
  * @param user - The user, e.g. TEST_USER or TEST_STAFF.
  */
@@ -967,12 +996,14 @@ function json(body: unknown, status = 200) {
  * Answers /api/products like the server: search words must all appear in the name or description (any
  * language, any case), then the category, brand and (customers only) price filters, the faceted chip and brand
  * counts, the sort (name in `lang`, newest = highest WooCommerce id, customers' price sorts with the unpriced last)
- * and a clamped page.
+ * and a clamped page. Inactive products (staff rows) are left out, unless staff ask for `all=1`.
  * @param params - The query string.
  * @returns One page of results.
  */
 async function productPage(params: URLSearchParams): Promise<ProductPage> {
-  const { default: products } = (await import('@/stubs/products.json')) as { default: StubProduct[] }
+  const { default: stubProducts } = (await import('@/stubs/products.json')) as { default: StubProduct[] }
+  const hidden = staffWantsAll(params) ? new Set<string>() : await inactiveSlugs()
+  const products = stubProducts.filter((product) => !hidden.has(product.slug))
   // Like the server: the price sorts and range only for a signed-in business customer.
   const prices = session?.kind === 'business' ? ((await import('@/stubs/prices.json')).default.prices as Record<string, number>) : null
   const words = (params.get('q') ?? '').toLowerCase().split(/\s+/).filter(Boolean)
@@ -1036,11 +1067,15 @@ async function productPage(params: URLSearchParams): Promise<ProductPage> {
 /**
  * One product for its page, like the server's product_detail_json: the gallery, the category, the brand when it is
  * shown, and the next products of the category in catalog order (wrapping round). Empty translations are left out.
+ * An inactive product (its staff row) is unknown, and never related, unless staff ask for `all=1`.
  * @param slug - The product's URL name.
+ * @param params - The query string.
  * @returns The product, or null for an unknown slug.
  */
-async function productDetail(slug: string): Promise<ProductDetail | null> {
-  const { default: products } = (await import('@/stubs/products.json')) as { default: StubProduct[] }
+async function productDetail(slug: string, params: URLSearchParams): Promise<ProductDetail | null> {
+  const { default: stubProducts } = (await import('@/stubs/products.json')) as { default: StubProduct[] }
+  const hidden = staffWantsAll(params) ? new Set<string>() : await inactiveSlugs()
+  const products = stubProducts.filter((product) => !hidden.has(product.slug))
   const index = products.findIndex((p) => p.slug === slug)
   if (index < 0) return null
   const product = products[index]
@@ -1134,7 +1169,7 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
     if (path === '/api/products') return json(await productPage(url.searchParams))
     const productSlug = slug('/api/products/')
     if (productSlug) {
-      const product = await productDetail(productSlug)
+      const product = await productDetail(productSlug, url.searchParams)
       if (product) return json(product)
     }
     if (path === '/api/brands') return json(activeBrands.map(brandJson))

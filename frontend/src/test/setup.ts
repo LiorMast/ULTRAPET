@@ -3,8 +3,8 @@
  *
  * - Adds the jest-dom matchers (toBeInTheDocument, toHaveAttribute, ...).
  * - Answers the site's API calls with the fake backend in test/api.ts (fetch), built from the stub fixtures.
- * - Unmounts whatever a test rendered, restores mocked functions, signs the fake API out and clears browser
- *   storage (saved sessions, carts), so tests don't leak into each other.
+ * - Unmounts whatever a test rendered, restores mocked functions, signs the fake API out, turns the staff's manage
+ *   mode off and clears browser storage (saved sessions, carts), so tests don't leak into each other.
  * - Adds browser APIs that jsdom lacks but Radix UI and TanStack Router call:
  *   ResizeObserver, scrollIntoView, pointer capture, window.scrollTo and matchMedia (no-ops here).
  * - Keeps the event properties that user-event sets (relatedTarget, ...) redefinable, as they are in browsers,
@@ -13,6 +13,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+import { setManageMode } from '@/auth'
 import { fakeFetch, resetFakeApi } from '@/test/api'
 
 globalThis.fetch = fakeFetch
@@ -30,6 +31,7 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   resetFakeApi()
+  setManageMode(false)
   localStorage.clear()
   sessionStorage.clear()
 })

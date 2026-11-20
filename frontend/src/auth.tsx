@@ -13,10 +13,18 @@
  * user ("remember me" → localStorage, else sessionStorage) so the header shows the account at once instead of
  * flickering; the server's answer replaces it. When the API reports the sign-in gone (expired, revoked), the
  * provider shows the visitor as signed out.
+ *
+ * Manage mode (the staff's management layer on the catalog and product pages, ProductManager.tsx): useManage() tells
+ * a page whether to show it (a staff member is signed in and turned the "Manage products" switch on); route loaders
+ * read the switch with readManageMode() (the server still answers its extra data only to staff). The switch is kept
+ * in localStorage (`ultrapet.manage`), so it survives page loads, and either way of ending the session turns it off,
+ * so the next person on the browser starts in the customer view. The staff data it shows is in manage.ts.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useRouter } from '@tanstack/react-router'
 import { fetchPrices, fetchSession, postSignIn, postSignOut, setSignedOutHandler, type StockStatus, type User } from '@/api'
 import { useI18n } from '@/i18n'
+import { clearProductAdmin } from '@/manage'
 import { useToast } from '@/toast'
 
 /** What signIn receives: the login form's values. */
@@ -66,6 +74,63 @@ function writeSession(user: User | null, remember = false) {
   }
 }
 
+/** Browser storage key of the manage mode switch ("1" = on). */
+const MANAGE_KEY = 'ultrapet.manage'
+
+/**
+ * Reads the stored manage mode switch; blocked storage counts as off.
+ * @returns Whether manage mode was left on.
+ */
+function readStoredManage(): boolean {
+  try {
+    return window.localStorage.getItem(MANAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+let manageFlag = readStoredManage()
+const manageListeners = new Set<() => void>()
+
+/**
+ * Whether the manage mode switch is on, for route loaders (outside React). The server still decides: only a staff
+ * sign-in gets the inactive products and the staff rows.
+ * @returns The switch.
+ */
+export function readManageMode(): boolean {
+  return manageFlag
+}
+
+/**
+ * Turns manage mode on or off, remembers it in the browser and rerenders the components that follow it (useManage).
+ * The cached staff data is dropped, so the next load reads it fresh; the pages reload through useManageReload.
+ * @param on - The new state.
+ */
+export function setManageMode(on: boolean) {
+  clearProductAdmin()
+  if (manageFlag === on) return
+  manageFlag = on
+  try {
+    if (on) window.localStorage.setItem(MANAGE_KEY, '1')
+    else window.localStorage.removeItem(MANAGE_KEY)
+  } catch {
+    // Storage unavailable: the switch then lasts only for this page load.
+  }
+  for (const listener of manageListeners) listener()
+}
+
+/**
+ * Subscribes a component to the manage mode switch (useSyncExternalStore).
+ * @param listener - Called after every change.
+ * @returns The unsubscribe function.
+ */
+function subscribeManage(listener: () => void) {
+  manageListeners.add(listener)
+  return () => {
+    manageListeners.delete(listener)
+  }
+}
+
 const AuthContext = createContext<AuthValue | null>(null)
 
 /**
@@ -81,6 +146,7 @@ export function AuthProvider({ initialUser, children }: { initialUser?: User | n
   useEffect(() => {
     setSignedOutHandler(() => {
       writeSession(null)
+      setManageMode(false)
       setUser(null)
     })
     return () => setSignedOutHandler(null)
@@ -121,6 +187,7 @@ export function AuthProvider({ initialUser, children }: { initialUser?: User | n
    */
   const signOut = useCallback(async () => {
     writeSession(null)
+    setManageMode(false)
     setUser(null)
     await postSignOut().catch(() => undefined)
   }, [])
@@ -182,4 +249,32 @@ export function useCustomerPrices(): CustomerPrices | undefined {
   // Prices belong to the customer they were loaded for; anything else is still loading (or signed out).
   if (!user) return undefined
   return loaded?.email === user.email ? { status: 'loaded', prices: loaded.prices, stock: loaded.stock } : { status: 'loading' }
+}
+
+/**
+ * The staff's manage mode for a page.
+ * @returns `available` (a staff member is signed in: show the "Manage products" switch), `on` (show the management
+ *   layer: available and the switch is on) and `setOn` (setManageMode).
+ */
+export function useManage(): { available: boolean; on: boolean; setOn: (on: boolean) => void } {
+  const { user } = useAuth()
+  const flag = useSyncExternalStore(subscribeManage, readManageMode, () => false)
+  const available = user?.kind === 'staff'
+  return { available, on: available && flag, setOn: setManageMode }
+}
+
+/**
+ * Reloads the page's route data when manage mode turns on or off (the switch, or a staff member signing in or out),
+ * since the loaders then ask for other data (the inactive products, the staff rows). Used by the pages that show
+ * products: the catalog, a product page, a brand page.
+ */
+export function useManageReload() {
+  const { on } = useManage()
+  const router = useRouter()
+  const shown = useRef(on)
+  useEffect(() => {
+    if (shown.current === on) return
+    shown.current = on
+    void router.invalidate()
+  }, [on, router])
 }

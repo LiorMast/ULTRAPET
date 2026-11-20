@@ -9,12 +9,17 @@
  * /catalog?brand=<slug>, "Become a business customer"); then the brand's products as catalog cards (a signed-in
  * customer's prices and "Add to cart", "log in to see the price" for everyone else) and the other brands.
  *
+ * Staff: the "Manage mode" switch sits under the breadcrumbs; in manage mode the brand's products include the ones
+ * hidden from customers (`all`) and each card carries its staff strip (cardManagement, ProductManager.tsx), from the
+ * staff data the loader then loads (loadProductAdmin); switching the mode reloads the page (useManageReload).
+ *
  * SEO: its `head` sets the brand's title, a description from its text (else its tagline), the canonical and hreflang
  * links, og:image (the logo), and Brand + BreadcrumbList JSON-LD.
  */
+import { Suspense } from 'react'
 import { createFileRoute, Link, linkOptions } from '@tanstack/react-router'
 import { fetchBrand, fetchBrands, fetchCategories, fetchProducts, rethrowNotFound, type Brand } from '@/api'
-import { useCustomerPrices } from '@/auth'
+import { readManageMode, useCustomerPrices, useManage, useManageReload } from '@/auth'
 import { BrandCard } from '@/components/BrandCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { Carousel } from '@/components/Carousel'
@@ -23,6 +28,7 @@ import { TextLink } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
 import { brandLogo, HERO_LINKS, localized } from '@/config'
 import { dictionaryFor, localizePath, useI18n } from '@/i18n'
+import { cardManagement, loadProductAdmin, ManageBar } from '@/manage'
 import { absoluteUrl, breadcrumbJsonLd, metaDescription, pageHead } from '@/seo'
 
 /** How many of the brand's products the page shows (the rest are one click away in the filtered catalog). */
@@ -34,13 +40,15 @@ const BRANDS_PER_PAGE = 3
 export const Route = createFileRoute('/brands/$slug')({
   loader: async ({ params, context, abortController }) => {
     const { signal } = abortController
-    const [brand, products, categories, brands] = await Promise.all([
+    const manage = readManageMode()
+    const [brand, products, categories, brands, admin] = await Promise.all([
       fetchBrand(params.slug, signal).catch(rethrowNotFound),
-      fetchProducts({ brand: params.slug }, context.locale, signal, PRODUCTS_SHOWN),
+      fetchProducts({ brand: params.slug }, context.locale, signal, PRODUCTS_SHOWN, manage),
       fetchCategories(signal),
       fetchBrands(signal),
+      manage ? loadProductAdmin(context.locale) : null,
     ])
-    return { brand, products, categories, brands }
+    return { brand, products, categories, brands, admin }
   },
   head: ({ match, loaderData }) => {
     if (!loaderData) return {}
@@ -116,8 +124,11 @@ function BrandLogoPanel({ brand }: { brand: Brand }) {
  */
 function BrandPage() {
   const { t, locale } = useI18n()
-  const { brand, products, categories, brands } = Route.useLoaderData()
+  const { brand, products, categories, brands, admin } = Route.useLoaderData()
   const prices = useCustomerPrices()
+  const manage = useManage()
+  useManageReload()
+  const managed = manage.on ? admin : null
   const categoryName = new Map(categories.map((category) => [category.slug, localized(category.name, locale)]))
   const brandCategories = categories.filter((category) => (products.categoryCounts[category.slug] ?? 0) > 0)
   const others = brands.filter((other) => other.slug !== brand.slug)
@@ -135,6 +146,11 @@ function BrandPage() {
             { label: brand.name },
           ]}
         />
+        {manage.available && (
+          <Suspense fallback={null}>
+            <ManageBar admin={managed} actions={false} className="mt-6" />
+          </Suspense>
+        )}
 
         <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
           <BrandLogoPanel brand={brand} />
@@ -208,6 +224,7 @@ function BrandPage() {
                     categoryName={categoryName.get(product.category)}
                     price={priceFor(prices, product.id)}
                     stock={stockFor(prices, product.id)}
+                    {...cardManagement(managed, product.slug)}
                     className="w-full"
                   />
                 </li>

@@ -16,6 +16,8 @@
  *   The same edit mode also edits the section's own texts (EditableSection, saved in page_sections "faq"): the
  *   heading's words, font and size (the PropBar shows while one of them is selected) and the contact box's title and
  *   text (words only; its button keeps its label). One Save stores the list, then the texts.
+ * - Reusable through props: the /private-label page shows its own FAQ with it (another anchor, its own heading words,
+ *   no contact box, the card accordion); where the list is stored is the caller's `onSave`.
  */
 import { useRef } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
@@ -153,6 +155,11 @@ export function mergeFaq(items: FaqItem[], locale: Locale, draft: FaqDraft): Faq
  * @param props.onSave - Stores the new list of questions and the section's new content (rejects with an ApiError on
  *   refusal); given = staff can edit in place.
  * @param props.defaultOpen - The id of the question open on load; default the first shown one, null = all closed.
+ * @param props.id - The section's anchor; default "faq" (its title's id is "<id>-title").
+ * @param props.heading - The heading's built-in words (eyebrow, title, intro: '' = none); default the dictionary's
+ *   t.faq. The eyebrow also names the section's "Edit on page" button.
+ * @param props.contactBox - Whether the "still have a question?" box shows beside the questions; default true.
+ * @param props.variant - The accordion's look: "line" (default) or "card".
  * @returns The <section>, or nothing for visitors when no question has the page language.
  */
 export function Faq({
@@ -160,19 +167,29 @@ export function Faq({
   content,
   onSave,
   defaultOpen,
+  id = 'faq',
+  heading,
+  contactBox = true,
+  variant,
 }: {
   items: FaqItem[]
   content?: SectionContent | null
   onSave?: (items: FaqItemInput[], content: SectionContent) => Promise<unknown>
   defaultOpen?: string | null
+  id?: string
+  heading?: Record<HeadingKey, string>
+  contactBox?: boolean
+  variant?: 'line' | 'card'
 }) {
   const { t, locale } = useI18n()
   const e = t.faq.edit
   const shown = shownFaq(items, locale)
   const open = defaultOpen === undefined ? shown[0]?.id : (defaultOpen ?? undefined)
+  const headingTexts = heading ?? { eyebrow: t.faq.eyebrow, title: t.faq.title, intro: t.faq.intro }
+  // Without the contact box, its two texts are not part of the section (cast: the keys are simply absent).
   const texts: SectionOptions<TextKey> = {
     content,
-    defaults: { eyebrow: t.faq.eyebrow, title: t.faq.title, intro: t.faq.intro, moreTitle: t.faq.moreTitle, moreText: t.faq.moreText },
+    defaults: (contactBox ? { ...headingTexts, moreTitle: t.faq.moreTitle, moreText: t.faq.moreText } : headingTexts) as Record<TextKey, string>,
     labels: { ...headingLabels(t), moreTitle: fieldLabel(t, 'title', t.faq.moreTitle), moreText: fieldLabel(t, 'text', t.faq.moreTitle) },
     styled: HEADING_KEYS,
   }
@@ -221,24 +238,26 @@ export function Faq({
   const hint = (texts: Texts | undefined, prompt: string) => Object.entries(texts ?? {}).find(([language, text]) => language !== locale && text?.trim())?.[1] ?? prompt
 
   return (
-    <section id="faq" aria-labelledby="faq-title" className="bg-white px-6 py-20 lg:px-10 lg:py-24">
+    <section id={id} aria-labelledby={`${id}-title`} className="bg-white px-6 py-20 lg:px-10 lg:py-24">
       {/* One form for the whole section: the questions and the section's texts are saved together. */}
       <form {...inline.formProps} className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
         <div className="lg:sticky lg:top-32 lg:self-start">
-          <SectionHeading id="faq-title" edit={field} />
-          <div className="mt-10 rounded-2xl bg-neutral-100 p-6 lg:p-8">
-            <EditableText as="h3" wrap {...field('moreTitle')} className="font-display text-xl font-bold text-brand-charcoal" />
-            <EditableText multiline {...field('moreText')} className="mt-2 text-brand-charcoal-muted" />
-            <Button asChild className="mt-6">
-              <Link to="/" hash="contact">{t.faq.cta}</Link>
-            </Button>
-          </div>
+          <SectionHeading id={`${id}-title`} edit={field} />
+          {contactBox && (
+            <div className="mt-10 rounded-2xl bg-neutral-100 p-6 lg:p-8">
+              <EditableText as="h3" wrap {...field('moreTitle')} className="font-display text-xl font-bold text-brand-charcoal" />
+              <EditableText multiline {...field('moreText')} className="mt-2 text-brand-charcoal-muted" />
+              <Button asChild className="mt-6">
+                <Link to="/" hash="contact">{t.faq.cta}</Link>
+              </Button>
+            </div>
+          )}
         </div>
         <div>
           {onSave && (
             <SectionEditBar
               edit={{ bar: { ...inline.bar, onEdit: () => inline.start({ ...faqDraft(items, locale), ...textsDraft() }) }, propBar }}
-              label={t.faq.eyebrow}
+              label={headingTexts.eyebrow}
               className="bg-white"
             />
           )}
@@ -293,7 +312,7 @@ export function Faq({
               </Button>
             </div>
           ) : shown.length ? (
-            <Accordion type="single" collapsible defaultValue={open}>
+            <Accordion type="single" collapsible variant={variant} defaultValue={open}>
               {shown.map((item) => (
                 <AccordionItem key={item.id} value={item.id}>
                   <AccordionTrigger>{item.question}</AccordionTrigger>

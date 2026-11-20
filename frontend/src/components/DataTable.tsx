@@ -23,13 +23,12 @@ import DataTableLib, { type DataTableSlots } from 'datatables.net-react'
 import DT, { type ColumnOptions, type Options } from 'datatables.net-dt'
 import 'datatables.net-dt/css/dataTables.dataTables.css'
 import { ArrowUpDown, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { ApiError, type StaffProductImage, type UploadFolder } from '@/api'
+import type { StaffProductImage, UploadFolder } from '@/api'
 import { localized, type Localized } from '@/config'
-import { RecordDialog, errorMessage } from '@/components/RecordDialog'
+import { DeleteDialog, RecordDialog } from '@/components/RecordDialog'
 import { ReorderDialog } from '@/components/ReorderDialog'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/toast'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n, type Locale } from '@/i18n'
 
 // Tells the React component which DataTables build to use (the default-styled one). Called through a variable
@@ -499,65 +498,4 @@ function ActionDialog<Row>({ action, row, onClose, onCloseAutoFocus }: { action:
  */
 function FormDialog<Row>({ render, row, ...props }: FormDialogProps & { render: NonNullable<DataTableProps<Row>['formDialog']>; row: Row | undefined }) {
   return render(row, props)
-}
-
-/**
- * Asks before deleting a row, and shows why the server refused (e.g. other rows still use it).
- * @param props.name - The row's name, in the title.
- * @param props.onConfirm - Deletes the row (rejects with ApiError on refusal).
- * @param props.onClose - Closes the dialog without deleting.
- * @param props.onCloseAutoFocus - Where the focus goes after closing (the row and its button are gone).
- * @returns The confirmation dialog.
- */
-function DeleteDialog({
-  name,
-  onConfirm,
-  onClose,
-  onCloseAutoFocus,
-}: {
-  name: string
-  onConfirm: () => Promise<void>
-  onClose: () => void
-  onCloseAutoFocus: (event: Event) => void
-}) {
-  const { t } = useI18n()
-  const [error, setError] = useState('')
-  const [pending, setPending] = useState(false)
-
-  /** Runs the delete; on failure keeps the dialog open with the server's reason. */
-  const handleConfirm = async () => {
-    if (pending) return
-    setPending(true)
-    setError('')
-    try {
-      await onConfirm()
-    } catch (caught) {
-      setError(errorMessage(caught instanceof ApiError ? caught.code : undefined, t))
-      setPending(false)
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent role="alertdialog" closeLabel={t.admin.close} onCloseAutoFocus={onCloseAutoFocus}>
-        <DialogHeader>
-          <DialogTitle>{t.admin.deleteTitle.replace('{name}', name)}</DialogTitle>
-          <DialogDescription>{t.admin.deleteBody}</DialogDescription>
-        </DialogHeader>
-        {error && (
-          <p role="alert" className="px-6 pt-4 text-sm font-medium text-brand-red-dark">
-            {error}
-          </p>
-        )}
-        <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose}>
-            {t.admin.cancel}
-          </Button>
-          <Button size="sm" loading={pending} onClick={handleConfirm}>
-            {t.admin.delete}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
 }

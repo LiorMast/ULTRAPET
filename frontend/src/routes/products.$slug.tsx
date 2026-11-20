@@ -10,13 +10,19 @@
  * the shipping and returns notes; then the full description and
  * "You may also like" (CatalogCards of the same category).
  *
+ * Staff: the "Manage mode" switch sits under the breadcrumbs; in manage mode the price block becomes the product's
+ * staff panel (ProductManageStrip, size "lg": the information and every action of /admin/products; deleting the
+ * product goes back to the catalog), a product hidden from customers opens too (`all`, with a "Hidden from customers"
+ * ribbon), and the related cards carry their staff strips. The loader then also loads the staff data
+ * (loadProductAdmin); switching the mode reloads the page (useManageReload).
+ *
  * SEO: its `head` sets the product's title, a description from its text, the canonical and hreflang links,
  * og:image, and Product + BreadcrumbList JSON-LD. No price ever appears in the head (the public site has none).
  */
-import { useState } from 'react'
-import { createFileRoute, Link, linkOptions } from '@tanstack/react-router'
+import { Suspense, useState } from 'react'
+import { createFileRoute, Link, linkOptions, useNavigate } from '@tanstack/react-router'
 import { fetchProduct, rethrowNotFound, type ProductDetail } from '@/api'
-import { useCustomerPrices } from '@/auth'
+import { readManageMode, useCustomerPrices, useManage, useManageReload } from '@/auth'
 import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { CatalogCard, PriceSlot, priceFor, stockFor } from '@/components/CatalogCard'
@@ -27,12 +33,21 @@ import { RichText } from '@/components/RichText'
 import { TextLink } from '@/components/TextLink'
 import { localized } from '@/config'
 import { dictionaryFor, localizePath, useI18n, type Locale } from '@/i18n'
+import { cardManagement, loadProductAdmin, ManageBar, ManageStrip } from '@/manage'
 import { absoluteUrl, breadcrumbJsonLd, metaDescription, pageHead } from '@/seo'
 
 export const Route = createFileRoute('/products/$slug')({
-  loader: ({ params, abortController }) => fetchProduct(params.slug, abortController.signal).catch(rethrowNotFound),
-  head: ({ match, loaderData: product }) => {
-    if (!product) return {}
+  loader: async ({ params, context, abortController }) => {
+    const manage = readManageMode()
+    const [product, admin] = await Promise.all([
+      fetchProduct(params.slug, abortController.signal, manage).catch(rethrowNotFound),
+      manage ? loadProductAdmin(context.locale) : null,
+    ])
+    return { product, admin }
+  },
+  head: ({ match, loaderData }) => {
+    if (!loaderData) return {}
+    const { product } = loaderData
     const { locale } = match.context
     const t = dictionaryFor(locale)
     const path = productPath(product.slug)
@@ -127,7 +142,12 @@ function ServiceNote({ title, text }: { title: string; text: string }) {
  */
 function ProductPage() {
   const { t, locale } = useI18n()
-  const product = Route.useLoaderData()
+  const { product, admin } = Route.useLoaderData()
+  const navigate = useNavigate()
+  const manage = useManage()
+  useManageReload()
+  const managed = manage.on ? admin : null
+  const row = managed?.bySlug.get(product.slug)
   const prices = useCustomerPrices()
   const price = priceFor(prices, product.id)
   const stock = stockFor(prices, product.id)
@@ -159,6 +179,11 @@ function ProductPage() {
             { label: name },
           ]}
         />
+        {manage.available && (
+          <Suspense fallback={null}>
+            <ManageBar admin={managed ?? null} actions={false} className="mt-6" />
+          </Suspense>
+        )}
 
         {/* The gallery's large photo is the one that flies to the cart. */}
         <div {...{ [CART_FLY_SOURCE_ATTR]: '' }} className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
@@ -169,6 +194,7 @@ function ProductPage() {
             <h1 id="product-title" className="mt-3 font-display text-3xl font-bold text-brand-charcoal lg:text-4xl">
               {name}
             </h1>
+            {row && !row.isActive && <DiscountRibbon kind="hidden" message={t.manage.hidden} className="mt-3" />}
 
             {(product.brand || details.length > 0) && (
               <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
@@ -197,24 +223,30 @@ function ProductPage() {
               </dl>
             )}
 
-            <div className="mt-8 border-t border-neutral-150 pt-6">
-              <PriceSlot state={price} size="lg" />
-              {price.status === 'shown' && stock && <DiscountRibbon kind={STOCK_RIBBONS[stock]} message={t.stock[stock]} className="mt-3" />}
-              <p className="mt-3 text-sm text-brand-charcoal-muted">{t.product.wholesale}</p>
-              {price.status === 'shown' && (
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  {stock !== 'out' && <QuantityStepper value={quantity} onChange={setQuantity} />}
-                  <AddToCartButton
-                    key={product.id}
-                    size="lg"
-                    product={{ id: product.id, slug: product.slug, name: product.name, image: product.images[0]?.thumbnail ?? null, unitPrice: price.price }}
-                    quantity={quantity}
-                    onAdded={() => setQuantity(1)}
-                    available={stock !== 'out'}
-                  />
-                </div>
-              )}
-            </div>
+            {managed && row ? (
+              <Suspense fallback={null}>
+                <ManageStrip row={row} admin={managed} size="lg" onDeleted={() => void navigate({ to: '/catalog' })} className="mt-8" />
+              </Suspense>
+            ) : (
+              <div className="mt-8 border-t border-neutral-150 pt-6">
+                <PriceSlot state={price} size="lg" />
+                {price.status === 'shown' && stock && <DiscountRibbon kind={STOCK_RIBBONS[stock]} message={t.stock[stock]} className="mt-3" />}
+                <p className="mt-3 text-sm text-brand-charcoal-muted">{t.product.wholesale}</p>
+                {price.status === 'shown' && (
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    {stock !== 'out' && <QuantityStepper value={quantity} onChange={setQuantity} />}
+                    <AddToCartButton
+                      key={product.id}
+                      size="lg"
+                      product={{ id: product.id, slug: product.slug, name: product.name, image: product.images[0]?.thumbnail ?? null, unitPrice: price.price }}
+                      quantity={quantity}
+                      onAdded={() => setQuantity(1)}
+                      available={stock !== 'out'}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             <dl className="mt-8 divide-y divide-neutral-200 rounded-2xl bg-neutral-100 p-6">
               <ServiceNote title={t.product.shippingTitle} text={t.product.shippingText} />
@@ -242,7 +274,14 @@ function ProductPage() {
             <ul className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
               {product.related.map((other) => (
                 <li key={other.id} className="flex">
-                  <CatalogCard product={other} categoryName={categoryName} price={priceFor(prices, other.id)} stock={stockFor(prices, other.id)} className="w-full" />
+                  <CatalogCard
+                    product={other}
+                    categoryName={categoryName}
+                    price={priceFor(prices, other.id)}
+                    stock={stockFor(prices, other.id)}
+                    {...cardManagement(managed, other.slug)}
+                    className="w-full"
+                  />
                 </li>
               ))}
             </ul>

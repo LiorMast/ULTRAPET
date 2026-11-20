@@ -63,7 +63,7 @@ export const headingLabels = (t: Dictionary): Record<HeadingKey, string> => ({ e
  * @param props.intro - The paragraph under the title; omitted when not given (ignored with `edit`, which always has
  *   an intro).
  * @param props.edit - The section's editable texts: `edit(key)` gives the EditableText props of "eyebrow", "title"
- *   and "intro" (sectionFields' `field`). Omitted = the plain texts above.
+ *   and "intro" (sectionFields' `field`); an empty intro shows only while editing. Omitted = the plain texts above.
  * @param props.as - The title's heading level: "h2" (default, a page section) or "h1" (a page's own heading).
  * @param props.tone - "light" (default: red eyebrow, charcoal title) or "dark" (white texts, for a black section).
  * @param props.className - Extra classes for the wrapper (it is max-w-3xl by default).
@@ -89,11 +89,13 @@ export function SectionHeading({
   className?: string
 }) {
   if (edit) {
+    const introField = edit('intro')
     return (
       <div className={cn('max-w-3xl', className)}>
         <EditableText {...edit('eyebrow')} sizeClass={(size) => eyebrowLook({ size, tone })} />
         <EditableText {...edit('title')} as={Heading} id={id} wrap sizeClass={(size) => titleLook({ size, tone })} />
-        <EditableText {...edit('intro')} multiline sizeClass={(size) => introLook({ size, tone })} />
+        {/* An empty intro (a heading built without one) shows only while editing, so staff can add it. */}
+        {(introField.editing || introField.value.text) && <EditableText {...introField} multiline sizeClass={(size) => introLook({ size, tone })} />}
       </div>
     )
   }

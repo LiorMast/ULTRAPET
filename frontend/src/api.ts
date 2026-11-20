@@ -226,13 +226,19 @@ export type HeroContent = {
 }
 
 /**
- * A question of the home page FAQ section (table faq_items) and its answer, per language. A language may be missing:
+ * A question of a FAQ section (the home page's: table faq_items) and its answer, per language. A language may be missing:
  * the site shows the question only in the languages where both texts are there (see shownFaq in Faq.tsx).
  */
 export type FaqItem = { id: string; question: Partial<Record<Locale, string>>; answer: Partial<Record<Locale, string>> }
 
 /** A question as the FAQ editor saves it: with the `id` of the row it keeps, or without one for a new question. */
 export type FaqItemInput = Omit<FaqItem, 'id'> & { id?: string }
+
+/**
+ * A FAQ list saved as page content instead of the faq_items table (page_sections row "private_label_page_faq_items":
+ * the Private Label page's questions), in order; missing = the page's built-in questions.
+ */
+export type FaqItemsContent = { items?: FaqItem[] }
 
 /** The signed-in user: a business customer ("business") or an Ultra Pet staff member ("staff", no company). */
 export type User = { kind: 'business' | 'staff'; email: string; fullName: string; companyName: string | null }
@@ -394,10 +400,13 @@ export const fetchCategories = (signal?: AbortSignal) => apiFetch<ProductCategor
  * @param locale - The page's language, whose names the name sorts compare; omit for Hebrew.
  * @param signal - Aborts the request (a newer search replaces it).
  * @param pageSize - Products per page (1-100); omit for the server's 24 (the catalog). A brand page asks for a few.
+ * @param all - true = the inactive products too (staff manage mode: `all=1`, which the server answers only for a
+ *   signed-in staff member; anyone else gets the public page).
  * @returns The page of products with its totals and filter counts.
  */
-export function fetchProducts({ category, q, page, sort, brand, min, max }: CatalogSearch, locale?: Locale, signal?: AbortSignal, pageSize?: number) {
+export function fetchProducts({ category, q, page, sort, brand, min, max }: CatalogSearch, locale?: Locale, signal?: AbortSignal, pageSize?: number, all = false) {
   const params = new URLSearchParams()
+  if (all) params.set('all', '1')
   if (category) params.set('category', category)
   if (brand) params.set('brand', brand)
   if (q) params.set('q', q)
@@ -415,9 +424,11 @@ export function fetchProducts({ category, q, page, sort, brand, min, max }: Cata
  * One product, for its page.
  * @param slug - The product's URL name.
  * @param signal - Aborts the request (the router passes its loader's signal).
+ * @param all - true = an inactive product too (staff manage mode: `all=1`, answered only for a signed-in staff member).
  * @returns The product; throws ApiError 404 when it is unknown or not shown.
  */
-export const fetchProduct = (slug: string, signal?: AbortSignal) => apiFetch<ProductDetail>(`/api/products/${encodeURIComponent(slug)}`, { signal })
+export const fetchProduct = (slug: string, signal?: AbortSignal, all = false) =>
+  apiFetch<ProductDetail>(`/api/products/${encodeURIComponent(slug)}${all ? '?all=1' : ''}`, { signal })
 
 /**
  * The signed-in customer's prices and the stock status of the tracked products.

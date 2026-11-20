@@ -7,8 +7,12 @@
  * route reloads the results when the URL changes, meanwhile the current results dim and are aria-busy. Prices are shown only when the caller passes `prices`
  * (routes/catalog.tsx does that for signed-in customers), with each card's stock status; otherwise every card shows
  * "log in to see the price".
+ *
+ * Staff: the manage mode bar (the "Manage mode" switch, and while it is on the catalog-wide actions) sits under the
+ * heading, and in manage mode each card carries its staff strip (cardManagement, ProductManager.tsx) and the list
+ * includes the products hidden from customers. The route passes the staff data (`admin`).
  */
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Link, linkOptions, useNavigate, useRouterState } from '@tanstack/react-router'
 import { Download, Search } from 'lucide-react'
 import { cn } from 'cn'
@@ -20,9 +24,10 @@ import { TextLink } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
 import { inputVariants } from '@/components/ui/input'
 import type { Brand, CatalogSearch, ProductCategory, ProductPage } from '@/api'
-import type { CustomerPrices } from '@/auth'
+import { useManage, type CustomerPrices } from '@/auth'
 import { catalogPdfUrl, localized } from '@/config'
 import { useI18n } from '@/i18n'
+import { cardManagement, ManageBar, type ProductAdmin } from '@/manage'
 
 /**
  * One category filter chip: a link that keeps the search text and goes back to page 1. Its accessible
@@ -80,6 +85,7 @@ function PricesHiddenBanner() {
  * @param props.brands - The active brands (the brand filter).
  * @param props.search - The URL state (page, category, brands, search text, sort, price range), as validated by the route.
  * @param props.prices - Prices and stock statuses for a signed-in customer; omit to hide every price.
+ * @param props.admin - The staff data of the manage mode (loadProductAdmin); null / omitted = none loaded.
  * @returns The catalog <section>.
  */
 export function Catalog({
@@ -88,14 +94,18 @@ export function Catalog({
   brands,
   search,
   prices,
+  admin,
 }: {
   results: ProductPage
   categories: ProductCategory[]
   brands: Brand[]
   search: CatalogSearch
   prices?: CustomerPrices
+  admin?: ProductAdmin | null
 }) {
   const { t, locale } = useI18n()
+  const manage = useManage()
+  const managed = manage.on ? admin : null
   const navigate = useNavigate()
   // While a filter, search or page change loads, the current results stay but dim (after 200ms) and are aria-busy.
   const loading = useRouterState({ select: (state) => state.status === 'pending' })
@@ -130,7 +140,13 @@ export function Catalog({
         </TextLink>
       </div>
 
-      {!prices && <PricesHiddenBanner />}
+      {manage.available && (
+        <Suspense fallback={null}>
+          <ManageBar admin={managed ?? null} className="mt-8" />
+        </Suspense>
+      )}
+
+      {!prices && !manage.available && <PricesHiddenBanner />}
 
       <div className={cn('flex flex-col gap-5', prices ? 'mt-12' : 'mt-8')}>
         <form role="search" aria-label={t.catalog.searchLabel} onSubmit={(e) => e.preventDefault()} className="relative max-w-xl">
@@ -193,7 +209,14 @@ export function Catalog({
         >
           {items.map((product) => (
             <li key={product.id} className="flex">
-              <CatalogCard product={product} categoryName={categoryName.get(product.category)} price={priceFor(prices, product.id)} stock={stockFor(prices, product.id)} className="w-full" />
+              <CatalogCard
+                product={product}
+                categoryName={categoryName.get(product.category)}
+                price={priceFor(prices, product.id)}
+                stock={stockFor(prices, product.id)}
+                {...cardManagement(managed, product.slug)}
+                className="w-full"
+              />
             </li>
           ))}
         </ul>
