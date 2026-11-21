@@ -5,7 +5,8 @@
  *
  * The page follows the old WordPress product page: breadcrumbs (home > catalog > category > product); the gallery
  * beside the title, the product details (brand, item code, barcode), the price slot (a signed-in customer's price,
- * "log in to see the price" for everyone else; with a price, the stock status when the product's stock is tracked
+ * "log in to see the price" for everyone else; a discounted price shows its discount ribbons above it, the list price
+ * struck out and the total percentage, and bulk prices a footnote under it; with a price, the stock status when the product's stock is tracked
  * (In stock / Low stock / Out of stock), a quantity stepper and "Add to cart", or a disabled "Out of stock" button) and
  * the shipping and returns notes; then the full description and
  * "You may also like" (CatalogCards of the same category).
@@ -25,8 +26,8 @@ import { fetchProduct, rethrowNotFound, type ProductDetail } from '@/api'
 import { readManageMode, useCustomerPrices, useManage, useManageReload } from '@/auth'
 import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { CatalogCard, PriceSlot, priceFor, stockFor } from '@/components/CatalogCard'
-import { DiscountRibbon, STOCK_RIBBONS } from '@/components/DiscountRibbon'
+import { BulkNote, CatalogCard, PriceSlot, priceFor, stockFor } from '@/components/CatalogCard'
+import { DiscountRibbon, DiscountRibbons, STOCK_RIBBONS } from '@/components/DiscountRibbon'
 import { ProductGallery } from '@/components/ProductGallery'
 import { QuantityStepper } from '@/components/QuantityStepper'
 import { RichText } from '@/components/RichText'
@@ -229,7 +230,13 @@ function ProductPage() {
               </Suspense>
             ) : (
               <div className="mt-8 border-t border-neutral-150 pt-6">
+                {price.status === 'shown' && price.discount && (
+                  <DiscountRibbons types={price.discount.types} colors={price.discount.colors} className="mb-3" />
+                )}
                 <PriceSlot state={price} size="lg" />
+                {price.status === 'shown' && price.bulk && (
+                  <BulkNote tiers={price.bulk} listPrice={price.discount?.listPrice ?? price.price} size="lg" className="mt-3" />
+                )}
                 {price.status === 'shown' && stock && <DiscountRibbon kind={STOCK_RIBBONS[stock]} message={t.stock[stock]} className="mt-3" />}
                 <p className="mt-3 text-sm text-brand-charcoal-muted">{t.product.wholesale}</p>
                 {price.status === 'shown' && (
@@ -238,7 +245,7 @@ function ProductPage() {
                     <AddToCartButton
                       key={product.id}
                       size="lg"
-                      product={{ id: product.id, slug: product.slug, name: product.name, image: product.images[0]?.thumbnail ?? null, unitPrice: price.price }}
+                      product={{ id: product.id, slug: product.slug, name: product.name, image: product.images[0]?.thumbnail ?? null, unitPrice: price.price, bulk: price.bulk }}
                       quantity={quantity}
                       onAdded={() => setQuantity(1)}
                       available={stock !== 'out'}

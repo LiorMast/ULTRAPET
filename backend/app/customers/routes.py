@@ -38,7 +38,7 @@ from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.settings import Setting, get_setting
 from app.database.models.users import AppUser, BusinessLead, BusinessUser
 from app.database.wordpress import sanitize_html
-from app.pricing import ISRAEL, customer_prices
+from app.pricing import ISRAEL, customer_price_details, customer_prices, ribbon_colors
 
 bp = Blueprint("customers", __name__, url_prefix="/api")
 
@@ -828,18 +828,34 @@ def me() -> dict[str, Any]:
 
 @bp.get("/prices")
 def prices() -> dict[str, Any]:
-    """The signed-in customer's price of every product they can buy (the catalog shows them on the cards), and the
-    stock status of the products whose stock is tracked (never the units: see app.inventory).
+    """The signed-in customer's price of every product they can buy (the catalog shows them on the cards), the
+    discounts behind them, and the stock status of the products whose stock is tracked (never the units: see
+    app.inventory).
 
     Returns:
-        {currency, prices: {product id: unit price in shekels before VAT}, stock: {product id: "in" | "low" | "out"}};
-        products without a price are left out of `prices`, untracked ones out of `stock` (always orderable).
+        {currency, prices: {product id: unit price in shekels before VAT}, discounts: {product id: {listPrice, types}},
+        bulk: {product id: [{minQuantity, price}]} (the unit price from each bulk threshold that lowers it),
+        ribbonColors: {"general" | "customer": "#rrggbb"}, stock: {product id: "in" | "low" | "out"}}; products without
+        a price are left out of `prices`, those not below their list price out of `discounts` (`types` = the kinds of
+        discount that lowered it, "general" then "customer"), untracked ones out of `stock` (always orderable).
         401 when signed out, 403 for a staff token.
     """
     user = require_user("business")
+    details = customer_price_details(user.id)
     return {
         "currency": get_setting("currency", "ILS"),
-        "prices": {str(product_id): price for product_id, price in customer_prices(user.id).items()},
+        "prices": {str(product_id): detail.price for product_id, detail in details.items()},
+        "discounts": {
+            str(product_id): {"listPrice": detail.list_price, "types": list(detail.discounts)}
+            for product_id, detail in details.items()
+            if detail.discounts
+        },
+        "bulk": {
+            str(product_id): [{"minQuantity": tier.min_quantity, "price": tier.price} for tier in detail.bulk]
+            for product_id, detail in details.items()
+            if detail.bulk
+        },
+        "ribbonColors": ribbon_colors(),
         "stock": {str(product_id): status for product_id, status in inventory.customer_stock().items()},
     }
 

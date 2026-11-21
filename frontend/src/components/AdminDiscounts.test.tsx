@@ -4,15 +4,17 @@
  * customer, with its state), adding a discount for all customers or one customer through DiscountDialog's "applies
  * to" fields (what is sent, the required choices), a discount on all products (always for one customer), editing
  * one (moving it to a product), ending one now, deleting one, a fixed price
- * (listed, deletable, not editable), the sign-in form when signed out, and the Hebrew texts.
+ * (listed, deletable, not editable), the "Ribbon colors" dialog (the defaults, picking and typing a color, an invalid
+ * code, saving the setting, which the customers' catalog then uses), the sign-in form when signed out, and the Hebrew
+ * texts.
  */
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { createStaffRow } from '@/api'
 import { israelNow, israelToday } from '@/components/DiscountDialog'
 import categories from '@/stubs/product-categories.json'
 import products from '@/stubs/products.json'
-import { fakeFetch, signInFakeUser, STAFF_CUSTOMERS, TEST_STAFF } from '@/test/api'
+import { addFakePriceRule, fakeFetch, signInFakeUser, STAFF_CUSTOMERS, TEST_STAFF, TEST_USER } from '@/test/api'
 import { renderPage } from '@/test/utils'
 
 /** The ids the fake gives the first category and the first product (seeded rows have fixed ids). */
@@ -240,6 +242,60 @@ describe('/admin/discounts', { timeout: 15_000 }, () => {
     expect(tableCells()[0].slice(0, 6)).toEqual([PRODUCT, CUSTOMER.companyName, 'Fixed price ⁦₪40.00⁩', '—', 'No end date', 'Active'])
     expect(screen.queryByRole('button', { name: `Edit ${label}` })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: `Delete ${label}` })).toBeInTheDocument()
+  })
+
+  it('sets the ribbon colors: defaults, a picked and a typed color, an invalid code, saved for the catalog', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch)
+    const { user } = await renderPage('/en/admin/discounts', { staff: TEST_STAFF })
+    const button = screen.getByRole('button', { name: 'Ribbon colors' })
+    await user.click(button)
+    const dialog = await screen.findByRole('dialog', { name: 'Discount ribbon colors' })
+    const general = await within(dialog).findByRole('textbox', { name: 'Color code: General discount (all customers)' })
+    const own = within(dialog).getByRole('textbox', { name: "Color code: Customer's own discount" })
+    expect(general).toHaveValue('#BE1E24')
+    expect(own).toHaveValue('#1A1A1A')
+
+    // The color picker writes the code; typing works too, with or without "#".
+    const picker = within(dialog).getByLabelText('Pick a color: General discount (all customers)')
+    fireEvent.input(picker, { target: { value: '#0055aa' } })
+    expect(general).toHaveValue('#0055AA')
+    await user.clear(own)
+    await user.type(own, 'zz')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Enter a color code like #RRGGBB')
+    expect(own).toHaveAttribute('aria-invalid', 'true')
+    expect(own).toHaveFocus()
+    expect(fetchSpy.mock.calls.some(([url, init]) => String(url).includes('/settings') && init?.method && init.method !== 'GET')).toBe(false)
+
+    await user.clear(own)
+    await user.type(own, 'ffd54f')
+    const preview = within(dialog).getByText("Your discount", { selector: '[data-slot="discount-ribbon"]' })
+    expect(preview).toHaveStyle({ backgroundColor: '#FFD54F', color: '#1A1A1A' })
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Ribbon colors saved')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(button).toHaveFocus()
+    const sent = fetchSpy.mock.calls.find(([url, init]) => String(url).includes('/api/staff/settings') && init?.method === 'POST')!
+    expect(JSON.parse(String(sent[1]?.body))).toEqual({ key: 'discount_ribbon_colors', value: { general: '#0055AA', customer: '#FFD54F' } })
+
+    // Reopened: the saved colors; "Reset to default" puts the defaults back in the form.
+    await user.click(button)
+    const again = await screen.findByRole('dialog', { name: 'Discount ribbon colors' })
+    expect(await within(again).findByRole('textbox', { name: 'Color code: General discount (all customers)' })).toHaveValue('#0055AA')
+    await user.click(within(again).getByRole('button', { name: 'Reset to default' }))
+    expect(within(again).getByRole('textbox', { name: 'Color code: General discount (all customers)' })).toHaveValue('#BE1E24')
+    await user.click(within(again).getByRole('button', { name: 'Cancel' }))
+
+    // A customer's catalog uses the saved colors.
+    await addFakePriceRule({ product: String(products[0].id), kind: 'percent', value: 10 })
+    await addFakePriceRule({ product: String(products[0].id), customer: true, kind: 'percent', value: 5 })
+    cleanup()
+    await renderPage('/en/catalog', { user: TEST_USER })
+    const card = screen.getByRole('heading', { name: products[0].name.en }).closest('article')!
+    await within(card).findByRole('button', { name: 'Add to cart' })
+    const ribbons = card.querySelectorAll('[data-slot="discount-ribbons"] [data-slot="discount-ribbon"]')
+    expect(ribbons[0]).toHaveStyle({ backgroundColor: '#0055AA' })
+    expect(ribbons[1]).toHaveStyle({ backgroundColor: '#FFD54F', color: '#1A1A1A' })
   })
 
   it('shows the sign-in form when signed out', async () => {

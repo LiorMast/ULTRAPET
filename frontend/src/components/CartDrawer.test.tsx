@@ -3,13 +3,15 @@
  * business customers get the cart icon; it opens a titled panel from the end side with the empty state, the
  * minimum order and a disabled Checkout; it closes with the close button and Escape, and the catalog link
  * navigates and closes it; with products in it, it lists the lines (quantity, remove, subtotal) under the
- * minimum-order banner, and a stepper going down to 0 removes its line (the focus moves on).
+ * minimum-order banner, and a stepper going down to 0 removes its line (the focus moves on); a product with bulk
+ * prices shows its progress to the next one (BulkProgress, on the shared ProgressBar), and once its quantity reaches a
+ * tier the line total and the subtotal use the bulk price (the one-unit price struck out).
  * Hovering the icon shows a tooltip with the cart's summary. Also covers Offcanvas on its own (uncontrolled trigger, start side, no footer).
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { Offcanvas } from '@/components/Offcanvas'
-import { TEST_STAFF, TEST_USER } from '@/test/api'
+import { addFakePriceRule, TEST_STAFF, TEST_USER } from '@/test/api'
 import { renderComponent, renderPage } from '@/test/utils'
 import products from '@/stubs/products.json'
 import prices from '@/stubs/prices.json'
@@ -110,6 +112,64 @@ describe('Cart drawer', () => {
     expect(within(panel).getByText('Your cart is empty')).toBeInTheDocument()
     // The page behind the open panel is hidden from assistive tech, so the header button is too.
     expect(screen.getByRole('button', { name: 'Shopping cart', hidden: true })).toBeInTheDocument()
+  })
+
+  it("shows a line's progress to its next bulk price and prices the line at the bulk price it reaches", async () => {
+    const [first] = products
+    const list = prices.prices[first.id as keyof typeof prices.prices]
+    await addFakePriceRule({ category: first.category, kind: 'percent', value: 5, minQuantity: 6 })
+    await addFakePriceRule({ product: first.id, customer: true, kind: 'percent', value: 10, minQuantity: 12 })
+    const shekels = (amount: number) => new Intl.NumberFormat('en', { style: 'currency', currency: 'ILS' }).format(amount)
+    const { user } = await renderPage('/en/catalog', { user: TEST_USER })
+    const card = screen.getByRole('heading', { name: first.name.en }).closest('article')!
+    await user.click(await within(card).findByRole('button', { name: 'Add to cart' }))
+    await user.click(screen.getByRole('button', { name: 'Shopping cart, 1 item' }))
+    const panel = await screen.findByRole('dialog', { name: 'Shopping cart' })
+    const line = within(panel).getByRole('listitem')
+
+    const progress = () => line.querySelector<HTMLElement>('[data-slot="bulk-progress"]')!
+    expect(progress()).toHaveTextContent(`Add 5 more for ${shekels(Math.round(list * 0.95 * 100) / 100)} per unit`)
+    const bar = within(line).getByRole('progressbar', { name: `Progress to the bulk price: ${first.name.en}` })
+    expect(bar).toHaveAttribute('aria-valuenow', '1')
+    expect(bar).toHaveAttribute('aria-valuemax', '6')
+    expect(bar).toHaveAttribute('aria-valuetext', '1 of 6 units')
+    expect(line.querySelector('s')).toBeNull()
+
+    // Past the first tier: the next one.
+    const quantity = within(line).getByRole('textbox', { name: `Quantity of ${first.name.en}` })
+    await user.clear(quantity)
+    await user.type(quantity, '8')
+    const at6 = Math.round(list * 0.95 * 100) / 100
+    const at12 = Math.round(list * 0.9 * 0.95 * 100) / 100
+    expect(progress()).toHaveTextContent(`Add 4 more for ${shekels(at12)} per unit`)
+    expect(within(line).getByRole('progressbar', { name: `Progress to the bulk price: ${first.name.en}` })).toHaveAttribute('aria-valuemax', '12')
+    // 8 units reach the first tier: the line and the subtotal are priced at it, the one-unit price struck out.
+    expect(line).toHaveTextContent(`${shekels(at6)} per unitPrice before discount: ${shekels(list)}`)
+    expect(within(line).getByText(shekels(list), { selector: 's' })).toBeInTheDocument()
+    const total8 = shekels(Math.round(at6 * 8 * 100) / 100)
+    expect(within(line).getByText(total8)).toBeInTheDocument()
+    expect(panel.querySelector('[data-slot="offcanvas-footer"]') ?? panel).toHaveTextContent(`Subtotal${total8}`)
+
+    // Past the last tier: the bulk price reached, no bar.
+    await user.clear(quantity)
+    await user.type(quantity, '12')
+    expect(progress()).toHaveTextContent(`Bulk price applied: ${shekels(at12)} per unit`)
+    expect(within(line).queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(within(line).getByText(shekels(Math.round(at12 * 12 * 100) / 100))).toBeInTheDocument()
+
+    // Back under the first tier: the one-unit price again.
+    await user.clear(quantity)
+    await user.type(quantity, '2')
+    expect(line.querySelector('s')).toBeNull()
+    expect(within(line).getByText(shekels(Math.round(list * 2 * 100) / 100))).toBeInTheDocument()
+  })
+
+  it('shows no bulk progress on a product without bulk prices', async () => {
+    const { user } = await renderPage('/en/catalog', { user: TEST_USER })
+    await user.click((await screen.findAllByRole('button', { name: 'Add to cart' }))[0])
+    await user.click(screen.getByRole('button', { name: 'Shopping cart, 1 item' }))
+    const panel = await screen.findByRole('dialog', { name: 'Shopping cart' })
+    expect(panel.querySelector('[data-slot="bulk-progress"]')).toBeNull()
   })
 
   it('removes a line when its stepper goes down to 0, moving the focus to the next line', async () => {

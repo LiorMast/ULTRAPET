@@ -8,20 +8,26 @@
  *
  * Until the server cart and checkout (Phase 4) exist, the cart lives in localStorage, one per customer
  * (`ultrapet.cart.<email>`): it survives reloads, another customer signing in on the same browser sees their own
- * cart, and visitors and staff have none. Each line keeps a snapshot of the product (name, photo, unit price)
- * taken when it was added; checkout will re-price the lines on the server (bulk discounts included).
+ * cart, and visitors and staff have none. Each line keeps a snapshot of the product (name, photo, unit price, bulk
+ * tiers) taken when it was last added; a line's unit price is the bulk price its quantity reaches, else the one-unit
+ * price (lineUnitPrice), and the subtotal adds up those line totals. Checkout will re-price the lines on the server.
  */
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import type { BulkTier } from '@/api'
 import { useAuth } from '@/auth'
 import type { Localized } from '@/config'
 
-/** One product in the cart: the snapshot taken when it was added, and how many units. */
+/**
+ * One product in the cart: the snapshot taken when it was added (`unitPrice` = the price of one unit, `bulk` = its bulk
+ * tiers, lowest threshold first; none = no bulk prices), and how many units.
+ */
 export type CartLine = {
   id: string
   slug: string
   name: Localized<string>
   image: string | null
   unitPrice: number
+  bulk?: BulkTier[]
   quantity: number
 }
 
@@ -30,6 +36,24 @@ export type CartProduct = Omit<CartLine, 'quantity'>
 
 /** The attribute that marks the header's cart icon: the fly-to-cart animation lands on it. */
 export const CART_TARGET_ATTR = 'data-cart-target'
+
+/**
+ * The bulk tier a line's quantity reaches, if any.
+ * @param line - The cart line.
+ * @returns The highest tier whose threshold the quantity reaches; undefined when none.
+ */
+export function bulkTierOf(line: Pick<CartLine, 'bulk' | 'quantity'>): BulkTier | undefined {
+  return line.bulk?.findLast((tier) => tier.minQuantity <= line.quantity)
+}
+
+/**
+ * The unit price of a cart line at its quantity.
+ * @param line - The cart line.
+ * @returns The bulk price its quantity reaches, else the one-unit price.
+ */
+export function lineUnitPrice(line: Pick<CartLine, 'bulk' | 'quantity' | 'unitPrice'>): number {
+  return bulkTierOf(line)?.price ?? line.unitPrice
+}
 
 /** The fewest and the most units one line may hold. */
 export const MIN_QUANTITY = 1
@@ -130,7 +154,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   /**
    * Adds units of a product; a product already in the cart gets the units added to its line.
-   * @param product - The product snapshot (id, slug, name, photo, unit price).
+   * @param product - The product snapshot (id, slug, name, photo, unit price, bulk tiers); replaces the line's one.
    * @param quantity - Units to add (default 1).
    * @param options.pop - false = don't pop the header badge now (the caller calls pop() when its animation lands).
    */
@@ -140,7 +164,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       update((current) => {
         const existing = current.find((line) => line.id === product.id)
         if (!existing) return [...current, { ...product, quantity: clampQuantity(quantity) }]
-        return current.map((line) => (line.id === product.id ? { ...line, ...product, quantity: clampQuantity(line.quantity + quantity) } : line))
+        return current.map((line) => (line.id === product.id ? { ...line, bulk: undefined, ...product, quantity: clampQuantity(line.quantity + quantity) } : line))
       })
       if (pop) setAddedTick((tick) => tick + 1)
     },
@@ -168,8 +192,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => {
     const count = lines.reduce((sum, line) => sum + line.quantity, 0)
-    // Rounded to agorot once, like the server's prices.
-    const subtotal = Math.round(lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0) * 100) / 100
+    // Each line at its bulk price when its quantity reaches one; rounded to agorot once, like the server's prices.
+    const subtotal = Math.round(lines.reduce((sum, line) => sum + lineUnitPrice(line) * line.quantity, 0) * 100) / 100
     return { lines, count, subtotal, addedTick, add, pop, setQuantity, remove }
   }, [lines, addedTick, add, pop, setQuantity, remove])
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
@@ -177,7 +201,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
 /**
  * Gives a component the cart.
- * @returns The lines, `count` (units), `subtotal` (shekels before VAT), `addedTick` (grows when the badge should
+ * @returns The lines, `count` (units), `subtotal` (shekels before VAT, bulk prices applied), `addedTick` (grows when the badge should
  *   pop) and the actions `add`, `pop`, `setQuantity`, `remove`.
  */
 export function useCart(): CartValue {

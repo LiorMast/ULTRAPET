@@ -13,16 +13,20 @@
  * Every add replays a short pop of the badge and a nudge of the icon (`animate-cart-pop` / `animate-cart-nudge`
  * in index.css; a fade with reduced motion). A new line fades in and settles 4px (`starting:` styles, @starting-style).
  * The panel lists the lines (photo, name linking to the product, unit
- * price, a QuantityStepper, remove, line total), or an empty state with a link to the catalog; its footer shows
+ * price, a QuantityStepper, remove, line total, and for a product with bulk prices its progress to the next one:
+ * BulkProgress, from the line's bulk tiers; a line whose quantity reaches a tier is priced at it: lineUnitPrice, with
+ * the one-unit price struck out, and the subtotal follows), or an empty state with a link to the catalog; its footer shows
  * the subtotal before VAT and Checkout, which stays disabled until checkout exists (Phase 4).
  */
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { CircleAlert, CircleCheck, ShoppingCart, Trash2 } from 'lucide-react'
 import { cn } from 'cn'
-import { CART_TARGET_ATTR, useCart, type CartLine } from '@/cart'
+import type { BulkTier } from '@/api'
+import { bulkTierOf, CART_TARGET_ATTR, lineUnitPrice, useCart, type CartLine } from '@/cart'
 import { formatPrice } from '@/components/CatalogCard'
 import { Offcanvas } from '@/components/Offcanvas'
+import { ProgressBar } from '@/components/ProgressBar'
 import { QuantityStepper } from '@/components/QuantityStepper'
 import { Button } from '@/components/ui/button'
 import { localized, MIN_ORDER_AMOUNT } from '@/config'
@@ -165,17 +169,7 @@ function MinimumOrderBanner({ subtotal }: { subtotal: number }) {
       <div className="flex min-w-0 flex-1 flex-col gap-2.5">
         <p className="text-sm font-semibold leading-snug">{message}</p>
         {!reached && (
-          <div
-            role="progressbar"
-            aria-label={t.cart.minimumProgress}
-            aria-valuemin={0}
-            aria-valuemax={MIN_ORDER_AMOUNT}
-            aria-valuenow={Math.round(subtotal)}
-            aria-valuetext={`${formatPrice(locale, subtotal)} / ${minimum}`}
-            className="h-1.5 overflow-hidden rounded-full bg-white"
-          >
-            <div className="h-full rounded-full bg-brand-red transition-[width] duration-500" style={{ width: `${(subtotal / MIN_ORDER_AMOUNT) * 100}%` }} />
-          </div>
+          <ProgressBar label={t.cart.minimumProgress} value={subtotal} max={MIN_ORDER_AMOUNT} valueText={`${formatPrice(locale, subtotal)} / ${minimum}`} />
         )}
       </div>
     </div>
@@ -183,8 +177,45 @@ function MinimumOrderBanner({ subtotal }: { subtotal: number }) {
 }
 
 /**
+ * A cart line's progress to its next bulk price: "Add 4 more for ₪85.50 per unit" over a progress bar (the line's
+ * units out of the next threshold), or, past the last threshold, a confirmation of the bulk price applied (the line is
+ * priced at it: lineUnitPrice).
+ * @param props.tiers - The product's bulk tiers, lowest threshold first.
+ * @param props.quantity - The line's units.
+ * @param props.name - The product's name (names the bar).
+ * @returns The progress, or nothing without tiers.
+ */
+export function BulkProgress({ tiers, quantity, name }: { tiers: BulkTier[]; quantity: number; name: string }) {
+  const { t, locale } = useI18n()
+  const next = tiers.find((tier) => tier.minQuantity > quantity)
+  const reached = tiers.findLast((tier) => tier.minQuantity <= quantity)
+  if (!next && !reached) return null
+  const price = (tier: BulkTier) => formatPrice(locale, tier.price)
+  return (
+    <div data-slot="bulk-progress" className="flex flex-col gap-1.5">
+      <p className={cn('flex items-start gap-1.5 text-xs leading-snug', next ? 'text-brand-charcoal' : 'font-semibold text-success')}>
+        {!next && <CircleCheck aria-hidden="true" className="mt-px size-3.5 shrink-0" />}
+        {next
+          ? t.cart.bulkNext.replace('{n}', (next.minQuantity - quantity).toLocaleString(locale)).replace('{price}', price(next))
+          : t.cart.bulkReached.replace('{price}', price(reached!))}
+      </p>
+      {next && (
+        <ProgressBar
+          tone="muted"
+          label={t.cart.bulkProgress.replace('{name}', name)}
+          value={quantity}
+          max={next.minQuantity}
+          valueText={t.cart.bulkUnits.replace('{n}', quantity.toLocaleString(locale)).replace('{min}', next.minQuantity.toLocaleString(locale))}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
  * One line of the cart panel: photo, name (a link to the product), unit price, quantity (down to 0 = remove),
- * remove, line total.
+ * remove, line total (at the bulk price its quantity reaches, the one-unit price struck out), and its bulk progress when
+ * the product has bulk prices.
  * @param props.line - The cart line.
  * @param props.onNavigate - Called when the name link is followed (the panel closes).
  * @param props.onRemove - Removes the line (its trash button, or the stepper reaching 0).
@@ -194,6 +225,8 @@ function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNaviga
   const { t, locale } = useI18n()
   const { setQuantity } = useCart()
   const name = localized(line.name, locale)
+  const bulk = bulkTierOf(line)
+  const unit = lineUnitPrice(line)
 
   return (
     <li data-cart-line={line.id} className="flex gap-4 py-4 transition-[opacity,translate] duration-500 first:pt-0 starting:translate-y-1 starting:opacity-0">
@@ -219,7 +252,15 @@ function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNaviga
             <Trash2 aria-hidden="true" className="size-4" />
           </button>
         </div>
-        <p className="text-xs text-brand-charcoal-muted">{t.cart.unitPrice.replace('{price}', formatPrice(locale, line.unitPrice))}</p>
+        <p className="flex flex-wrap items-baseline gap-x-1.5 text-xs text-brand-charcoal-muted">
+          <span className={cn(bulk && 'font-semibold text-brand-charcoal')}>{t.cart.unitPrice.replace('{price}', formatPrice(locale, unit))}</span>
+          {bulk && (
+            <>
+              <span className="sr-only">{t.catalog.listPrice}: </span>
+              <s>{formatPrice(locale, line.unitPrice)}</s>
+            </>
+          )}
+        </p>
         <div className="flex items-center justify-between gap-2">
           <QuantityStepper
             size="sm"
@@ -229,8 +270,9 @@ function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNaviga
             label={t.quantity.labelFor.replace('{name}', name)}
             removeLabel={t.quantity.decreaseToRemove}
           />
-          <span className="font-semibold tabular-nums text-brand-charcoal">{formatPrice(locale, line.unitPrice * line.quantity)}</span>
+          <span className="font-semibold tabular-nums text-brand-charcoal">{formatPrice(locale, Math.round(unit * line.quantity * 100) / 100)}</span>
         </div>
+        {line.bulk && <BulkProgress tiers={line.bulk} quantity={line.quantity} name={name} />}
       </div>
     </li>
   )

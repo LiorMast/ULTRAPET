@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.database.models.catalog import Category, Product
-from app.pricing import PriceRule, customer_prices, resolve_price
+from app.pricing import BulkTier, PriceDetail, bulk_tiers, PriceRule, customer_price_details, customer_prices, price_detail, resolve_price
 from app.database.models.users import BusinessUser
 
 NOW = datetime(2026, 11, 15, 12, 0, tzinfo=UTC)
@@ -174,6 +174,87 @@ def test_a_customer_fixed_price_ignores_bulk_discounts():
     assert price([fixed], [rule("percent", "50", min_quantity=2)], quantity=10) == Decimal("60.00")
 
 
+def detail(customer: Iterable[PriceRule] = (), general: Iterable[PriceRule] = (), list_price: Decimal | None = LIST) -> PriceDetail | None:
+    """Prices the test product with its discount kinds.
+
+    Args:
+        customer: The customer's rules.
+        general: The general rules.
+        list_price: The product's list price.
+
+    Returns:
+        What price_detail returns at NOW for one unit.
+    """
+    return price_detail(list_price, customer, general, PRODUCT, CATEGORY, NOW)
+
+
+def test_price_detail_names_the_kinds_of_discount_that_lowered_the_price():
+    assert detail() == PriceDetail(LIST, LIST, ())
+    assert detail(general=[rule("percent", "10")]) == PriceDetail(Decimal("90.00"), LIST, ("general",))
+    assert detail(customer=[rule("amount", "15", every=True)]) == PriceDetail(Decimal("85.00"), LIST, ("customer",))
+    # Both stacked: general first in the list (display order), whatever the layer order.
+    both = detail(customer=[rule("percent", "20", product=True)], general=[rule("percent", "10")])
+    assert both == PriceDetail(Decimal("72.00"), LIST, ("general", "customer"))
+
+
+def test_price_detail_ignores_bulk_rules_for_one_unit():
+    assert detail(general=[rule("percent", "10", min_quantity=5)]) == PriceDetail(LIST, LIST, ())
+
+
+def test_a_fixed_price_is_a_customer_discount_only_below_the_list_price():
+    assert detail(customer=[rule("fixed_price", "60", product=True)], general=[rule("percent", "10")]) == PriceDetail(
+        Decimal("60.00"), LIST, ("customer",)
+    )
+    assert detail(customer=[rule("fixed_price", "120", product=True)]) == PriceDetail(Decimal("120.00"), LIST, ())
+    assert detail(customer=[rule("fixed_price", "40", product=True)], list_price=None) == PriceDetail(
+        Decimal("40.00"), None, ()
+    )
+    assert detail(list_price=None) is None
+
+
+def test_a_discount_that_does_not_lower_the_price_is_not_named():
+    # Already at 0 by the customer's discount: the general one changes nothing more, but it still applied.
+    assert detail(customer=[rule("percent", "100")]) == PriceDetail(Decimal("0.00"), LIST, ("customer",))
+    assert detail(general=[rule("amount", "0.001")]) == PriceDetail(LIST, LIST, ())
+
+
+def tiers(customer: Iterable[PriceRule] = (), general: Iterable[PriceRule] = ()) -> tuple[BulkTier, ...]:
+    """The test product's bulk tiers.
+
+    Args:
+        customer: The customer's rules.
+        general: The general rules.
+
+    Returns:
+        What bulk_tiers returns at NOW.
+    """
+    return bulk_tiers(LIST, customer, general, PRODUCT, CATEGORY, NOW)
+
+
+def test_bulk_tiers_price_each_threshold_with_every_layer():
+    assert tiers() == ()
+    regular = rule("percent", "10")
+    assert tiers(general=[regular, rule("percent", "5", min_quantity=12), rule("percent", "10", min_quantity=50)]) == (
+        BulkTier(12, Decimal("85.50")),
+        BulkTier(50, Decimal("81.00")),
+    )
+    # The customer's and the general bulk layers stack: from 20 units both apply.
+    both = tiers(customer=[rule("amount", "10", min_quantity=20, every=True)], general=[rule("percent", "10", min_quantity=10)])
+    assert both == (BulkTier(10, Decimal("90.00")), BulkTier(20, Decimal("81.00")))
+
+
+def test_bulk_tiers_follow_target_precedence_and_skip_what_does_not_lower_the_price():
+    # The product's bulk rule beats the category's from its threshold on, so 30 units are not cheaper than 10.
+    category = rule("percent", "20", min_quantity=30)
+    product = rule("percent", "10", product=True, min_quantity=10)
+    assert tiers(general=[category, product]) == (BulkTier(10, Decimal("90.00")),)
+    # Ended rules and other products' rules give no tier; a fixed price has none.
+    ended = rule("percent", "10", min_quantity=5, ends_at=NOW - timedelta(days=1))
+    elsewhere = PriceRule(created_at=NOW, kind="percent", value=Decimal(10), product_id=uuid.UUID(int=99), min_quantity=5, is_active=True)
+    assert tiers(general=[ended, elsewhere]) == ()
+    assert tiers(customer=[rule("fixed_price", "50", product=True)], general=[rule("percent", "10", min_quantity=5)]) == ()
+
+
 def test_customer_prices_uses_only_this_customer_and_the_general_rules(database):
     food = Category(slug="food", name={"he": "מזון"})
     toys = Category(slug="toys", name={"he": "צעצועים"})
@@ -221,6 +302,11 @@ def test_customer_prices_uses_only_this_customer_and_the_general_rules(database)
     database.commit()
 
     assert customer_prices(me.id, NOW) == {p1.id: Decimal("81.00"), p2.id: Decimal("30.00"), p3.id: Decimal("20.00")}
+    assert customer_price_details(me.id, NOW) == {
+        p1.id: PriceDetail(Decimal("81.00"), Decimal("100.00"), ("general", "customer")),
+        p2.id: PriceDetail(Decimal("30.00"), Decimal("50.00"), ("customer",)),
+        p3.id: PriceDetail(Decimal("20.00"), Decimal("20.00"), (), (BulkTier(2, Decimal("12.00")),)),  # the general bulk rule
+    }
 
 
 def test_customer_prices_applies_the_customers_discount_on_every_product(database):

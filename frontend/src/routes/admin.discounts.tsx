@@ -11,13 +11,16 @@
  * "fixed_price", which that dialog does not edit) is listed and can be deleted, but not edited here. The same general
  * discounts also show on the products and categories pages (their "Discounts" row action). After every change the
  * page reloads the rules from the server. Loads nothing when signed out (the layout shows the sign-in form instead).
+ * The header's "Ribbon colors" button (RibbonColorsDialog) sets the color of each kind of discount ribbon customers see.
  */
 import { useMemo } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import {
   createStaffRow,
   deleteStaffRow,
+  fetchSetting,
   fetchStaffRows,
+  saveSetting,
   updateStaffRow,
   type StaffCategory,
   type StaffCustomer,
@@ -27,7 +30,9 @@ import {
 import { DataTable, type DataColumn } from '@/components/DataTable'
 import { DiscountDialog, describeDiscount, discountTargets, END_TIME, formatMoment, formatValue, israelNow, israelTime, scopeFields, START_TIME } from '@/components/DiscountDialog'
 import { discountFields, ruleDiscount, ruleScope, ruleState, type RuleState } from '@/components/DiscountsDialog'
+import { RibbonColorsButton } from '@/components/RibbonColorsDialog'
 import type { SearchOption } from '@/components/SearchableField'
+import { RIBBON_COLORS_SETTING } from '@/config'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
 
@@ -95,7 +100,7 @@ function discountRows(
 }
 
 /**
- * The discounts page: its title and the table of every discount.
+ * The discounts page: its title, the ribbon colors button and the table of every discount.
  * @returns The page.
  */
 function AdminDiscounts() {
@@ -139,8 +144,16 @@ function AdminDiscounts() {
 
   return (
     <section>
-      <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.discountsTitle}</h1>
-      <p className="mb-8 mt-2 max-w-2xl text-sm text-brand-charcoal-muted">{t.admin.discountsDescription}</p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.discountsTitle}</h1>
+          <p className="mt-2 max-w-2xl text-sm text-brand-charcoal-muted">{t.admin.discountsDescription}</p>
+        </div>
+        <RibbonColorsButton
+          load={(signal) => fetchSetting(RIBBON_COLORS_SETTING, signal)}
+          onSave={(colors) => saveSetting(RIBBON_COLORS_SETTING, colors)}
+        />
+      </div>
       <DataTable
         rows={rows}
         columns={columns}

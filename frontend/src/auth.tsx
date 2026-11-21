@@ -4,7 +4,7 @@
  * AuthProvider holds the session and useAuth() gives components `user` (its `kind` tells a customer from a
  * staff member), `signIn` and `signOut`; useSignOut() is the Sign out buttons' action (signs out and confirms it in a
  * toast). Used by LoginForm (signs in), LoginPopover, MobileMenu and the /login
- * page (log out, the admin link for staff), the catalog and product pages (useCustomerPrices: prices and stock
+ * page (log out, the admin link for staff), the catalog and product pages (useCustomerPrices: prices, their discounts and stock
  * statuses only for a signed-in customer) and the /admin layout (the panel only for staff).
  *
  * The sign-in itself lives on the server: JWTs in HttpOnly cookies that scripts cannot read (see src/api.ts
@@ -22,7 +22,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useRouter } from '@tanstack/react-router'
-import { fetchPrices, fetchSession, postSignIn, postSignOut, setSignedOutHandler, type StockStatus, type User } from '@/api'
+import { fetchPrices, fetchSession, postSignIn, postSignOut, setSignedOutHandler, type Prices, type User } from '@/api'
 import { useI18n } from '@/i18n'
 import { clearProductAdmin } from '@/manage'
 import { useToast } from '@/toast'
@@ -31,10 +31,12 @@ import { useToast } from '@/toast'
 export type Credentials = { email: string; password: string; remember: boolean }
 
 /**
- * A signed-in customer's prices: `loading` while they arrive, then a map of product id → price in shekels, and the
- * stock status of the tracked products (product id → StockStatus; an untracked product is not in it).
+ * A signed-in customer's prices: `loading` while they arrive, then a map of product id → price in shekels, the
+ * discounts behind them (product id → list price + kinds, only for discounted products), the bulk tiers, each kind's
+ * ribbon color, and
+ * the stock status of the tracked products (product id → StockStatus; an untracked product is not in it).
  */
-export type CustomerPrices = { status: 'loading' } | { status: 'loaded'; prices: Record<string, number>; stock: Record<string, StockStatus> }
+export type CustomerPrices = { status: 'loading' } | ({ status: 'loaded' } & Pick<Prices, 'prices' | 'discounts' | 'bulk' | 'ribbonColors' | 'stock'>)
 
 type AuthValue = { user: User | null; signIn: (credentials: Credentials) => Promise<User>; signOut: () => Promise<void> }
 
@@ -222,21 +224,23 @@ export function useSignOut(): () => void {
 }
 
 /**
- * Loads the signed-in business customer's prices and the stock statuses (staff and visitors have none). Used by the
- * pages that show products (the catalog, a product page); reloads when another customer signs in.
- * @returns undefined when no customer is signed in, `loading` until the prices arrive, then the prices and statuses.
+ * Loads the signed-in business customer's prices, their discounts, the ribbon colors and the stock statuses (staff and
+ * visitors have none). Used by the pages that show products (the catalog, a product page); reloads when another
+ * customer signs in.
+ * @returns undefined when no customer is signed in, `loading` until the prices arrive, then the prices, discounts,
+ *   ribbon colors and statuses.
  */
 export function useCustomerPrices(): CustomerPrices | undefined {
   const { user: signedIn } = useAuth()
   const user = signedIn?.kind === 'business' ? signedIn : null
-  const [loaded, setLoaded] = useState<{ email: string; prices: Record<string, number>; stock: Record<string, StockStatus> } | null>(null)
+  const [loaded, setLoaded] = useState<({ email: string } & Pick<Prices, 'prices' | 'discounts' | 'bulk' | 'ribbonColors' | 'stock'>) | null>(null)
 
   useEffect(() => {
     if (!user) return
     let cancelled = false
     fetchPrices().then(
-      ({ prices, stock }) => {
-        if (!cancelled) setLoaded({ email: user.email, prices, stock })
+      ({ prices, discounts, bulk, ribbonColors, stock }) => {
+        if (!cancelled) setLoaded({ email: user.email, prices, discounts, bulk, ribbonColors, stock })
       },
       // A lost sign-in signs the visitor out (api.ts); other failures leave the prices loading.
       () => undefined,
@@ -248,7 +252,8 @@ export function useCustomerPrices(): CustomerPrices | undefined {
 
   // Prices belong to the customer they were loaded for; anything else is still loading (or signed out).
   if (!user) return undefined
-  return loaded?.email === user.email ? { status: 'loaded', prices: loaded.prices, stock: loaded.stock } : { status: 'loading' }
+  if (loaded?.email !== user.email) return { status: 'loading' }
+  return { status: 'loaded', prices: loaded.prices, discounts: loaded.discounts, bulk: loaded.bulk, ribbonColors: loaded.ribbonColors, stock: loaded.stock }
 }
 
 /**

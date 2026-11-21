@@ -117,10 +117,35 @@ export type CatalogSearch = { page?: number; category?: string; q?: string; sort
 export type StockStatus = 'in' | 'low' | 'out'
 
 /**
- * A signed-in customer's prices: product id → unit price in shekels before VAT; and `stock`: product id → the stock
- * status of the products whose stock is tracked (an untracked product is left out: always orderable, no status).
+ * A kind of discount the catalog shows a ribbon for: `general` (a rule for all customers) or `customer` (the
+ * customer's own rule, a fixed price below the list price included).
  */
-export type Prices = { currency: string; prices: Record<string, number>; stock: Record<string, StockStatus> }
+export type DiscountType = 'general' | 'customer'
+
+/** Why a customer's price is below the list price: the list price and the kinds of discount, "general" first. */
+export type PriceDiscount = { listPrice: number; types: DiscountType[] }
+
+/** A bulk price: the unit price when one order line has at least `minQuantity` units (all discounts applied). */
+export type BulkTier = { minQuantity: number; price: number }
+
+/** The background color (#rrggbb) of each kind of discount ribbon, as staff set it (setting discount_ribbon_colors). */
+export type RibbonColors = Record<DiscountType, string>
+
+/**
+ * A signed-in customer's prices: product id → unit price in shekels before VAT; `discounts`: product id → the list
+ * price and the kinds of discount, for the products priced below their list price; `bulk`: product id → its bulk
+ * tiers, lowest threshold first (only products that have some); `ribbonColors`: each kind's ribbon
+ * color; and `stock`: product id → the stock status of the products whose stock is tracked (an untracked product is
+ * left out: always orderable, no status).
+ */
+export type Prices = {
+  currency: string
+  prices: Record<string, number>
+  discounts: Record<string, PriceDiscount>
+  bulk: Record<string, BulkTier[]>
+  ribbonColors: RibbonColors
+  stock: Record<string, StockStatus>
+}
 
 /**
  * A brand. `accent` null = the site red; `logoUrl` null = the logo file bundled with the site (see
@@ -431,8 +456,8 @@ export const fetchProduct = (slug: string, signal?: AbortSignal, all = false) =>
   apiFetch<ProductDetail>(`/api/products/${encodeURIComponent(slug)}${all ? '?all=1' : ''}`, { signal })
 
 /**
- * The signed-in customer's prices and the stock status of the tracked products.
- * @returns The prices and stock statuses by product id; throws ApiError 401/403 when no customer is signed in.
+ * The signed-in customer's prices, the discounts behind them, the ribbon colors and the stock status of the tracked products.
+ * @returns The prices, discounts and stock statuses by product id, and the ribbon colors; throws ApiError 401/403 when no customer is signed in.
  */
 export const fetchPrices = () => apiFetch<Prices>('/api/prices')
 
@@ -838,6 +863,21 @@ export const deleteStaffRow = (resource: StaffResource, key: string) =>
  */
 export const saveSection = (key: string, content: object, saved: boolean) =>
   saved ? updateStaffRow('page-sections', key, { content }) : createStaffRow('page-sections', { key, content })
+
+/**
+ * Reads one setting (staff only), e.g. the discount ribbon colors.
+ * @param key - The setting's key.
+ * @param signal - Aborts the request.
+ * @returns Its stored value, or undefined when it has never been saved (404); throws ApiError for other failures.
+ */
+export async function fetchSetting(key: string, signal?: AbortSignal): Promise<unknown> {
+  try {
+    return (await apiFetch<{ value: unknown }>(`/api/staff/settings/${encodeURIComponent(key)}`, { signal })).value
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return undefined
+    throw error
+  }
+}
 
 /**
  * Stores one site setting: changes its value, or creates the setting when it does not exist yet.

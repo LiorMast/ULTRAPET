@@ -546,4 +546,55 @@ def test_prices_are_the_customers_own(customer_client, customer, catalog, databa
     data = customer_client.get("/api/prices").get_json()
     # Only the treat has a list price; the customer's 10% dog discount applies to it.
     # No product's stock is tracked, so there is no stock status (see test_inventory.py).
-    assert data == {"currency": "ILS", "prices": {str(catalog.treat.id): 9.0}, "stock": {}}
+    assert data == {
+        "currency": "ILS",
+        "prices": {str(catalog.treat.id): 9.0},
+        "discounts": {str(catalog.treat.id): {"listPrice": 10.0, "types": ["customer"]}},
+        "bulk": {},
+        "ribbonColors": {"general": "#BE1E24", "customer": "#1A1A1A"},
+        "stock": {},
+    }
+
+
+def test_prices_name_the_discounts_and_leave_out_undiscounted_products(customer_client, customer, priced, database):
+    database.add_all(
+        [
+            PriceRule(category=priced.dogs, kind="percent", value=Decimal("10")),  # every dog product
+            PriceRule(business_user=customer, product=priced.beef, kind="amount", value=Decimal("3")),
+            PriceRule(category=priced.cats, kind="percent", value=Decimal("50")),  # the cat food has no price
+        ]
+    )
+    database.commit()
+    data = customer_client.get("/api/prices").get_json()
+    assert data["prices"] == {str(priced.treat.id): 9.0, str(priced.beef.id): 24.3, str(priced.chew.id): 18.0}
+    assert data["discounts"] == {
+        str(priced.treat.id): {"listPrice": 10.0, "types": ["general"]},
+        str(priced.beef.id): {"listPrice": 30.0, "types": ["general", "customer"]},
+        str(priced.chew.id): {"listPrice": 20.0, "types": ["general"]},
+    }
+
+
+def test_prices_answer_the_bulk_tiers(customer_client, customer, priced, database):
+    database.add_all(
+        [
+            PriceRule(category=priced.dogs, kind="percent", value=Decimal("10"), min_quantity=12),
+            PriceRule(business_user=customer, product=priced.beef, kind="amount", value=Decimal("3"), min_quantity=24),
+        ]
+    )
+    database.commit()
+    data = customer_client.get("/api/prices").get_json()
+    # One unit costs the list price: bulk never changes the catalog price.
+    assert data["prices"][str(priced.beef.id)] == 30.0
+    assert data["discounts"] == {}
+    assert data["bulk"] == {
+        str(priced.treat.id): [{"minQuantity": 12, "price": 9.0}],
+        str(priced.beef.id): [{"minQuantity": 12, "price": 27.0}, {"minQuantity": 24, "price": 24.3}],
+        str(priced.chew.id): [{"minQuantity": 12, "price": 18.0}],
+    }
+
+
+def test_prices_answer_the_ribbon_colors_staff_chose(customer_client, database):
+    database.add(Setting(key="discount_ribbon_colors", value={"general": "#0055aa", "customer": "red", "other": "#000000"}))
+    database.commit()
+    # An invalid color falls back to its default; unknown kinds are left out.
+    assert customer_client.get("/api/prices").get_json()["ribbonColors"] == {"general": "#0055aa", "customer": "#1A1A1A"}

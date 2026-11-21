@@ -26,8 +26,10 @@
  * A product's stock (the server's app/inventory.py): `stockQuantity` is read-only in the products table (null = not
  * tracked, as every seeded product starts) and changes only through GET/POST /api/staff/products/<id>/stock, which keep
  * an in-memory ledger with the server's rules and errors (only a count starts tracking; "insufficient_stock" when
- * removing more than is on hand); GET /api/prices answers the `stock` status of the active, tracked products (keyed by
- * their public id, the WooCommerce id). setFakeStock is a test's shortcut for a stock staff counted.
+ * removing more than is on hand); GET /api/prices applies the price rules (fakePriceDetail: the customer's and the
+ * general regular rules, like app/pricing.py) and answers the discounts, the ribbon colors and the `stock` status of
+ * the active, tracked products (keyed by their public id, the WooCommerce id). setFakeStock is a test's shortcut for a
+ * stock staff counted, addFakePriceRule for a discount staff saved.
  * The generated PDF catalog: GET/POST /api/staff/catalog-pdf keep its options and answer a build as finished at once
  * (setFakeCatalogPdf sets another state, e.g. "building").
  * POST /api/staff/uploads fakes the upload (staff only; folder "categories", "brands", "private-label" or "products";
@@ -44,8 +46,10 @@
  * test can see a button wait on the server (its spinner) and count that a second click sent nothing.
  */
 import { CATALOG_SORTS, type CatalogSort } from '@/api'
-import type { Brand, Branch, CatalogPdfOptions, CatalogPdfState, ContactDetails, CustomerProfile, ProductCategory, ProductDetail, ProductImage, ProductPage, ProductStock, ProfileOrder, Stat, StaffCustomer, StaffLead, StockMovement, StockStatus, User } from '@/api'
-import type { Localized } from '@/config'
+import type { Brand, Branch, BulkTier, CatalogPdfOptions, CatalogPdfState, ContactDetails, CustomerProfile, DiscountType, PriceDiscount, ProductCategory, ProductDetail, ProductImage, ProductPage, ProductStock, ProfileOrder, Stat, StaffCustomer, StaffLead, StockMovement, StockStatus, User } from '@/api'
+import { israelNow, israelTime } from '@/components/DiscountDialog'
+import { ribbonColorsOf } from '@/components/RibbonColorsDialog'
+import { DISCOUNT_TYPES, RIBBON_COLORS_SETTING, type Localized } from '@/config'
 import articles from '@/stubs/articles.json'
 import branches from '@/stubs/branches.json'
 import brands from '@/stubs/brands.json'
@@ -211,6 +215,46 @@ export async function setFakeProduct(slug: string, changes: Record<string, unkno
   const row = (await tableRows('products')).find((product) => product.slug === slug)
   if (!row) throw new Error(`No stub product ${slug}`)
   Object.assign(row, changes)
+}
+
+/**
+ * Adds a price rule as if staff had saved it (a test's shortcut): an open-ended, active rule (regular unless `minQuantity`).
+ * @param rule.product - The target product's public id (its WooCommerce id); or
+ * @param rule.category - The target category's slug; neither = every product (a customer's rule only).
+ * @param rule.customer - true = the test customer's own rule (TEST_USER); false (default) = for all customers.
+ * @param rule.kind - "percent", "amount" or "fixed_price".
+ * @param rule.value - The percent or shekels.
+ * @param rule.minQuantity - A bulk rule's threshold; null (default) = a regular rule.
+ */
+export async function addFakePriceRule({
+  product,
+  category,
+  customer = false,
+  kind,
+  value,
+  minQuantity = null,
+}: {
+  product?: string
+  category?: string
+  customer?: boolean
+  kind: 'percent' | 'amount' | 'fixed_price'
+  value: number
+  minQuantity?: number | null
+}) {
+  const [products, categoryRows, rules] = await Promise.all([tableRows('products'), tableRows('categories'), tableRows('price-rules')])
+  const now = new Date().toISOString()
+  rules.push({
+    ...STAFF_TABLES['price-rules'].defaults,
+    id: crypto.randomUUID(),
+    productId: product === undefined ? null : products.find((row) => String(row.woocommerceId) === product)!.id,
+    categoryId: category === undefined ? null : categoryRows.find((row) => row.slug === category)!.id,
+    businessUserId: customer ? STAFF_CUSTOMERS[0].id : null,
+    kind,
+    value,
+    minQuantity,
+    createdAt: now,
+    updatedAt: now,
+  })
 }
 
 /**
@@ -739,6 +783,137 @@ function fakeStockStatus(quantity: unknown, threshold: unknown): StockStatus | n
   return threshold !== null && threshold !== undefined && Number(quantity) <= Number(threshold) ? 'low' : 'in'
 }
 
+/**
+ * The price rule of one layer that applies to a product now, like the server's pick_rule: a product rule beats a
+ * category rule, which beats a rule on every product; in a bulk layer the highest threshold reached; then the latest
+ * start (none = earliest), then the newest.
+ * @param rules - The layer's rules (one audience).
+ * @param product - The product's staff row.
+ * @param now - The current Israel time (israelNow).
+ * @param bulkQuantity - undefined = the regular rules; a number of units = the bulk rules whose threshold it reaches.
+ * @returns The winning rule, or undefined.
+ */
+function fakePickRule(rules: StaffRow[], product: StaffRow, now: string, bulkQuantity?: number): StaffRow | undefined {
+  const active = rules.filter(
+    (rule) =>
+      rule.isActive &&
+      (bulkQuantity === undefined ? rule.minQuantity === null : rule.minQuantity !== null && Number(rule.minQuantity) <= bulkQuantity) &&
+      (rule.startsAt === null || israelTime(String(rule.startsAt)) <= now) &&
+      (rule.endsAt === null || israelTime(String(rule.endsAt)) > now),
+  )
+  const tiers = [
+    (rule: StaffRow) => rule.productId === product.id,
+    (rule: StaffRow) => rule.productId === null && rule.categoryId !== null && rule.categoryId === product.categoryId,
+    (rule: StaffRow) => rule.productId === null && rule.categoryId === null,
+  ]
+  for (const matches of tiers) {
+    const candidates = active.filter(matches)
+    if (candidates.length > 0) {
+      const age = (rule: StaffRow) =>
+        `${String(Number(rule.minQuantity ?? 0)).padStart(9, '0')}|${rule.startsAt === null ? '' : israelTime(String(rule.startsAt))}|${rule.createdAt}`
+      return candidates.reduce((best, rule) => (age(rule) >= age(best) ? rule : best))
+    }
+  }
+  return undefined
+}
+
+/**
+ * A customer's unit price of one product, bought in a quantity, and the kinds of discount that lowered it, like the
+ * server's price_detail.
+ * @param listPrice - The product's list price.
+ * @param own - The customer's own rules.
+ * @param general - The rules for all customers.
+ * @param product - The product's staff row.
+ * @param quantity - Units on the order line (1 = the catalog price; bulk rules count from their threshold).
+ * @returns The price and, when it is below the list price, its discount.
+ */
+function fakePriceDetail(listPrice: number, own: StaffRow[], general: StaffRow[], product: StaffRow, quantity = 1): { price: number; discount?: PriceDiscount } {
+  const now = israelNow()
+  const mine = fakePickRule(own, product, now)
+  if (mine?.kind === 'fixed_price') {
+    const fixed = Number(mine.value)
+    return fixed < listPrice ? { price: fixed, discount: { listPrice, types: ['customer'] } } : { price: fixed }
+  }
+  let price = listPrice
+  const applied = new Set<DiscountType>()
+  const layers = [
+    ['customer', mine],
+    ['general', fakePickRule(general, product, now)],
+    ['customer', fakePickRule(own, product, now, quantity)],
+    ['general', fakePickRule(general, product, now, quantity)],
+  ] as const
+  for (const [type, rule] of layers) {
+    if (!rule) continue
+    price = Math.max(0, rule.kind === 'amount' ? price - Number(rule.value) : price * (1 - Number(rule.value) / 100))
+    applied.add(type)
+  }
+  price = Math.round(price * 100) / 100
+  return price < listPrice ? { price, discount: { listPrice, types: DISCOUNT_TYPES.filter((type) => applied.has(type)) } } : { price }
+}
+
+/**
+ * A product's bulk tiers for the customer, like the server's bulk_tiers: the price at each threshold of the bulk rules
+ * that can apply, kept when it is below the previous tier's.
+ * @param listPrice - The product's list price.
+ * @param own - The customer's own rules.
+ * @param general - The rules for all customers.
+ * @param product - The product's staff row.
+ * @returns The tiers, lowest threshold first.
+ */
+function fakeBulkTiers(listPrice: number, own: StaffRow[], general: StaffRow[], product: StaffRow): BulkTier[] {
+  const thresholds = [
+    ...new Set(
+      [...own, ...general]
+        .filter((rule) => rule.isActive && rule.minQuantity !== null && (rule.productId === product.id || (rule.productId === null && (rule.categoryId === null || rule.categoryId === product.categoryId))))
+        .map((rule) => Number(rule.minQuantity)),
+    ),
+  ].sort((a, b) => a - b)
+  const tiers: BulkTier[] = []
+  let best = fakePriceDetail(listPrice, own, general, product).price
+  for (const minQuantity of thresholds) {
+    const { price } = fakePriceDetail(listPrice, own, general, product, minQuantity)
+    if (price < best) {
+      tiers.push({ minQuantity, price })
+      best = price
+    }
+  }
+  return tiers
+}
+
+/**
+ * Answers GET /api/prices like the server: the stub list prices with the signed-in customer's and the general price
+ * rules applied, the discounts behind them, the bulk tiers, the ribbon colors (setting discount_ribbon_colors) and the stock statuses
+ * of the active, tracked products, all keyed by the public id (the WooCommerce id).
+ * @returns The answer.
+ */
+async function pricesAnswer(): Promise<Response> {
+  const { default: stub } = await import('@/stubs/prices.json')
+  const [products, rules, customers, settings] = await Promise.all([tableRows('products'), tableRows('price-rules'), tableRows('customers'), tableRows('settings')])
+  const customerId = customers.find((customer) => customer.email === session?.email)?.id
+  const own = rules.filter((rule) => rule.businessUserId !== null && rule.businessUserId === customerId)
+  const general = rules.filter((rule) => rule.businessUserId === null)
+  const prices: Record<string, number> = { ...stub.prices }
+  const discounts: Record<string, PriceDiscount> = {}
+  const bulk: Record<string, BulkTier[]> = {}
+  const stock: Record<string, StockStatus> = {}
+  for (const row of products) {
+    if (row.woocommerceId === null) continue
+    const id = String(row.woocommerceId)
+    const listPrice = (stub.prices as Record<string, number>)[id]
+    if (listPrice !== undefined && rules.length > 0) {
+      const { price, discount } = fakePriceDetail(listPrice, own, general, row)
+      prices[id] = price
+      if (discount) discounts[id] = discount
+      const tiers = fakeBulkTiers(listPrice, own, general, row)
+      if (tiers.length > 0) bulk[id] = tiers
+    }
+    const status = fakeStockStatus(row.stockQuantity, row.lowStockThreshold)
+    if (row.isActive && status) stock[id] = status
+  }
+  const ribbonColors = ribbonColorsOf(settings.find((setting) => setting.key === RIBBON_COLORS_SETTING)?.value)
+  return json({ currency: stub.currency, prices, discounts, bulk, ribbonColors, stock })
+}
+
 /** How many movements the stock routes answer (the server's HISTORY_LIMIT). */
 const STOCK_HISTORY_LIMIT = 50
 
@@ -1194,16 +1369,7 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
     const section = (await tableRows('page-sections')).find((row) => row.key === slug('/api/sections/'))
     if (section) return json({ key: section.key, content: sectionJson(String(section.key), section.content), updatedAt: section.updatedAt })
     if (path === '/api/resellers') return json(branches.map((b) => ({ approximate: false, ...b })) satisfies Branch[])
-    if (path === '/api/prices') {
-      const { default: prices } = await import('@/stubs/prices.json')
-      // The stock statuses of the active, tracked products, by their public id (the server's customer_stock).
-      const stock: Record<string, StockStatus> = {}
-      for (const row of await tableRows('products')) {
-        const status = fakeStockStatus(row.stockQuantity, row.lowStockThreshold)
-        if (row.isActive && status && row.woocommerceId !== null) stock[String(row.woocommerceId)] = status
-      }
-      return json({ currency: prices.currency, prices: prices.prices, stock })
-    }
+    if (path === '/api/prices') return pricesAnswer()
     if (path === '/api/account') return accountAnswer()
     if (path === '/api/auth/me') return session ? json({ user: session }) : json({ error: 'unauthorized' }, 401)
   }

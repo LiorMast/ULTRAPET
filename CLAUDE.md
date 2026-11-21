@@ -82,11 +82,13 @@ frontend/
                         Offcanvas (the reusable side panel on ui/sheet: title, close, `notice` strip, scrolling body, footer;
                         logical side; optional trigger `tooltip`),
                         CartDrawer (the business customers' header cart icon + badge and its Offcanvas: lines, subtotal,
-                        minimum order), AddToCartButton (adds to the cart, "✓ Added" morph; `available={false}` = a
+                        minimum order, each line's bulk progress), ProgressBar (role="progressbar", the cart's bars), AddToCartButton (adds to the cart, "✓ Added" morph; `available={false}` = a
                         disabled "Out of stock"), QuantityStepper (− n +),
                         StockDialog (a product's stock in the admin: record a movement, the history; stockAction,
                         StockCell, StockSummary, stockStatus), DiscountRibbon (a small squircle badge: short message on a color; kinds
-                        discount / sale and the stock statuses: STOCK_RIBBONS; an `icon` only when asked),
+                        discount / sale and the stock statuses: STOCK_RIBBONS; an `icon` only when asked; `customColor` = a
+                        staff-chosen color with readableTextColor text; DiscountRibbons = a product's ribbons per kind of discount),
+                        RibbonColorsDialog (the "Ribbon colors" button + dialog of /admin/discounts: each discount kind's ribbon color),
                         SegmentedSwitch (the multi-choice switch: a radio group drawn as one bar with a sliding thumb),
                         Toast (a compact squircle notification at the top center: icon, bold message, close X; `kind` success / error / warning
                         presets them (TOAST_KINDS; tokens `success`, `warning`); shows 2 s, fades, then onDone; above everything, z-[100]),
@@ -140,7 +142,8 @@ backend/
                         `stock_quantity` is `read_only`); GET/POST /catalog-pdf = the PDF catalog dialog (options,
                         status, files / save the options and build now); an after_request hook asks for a rebuild of
                         the PDF catalog after a change to products, categories, brands or the contact_* settings
-    pricing.py          the customer's price from the price rules (pick_rule, resolve_price, customer_prices)
+    pricing.py          the customer's price from the price rules (pick_rule, price_detail (+ the kinds of discount that lowered
+                        it), bulk_tiers, resolve_price, customer_price_details, customer_prices) and ribbon_colors (setting discount_ribbon_colors)
     accounts.py         a customer's profile (profile_json: details, orders, own price rules; staff view adds notes,
                         Rivhit id, paused rules), shared by GET /api/account and the staff profile route
     mailer.py           send_mail (MAIL_BACKEND smtp / log / memory (tests) / off; SMTP in a background thread, never
@@ -408,6 +411,20 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   no product) is a customer's store-wide discount, always for one customer (`price_rules_target_check`). A discount is stored as a `price_rules` row: `kind` 'percent' | 'amount' = the type, `value` > 0,
   `min_quantity` = the bulk threshold (NULL = a regular discount; never on a fixed price).
   **Not yet stored:** `payment_methods.discount_percent` has no amounts or dates (schema change with its page).
+  **What customers see**: `/api/prices` also answers `discounts` (product id → `{ listPrice, types }`, only products
+  priced below their list price; `types` = `general` (a rule for all customers) and/or `customer` (their own rule, a
+  fixed price below list included), from `price_detail`) and `ribbonColors`. `priceFor` puts it on the `PriceState`;
+  a card shows one `DiscountRibbons` ribbon per type over the photo's corner ("Sale" / "Your discount"), the product
+  page above its price, and `PriceSlot` shows the list price struck out plus one total percentage of all discounts
+  combined (`discountPercent`). Bulk rules never change the unit price, so they get no ribbon; instead `/api/prices`
+  answers `bulk` (product id → `[{ minQuantity, price }]`: `bulk_tiers` prices each threshold with every layer, keeping
+  the ones that lower the price) and `BulkNote` (CatalogCard.tsx) adds a footnote under the price: the first tier on a
+  card ("* From 12 units: ₪X per unit · more on the product page"), every tier with its saving off the list price on
+  the product page, plus a note that the cart applies it. Each type's color is the
+  setting `discount_ribbon_colors` ({ general, customer }: "#rrggbb"; defaults `DISCOUNT_RIBBON_DEFAULTS` in config.ts =
+  `RIBBON_COLOR_DEFAULTS` in pricing.py; invalid values fall back), set by staff in `/admin/discounts` → "Ribbon
+  colors" (`RibbonColorsDialog`: picker + hex field, live preview, reset); the text is white, charcoal or black,
+  whichever reaches 4.5:1 (`readableTextColor`).
 - **Inline section editing** (`InlineEditor.tsx`): a section that staff may edit in place calls
   `useInlineDraft(onSave)` (`onSave` undefined = the user may not edit: signing out while editing drops the draft and
   ends edit mode), wraps its texts in `<form {...formProps}>`, puts `<InlineEditBar {...bar} onEdit={() =>
@@ -478,7 +495,7 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Cart** (`src/cart.tsx`, `AddToCartButton`, `CartDrawer`): only signed-in business customers have one, and an
   "Add to cart" button appears only where their price is shown (`priceFor(...).status === 'shown'`): +1 on a
   `CatalogCard` (above its stretched link), a `QuantityStepper` + the button on the product page. A line keeps a
-  snapshot (id, slug, name, thumbnail, unit price); bulk discounts and the final price come at checkout (Phase 4).
+  snapshot (id, slug, name, thumbnail, unit price, bulk tiers); the final price is recomputed at checkout (Phase 4).
   Feedback on add: the button cross-fades to "✓ Added" for `ADDED_MS` (with a polite status line), a copy of the
   product photo flies into the header cart icon (`flyToCart`, Web Animations: the first <img> inside the nearest
   `CART_FLY_SOURCE_ATTR` element, landing on the `CART_TARGET_ATTR` icon; from the button when the photo is scrolled
@@ -487,7 +504,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   Hovering the cart icon shows a tooltip with the units and subtotal (`Offcanvas tooltip`, on `ui/tooltip`).
   In the cart panel a line's `QuantityStepper min={0}` removes the line at 0 (the minus shows a trash icon at 1; the
   focus moves to the next line), and the minimum-order banner with its progress bar sits in the `Offcanvas notice`
-  strip (under the header, never scrolls away). Money is formatted with `formatPrice` (CatalogCard.tsx). Checkout stays disabled until Phase 4.
+  strip (under the header, never scrolls away). A line of a product with bulk prices shows `BulkProgress` ("Add 4 more for
+  ₪X per unit" over a progress bar to the next threshold, then "Bulk price applied"); a line snapshots its product's bulk
+  tiers (`CartLine.bulk`) and is priced at the tier its quantity reaches (`lineUnitPrice`, the one-unit price struck
+  out), so the line total, the subtotal and the minimum order use bulk prices. Checkout must still re-price on the server. Progress bars are the shared `ProgressBar` (`tone` onTint / muted). Money is formatted with `formatPrice` (CatalogCard.tsx). Checkout stays disabled until Phase 4.
 - **Inventory** (stock ledger: `backend/app/inventory.py`, table `stock_movements`, `StockDialog`): a product's units on
   hand are `products.stock_quantity` (**NULL = not tracked**: always orderable, no status; every seeded product starts
   untracked) and its `low_stock_threshold` (NULL = no low warning). The units change only by recording a movement
@@ -546,7 +566,7 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   names from several spans that rely on whitespace.
 - **Icons**: lucide-react only; logos are SVG assets. An **action button** leads with its icon (aria-hidden, before
   the label): Edit `Pencil`, Delete / Remove `Trash2`, Add `Plus`, Change order `ArrowUpDown`, Discounts `Percent`,
-  Stock `Boxes`, End discount now `CalendarX2`, PDF catalog `FileText`, Upload `Upload`, Edit on page `Pencil`, Add
+  Stock `Boxes`, End discount now `CalendarX2`, PDF catalog `FileText`, Ribbon colors `Palette`, Upload `Upload`, Edit on page `Pencil`, Add
   to cart `ShoppingCart`, Out of stock `PackageX`, Find the nearest store `LocateFixed`, Login `UserRound`, My account
   `UserRound`, Open account `UserPlus`, Admin panel `ShieldCheck`, Log out `LogOut`, To the catalog `LayoutGrid`; a download link too (`TextLink icon={Download}`).
   Controls that are icons stay (close, menu, chevrons, carousel arrows, cart, play/pause, password eye, drag grip,

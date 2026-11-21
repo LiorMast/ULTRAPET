@@ -13,7 +13,7 @@
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
 import { Award, ClipboardList, Factory, FlaskConical, Globe, Handshake, Lightbulb, Package, Palette, Ship, ShieldCheck, Truck, type LucideIcon } from 'lucide-react'
-import type { ContactDetails, FontKey, ProductCategory, SizeStep } from '@/api'
+import type { ContactDetails, DiscountType, FontKey, ProductCategory, RibbonColors, SizeStep } from '@/api'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
 
@@ -309,6 +309,18 @@ export const ADMIN_NAV: NavLink[] = [
 
 /** The smallest order a business customer can place, in shekels (shown in the cart; checked at checkout). */
 export const MIN_ORDER_AMOUNT = 2000
+
+/** The kinds of discount ribbon, in display order (a product with both shows the general one first). */
+export const DISCOUNT_TYPES: DiscountType[] = ['general', 'customer']
+
+/**
+ * Each discount ribbon's color until staff choose their own (brand red, brand charcoal); the server's
+ * RIBBON_COLOR_DEFAULTS (backend/app/pricing.py) holds the same. Staff change them in /admin/discounts (RibbonColorsDialog).
+ */
+export const DISCOUNT_RIBBON_DEFAULTS: RibbonColors = { general: '#BE1E24', customer: '#1A1A1A' }
+
+/** The setting that stores the ribbon colors chosen by staff ({ general, customer }: "#rrggbb" each). */
+export const RIBBON_COLORS_SETTING = 'discount_ribbon_colors'
 
 /** The header's login link (the B2B customer portal). */
 export const HEADER_LOGIN = {
