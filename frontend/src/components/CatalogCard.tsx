@@ -270,7 +270,8 @@ export function CatalogCard({
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-2 pt-3 sm:p-3 sm:pt-4">
         {categoryName && <p className="font-heading text-xs font-semibold text-brand-red-dark">{categoryName}</p>}
-        <Heading className="line-clamp-3 flex-1 text-sm font-semibold leading-snug text-brand-charcoal">
+        {/* Exactly three lines tall (the clamp; the height also cuts a line a mixed-direction name lets through), so the divider and the price row line up across a row of cards. */}
+        <Heading className="line-clamp-3 h-[3lh] text-sm font-semibold leading-snug text-brand-charcoal">
           {/* The stretched link: its ::after covers the card, so the whole card opens the product. */}
           <Link
             to="/products/$slug"
@@ -280,7 +281,8 @@ export function CatalogCard({
             {localized(product.name, locale)}
           </Link>
         </Heading>
-        <div className="border-t border-neutral-150 pt-3">
+        {/* Takes the spare height of the row, so the Add to cart buttons sit on one line at the bottom. */}
+        <div className="flex flex-1 flex-col border-t border-neutral-150 pt-3">
           {manage ? (
             <Suspense fallback={null}>{manage}</Suspense>
           ) : (
@@ -291,11 +293,13 @@ export function CatalogCard({
               )}
               {price.status === 'shown' && stock === 'low' && <DiscountRibbon kind="lowStock" message={t.stock.low} className="mt-2" />}
               {price.status === 'shown' && (
-                <AddToCartButton
-                  product={{ id: product.id, slug: product.slug, name: product.name, image: product.image?.thumbnail ?? null, unitPrice: price.price, bulk: price.bulk }}
-                  available={stock !== 'out'}
-                  className="z-10 mt-3"
-                />
+                <div className="mt-auto pt-3">
+                  <AddToCartButton
+                    product={{ id: product.id, slug: product.slug, name: product.name, image: product.image?.thumbnail ?? null, unitPrice: price.price, bulk: price.bulk }}
+                    available={stock !== 'out'}
+                    className="z-10"
+                  />
+                </div>
               )}
             </>
           )}
