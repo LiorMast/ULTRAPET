@@ -2,14 +2,15 @@
  * WhereToBuy.tsx — The "Where to Buy" page content (משווקים): a store locator with a search box, a
  * "find the nearest store" button, a list of the reseller stores (name, address, phone, distance) and a map.
  * Used by routes/where-to-buy.tsx, which loads the stores from the API (fetchResellers).
- * The map (Leaflet) is loaded lazily, so the rest of the site does not download it.
+ * The map (Leaflet) is loaded lazily, so the rest of the site does not download it; a skeleton of its size waits in
+ * its place meanwhile.
  */
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import { LocateFixed, Search } from 'lucide-react'
 import { cn } from 'cn'
 import { SectionHeading } from '@/components/SectionHeading'
 import { textLinkVariants } from '@/components/TextLink'
-import { Spinner } from '@/components/ui/spinner'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { inputVariants } from '@/components/ui/input'
 import type { Branch } from '@/api'
@@ -183,7 +184,15 @@ export function WhereToBuy({ branches }: { branches: Branch[] }) {
             </ul>
           )}
         </div>
-        <Suspense fallback={<div className={`${PANE_HEIGHT} flex items-center justify-center gap-3 rounded-2xl bg-neutral-100 text-sm text-brand-charcoal-muted`}><Spinner label={false} className="text-brand-red" />{t.whereToBuy.mapLoading}</div>}>
+        {/* While the map's code loads: a skeleton of the map's size, saying what is coming. */}
+        <Suspense
+          fallback={
+            <div className={`${PANE_HEIGHT} relative flex items-center justify-center overflow-hidden rounded-2xl`}>
+              <Skeleton className="absolute inset-0 size-full rounded-none" />
+              <p className="relative text-sm text-brand-charcoal-muted">{t.whereToBuy.mapLoading}</p>
+            </div>
+          }
+        >
           <BranchMap branches={shownBranches} selectedId={activeId} onSelect={setSelectedId} userLocation={position} className={PANE_HEIGHT} />
         </Suspense>
       </div>

@@ -1,6 +1,7 @@
 /**
  * Catalog.test.tsx — Tests for the catalog page (/catalog), built from Catalog, CatalogCard and Pagination:
- * no prices for visitors who are not signed in, prices for signed-in customers in both languages, paging
+ * no prices for visitors who are not signed in, prices for signed-in customers in both languages (a skeleton while
+ * they load), paging
  * through real links, category chips, search (in either language), product translations, the empty state,
  * the page-number window, the head tags, product photos served from our own file storage, and the toolbar: sorts
  * (the price ones for customers only), the brand filter with its counts, a customer's price range, the filter pills.
@@ -133,6 +134,18 @@ describe('Catalog page', () => {
     await renderPage('/en/catalog', { user: customer })
     const en = format('en')
     await waitFor(() => expect(cards()[0]).toHaveTextContent(`${en}excl. VAT`))
+  })
+
+  it("holds each card's price place with a skeleton while a customer's prices load", async () => {
+    const held = holdRequests((path) => path === '/api/prices')
+    await renderPage('/en/catalog', { user: customer })
+    await waitFor(() => expect(held.calls).toEqual(['GET /api/prices']))
+    expect(cards()[0]).toHaveTextContent('Loading price…')
+    expect(cards()[0].querySelector('[data-slot="skeleton"]')).toHaveAttribute('aria-hidden', 'true')
+
+    held.release()
+    await waitFor(() => expect(cards()[0]).toHaveTextContent('excl. VAT'))
+    expect(cards()[0].querySelector('[data-slot="skeleton"]')).toBeNull()
   })
 
   it('sets the title, canonical (category + page, no search) and JSON-LD', async () => {

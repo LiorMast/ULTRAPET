@@ -15,6 +15,8 @@
  * Staff in manage mode (ProductManager.tsx): the caller passes `manage`, the product's staff strip, which takes the
  * price slot's place (rendered in a Suspense, since the strip is loaded lazily), and `inactive` for a product hidden
  * from customers (its photo dims and a "Hidden from customers" ribbon sits in the corner).
+ * While its photo downloads, the photo's well shimmers (img-frame). CatalogCardSkeleton is the card's loading
+ * placeholder, in the same frame (the pages' first-load skeletons, PageSkeleton.tsx).
  * Used by the Catalog component and the product page's "You may also like" row. Also exports the price and stock
  * helpers the product page and the cart share (priceFor, stockFor, PriceSlot, formatPrice).
  */
@@ -25,6 +27,7 @@ import { cn } from 'cn'
 import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
 import { DiscountRibbon, DiscountRibbons } from '@/components/DiscountRibbon'
 import { textLinkVariants } from '@/components/TextLink'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import type { BulkTier, PriceDiscount, Product, RibbonColors, StockStatus } from '@/api'
 import type { CustomerPrices } from '@/auth'
 import { localized } from '@/config'
@@ -102,7 +105,7 @@ const cardVariants = cva('group relative flex rounded-2xl border border-neutral-
   defaultVariants: { variant: 'grid' },
 })
 
-const photoVariants = cva('relative shrink-0 overflow-hidden rounded-xl bg-neutral-100', {
+const photoVariants = cva('img-frame relative shrink-0 overflow-hidden rounded-xl bg-neutral-100', {
   variants: {
     variant: {
       grid: 'aspect-square w-full',
@@ -132,7 +135,8 @@ export function PriceSlot({ state, size = 'sm' }: { state: PriceState; size?: 's
   }
   if (state.status === 'loading') {
     return (
-      <span className="block h-6 w-24 animate-pulse rounded-md bg-neutral-150">
+      <span className="block">
+        <Skeleton className={size === 'lg' ? 'h-9 w-40' : 'h-6 w-24'} />
         <span className="sr-only">{t.catalog.loadingPrice}</span>
       </span>
     )
@@ -306,5 +310,28 @@ export function CatalogCard({
         </div>
       </div>
     </article>
+  )
+}
+
+/**
+ * The loading placeholder of a product card: the same frame, photo well and text rows, as skeletons.
+ * @param props.variant - `grid` (tile, default) or `list` (row), as the card it stands for.
+ * @param props.className - Extra classes for the card.
+ * @returns The decorative placeholder card (put it inside a SkeletonGroup).
+ */
+export function CatalogCardSkeleton({ variant, className }: { className?: string } & VariantProps<typeof cardVariants>) {
+  return (
+    <div aria-hidden="true" className={cn(cardVariants({ variant }), 'pointer-events-none', className)}>
+      <div className={photoVariants({ variant })}>
+        <Skeleton className="size-full rounded-none" />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-2 pt-3 sm:p-3 sm:pt-4">
+        <SkeletonText className="text-xs" width="w-1/3" />
+        <SkeletonText lines={2} className="h-[3lh] text-sm leading-snug" />
+        <div className="flex flex-1 flex-col border-t border-neutral-150 pt-3">
+          <Skeleton className="h-6 w-24" />
+        </div>
+      </div>
+    </div>
   )
 }

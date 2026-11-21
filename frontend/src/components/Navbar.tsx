@@ -41,6 +41,12 @@ import type { ProductCategory } from '@/api'
 import { useAuth } from '@/auth'
 import { useI18n } from '@/i18n'
 
+/** The fixed header bar: the translucent white material, 88px tall (py-4 + the 56px logo); shared with HeaderSkeleton. */
+export const HEADER_BAR_CLASS = 'material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]'
+
+/** The header's row: logo at the start edge, the menu centered, the buttons at the end edge; shared with HeaderSkeleton. */
+export const HEADER_ROW_CLASS = 'flex w-full items-center justify-between gap-1 px-4 sm:px-6 lg:px-10 xl:gap-6 xl:px-6 2xl:px-10'
+
 /**
  * The site header.
  * @param props.categories - The catalog categories for the Products dropdown (loaded by the root route).
@@ -57,8 +63,8 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
   const mainNavRef = useRef<HTMLElement>(null)
 
   return (
-    <header className="material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]">
-      <div className="flex w-full items-center justify-between gap-1 px-4 sm:px-6 lg:px-10 xl:gap-6 xl:px-6 2xl:px-10">
+    <header className={HEADER_BAR_CLASS}>
+      <div className={HEADER_ROW_CLASS}>
         <Link
           to="/"
           aria-label={t.header.home}

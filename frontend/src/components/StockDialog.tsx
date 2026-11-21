@@ -12,6 +12,7 @@
  * StockCell (the table cell: units + a Low / Out ribbon), StockSummary (the stock alerts above the table) and
  * stockAction (the row's "Stock" button that opens this dialog). The ribbons are DiscountRibbon's stock kinds, the
  * same ones customers see on the catalog.
+ * While the stock loads, the body shows skeletons in its shape (ui/skeleton.tsx).
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Boxes } from 'lucide-react'
@@ -23,6 +24,7 @@ import { errorMessage } from '@/components/RecordDialog'
 import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { SegmentedSwitch } from '@/components/SegmentedSwitch'
 import { Button } from '@/components/ui/button'
+import { Skeleton, SkeletonFields, SkeletonGroup, SkeletonText } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useI18n, type Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
@@ -278,9 +280,23 @@ export function StockDialog({
         <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-col">
           <div className="min-h-0 space-y-6 overflow-y-auto px-6 py-5">
             {stock === null ? (
-              <p role={loadFailed ? 'alert' : 'status'} className={cn('text-sm', loadFailed ? 'font-medium text-brand-red-dark' : 'text-brand-charcoal-muted')}>
-                {loadFailed ? s.loadFailed : s.loading}
-              </p>
+              loadFailed ? (
+                <p role="alert" className="text-sm font-medium text-brand-red-dark">
+                  {s.loadFailed}
+                </p>
+              ) : (
+                // The values are on their way: placeholders in the shape of the form below.
+                <SkeletonGroup label={s.loading} className="space-y-6">
+                  <span className="block">
+                    <SkeletonText className={LABEL_CLASS} width="w-24" />
+                    <SkeletonText className="mt-1 font-display text-3xl" width="w-20" />
+                  </span>
+                  <Skeleton className="h-10 w-full rounded-lg" />
+                  <SkeletonFields className="grid gap-5 sm:grid-cols-2" />
+                  <SkeletonFields count={1} />
+                  <SkeletonText lines={3} className="text-sm" width="w-full" />
+                </SkeletonGroup>
+              )
             ) : (
               <>
                 <div className="flex flex-wrap items-end gap-x-6 gap-y-3">

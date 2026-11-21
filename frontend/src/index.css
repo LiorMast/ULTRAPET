@@ -21,7 +21,8 @@
  *   transition (--ease-spring), size-specific letter-spacing on large text, a translucent header
  *   material (material-bar), and a reduced-motion mode that keeps fades but drops movement. Durations come in three
  *   steps: 150ms (press, color), 300ms (hover lift, menus, pills), 500ms (panels, photos). Shared motion utilities:
- *   img-fade (a photo fades in once loaded), link-underline (an underline that sweeps in), the Spinner's
+ *   img-fade (a photo fades in once loaded), img-frame (its frame shimmers until then), skeleton (a loading
+ *   placeholder's sweeping shine, ui/skeleton.tsx), link-underline (an underline that sweeps in), the Spinner's
  *   animate-spinner, and the route cross-fade (view transitions, ::view-transition rules below).
  * - Restyles the DataTables tables of the admin panel (DataTable.tsx) to the brand, under `.data-table`.
  * - Styles stored HTML text (RichText.tsx, e.g. a product description) under `.rich-text`.
@@ -354,6 +355,57 @@ html:lang(he) {
   transition-timing-function: var(--ease-spring);
   &[data-loaded] {
     opacity: 1;
+  }
+}
+
+/*
+ * Loading skeletons (ui/skeleton.tsx): a pale block with a soft shine that sweeps across it in the reading direction,
+ * then rests, and again, while the content loads (a loading indicator, like the Spinner: the one kind of looping motion
+ * the site allows). Its colors are variables: --skeleton-base (the block, neutral-150) and --skeleton-shine (white;
+ * the dark tone sets both to faint white). The first frame has the shine outside the block, so a screenshot with
+ * animations stopped shows a plain block. Reduced motion pulses it in place instead (see the reduced-motion block).
+ */
+@keyframes skeleton-shine {
+  from {
+    background-position: 200% 0;
+  }
+  70%,
+  to {
+    background-position: -100% 0;
+  }
+}
+/* The reduced-motion skeleton: fades a little and back, in place. */
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@utility skeleton {
+  background-color: var(--skeleton-base, var(--color-neutral-150));
+  background-image: linear-gradient(90deg, transparent 25%, var(--skeleton-shine, rgb(255 255 255 / 0.75)) 50%, transparent 75%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shine 2s ease-in-out infinite;
+  &:dir(rtl) {
+    animation-direction: reverse;
+  }
+}
+
+/*
+ * A photo's frame (the box an img-fade photo fills) that shimmers like a skeleton until its photo has loaded: the
+ * frame keeps its own background color and only the shine sweeps over it. Set --skeleton-shine on a dark frame
+ * (e.g. [--skeleton-shine:rgb(255_255_255/0.08)]). Used by the cards' photos (CatalogCard, ArticleCard, CategoryCard,
+ * BrandCard) and the product gallery. Reduced motion shows the plain frame.
+ */
+@utility img-frame {
+  &:has(> .img-fade:not([data-loaded])) {
+    background-image: linear-gradient(90deg, transparent 25%, var(--skeleton-shine, rgb(255 255 255 / 0.75)) 50%, transparent 75%);
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: skeleton-shine 2s ease-in-out infinite;
+  }
+  &:dir(rtl):has(> .img-fade:not([data-loaded])) {
+    animation-direction: reverse;
   }
 }
 
@@ -700,6 +752,15 @@ html:lang(he) {
   [dir] .animate-route-progress {
     width: 100%;
     animation: spinner-pulse 1.2s ease-in-out infinite;
+  }
+  /* A skeleton pulses in place (no sweeping shine); a photo's frame stays plain while the photo loads. */
+  .skeleton {
+    background-image: none;
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+  .img-frame {
+    animation: none;
+    background-image: none;
   }
   details::details-content {
     transition: none;

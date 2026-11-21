@@ -3,7 +3,7 @@
  * stock alerts above the table, the "Stock" row action and its StockDialog) against the fake staff API
  * (src/test/api.ts): an untracked product starts with a count, goods received / removed change the units on hand,
  * removing more than is on hand and a bad number are refused next to the box, the history lists each movement, the
- * low-stock threshold is set in the product form, and the Hebrew texts.
+ * low-stock threshold is set in the product form, the form's skeleton shows while the stock loads, and the Hebrew texts.
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -114,6 +114,21 @@ describe('/admin/products stock', () => {
     await waitFor(() => expect(within(dialog).getByText('Out of stock')).toBeInTheDocument())
     expect(within(within(dialog).getByRole('list')).getAllByRole('listitem')[0]).toHaveTextContent(/Removed\s*−17/)
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it("shows a skeleton of the form while the product's stock loads", async () => {
+    const held = holdRequests((path, method) => method === 'GET' && path.endsWith('/stock'))
+    const { user } = await renderPage('/en/admin/products', { staff: TEST_STAFF })
+    await user.click(screen.getByRole('button', { name: `Stock: ${first.name.en}` }))
+    const dialog = await screen.findByRole('dialog', { name: 'Stock' })
+    await waitFor(() => expect(held.calls).toHaveLength(1))
+    expect(within(dialog).getByRole('status')).toHaveTextContent('Loading the stock...')
+    expect(dialog.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(3)
+    expect(within(dialog).queryByRole('group', { name: 'Movement' })).not.toBeInTheDocument()
+
+    held.release()
+    expect(await within(dialog).findByRole('group', { name: 'Movement' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-slot="skeleton"]')).toBeNull()
   })
 
   it('shows Record busy while the server records, and records the movement once', async () => {

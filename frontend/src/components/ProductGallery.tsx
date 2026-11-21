@@ -1,13 +1,15 @@
 /**
  * ProductGallery.tsx — The photos of one product: a large photo and, when there are several, a row of
  * thumbnail buttons that switch it (each says which photo it shows; the current one is pressed). The large
- * photo cross-fades when it changes. With no photo, a quiet placeholder keeps the layout. Used by the product
+ * photo fades in once it has loaded (img-fade; its frame shimmers until then, img-frame), so it cross-fades when it
+ * changes. With no photo, a quiet placeholder keeps the layout. Used by the product
  * page (routes/products.$slug.tsx).
  */
 import { useState } from 'react'
 import { cn } from 'cn'
 import type { ProductDetail } from '@/api'
 import { useI18n } from '@/i18n'
+import { imgFade } from '@/motion'
 
 /**
  * Renders the gallery.
@@ -23,7 +25,7 @@ export function ProductGallery({ images, name, className }: { images: ProductDet
 
   return (
     <div role="group" aria-label={t.product.galleryLabel} className={cn('flex flex-col gap-3', className)}>
-      <div className="relative aspect-square overflow-hidden rounded-3xl bg-neutral-100">
+      <div className="img-frame relative aspect-square overflow-hidden rounded-3xl bg-neutral-100">
         {image ? (
           <img
             key={image.src}
@@ -33,7 +35,8 @@ export function ProductGallery({ images, name, className }: { images: ProductDet
             height={800}
             fetchPriority="high"
             decoding="async"
-            className="size-full object-contain p-6 mix-blend-multiply animate-in fade-in duration-500 sm:p-10"
+            {...imgFade}
+            className="img-fade size-full object-contain p-6 mix-blend-multiply sm:p-10"
           />
         ) : (
           <div className="flex size-full items-center justify-center text-brand-charcoal-muted">

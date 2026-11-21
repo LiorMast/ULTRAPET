@@ -2,7 +2,9 @@
  * Hero.tsx — The home page hero: a slideshow of photos with a dark gradient on the text side, the "Ultra Pet"
  * headline, a short pitch and a button. Rebuilt from legacy/src/components/Hero.tsx.
  *
- * - Full-bleed: edge to edge right under the header, filling the rest of the first screen.
+ * - Full-bleed: edge to edge right under the header, filling the rest of the first screen (HERO_FRAME_CLASS, shared
+ *   with the page's first-load skeleton, PageSkeleton.tsx; HERO_GUTTER_CLASS = the navbar's side padding, so the text
+ *   lines up with the logo).
  * - The photos come from the folder src/assets/hero (see HERO_IMAGES in src/config.ts): drop files there
  *   and they appear, in filename order. Photos are decorative; the headline carries the meaning.
  * - Each photo fades in over 1.6s while slowly zooming in (styles: .hero-slide in src/index.css).
@@ -29,14 +31,13 @@ import { cn } from 'cn'
 import type { HeroContent, SectionText } from '@/api'
 import { putLocale, putWidth, resolveText } from '@/components/EditableSection'
 import { EditableText, InlineEditBar, PropBar, useInlineDraft, type TextValue } from '@/components/InlineEditor'
+import { HERO_FRAME_CLASS, HERO_GUTTER_CLASS } from '@/components/PageSkeleton'
 import { useReducedMotion } from '@/components/useReducedMotion'
 import { Button } from '@/components/ui/button'
 import logoMarkUrl from '@/assets/logo-mark.svg'
 import { HERO_IMAGES, HERO_LINKS, type HeroImage } from '@/config'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 
-/** Same side padding as the navbar, so the hero text lines up with the logo. */
-const PAGE_GUTTER = 'px-6 lg:px-10 xl:px-6 2xl:px-10'
 
 // The size class goes first in cn(): tailwind-merge drops a `leading-*` that comes before a text size.
 
@@ -230,7 +231,7 @@ export function Hero({
     <section
       id="home"
       className={cn(
-        'relative isolate h-[calc(100svh-5.5rem)] max-h-[960px] min-h-[600px] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3',
+        HERO_FRAME_CLASS,
         // While editing, the boxes' frames and a wrapped bar can add height: the hero grows instead of cutting off.
         editing && 'h-auto max-h-none py-28',
       )}
@@ -255,7 +256,7 @@ export function Hero({
       <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-black/20" />
       <div className="pointer-events-none absolute inset-0 bg-black/30 lg:hidden" />
 
-      <div className={cn('relative z-10 mx-auto flex h-full max-w-screen-2xl flex-col justify-center', PAGE_GUTTER)}>
+      <div className={cn('relative z-10 mx-auto flex h-full max-w-screen-2xl flex-col justify-center', HERO_GUTTER_CLASS)}>
         <form {...inline.formProps} className="max-w-3xl">
           <div className="mb-5 flex animate-hero-rise items-center gap-3 [animation-delay:200ms]">
             <span aria-hidden="true" className="h-px w-8 bg-brand-red" />
@@ -345,7 +346,7 @@ export function Hero({
       {hasControls && (
         // At the text's side (inline start): the inline end belongs to the floating WhatsApp button. On phones the row
         // sits higher, clear of the centered scroll-down arrow.
-        <div className={cn('absolute inset-x-0 bottom-16 z-10 mx-auto flex max-w-screen-2xl justify-start sm:bottom-6', PAGE_GUTTER)}>
+        <div className={cn('absolute inset-x-0 bottom-16 z-10 mx-auto flex max-w-screen-2xl justify-start sm:bottom-6', HERO_GUTTER_CLASS)}>
           <div
             role="group"
             aria-label={t.hero.slideshowLabel}
@@ -396,7 +397,7 @@ export function Hero({
       )}
 
       {(onSave || editor) && (
-        <div className={cn('absolute inset-x-0 top-6 z-20 mx-auto flex max-w-screen-2xl flex-wrap justify-end gap-3', PAGE_GUTTER)}>
+        <div className={cn('absolute inset-x-0 top-6 z-20 mx-auto flex max-w-screen-2xl flex-wrap justify-end gap-3', HERO_GUTTER_CLASS)}>
           {onSave && (
             <InlineEditBar
               {...inline.bar}

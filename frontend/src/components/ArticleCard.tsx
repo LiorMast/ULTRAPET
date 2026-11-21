@@ -5,12 +5,15 @@
  * `default` for grids, `featured` (photo beside the text on large screens) for the latest article.
  * Used by the articles list page and the "more articles" row of an article page.
  *
- * Also exports ArticleMeta, the topic · date · reading-time line, shared with the article page header.
+ * Also exports ArticleMeta, the topic · date · reading-time line, shared with the article page header, and
+ * ArticleCardSkeleton, the card's loading placeholder in the same frame (the pages' first-load skeletons,
+ * PageSkeleton.tsx). While the photo downloads, its frame shimmers (img-frame).
  */
 import { Link } from '@tanstack/react-router'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from 'cn'
 import type { Article } from '@/api'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { articleImage, localized } from '@/config'
 import { useI18n, type Locale } from '@/i18n'
 import { imgFade } from '@/motion'
@@ -69,6 +72,20 @@ const cardVariants = cva(
 )
 
 /**
+ * The photo frame's classes (shared with the skeleton).
+ * @param featured - The wide card (photo beside the text on large screens).
+ * @returns The frame's size classes.
+ */
+const photoClass = (featured: boolean) => cn('relative aspect-[16/10] overflow-hidden', featured && 'lg:aspect-auto lg:min-h-96')
+
+/**
+ * The text column's classes (shared with the skeleton).
+ * @param featured - The wide card.
+ * @returns The column's layout classes.
+ */
+const bodyClass = (featured: boolean) => cn('flex flex-1 flex-col p-7', featured && 'lg:justify-center lg:p-12')
+
+/**
  * One article card. A real link (crawlable, keyboard-focusable); on hover its border darkens and it gains a soft shadow.
  * @param props.article - The article to show.
  * @param props.variant - `default` (grid card) or `featured` (wide card, photo beside the text).
@@ -89,7 +106,7 @@ export function ArticleCard({
   const image = articleImage(article.slug)
   return (
     <Link to="/articles/$slug" params={{ slug: article.slug }} className={cn(cardVariants({ variant }), className)}>
-      <div className={cn('relative aspect-[16/10] overflow-hidden bg-neutral-150', featured && 'lg:aspect-auto lg:min-h-96')}>
+      <div className={cn(photoClass(featured), 'img-frame bg-neutral-150')}>
         {image && (
           <img
             src={image.src}
@@ -105,7 +122,7 @@ export function ArticleCard({
           />
         )}
       </div>
-      <div className={cn('flex flex-1 flex-col p-7', featured && 'lg:justify-center lg:p-12')}>
+      <div className={bodyClass(featured)}>
         <ArticleMeta article={article} />
         <Heading className={cn('mt-4 font-display font-bold text-brand-charcoal', featured ? 'text-2xl lg:text-3xl' : 'text-xl')}>
           {localized(article.title, locale)}
@@ -116,5 +133,26 @@ export function ArticleCard({
         </span>
       </div>
     </Link>
+  )
+}
+
+/**
+ * The loading placeholder of an article card: the same frame, photo and text rows, as skeletons.
+ * @param props.variant - `default` (grid card) or `featured`, as the card it stands for.
+ * @param props.className - Extra classes for the card, e.g. grid placement.
+ * @returns The decorative placeholder card (put it inside a SkeletonGroup).
+ */
+export function ArticleCardSkeleton({ variant, className }: { className?: string } & VariantProps<typeof cardVariants>) {
+  const featured = variant === 'featured'
+  return (
+    <div aria-hidden="true" className={cn(cardVariants({ variant }), 'pointer-events-none', className)}>
+      <Skeleton className={cn(photoClass(featured), 'rounded-none')} />
+      <div className={bodyClass(featured)}>
+        <SkeletonText className="text-xs" width="w-1/2" />
+        <SkeletonText className={cn('mt-4', featured ? 'text-2xl lg:text-3xl' : 'text-xl')} width="w-4/5" />
+        <SkeletonText lines={3} className="mt-3 flex-1 text-sm leading-relaxed" />
+        <SkeletonText className="mt-6 text-sm" width="w-28" />
+      </div>
+    </div>
   )
 }

@@ -6,14 +6,15 @@
  * whose API request failed. Its `head` sets the default title and description; pages override them (see seo.ts).
  * Loading feedback: while a navigation waits for its data, the current page stays (so a field being typed in keeps
  * its focus) and a slim red bar runs along the top of the window (RouteProgress; <main> is aria-busy); the very first
- * load, before there is any page to keep, shows a centered Spinner (PagePending, this route's pendingComponent).
+ * load, before there is any page to keep, shows a skeleton of the page being opened (PageSkeleton, the router's
+ * default pending component, see router.ts): inside this layout once its own data is in, else with the header's
+ * skeleton too.
  */
 import { useState } from 'react'
 import { createRootRouteWithContext, HeadContent, Link, Outlet, useMatchRoute, useRouter, useRouterState } from '@tanstack/react-router'
 import { fetchCategories, fetchContact, type ContactDetails, type ProductCategory } from '@/api'
 import { Navbar } from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/spinner'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
 
@@ -32,23 +33,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   },
   component: RootLayout,
   notFoundComponent: NotFound,
-  // Only the first load has no page to keep on screen: after 400ms it shows the spinner (for at least 300ms, no blink).
-  pendingComponent: PagePending,
-  pendingMs: 400,
-  pendingMinMs: 300,
 })
-
-/**
- * The first page load's waiting screen: a centered brand-red Spinner that fades in.
- * @returns The spinner, centered in the window.
- */
-export function PagePending() {
-  return (
-    <div className="flex min-h-svh animate-fade-in items-center justify-center text-brand-red">
-      <Spinner size="lg" />
-    </div>
-  )
-}
 
 /**
  * The navigation progress bar: a slim red bar sliding along the top edge while the next page's data loads. It

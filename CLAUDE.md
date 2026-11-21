@@ -64,7 +64,7 @@ frontend/
                         admin.customers.$id = one customer's profile (staff view); admin.requests = the requests for
                         an account ("Open account" converts one); account.tsx = "My account" (the customer's profile);
                         private-label.tsx = the Private Label page (every section editable in place, components/PrivateLabelPage.tsx); route pages are tested in components/<Name>Page.test.tsx)
-    components/         site components (Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm (+ LoginCard, the sign-in pages' card), Logo,
+    components/         site components (PageSkeleton (the first load's skeleton of each page: skeletonFor picks it), Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm (+ LoginCard, the sign-in pages' card), Logo,
                         Brands, Stats, Categories, PrivateLabel, BusinessCustomers (#business: the request for an
                         account + RequestForm), About, Faq, Contact, Hero, SectionHeading, FormField (a public form's
                         labelled input/textarea + inline role="alert" error: Contact, BusinessCustomers),
@@ -98,7 +98,7 @@ frontend/
                         CatalogPdfDialog (the "PDF catalog" button + dialog of /admin/products: the generated PDF
                         catalog's layout, status, files and "Generate now"; catalogPdfGrid), ...)
                         + their tests
-    components/ui/      shadcn primitives (accordion, button (+ `loading`), dialog, dropdown-menu, popover, sheet, slider, spinner,
+    components/ui/      shadcn primitives (accordion, button (+ `loading`), dialog, dropdown-menu, popover, sheet, skeleton, slider, spinner,
                         switch, tooltip), restyled for the brand; input.tsx = the one form-field look (inputVariants,
                         INPUT_CLASS, LABEL_CLASS) for inputs, selects, textareas, PasswordInput and SearchableField
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
@@ -553,7 +553,18 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   of its two actions runs). Anything else that waits shows `<Spinner label? size? />` (`ui/spinner`, a status region
   named "Loading…"; `label={false}` = decorative). Page loads: the current page stays while the next one loads (so a
   typed-in field keeps its focus), <main> is aria-busy and a slim red bar runs along the top (`RouteProgress` in
-  `__root.tsx`); only the first load shows a centered Spinner (`PagePending`). Test a busy button with
+  `__root.tsx`); only the first load (data slower than 400ms) shows a skeleton of the page (`PageSkeleton`, the router's
+  `defaultPendingComponent`; router.ts sets `defaultPendingMs` to Infinity once the first load resolves): in place of
+  the first route still loading, so inside the real header once the root's data is in (else with `HeaderSkeleton`),
+  and only the page part inside the staff panel's layout. **Skeletons** (`ui/skeleton`): content that is on its way
+  and has a known shape gets placeholders in its exact frame, never a spinner: `Skeleton` (one shape, `tone` dark on
+  black sections), `SkeletonText` (lines as tall as real text with the same text classes), `SkeletonFields`,
+  `SkeletonGroup` (one polite status "Loading…" around them; the shapes are aria-hidden). A card's skeleton lives next to
+  the card and reuses its frame (`CatalogCardSkeleton`, `ArticleCardSkeleton`, `BrandCardSkeleton`,
+  `SectionHeadingSkeleton`); page skeletons in `PageSkeleton.tsx` must follow the pages' layouts. Also: a customer's price
+  while it loads (`PriceSlot`), the admin dialogs that load their data (Stock, Ribbon colors, PDF catalog), the Where to
+  Buy map's code. A photo that is downloading shimmers in its frame: `img-frame` on the box whose direct child is the
+  `img-fade` <img> (cards, product gallery). Test a busy button with
   `holdRequests` (test/api.ts): the spinner shows and a second click / Enter sends nothing.
 - **Choices** (`SegmentedSwitch`): one choice among a few options (2+) is a `SegmentedSwitch` (`legend`, `options`
   { value, label, icon?, disabled? }, `value`, `onChange`; `tone` light/dark, `size` default/sm, `hideLegend`): native
@@ -634,8 +645,8 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   `translate`/`scale`, so `transition-[transform]` would not animate those. The mobile drawer
   can be swiped closed (`onSwipeClose` on `SheetContent`). Reduced motion keeps fades and drops movement (see the
   `prefers-reduced-motion` block in `index.css`). Subtle motion wherever it answers an action, in three durations
-  (150ms press / color, 300ms hover / menus, 500ms panels / photos), never more than ~8px of travel, never looping (except a Spinner or the progress bar while something loads): shared utilities `img-fade`
-  (a photo fades in once loaded), `link-underline` (an underline that sweeps in), `animate-spinner`,
+  (150ms press / color, 300ms hover / menus, 500ms panels / photos), never more than ~8px of travel, never looping (except a Spinner, the progress bar or a skeleton's shine while something loads): shared utilities `img-fade`
+  (a photo fades in once loaded), `img-frame` (its frame shimmers until then), `skeleton` (the shine; reduced motion pulses), `link-underline` (an underline that sweeps in), `animate-spinner`,
   `animate-route-progress`, `animate-fade-in`; a change of page cross-fades through a view transition (`router.ts`,
   only when the path changes). No scroll-triggered reveals: content below the fold must be visible in screenshots
   and to axe.

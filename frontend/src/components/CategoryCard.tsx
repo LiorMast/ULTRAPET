@@ -3,7 +3,7 @@
  * veil with the white category name centered over it, or (no photo) a white card with the name in charcoal. The whole card is one
  * link. Used by the home page Categories carousel (the catalog categories from the database, linking to the catalog
  * filtered by the category) and the article page's related categories; the caller gives the name, photo and link, so
- * any category list can feed it.
+ * any category list can feed it. While the photo downloads, the card shimmers (img-frame).
  */
 import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
@@ -36,7 +36,7 @@ export function CategoryCard({
       {...link}
       className={cn(
         'group relative block aspect-[4/3] w-full overflow-hidden rounded-2xl outline-none',
-        image ? 'bg-brand-charcoal' : 'bg-white shadow-soft',
+        image ? 'img-frame bg-brand-charcoal [--skeleton-shine:rgb(255_255_255/0.08)]' : 'bg-white shadow-soft',
         'transition-[box-shadow] duration-300 hover:shadow-premium-sm',
         'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
         className,

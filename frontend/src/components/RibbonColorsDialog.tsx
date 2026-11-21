@@ -7,6 +7,7 @@
  * GET /api/prices answers as `ribbonColors`.
  *
  * The dialog fetches nothing itself: the page passes `load` and `onSave` (fetchSetting / saveSetting).
+ * While the colors load, the body shows skeletons in its shape (ui/skeleton.tsx).
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Palette } from 'lucide-react'
@@ -15,6 +16,7 @@ import { ApiError, type DiscountType, type RibbonColors } from '@/api'
 import { DiscountRibbon } from '@/components/DiscountRibbon'
 import { errorMessage } from '@/components/RecordDialog'
 import { Button } from '@/components/ui/button'
+import { Skeleton, SkeletonGroup, SkeletonText } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { LABEL_CLASS, inputVariants } from '@/components/ui/input'
 import { DISCOUNT_RIBBON_DEFAULTS, DISCOUNT_TYPES } from '@/config'
@@ -179,9 +181,25 @@ export function RibbonColorsDialog({
         <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-col">
           <div className="min-h-0 space-y-6 overflow-y-auto px-6 py-5">
             {colors === null ? (
-              <p role={loadFailed ? 'alert' : 'status'} className={cn('text-sm', loadFailed ? 'font-medium text-brand-red-dark' : 'text-brand-charcoal-muted')}>
-                {loadFailed ? s.loadFailed : s.loading}
-              </p>
+              loadFailed ? (
+                <p role="alert" className="text-sm font-medium text-brand-red-dark">
+                  {s.loadFailed}
+                </p>
+              ) : (
+                // The values are on their way: placeholders in the shape of the form below.
+                <SkeletonGroup label={s.loading} className="space-y-6">
+                  {DISCOUNT_TYPES.map((type) => (
+                    <span key={type} className="block">
+                      <SkeletonText className={LABEL_CLASS} width="w-28" />
+                      <span className="mt-2 flex flex-wrap items-center gap-3">
+                        <Skeleton className="size-11 rounded-lg" />
+                        <Skeleton className="h-11 w-32 rounded-lg" />
+                        <Skeleton className="h-6 w-24" />
+                      </span>
+                    </span>
+                  ))}
+                </SkeletonGroup>
+              )
             ) : (
               <>
                 {DISCOUNT_TYPES.map((type) => {

@@ -1,15 +1,20 @@
 /**
  * BrandCard.tsx — A minimalist rounded card for one brand: logo (the brand's logoUrl, else the logo file bundled
  * with the site, else a text wordmark) on a soft panel, name and tagline. The whole card is one link to the brand's
- * page; it brightens on hover (nothing moves), and the logo fades in once loaded.
- * Used by the home page Brands section; reusable on a future all-brands page.
+ * page; it brightens on hover (nothing moves), and the logo fades in once loaded (its panel shimmers until then,
+ * img-frame). BrandCardSkeleton is its loading placeholder (the pages' first-load skeletons, PageSkeleton.tsx).
+ * Used by the home page Brands section and the brand pages; reusable on a future all-brands page.
  */
 import { Link } from '@tanstack/react-router'
 import { cn } from 'cn'
 import type { Brand } from '@/api'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { brandLogo, localized } from '@/config'
 import { useI18n } from '@/i18n'
 import { imgFade } from '@/motion'
+
+/** The card's frame (shared with the skeleton): a faint white panel on the black section. */
+const CARD_CLASS = 'group relative flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-white/5 p-6 sm:p-7'
 
 /**
  * One brand card. The card is a real link (crawlable, keyboard-focusable); a thin line in the brand's
@@ -27,13 +32,14 @@ export function BrandCard({ brand, className }: { brand: Brand; className?: stri
       to="/brands/$slug"
       params={{ slug: brand.slug }}
       className={cn(
-        'group relative flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-white/5 p-6 outline-none sm:p-7',
+        CARD_CLASS,
+        'outline-none',
         'transition-[background-color,border-color] duration-300 hover:border-white/30 hover:bg-white/10',
         'focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
         className,
       )}
     >
-      <div className={cn('flex h-36 items-center justify-center rounded-xl', logo && 'bg-white/15')}>
+      <div className={cn('img-frame flex h-36 items-center justify-center rounded-xl [--skeleton-shine:rgb(255_255_255/0.12)]', logo && 'bg-white/15')}>
         {logo ? (
           <img
             src={logo}
@@ -61,5 +67,22 @@ export function BrandCard({ brand, className }: { brand: Brand; className?: stri
         style={{ backgroundColor: brand.accent ?? 'var(--color-brand-red)' }}
       />
     </Link>
+  )
+}
+
+/**
+ * The loading placeholder of a brand card (dark, like the card): the logo panel, name and tagline as skeletons.
+ * @param props.className - Extra classes for the card, e.g. grid placement.
+ * @returns The decorative placeholder card (put it inside a SkeletonGroup).
+ */
+export function BrandCardSkeleton({ className }: { className?: string }) {
+  return (
+    <div aria-hidden="true" className={cn(CARD_CLASS, className)}>
+      <Skeleton tone="dark" className="h-36 rounded-xl" />
+      <div className="mt-6">
+        <SkeletonText tone="dark" className="text-base" width="w-1/2" />
+        <SkeletonText tone="dark" className="mt-1 text-sm" width="w-3/4" />
+      </div>
+    </div>
   )
 }

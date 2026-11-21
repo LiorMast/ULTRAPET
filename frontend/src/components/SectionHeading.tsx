@@ -5,12 +5,16 @@
  *
  * Its three texts are the styled texts of an editable section (EditableSection.tsx): given `edit`, each renders as an
  * EditableText with the font and size staff picked (size steps below; "md" = the design), a box while editing.
+ *
+ * SectionHeadingSkeleton is its loading placeholder: the same three lines at the same sizes, as skeletons (the pages'
+ * first-load skeletons, PageSkeleton.tsx).
  */
 import type { ReactNode } from 'react'
 import { cva } from 'class-variance-authority'
 import { cn } from 'cn'
 import { fieldLabel, type EditableField } from '@/components/EditableSection'
 import { EditableText } from '@/components/InlineEditor'
+import { SkeletonText } from '@/components/ui/skeleton'
 import type { Dictionary } from '@/i18n/he'
 
 // The size class goes first in cn(): tailwind-merge drops a `leading-*` that comes before a text size.
@@ -106,6 +110,24 @@ export function SectionHeading({
         {title}
       </Heading>
       {intro && <p className={introLook({ tone })}>{intro}</p>}
+    </div>
+  )
+}
+
+/**
+ * The loading placeholder of a section heading: eyebrow, title and intro lines in the heading's own sizes, so the
+ * page does not shift when the real heading arrives.
+ * @param props.intro - How many intro lines (default 2; 0 = none).
+ * @param props.tone - "light" (default) or "dark" (a black section).
+ * @param props.className - Extra classes for the wrapper (max-w-3xl by default), as on the heading it stands for.
+ * @returns The decorative placeholder (put it inside a SkeletonGroup).
+ */
+export function SectionHeadingSkeleton({ intro = 2, tone = 'light', className }: { intro?: number; tone?: 'light' | 'dark'; className?: string }) {
+  return (
+    <div aria-hidden="true" className={cn('max-w-3xl', className)}>
+      <SkeletonText tone={tone} className={eyebrowLook({ tone })} width="w-28" />
+      <SkeletonText tone={tone} className={titleLook({ tone })} width="w-3/4" />
+      {intro > 0 && <SkeletonText tone={tone} lines={intro} className={introLook({ tone })} />}
     </div>
   )
 }

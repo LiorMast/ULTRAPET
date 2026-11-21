@@ -8,15 +8,16 @@
  *
  * The dialog fetches nothing itself: the page passes `load` and `onGenerate` (fetchCatalogPdf / generateCatalogPdf).
  * CatalogPdfButton is the button that opens it.
+ * While the options load, the body shows skeletons in its shape (ui/skeleton.tsx).
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Download, FileText } from 'lucide-react'
-import { cn } from 'cn'
 import { ApiError, type CatalogPdfOptions, type CatalogPdfState } from '@/api'
 import { errorMessage } from '@/components/RecordDialog'
 import { TextLink } from '@/components/TextLink'
 import { LABEL_CLASS } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Skeleton, SkeletonGroup, SkeletonText } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
@@ -187,9 +188,26 @@ export function CatalogPdfDialog({ load, onGenerate, onClose, onCloseAutoFocus }
         <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-col">
           <div className="min-h-0 space-y-6 overflow-y-auto px-6 py-5">
             {state === null || options === null ? (
-              <p role={loadFailed ? 'alert' : 'status'} className={cn('text-sm', loadFailed ? 'font-medium text-brand-red-dark' : 'text-brand-charcoal-muted')}>
-                {loadFailed ? s.loadFailed : s.loading}
-              </p>
+              loadFailed ? (
+                <p role="alert" className="text-sm font-medium text-brand-red-dark">
+                  {s.loadFailed}
+                </p>
+              ) : (
+                // The values are on their way: placeholders in the shape of the form below.
+                <SkeletonGroup label={s.loading} className="space-y-6">
+                  <span className="block">
+                    <SkeletonText className={LABEL_CLASS} width="w-40" />
+                    <Skeleton className="mt-4 h-2 w-full rounded-full" />
+                  </span>
+                  {Array.from({ length: 4 }, (_, index) => (
+                    <span key={index} className="flex items-center justify-between gap-4">
+                      <SkeletonText className="text-sm" width={index % 2 ? 'w-40' : 'w-52'} />
+                      <Skeleton className="h-6 w-11 rounded-full" />
+                    </span>
+                  ))}
+                  <Skeleton className="h-20 w-full rounded-2xl" />
+                </SkeletonGroup>
+              )
             ) : (
               <>
                 <div>
