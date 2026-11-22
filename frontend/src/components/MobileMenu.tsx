@@ -6,7 +6,8 @@
  * or a click on the backdrop, and stops the page behind it from scrolling. The drawer slides in from
  * the end side — right in English, left in Hebrew — next to the hamburger button in both cases — and can
  * be swiped back towards that edge to close it. Like the desktop menu, the current page or home-page section
- * (kept in the URL hash by the navbar's scrollspy) is shown in red. The Login entry becomes Log out when
+ * (kept in the URL hash by the navbar's scrollspy) is shown in red, and so is an entry that stands for the
+ * section being read (NavItem `sections`, data-in-view). The Login entry becomes Log out when
  * signed in, and staff also get an Admin panel entry.
  */
 import { useState } from 'react'
@@ -16,14 +17,15 @@ import { cn } from 'cn'
 import { useAuth, useSignOut } from '@/auth'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Logo } from '@/components/Logo'
+import { inViewProps, useInViewSection } from '@/components/NavText'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { HEADER_ACCOUNT, HEADER_CTA, HEADER_LOGIN, type NavItem } from '@/config'
 import { useI18n } from '@/i18n'
 
-/** Style of the drawer's top-level entries: sentence-case rows whose grey background fades in on hover; the active page is light brand red. */
+/** Style of the drawer's top-level entries: sentence-case rows whose grey background fades in on hover; the active page (and the entry of the home section being read) is light brand red. */
 const ENTRY_CLASS =
-  'block w-full rounded-lg px-3 py-3 text-start font-heading text-base font-medium text-neutral-800 transition-[color,background-color] duration-300 outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red data-[status=active]:bg-brand-red-muted data-[status=active]:text-brand-red-dark'
+  'block w-full rounded-lg px-3 py-3 text-start font-heading text-base font-medium text-neutral-800 transition-[color,background-color] duration-300 outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red data-[status=active]:bg-brand-red-muted data-[status=active]:text-brand-red-dark data-[in-view]:bg-brand-red-muted data-[in-view]:text-brand-red-dark'
 
 /** Style of the entries inside the Products group. */
 const SUB_ENTRY_CLASS =
@@ -39,6 +41,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
   const { user } = useAuth()
   const handleSignOut = useSignOut()
   const [open, setOpen] = useState(false)
+  const section = useInViewSection()
   /** Closes the drawer; every link calls it, so choosing a destination also closes the menu. */
   const close = () => setOpen(false)
 
@@ -80,7 +83,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
               <li key={item.id}>
                 {'children' in item ? (
                   <details className="group">
-                    <summary className={cn(ENTRY_CLASS, 'flex cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden')}>
+                    <summary {...inViewProps(item, section)} className={cn(ENTRY_CLASS, 'flex cursor-pointer list-none items-center justify-between [&::-webkit-details-marker]:hidden')}>
                       {item.label(t)}
                       <ChevronDown size={16} aria-hidden="true" className="transition-transform duration-300 group-open:rotate-180" />
                     </summary>
@@ -104,7 +107,7 @@ export function MobileMenu({ items }: { items: NavItem[] }) {
                     </ul>
                   </details>
                 ) : (
-                  <Link {...item.link} activeOptions={{ exact: true, includeHash: true }} onClick={close} className={ENTRY_CLASS}>
+                  <Link {...item.link} {...inViewProps(item, section)} activeOptions={{ exact: true, includeHash: true }} onClick={close} className={ENTRY_CLASS}>
                     {item.label(t)}
                   </Link>
                 )}

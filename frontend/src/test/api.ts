@@ -30,6 +30,10 @@
  * general regular rules, like app/pricing.py) and answers the discounts, the ribbon colors and the `stock` status of
  * the active, tracked products (keyed by their public id, the WooCommerce id). setFakeStock is a test's shortcut for a
  * stock staff counted, addFakePriceRule for a discount staff saved.
+ * Suppliers: the staff table "suppliers" starts with STAFF_SUPPLIERS (a unique name, a two-letter country, the email
+ * lowercased); GET/PUT /api/staff/suppliers/<id>/products read and replace the products each supplies (none at first),
+ * with the server's checks (each product once and existing; a cost of 0 or more; a three-letter currency, default ILS;
+ * `field` + `index` name the refused line) and its cascade (a deleted supplier or product takes its lines).
  * The generated PDF catalog: GET/POST /api/staff/catalog-pdf keep its options and answer a build as finished at once
  * (setFakeCatalogPdf sets another state, e.g. "building").
  * POST /api/staff/uploads fakes the upload (staff only; folder "categories", "brands", "private-label" or "products";
@@ -46,7 +50,7 @@
  * test can see a button wait on the server (its spinner) and count that a second click sent nothing.
  */
 import { CATALOG_SORTS, type CatalogSort } from '@/api'
-import type { Brand, Branch, BulkTier, CatalogPdfOptions, CatalogPdfState, ContactDetails, CustomerProfile, DiscountType, PriceDiscount, ProductCategory, ProductDetail, ProductImage, ProductPage, ProductStock, ProfileOrder, Stat, StaffCustomer, StaffLead, StockMovement, StockStatus, User } from '@/api'
+import type { Brand, Branch, BulkTier, CatalogPdfOptions, CatalogPdfState, ContactDetails, CustomerProfile, DiscountType, PriceDiscount, ProductCategory, ProductDetail, ProductImage, ProductPage, ProductStock, ProfileOrder, SupplierProduct, Stat, StaffCustomer, StaffLead, StaffSupplier, StockMovement, StockStatus, User } from '@/api'
 import { israelNow, israelTime } from '@/components/DiscountDialog'
 import { ribbonColorsOf } from '@/components/RibbonColorsDialog'
 import { DISCOUNT_TYPES, RIBBON_COLORS_SETTING, type Localized } from '@/config'
@@ -75,6 +79,36 @@ export const STAFF_CUSTOMERS: StaffCustomer[] = [
     id: '00000000-0000-4000-8000-000000000002', companyName: 'Zoo Haifa', fullName: 'Noa Levi', email: 'zoo@example.com',
     phone: null, businessNumber: null, city: 'Haifa', address: null, rivhitCustomerId: null, notes: null, isActive: false,
     lastLoginAt: null, lastSeenAt: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+]
+
+/** The suppliers the staff table "suppliers" starts with: an active one in Spain, and an inactive one. */
+export const STAFF_SUPPLIERS: StaffSupplier[] = [
+  {
+    id: '00000000-0000-4000-8004-000000000001',
+    name: 'Agrovet Foods',
+    country: 'ES',
+    contactName: 'Ana Ruiz',
+    email: 'ana@agrovet.example',
+    phone: '+34 600 000 000',
+    website: null,
+    notes: null,
+    isActive: true,
+    createdAt: '2026-11-01T10:00:00+02:00',
+    updatedAt: '2026-11-01T10:00:00+02:00',
+  },
+  {
+    id: '00000000-0000-4000-8004-000000000002',
+    name: 'Old Litter Co',
+    country: null,
+    contactName: null,
+    email: null,
+    phone: null,
+    website: null,
+    notes: 'No longer bought from',
+    isActive: false,
+    createdAt: '2026-11-01T10:00:00+02:00',
+    updatedAt: '2026-11-01T10:00:00+02:00',
   },
 ]
 
@@ -162,6 +196,9 @@ let uploadCount = 0
 /** The stock ledger: each product's movements (by staff product id), oldest first. */
 let stockMovements: Record<string, StockMovement[]> = {}
 
+/** The products each supplier supplies (by supplier id), as PUT /api/staff/suppliers/<id>/products saved them. */
+let supplierLinks: Record<string, SupplierProduct[]> = {}
+
 /** The PDF catalog's options before staff change them (the server's DEFAULT_OPTIONS). */
 const CATALOG_PDF_DEFAULTS: CatalogPdfOptions = { perPage: 3, categoryPages: true, showBrand: false, showSku: false, showBarcode: false, autoRebuild: true }
 
@@ -191,6 +228,7 @@ export function resetFakeApi() {
   staffRows = {}
   uploadCount = 0
   stockMovements = {}
+  supplierLinks = {}
 }
 
 /**
@@ -392,6 +430,18 @@ const newRowDefaults = (fallback: string) => (values: Record<string, unknown>, r
 }
 
 /**
+ * The server's email converter (backend/app/staff/routes.py): the email trimmed and lowercased, shaped name@domain.tld.
+ * @param values - The request's values (the email is changed in place).
+ * @returns The 400 answer, or null when the email is fine (or absent / null).
+ */
+function emailField(values: Record<string, unknown>): Response | null {
+  if (!('email' in values) || values.email === null) return null
+  if (typeof values.email !== 'string' || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(values.email.trim())) return json({ error: 'invalid', field: 'email' }, 400)
+  values.email = values.email.trim().toLowerCase()
+  return null
+}
+
+/**
  * The server's email and password converters and its require_password (backend/app/staff/routes.py): the email
  * trimmed and lowercased, a password of 8 to 128 characters, required on a new customer.
  * @param values - The request's values (the email is changed in place).
@@ -399,10 +449,8 @@ const newRowDefaults = (fallback: string) => (values: Record<string, unknown>, r
  * @returns The 400 answer, or null when the values are fine.
  */
 function customerFields(values: Record<string, unknown>, creating: boolean): Response | null {
-  if ('email' in values && values.email !== null) {
-    if (typeof values.email !== 'string' || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(values.email.trim())) return json({ error: 'invalid', field: 'email' }, 400)
-    values.email = values.email.trim().toLowerCase()
-  }
+  const email = emailField(values)
+  if (email) return email
   if ('password' in values && (typeof values.password !== 'string' || values.password.length < 8 || values.password.length > 128)) {
     return json({ error: 'invalid', field: 'password' }, 400)
   }
@@ -611,6 +659,18 @@ const STAFF_TABLES: Record<string, FakeTable> = {
       return duplicate(customer, others, 'email', 'app_users_email_key') ?? duplicate(customer, others, 'businessNumber', 'business_users_business_number_key')
     },
     order: (a, b) => String(a.companyName).localeCompare(String(b.companyName)) || String(a.email).localeCompare(String(b.email)),
+  },
+  suppliers: {
+    fields: ['name', 'country', 'contactName', 'email', 'phone', 'website', 'notes', 'isActive'],
+    required: ['name', 'isActive'],
+    defaults: { country: null, contactName: null, email: null, phone: null, website: null, notes: null, isActive: true },
+    convert: (values) => emailField(values),
+    seed: () => STAFF_SUPPLIERS.map((supplier) => ({ ...supplier })),
+    check: (supplier, others) => {
+      if (supplier.country !== null && !/^[A-Z]{2}$/.test(String(supplier.country))) return invalid('suppliers_country_check')
+      return duplicate(supplier, others, 'name', 'suppliers_name_key')
+    },
+    order: (a, b) => String(a.name).localeCompare(String(b.name)),
   },
   leads: {
     creatable: false,
@@ -971,6 +1031,55 @@ async function stockAnswer(productId: string, method: string, body: BodyInit | n
 }
 
 /**
+ * Answers /api/staff/suppliers/<id>/products like the server's supplier_products / replace_supplier_products (staff
+ * only): GET the supplier's lines in the catalog's order; PUT replaces them all, or changes nothing when a line is refused.
+ * @param supplierId - The supplier's id from the path.
+ * @param method - "GET" or "PUT".
+ * @param body - The PUT body: [{productId, supplierSku?, costPrice?, costCurrency?}].
+ * @returns The lines, or the server's error.
+ */
+async function supplierProductsAnswer(supplierId: string, method: string, body: BodyInit | null | undefined): Promise<Response> {
+  if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  const supplier = (await tableRows('suppliers')).find((row) => row.id === supplierId)
+  if (!supplier || (method !== 'GET' && method !== 'PUT')) return json({ error: 'not_found' }, 404)
+  const products = [...(await tableRows('products'))].sort(STAFF_TABLES.products.order)
+  /** @returns The supplier's lines in the catalog's order of their products. */
+  const answer = () => {
+    const lines = supplierLinks[supplierId] ?? []
+    return products.flatMap((product) => lines.filter((line) => line.productId === product.id))
+  }
+  if (method === 'GET') return json(answer())
+
+  const data = body ? (JSON.parse(String(body)) as unknown) : null
+  if (!Array.isArray(data)) return json({ error: 'invalid_body' }, 400)
+  const fields = ['productId', 'supplierSku', 'costPrice', 'costCurrency']
+  const lines: SupplierProduct[] = []
+  for (const [index, item] of data.entries()) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) return json({ error: 'invalid_body' }, 400)
+    const values = item as Record<string, unknown>
+    const unknown = Object.keys(values).find((key) => !fields.includes(key))
+    if (unknown) return json({ error: 'unknown_field', field: unknown, index }, 400)
+    const { productId, supplierSku, costPrice, costCurrency } = values
+    if (productId === undefined || productId === null) return json({ error: 'required', field: 'productId', index }, 400)
+    if (typeof productId !== 'string') return json({ error: 'invalid', field: 'productId', index }, 400)
+    if (supplierSku !== undefined && supplierSku !== null && typeof supplierSku !== 'string') return json({ error: 'invalid', field: 'supplierSku', index }, 400)
+    const cost = costPrice === undefined || costPrice === null ? null : typeof costPrice === 'boolean' ? NaN : Number(costPrice)
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0 || (typeof costPrice === 'string' && !costPrice.trim()))) return json({ error: 'invalid', field: 'costPrice', index }, 400)
+    const currency = costCurrency === undefined || costCurrency === null || costCurrency === '' ? 'ILS' : costCurrency
+    if (typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency)) return json({ error: 'invalid', field: 'costCurrency', index }, 400)
+    lines.push({ productId, supplierSku: (typeof supplierSku === 'string' && supplierSku.trim()) || null, costPrice: cost === null ? null : Math.round(cost * 100) / 100, costCurrency: currency })
+  }
+  const known = new Set(products.map((product) => product.id))
+  const seen = new Set<string>()
+  for (const [index, line] of lines.entries()) {
+    if (!known.has(line.productId) || seen.has(line.productId)) return json({ error: 'invalid', field: 'productId', index }, 400)
+    seen.add(line.productId)
+  }
+  supplierLinks[supplierId] = lines
+  return json(answer())
+}
+
+/**
  * Answers /api/staff/catalog-pdf like the server's get_catalog_pdf / generate_catalog_pdf (staff only). A POST saves
  * the options and answers a finished build at once (the server answers "building" and finishes in the background;
  * setFakeCatalogPdf sets that state for a test).
@@ -1050,6 +1159,9 @@ async function staffAnswer(resource: string, method: string, id: string | null, 
     // A deleted category's or product's price rules go with it (ON DELETE CASCADE).
     const rules = await staffRows['price-rules']
     if (rules) rules.splice(0, rules.length, ...rules.filter((rule) => rule.categoryId !== id && rule.productId !== id))
+    // A deleted supplier's or product's supplier lines go with it too.
+    delete supplierLinks[id]
+    for (const supplier of Object.keys(supplierLinks)) supplierLinks[supplier] = supplierLinks[supplier].filter((line) => line.productId !== id)
     return json(undefined, 204)
   }
   if (method !== 'PATCH') return json({ error: 'not_found' }, 404)
@@ -1330,6 +1442,8 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
   if (convertPath && method === 'POST') return convertAnswer(decodeURIComponent(convertPath[1]), init.body)
   const profilePath = /^\/api\/staff\/customers\/([^/]+)\/profile$/.exec(path)
   if (profilePath && method === 'GET') return customerProfileAnswer(decodeURIComponent(profilePath[1]))
+  const supplierProductsPath = /^\/api\/staff\/suppliers\/([^/]+)\/products$/.exec(path)
+  if (supplierProductsPath) return supplierProductsAnswer(decodeURIComponent(supplierProductsPath[1]), method, init.body)
   const stockPath = /^\/api\/staff\/products\/([^/]+)\/stock$/.exec(path)
   if (stockPath) return stockAnswer(decodeURIComponent(stockPath[1]), method, init.body)
   const staff = /^\/api\/staff\/([a-z-]+)(?:\/(.+))?$/.exec(path)

@@ -29,13 +29,20 @@ export type NavChild = { id: string; label: Label; divider?: boolean } & (
   | { href: string }
 )
 
-/** A plain menu link: an id (the React key), a translated label and an internal link. */
-export type NavLink = { id: string; label: Label; link: AppLink }
+/**
+ * The home page sections a menu entry stands for: while the visitor reads one of them on the home page (the
+ * scrollspy keeps its id in the URL hash), the entry lights up, even though it links elsewhere (Products ← the
+ * Categories section) or to another section (About ← the FAQ). An entry that links to a home #section lights up through its own link instead.
+ */
+type NavSections = { sections?: string[] }
+
+/** A plain menu link: an id (the React key), a translated label, an internal link and the home sections it stands for. */
+export type NavLink = { id: string; label: Label; link: AppLink } & NavSections
 
 /**
  * A dropdown entry (Products): `children` open on hover; `link` is where a click on its label goes (the full catalog).
  */
-export type NavDropdown = { id: string; label: Label; link: AppLink; children: NavChild[] }
+export type NavDropdown = { id: string; label: Label; link: AppLink; children: NavChild[] } & NavSections
 
 /** A top-level menu entry: a link, or a dropdown with `children`. */
 export type NavItem = NavLink | NavDropdown
@@ -204,6 +211,7 @@ export const mainNav = (categories: ProductCategory[], locale: Locale): NavItem[
     id: 'products',
     label: (t: Dictionary) => t.nav.products,
     link: linkOptions({ to: '/catalog' }),
+    sections: ['categories'],
     children: [
       { id: 'full-catalog', label: (t: Dictionary) => t.nav.fullCatalog, link: linkOptions({ to: '/catalog' }) },
       ...categories.map((category, i) => ({
@@ -215,10 +223,10 @@ export const mainNav = (categories: ProductCategory[], locale: Locale): NavItem[
       { id: 'catalog', label: (t: Dictionary) => t.nav.catalog, href: catalogPdfUrl(locale) },
     ],
   },
-  { id: 'private-label', label: (t: Dictionary) => t.nav.privateLabel, link: linkOptions({ to: '/private-label' }) },
+  { id: 'private-label', label: (t: Dictionary) => t.nav.privateLabel, link: linkOptions({ to: '/private-label' }), sections: ['private-label'] },
   { id: 'where-to-buy', label: (t: Dictionary) => t.nav.whereToBuy, link: linkOptions({ to: '/where-to-buy' }) },
   { id: 'articles', label: (t: Dictionary) => t.nav.articles, link: linkOptions({ to: '/articles' }) },
-  { id: 'about', label: (t: Dictionary) => t.nav.about, link: linkOptions({ to: '/', hash: 'about' }) },
+  { id: 'about', label: (t: Dictionary) => t.nav.about, link: linkOptions({ to: '/', hash: 'about' }), sections: ['faq'] },
   { id: 'contact', label: (t: Dictionary) => t.nav.contact, link: linkOptions({ to: '/', hash: 'contact' }) },
 ]
 
@@ -305,6 +313,7 @@ export const ADMIN_NAV: NavLink[] = [
   { id: 'discounts', label: (t: Dictionary) => t.admin.navDiscounts, link: linkOptions({ to: '/admin/discounts' }) },
   { id: 'customers', label: (t: Dictionary) => t.admin.navCustomers, link: linkOptions({ to: '/admin/customers' }) },
   { id: 'brands', label: (t: Dictionary) => t.admin.navBrands, link: linkOptions({ to: '/admin/brands' }) },
+  { id: 'suppliers', label: (t: Dictionary) => t.admin.navSuppliers, link: linkOptions({ to: '/admin/suppliers' }) },
 ]
 
 /** The smallest order a business customer can place, in shekels (shown in the cart; checked at checkout). */

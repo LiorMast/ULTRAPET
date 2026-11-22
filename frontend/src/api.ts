@@ -21,6 +21,8 @@
  * Pictures are uploaded with uploadImage (multipart; the server stores them in its file storage, a local stub or S3, and returns their URL).
  * A product's stock (the stock ledger, backend/app/inventory.py) is read with fetchProductStock and changed only by
  * recording a movement with recordStockMovement.
+ * The products a supplier supplies (its item code and the cost price of each) are read with fetchSupplierProducts
+ * and saved whole with saveSupplierProducts.
  * The generated PDF catalog (backend/app/catalog_pdf.py): fetchCatalogPdf reads its layout options, the last build's
  * status and the files; generateCatalogPdf saves the options and starts a build.
  * Every picture and file the API names is one of the server's stored objects (or the site bundles it): nothing is
@@ -268,30 +270,36 @@ export type FaqItemsContent = { items?: FaqItem[] }
 /** The signed-in user: a business customer ("business") or an Ultra Pet staff member ("staff", no company). */
 export type User = { kind: 'business' | 'staff'; email: string; fullName: string; companyName: string | null }
 
-/** The fields of a JSON error answer, e.g. { error: 'duplicate', constraint: 'brands_slug_key' }. */
-export type ApiErrorBody = { error?: string; field?: string; constraint?: string }
+/**
+ * The fields of a JSON error answer, e.g. { error: 'duplicate', constraint: 'brands_slug_key' }; `index` = the refused
+ * item of a list the request sent (e.g. a line of saveSupplierProducts).
+ */
+export type ApiErrorBody = { error?: string; field?: string; constraint?: string; index?: number }
 
 /**
  * A failed API call: the HTTP status and the server's error code (e.g. "invalid_credentials"), if any. The
- * staff API also names the JSON `field` (e.g. "slug") or the database `constraint` that refused the change.
+ * staff API also names the JSON `field` (e.g. "slug") or the database `constraint` that refused the change, and the
+ * `index` of the refused item when the request sent a list.
  */
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
   readonly field?: string
   readonly constraint?: string
+  readonly index?: number
 
   /**
    * @param status - The HTTP status, e.g. 404.
-   * @param body - The JSON answer's `error` (the code), `field` and `constraint`, when it had them.
+   * @param body - The JSON answer's `error` (the code), `field`, `constraint` and `index`, when it had them.
    */
-  constructor(status: number, { error, field, constraint }: ApiErrorBody = {}) {
+  constructor(status: number, { error, field, constraint, index }: ApiErrorBody = {}) {
     super(`API error ${status}${error ? ` (${error})` : ''}`)
     this.name = 'ApiError'
     this.status = status
     this.code = error
     this.field = field
     this.constraint = constraint
+    this.index = index
   }
 }
 
@@ -333,9 +341,10 @@ function send(path: string, { method = 'GET', body, signal, csrf = 'access' }: C
 }
 
 /**
- * Reads the string fields of a JSON error answer.
+ * Reads the fields of a JSON error answer.
  * @param response - The response (its body is consumed).
- * @returns `error`, `field` and `constraint` where present; empty when the body is not a JSON object.
+ * @returns `error`, `field`, `constraint` (strings) and `index` (a whole number) where present; empty when the body
+ *   is not a JSON object.
  */
 async function errorBody(response: Response): Promise<ApiErrorBody> {
   try {
@@ -346,6 +355,8 @@ async function errorBody(response: Response): Promise<ApiErrorBody> {
       const value = (data as Record<string, unknown>)[key]
       if (typeof value === 'string') body[key] = value
     }
+    const index = (data as Record<string, unknown>).index
+    if (Number.isInteger(index)) body.index = index as number
     return body
   } catch {
     return {}
@@ -575,7 +586,7 @@ export async function postSignIn(credentials: { email: string; password: string;
 export const postSignOut = () => apiFetch<void>('/api/auth/logout', { method: 'POST' })
 
 /** The tables the staff API edits (RESOURCES in backend/app/staff/routes.py). */
-export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections' | 'faq-items' | 'customers' | 'leads'
+export type StaffResource = 'brands' | 'categories' | 'products' | 'price-rules' | 'settings' | 'articles' | 'resellers' | 'page-sections' | 'faq-items' | 'customers' | 'leads' | 'suppliers'
 
 /** The staff resources edited as one ordered list, which replaceStaffRows saves whole (`replaceable` on the server). */
 export type StaffListResource = 'faq-items'
@@ -598,6 +609,31 @@ export type StaffBrand = StaffRowBase & {
   sortOrder: number
   isActive: boolean
 }
+
+/**
+ * A supplier (a manufacturer or exporter Ultra Pet buys from) as the staff API returns it. `country`: ISO 3166
+ * two-letter code (e.g. "ES"), null = unknown. Staff only, never shown on the public site.
+ */
+export type StaffSupplier = StaffRowBase & {
+  id: string
+  name: string
+  country: string | null
+  contactName: string | null
+  email: string | null
+  phone: string | null
+  website: string | null
+  notes: string | null
+  isActive: boolean
+}
+
+/**
+ * One product a supplier supplies: the supplier's own item code (null = none), the cost price (null = unknown) and
+ * its currency (ISO 4217, e.g. "ILS", "EUR").
+ */
+export type SupplierProduct = { productId: string; supplierSku: string | null; costPrice: number | null; costCurrency: string }
+
+/** A line sent by saveSupplierProducts: the product, and optionally its item code, cost (a number or text such as "12.50") and currency (default ILS). */
+export type SupplierProductInput = { productId: string; supplierSku?: string | null; costPrice?: number | string | null; costCurrency?: string }
 
 /** A catalog category as the staff API returns it (every column, active or not). */
 export type StaffCategory = StaffRowBase & {
@@ -961,6 +997,25 @@ export const fetchCatalogPdf = (signal?: AbortSignal) => apiFetch<CatalogPdfStat
  */
 export const generateCatalogPdf = (options: Partial<CatalogPdfOptions>) =>
   apiFetch<CatalogPdfState>('/api/staff/catalog-pdf', { method: 'POST', body: { options } })
+
+/**
+ * The products a supplier supplies, in the catalog's order (staff only).
+ * @param supplierId - The supplier's id.
+ * @param signal - Aborts the request (the dialog closed).
+ * @returns The lines; throws ApiError 404 for an unknown supplier.
+ */
+export const fetchSupplierProducts = (supplierId: string, signal?: AbortSignal) =>
+  apiFetch<SupplierProduct[]>(`/api/staff/suppliers/${supplierId}/products`, { signal })
+
+/**
+ * Replaces the whole list of products a supplier supplies, in one transaction: products left out are unlinked.
+ * @param supplierId - The supplier's id.
+ * @param lines - The new list, each product once.
+ * @returns The saved lines in the catalog's order; throws ApiError 400 (`field` + `index` name the refused line) and
+ *   nothing is changed.
+ */
+export const saveSupplierProducts = (supplierId: string, lines: SupplierProductInput[]) =>
+  apiFetch<SupplierProduct[]>(`/api/staff/suppliers/${supplierId}/products`, { method: 'PUT', body: lines })
 
 /**
  * A product's stock and its latest movements (staff only).

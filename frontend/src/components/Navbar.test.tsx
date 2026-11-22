@@ -76,6 +76,41 @@ describe('Scrollspy', () => {
     expect(within(nav).getByRole('link', { name: 'Brands' })).not.toHaveAttribute('aria-current')
   })
 
+  it('lights up the entry that stands for the section being read, though it links to another page', async () => {
+    const { router } = await renderPage('/en')
+    const nav = screen.getByRole('navigation', { name: 'Main menu' })
+    const products = within(nav).getByRole('link', { name: 'Products' })
+    const privateLabel = within(nav).getByRole('link', { name: 'Private Label' })
+    expect(nav.querySelector('[data-in-view]')).toBeNull()
+
+    scrollTo({ stats: -2000, brands: -1500, categories: 80, 'private-label': 900 })
+    await waitFor(() => expect(router.state.location.hash).toBe('categories'))
+    expect(products).toHaveAttribute('data-in-view')
+    expect(nav.querySelectorAll('[data-in-view]')).toHaveLength(1)
+    expect(products).not.toHaveAttribute('aria-current')
+
+    scrollTo({ stats: -2000, brands: -1500, categories: -900, 'private-label': 80, business: 900 })
+    await waitFor(() => expect(router.state.location.hash).toBe('private-label'))
+    expect(privateLabel).toHaveAttribute('data-in-view')
+    expect(products).not.toHaveAttribute('data-in-view')
+
+    scrollTo({ stats: -2000, brands: -1500, categories: -900, 'private-label': -400, business: -100, about: 88 })
+    await waitFor(() => expect(router.state.location.hash).toBe('about'))
+    expect(nav.querySelector('[data-in-view]')).toBeNull()
+    expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute('aria-current', 'page')
+
+    scrollTo({ stats: -2000, brands: -1500, categories: -900, 'private-label': -400, business: -100, about: -600, faq: 88, contact: 900 })
+    await waitFor(() => expect(router.state.location.hash).toBe('faq'))
+    expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute('data-in-view')
+    expect(within(nav).getByRole('link', { name: 'About' })).not.toHaveAttribute('aria-current')
+    expect(nav.querySelectorAll('[data-in-view]')).toHaveLength(1)
+  })
+
+  it('lights up no entry on other pages', async () => {
+    await renderPage('/en/catalog')
+    expect(screen.getByRole('navigation', { name: 'Main menu' }).querySelector('[data-in-view]')).toBeNull()
+  })
+
   it('clears the hash on the hero, above the first section', async () => {
     const { router } = await renderPage('/#about')
     scrollTo({ stats: 700 })

@@ -16,7 +16,9 @@
  * - Signed-in business customers get a cart icon (<CartDrawer>) at the end edge, beside the language button (at
  *   every width).
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
- *   (history replace, no extra Back entries), so TanStack marks the matching #section link active.
+ *   (history replace, no extra Back entries), so TanStack marks the matching #section link active, and an entry
+ *   that stands for the section but links elsewhere (NavItem `sections`: Products ← #categories, Private Label ←
+ *   #private-label, About ← #faq) gets data-in-view (inViewProps).
  */
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { Link, useLocation, useRouter } from '@tanstack/react-router'
@@ -27,7 +29,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LoginPopover } from '@/components/LoginPopover'
 import { Logo } from '@/components/Logo'
 import { MobileMenu } from '@/components/MobileMenu'
-import { NAV_TEXT, Underline } from '@/components/NavText'
+import { inViewProps, NAV_TEXT, Underline, useInViewSection } from '@/components/NavText'
 import { SubNavDrawer, useSubNavDrawer } from '@/components/SubNavDrawer'
 import {
   DropdownMenu,
@@ -57,6 +59,7 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
   const { t, locale } = useI18n()
   items ??= mainNav(categories, locale)
   useScrollSpy()
+  const section = useInViewSection()
   const { user } = useAuth()
   const staff = user?.kind === 'staff' ? user : null
   const adminDrawer = useSubNavDrawer(staff ? staff.email : null)
@@ -76,7 +79,7 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
 
         <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
           {items.map((item) => (
-            <DesktopNavItem key={item.id} item={item} />
+            <DesktopNavItem key={item.id} item={item} section={section} />
           ))}
         </nav>
 
@@ -109,7 +112,7 @@ const HEADER_HEIGHT = 88
  * the id of the section being read (the last `<section id>` in <main> whose top has passed the header plus a
  * third of the window; the last one at the very bottom of the page; no hash on the first one, the hero, or above it).
  * The router location stays the single source of truth, so the menu's `includeHash` links light up by
- * themselves. Runs once per animation frame at most, and navigates only when the section changes.
+ * themselves (and the entries with `sections`, through inViewProps). Runs once per animation frame at most, and navigates only when the section changes.
  */
 function useScrollSpy() {
   const router = useRouter()
@@ -166,9 +169,10 @@ const HOVER_CLOSE_MS = 150
  * dropdown opens on a mouse hover (touch and keyboard open it with a tap or ArrowDown), and activating its label
  * (click or Enter) goes to the dropdown's own link (the full catalog) and closes the menu.
  * @param props.item - The menu item (see mainNav in src/config.ts).
+ * @param props.section - The home section being read (useInViewSection): lights the entry up when it is one of its `sections`.
  * @returns The menu link or dropdown.
  */
-function DesktopNavItem({ item }: { item: NavItem }) {
+function DesktopNavItem({ item, section }: { item: NavItem; section: string }) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const closeTimer = useRef<number | undefined>(undefined)
@@ -177,7 +181,7 @@ function DesktopNavItem({ item }: { item: NavItem }) {
 
   if (!('children' in item)) {
     return (
-      <Link {...item.link} activeOptions={{ exact: true, includeHash: true }} className={NAV_TEXT}>
+      <Link {...item.link} {...inViewProps(item, section)} activeOptions={{ exact: true, includeHash: true }} className={NAV_TEXT}>
         {item.label(t)}
         <Underline />
       </Link>
@@ -241,6 +245,7 @@ function DesktopNavItem({ item }: { item: NavItem }) {
       <DropdownMenuTrigger asChild>
         <Link
           {...item.link}
+          {...inViewProps(item, section)}
           className={`${NAV_TEXT} flex items-center gap-1.5`}
           onPointerEnter={handleLabelEnter}
           onPointerLeave={handleLabelLeave}

@@ -8,7 +8,7 @@ import pytest
 
 from tests.conftest import CUSTOMER
 
-from app.database.models.catalog import Category, Product
+from app.database.models.catalog import Category, Product, ProductSupplier
 from app.database.models.content import FaqItem
 from app.database.models.price_rules import PriceRule
 from app.database.models.users import BusinessUser
@@ -51,7 +51,7 @@ def test_the_staff_api_needs_a_staff_sign_in(client):
 
 
 def test_unknown_resources_and_keys_are_not_found(api):
-    assert api("GET", "/suppliers").status_code == 404
+    assert api("GET", "/orders").status_code == 404
     assert api("GET", "/brands/not-a-uuid").status_code == 404
     assert api("GET", f"/brands/{uuid.uuid4()}").get_json() == {"error": "not_found"}
 
@@ -601,3 +601,134 @@ def test_resellers_need_a_valid_location(api):
     assert out_of_range.get_json() == {"error": "invalid", "constraint": "resellers_latitude_check"}
     no_city = api("POST", "/resellers", {k: v for k, v in shop.items() if k != "city"})
     assert no_city.get_json() == {"error": "required", "field": "city"}
+
+
+def test_suppliers_create_read_update_delete(api):
+    supplier = {"name": "Agrovet", "country": "ES", "contactName": "Ana", "email": " Ana@Agrovet.ES ", "phone": "+34 600 000 000"}
+    response = api("POST", "/suppliers", supplier)
+    assert response.status_code == 201
+    created = response.get_json()
+    assert {k: created[k] for k in ("name", "country", "contactName", "email", "website", "notes", "isActive")} == {
+        "name": "Agrovet", "country": "ES", "contactName": "Ana", "email": "ana@agrovet.es", "website": None,
+        "notes": None, "isActive": True,
+    }
+    assert "latitude" not in created
+    api("POST", "/suppliers", {"name": "Bewital"})
+    assert [s["name"] for s in api("GET", "/suppliers").get_json()] == ["Agrovet", "Bewital"]
+
+    changed = api("PATCH", f"/suppliers/{created['id']}", {"isActive": False, "notes": "60 days"}).get_json()
+    assert (changed["isActive"], changed["notes"], changed["name"]) == (False, "60 days", "Agrovet")
+    assert api("DELETE", f"/suppliers/{created['id']}").status_code == 204
+    assert api("GET", f"/suppliers/{created['id']}").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("body", "error"),
+    [
+        ({"country": "ES"}, {"error": "required", "field": "name"}),
+        ({"name": "X", "country": "Spain"}, {"error": "invalid", "constraint": "suppliers_country_check"}),
+        ({"name": "X", "email": "not-an-email"}, {"error": "invalid", "field": "email"}),
+        ({"name": "X", "latitude": 40}, {"error": "unknown_field", "field": "latitude"}),
+    ],
+)
+def test_invalid_suppliers_are_refused(api, body, error):
+    response = api("POST", "/suppliers", body)
+    assert (response.status_code, response.get_json()) == (400, error)
+
+
+def test_a_supplier_name_is_unique(api):
+    api("POST", "/suppliers", {"name": "Agrovet"})
+    response = api("POST", "/suppliers", {"name": "Agrovet"})
+    assert (response.status_code, response.get_json()) == (409, {"error": "duplicate", "constraint": "suppliers_name_key"})
+
+
+def test_customers_cannot_see_the_suppliers(customer_client):
+    assert customer_client.get("/api/staff/suppliers").status_code == 403
+
+
+@pytest.fixture
+def supplied(api):
+    """A supplier and three products (in the catalog order c, a, b) for the supplier products tests.
+
+    Args:
+        api: The staff API caller.
+
+    Returns:
+        (supplier id, {slug: product id}).
+    """
+    category = api("POST", "/categories", {"slug": "dogs", "name": {"he": "כלבים", "en": "Dogs"}}).get_json()
+    products = {}
+    for order, slug in enumerate(["c", "a", "b"]):
+        body = {"slug": slug, "name": {"he": slug, "en": slug}, "categoryId": category["id"], "sortOrder": order}
+        products[slug] = api("POST", "/products", body).get_json()["id"]
+    supplier = api("POST", "/suppliers", {"name": "Agrovet"}).get_json()["id"]
+    return supplier, products
+
+
+def test_a_supplier_products_list_is_replaced_at_once(api, database, supplied):
+    supplier, products = supplied
+    assert api("GET", f"/suppliers/{supplier}/products").get_json() == []
+
+    lines = [
+        {"productId": products["a"], "supplierSku": " AG-1 ", "costPrice": "12.50", "costCurrency": "EUR"},
+        {"productId": products["c"]},
+    ]
+    saved = api("PUT", f"/suppliers/{supplier}/products", lines).get_json()
+    # In the catalog's order; a blank code is none, the currency defaults to shekels.
+    assert saved == [
+        {"productId": products["c"], "supplierSku": None, "costPrice": None, "costCurrency": "ILS"},
+        {"productId": products["a"], "supplierSku": "AG-1", "costPrice": 12.5, "costCurrency": "EUR"},
+    ]
+    assert api("GET", f"/suppliers/{supplier}/products").get_json() == saved
+
+    # A linked product keeps its link and changes; one left out is unlinked; a new one is linked.
+    changed = api("PUT", f"/suppliers/{supplier}/products", [
+        {"productId": products["a"], "supplierSku": "AG-2", "costPrice": 13, "costCurrency": "EUR"},
+        {"productId": products["b"], "costPrice": 0},
+    ]).get_json()
+    assert [(line["productId"], line["supplierSku"], line["costPrice"]) for line in changed] == [
+        (products["a"], "AG-2", 13.0), (products["b"], None, 0.0),
+    ]
+    assert database.query(ProductSupplier).count() == 2
+
+    assert api("PUT", f"/suppliers/{supplier}/products", []).get_json() == []
+    assert database.query(ProductSupplier).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("lines", "error"),
+    [
+        ({"productId": "x"}, {"error": "invalid_body"}),
+        ([{"supplierSku": "A"}], {"error": "required", "field": "productId", "index": 0}),
+        ([{"productId": "a"}, {"productId": "nope"}], {"error": "invalid", "field": "productId", "index": 1}),
+        ([{"productId": "a"}, {"productId": "a"}], {"error": "invalid", "field": "productId", "index": 1}),
+        ([{"productId": "unknown"}], {"error": "invalid", "field": "productId", "index": 0}),
+        ([{"productId": "a", "costPrice": -1}], {"error": "invalid", "field": "costPrice", "index": 0}),
+        ([{"productId": "a", "costPrice": "cheap"}], {"error": "invalid", "field": "costPrice", "index": 0}),
+        ([{"productId": "a", "costCurrency": "eur"}], {"error": "invalid", "field": "costCurrency", "index": 0}),
+        ([{"productId": "a", "price": 1}], {"error": "unknown_field", "field": "price", "index": 0}),
+    ],
+)
+def test_a_refused_supplier_products_list_changes_nothing(api, database, supplied, lines, error):
+    supplier, products = supplied
+    api("PUT", f"/suppliers/{supplier}/products", [{"productId": products["b"]}])
+    ids = {**products, "unknown": str(uuid.uuid4())}
+    if isinstance(lines, list):
+        lines = [{**line, "productId": ids.get(line["productId"], line["productId"])} if "productId" in line else line for line in lines]
+    response = api("PUT", f"/suppliers/{supplier}/products", lines)
+    assert (response.status_code, response.get_json()) == (400, error)
+    assert [line["productId"] for line in api("GET", f"/suppliers/{supplier}/products").get_json()] == [products["b"]]
+
+
+def test_supplier_products_of_an_unknown_supplier_are_not_found(api):
+    assert api("GET", f"/suppliers/{uuid.uuid4()}/products").status_code == 404
+    assert api("PUT", f"/suppliers/{uuid.uuid4()}/products", []).status_code == 404
+
+
+def test_deleting_a_supplier_or_a_product_deletes_its_links(api, database, supplied):
+    supplier, products = supplied
+    api("PUT", f"/suppliers/{supplier}/products", [{"productId": products["a"]}, {"productId": products["b"]}])
+    assert api("DELETE", f"/products/{products['a']}").status_code == 204
+    assert [line["productId"] for line in api("GET", f"/suppliers/{supplier}/products").get_json()] == [products["b"]]
+    assert api("DELETE", f"/suppliers/{supplier}").status_code == 204
+    assert database.query(ProductSupplier).count() == 0

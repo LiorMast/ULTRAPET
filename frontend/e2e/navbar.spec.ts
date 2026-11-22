@@ -103,9 +103,9 @@ test.describe('desktop', () => {
     await expectSectionBelowHeader(page, 'about')
   })
 
-  for (const { path, about, prefix } of [
-    { path: '/', about: 'אודות', prefix: '/' },
-    { path: '/en', about: 'About', prefix: '/en' },
+  for (const { path, about, products, prefix } of [
+    { path: '/', about: 'אודות', products: 'מוצרים', prefix: '/' },
+    { path: '/en', about: 'About', products: 'Products', prefix: '/en' },
   ]) {
     test(`the menu follows the section being read, without adding history entries (${path})`, async ({ page }) => {
       await page.goto(path)
@@ -113,10 +113,17 @@ test.describe('desktop', () => {
       const historyLength = await page.evaluate(() => history.length)
 
       // Scrolled by the visitor (wheel), not by a link: the URL hash and the menu follow.
+      await page.locator('#categories').evaluate((el: HTMLElement) => window.scrollTo({ top: el.offsetTop - 88, behavior: 'instant' }))
+      await page.mouse.wheel(0, 1)
+      await expect(page).toHaveURL(new RegExp(`${prefix}#categories$`))
+      // Products stands for the Categories section, though it links to the catalog.
+      await expect(nav.getByRole('link', { name: products })).toHaveAttribute('data-in-view')
+
       await page.locator('#about').evaluate((el: HTMLElement) => window.scrollTo({ top: el.offsetTop - 88, behavior: 'instant' }))
       await page.mouse.wheel(0, 1)
       await expect(page).toHaveURL(new RegExp(`${prefix}#about$`))
       await expect(nav.getByRole('link', { name: about })).toHaveAttribute('aria-current', 'page')
+      await expect(nav.locator('[data-in-view]')).toHaveCount(0)
 
       await page.mouse.wheel(0, 100_000)
       await expect(page).toHaveURL(new RegExp(`${prefix}#contact$`))

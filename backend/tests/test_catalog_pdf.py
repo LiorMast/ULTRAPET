@@ -226,6 +226,8 @@ def test_a_staff_change_to_a_product_rebuilds_the_catalog(app, api, catalog, dat
     built = get_setting("catalog_pdf_status")["builtAt"]
     monkeypatch.setattr(catalog_pdf, "build_catalog", lambda *args, **kwargs: pytest.fail("rebuilt"))
     assert api("POST", "/faq-items", {"question": {"he": "ש"}, "answer": {"he": "ת"}}).status_code == 201
+    supplier = api("POST", "/suppliers", {"name": "Agrovet"}).get_json()["id"]
+    assert api("PUT", f"/suppliers/{supplier}/products", [{"productId": str(product)}]).status_code == 200
     assert api("PATCH", f"/products/{product}", {"listPrice": "x"}).status_code == 400
     assert api("GET", "/products").status_code == 200
     assert get_setting("catalog_pdf_status")["builtAt"] == built

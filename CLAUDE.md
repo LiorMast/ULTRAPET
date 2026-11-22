@@ -62,7 +62,8 @@ frontend/
                         admin.discounts = every price rule in one table, general or for one customer;
                         admin.customers.index = the business customers' accounts + each one's own discounts;
                         admin.customers.$id = one customer's profile (staff view); admin.requests = the requests for
-                        an account ("Open account" converts one); account.tsx = "My account" (the customer's profile);
+                        an account ("Open account" converts one); admin.suppliers = the suppliers (vendors) + each one's
+                        products (SupplierProductsDialog); account.tsx = "My account" (the customer's profile);
                         private-label.tsx = the Private Label page (every section editable in place, components/PrivateLabelPage.tsx); route pages are tested in components/<Name>Page.test.tsx)
     components/         site components (PageSkeleton (the first load's skeleton of each page: skeletonFor picks it), Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm (+ LoginCard, the sign-in pages' card), Logo,
                         Brands, Stats, Categories, PrivateLabel, BusinessCustomers (#business: the request for an
@@ -95,6 +96,8 @@ frontend/
                         PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button),
                         productColumns (the product's DataColumns + useProductHandlers: shared by /admin/products and
                         manage mode), ProductManager (manage mode: ProductManageBar, ProductManageStrip),
+                        SupplierProductsDialog (the "Products" row action of /admin/suppliers: the products a supplier
+                        supplies, its item code, cost price + currency; saved whole; supplierProductsAction),
                         CatalogPdfDialog (the "PDF catalog" button + dialog of /admin/products: the generated PDF
                         catalog's layout, status, files and "Generate now"; catalogPdfGrid), ...)
                         + their tests
@@ -130,7 +133,9 @@ backend/
                         stamp updated_by_id), customers (the business users: `write_only` password, `read_only`
                         last_login_at / last_seen_at, `deletable=False`: DELETE is 405, switch isActive off instead),
                         leads (the requests for an account: status + notes editable, the rest `read_only`,
-                        `creatable=False`: POST is 405)); POST /leads/<id>/convert opens the account from a request
+                        `creatable=False`: POST is 405), suppliers (the vendors; never public)); GET/PUT
+                        /suppliers/<id>/products reads / replaces a supplier's products (product_suppliers: item code,
+                        cost price, currency) in one transaction; POST /leads/<id>/convert opens the account from a request
                         (customer + request converted, one transaction; 409 "converted"); GET /customers/<id>/profile
                         (accounts.py, staff view); PUT /<resource> replaces a whole ordered list in one transaction (only
                         `replaceable` resources: faq-items); PUT /<resource>/order sets the order from every row's id
@@ -577,7 +582,7 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   names from several spans that rely on whitespace.
 - **Icons**: lucide-react only; logos are SVG assets. An **action button** leads with its icon (aria-hidden, before
   the label): Edit `Pencil`, Delete / Remove `Trash2`, Add `Plus`, Change order `ArrowUpDown`, Discounts `Percent`,
-  Stock `Boxes`, End discount now `CalendarX2`, PDF catalog `FileText`, Ribbon colors `Palette`, Upload `Upload`, Edit on page `Pencil`, Add
+  Stock `Boxes`, a supplier's Products `Package`, End discount now `CalendarX2`, PDF catalog `FileText`, Ribbon colors `Palette`, Upload `Upload`, Edit on page `Pencil`, Add
   to cart `ShoppingCart`, Out of stock `PackageX`, Find the nearest store `LocateFixed`, Login `UserRound`, My account
   `UserRound`, Open account `UserPlus`, Admin panel `ShieldCheck`, Log out `LogOut`, To the catalog `LayoutGrid`; a download link too (`TextLink icon={Download}`).
   Controls that are icons stay (close, menu, chevrons, carousel arrows, cart, play/pause, password eye, drag grip,
@@ -637,7 +642,9 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
 - **Header**: a translucent white material (`material-bar` in `index.css`: 85% white + backdrop blur; solid white
   for reduced transparency / more contrast), 88px tall (`py-4` + 56px logo; below `sm` the logo shrinks to h-8 so the cart, language and menu buttons fit at 360px); pages use `pt-22` to clear it. No
   transparent or scroll-driven states. On the home page the menu is a scrollspy (`useScrollSpy` in `Navbar.tsx`): the URL
-  hash follows the `<section id>` being read (history replace; none on the hero), so `includeHash` links light up.
+  hash follows the `<section id>` being read (history replace; none on the hero), so `includeHash` links light up, and an entry whose
+  `sections` (NavItem, config.ts) hold that id gets `data-in-view` (`inViewProps` in NavText.tsx: Products ← `#categories`,
+  Private Label ← `#private-label`, About ← `#faq`; red + underline, purely visual).
 - **Motion** (Apple fluid-interface rules): every transition uses `--ease-spring` (a critically damped spring as CSS
   `linear()`, the Tailwind default timing function). Controls react on press (`active:scale-[0.97]
   active:duration-100`); clickable cards never move: on hover their border darkens and they gain a soft shadow
@@ -890,6 +897,9 @@ content exists in each language, and the layout flips direction automatically.
       `flask push-media`
 - [x] Product photos in the admin (`ImageListField`, column type `images`, folder `products` with thumbnails)
 - [ ] Tables for settings, articles, resellers (a column config + route each)
+- [x] `/admin/suppliers`: the suppliers (vendors: name, country, contact, email, phone, website, notes, active) and
+      each one's products (row action "Products", `SupplierProductsDialog`: the supplier's item code, cost price +
+      currency, saved whole with `PUT /api/staff/suppliers/<id>/products`); [ ] the suppliers map (latitude / longitude)
 - [x] Inventory on `/admin/products`: the stock ledger (`stock_movements`, `app/inventory.py`, `StockDialog`), stock
       column + alerts, low-stock threshold; customers see In stock / Low / Out and cannot add an out-of-stock product
 - [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API

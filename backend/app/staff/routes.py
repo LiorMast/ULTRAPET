@@ -22,6 +22,11 @@ changes only by recording a movement:
 write-only (set on create, changed by sending a new one, never answered), `lastLoginAt` and `lastSeenAt` are read-only, and they are
 never deleted (DELETE is 405): `isActive` false blocks the sign-in.
     GET /customers/<id>/profile  a customer's profile: details, orders, own discounts, activity (app/accounts.py)
+`suppliers` are the manufacturers and exporters Ultra Pet buys from (staff only, never on the public site); the
+products each one supplies (table product_suppliers: the supplier's item code and the cost price) are edited as one
+list per supplier:
+    GET /suppliers/<id>/products the supplier's products, in the catalog's order
+    PUT /suppliers/<id>/products replace that list in one transaction (see replace_supplier_products)
 `leads` are the requests for a business account sent from the home page (POST /api/leads): staff change their
 `status` and `notes` (the rest is read-only), delete spam, and never create one (POST is 405); the account is opened
 from a request with
@@ -65,7 +70,7 @@ from app import catalog_pdf, inventory, storage
 from app.accounts import profile_json
 from app.auth import require_user
 from app.database.db import db
-from app.database.models.catalog import Brand, Category, Product, ProductImage
+from app.database.models.catalog import Brand, Category, Product, ProductImage, ProductSupplier, Supplier
 from app.database.models.content import Article, FaqItem, PageSection, Reseller
 from app.database.models.price_rules import PriceRule
 from app.database.models.settings import Setting
@@ -626,6 +631,14 @@ RESOURCES: dict[str, Resource] = {
         read_only=("last_login_at", "last_seen_at"),
         deletable=False,
     ),
+    # The manufacturers and exporters Ultra Pet buys from. Their location (latitude / longitude) waits for a suppliers
+    # map; their products are edited through /suppliers/<id>/products. Deleting one deletes its product links.
+    "suppliers": Resource(
+        Supplier,
+        {"name": text, "country": text, "contact_name": text, "email": email, "phone": text, "website": text,
+         "notes": text, "is_active": boolean},
+        (Supplier.name,),
+    ),
     # The requests for a business account (POST /api/leads). Staff follow them up (status, notes) and open the
     # account with POST /leads/<id>/convert; what the business sent is read-only. Spam is deleted.
     "leads": Resource(
@@ -1140,6 +1153,150 @@ def record_stock(product_id: uuid.UUID) -> tuple[dict[str, Any], int]:
         abort(404)
     commit()
     return inventory.product_stock_json(product), 201
+
+
+# The fields of one line of a supplier's products (PUT /suppliers/<id>/products): JSON key -> (column, converter).
+SUPPLIER_PRODUCT_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
+    "productId": ("product_id", reference),
+    "supplierSku": ("supplier_sku", text),
+    "costPrice": ("cost_price", money),
+    "costCurrency": ("cost_currency", text),
+}
+CURRENCY_PATTERN = re.compile(r"^[A-Z]{3}$")
+
+
+def find_supplier(supplier_id: uuid.UUID) -> Supplier:
+    """Loads a supplier with its product links.
+
+    Args:
+        supplier_id: The supplier's id.
+
+    Returns:
+        The supplier.
+
+    Raises:
+        404 when no supplier has that id.
+    """
+    supplier = db.session.get(Supplier, supplier_id, options=(selectinload(Supplier.product_links),))
+    if supplier is None:
+        abort(404)
+    return supplier
+
+
+def supplier_products_json(supplier: Supplier) -> list[dict[str, Any]]:
+    """The products a supplier supplies, for the staff panel's supplier products dialog.
+
+    Args:
+        supplier: The supplier, with its product links loaded.
+
+    Returns:
+        [{productId, supplierSku, costPrice, costCurrency}], in the catalog's order of the products.
+    """
+    links = db.session.scalars(
+        select(ProductSupplier)
+        .join(Product)
+        .where(ProductSupplier.supplier_id == supplier.id)
+        .order_by(Product.sort_order, Product.id)
+    )
+    return [
+        {"productId": link.product_id, "supplierSku": link.supplier_sku, "costPrice": link.cost_price,
+         "costCurrency": link.cost_currency}
+        for link in links
+    ]
+
+
+def supplier_product_line(index: int, item: Any) -> dict[str, Any]:
+    """Reads and checks one line of a supplier's products list.
+
+    Args:
+        index: The line's position in the list (named in the errors).
+        item: The line's JSON object: {productId, supplierSku?, costPrice?, costCurrency?}.
+
+    Returns:
+        Column name -> value: product_id, supplier_sku (blank = None), cost_price (None = unknown) and cost_currency
+        (default ILS).
+
+    Raises:
+        400 {"error": "invalid_body"} for an item that is not an object; 400 {"error": "unknown_field", "field"};
+        400 {"error": "required" | "invalid", "field", "index"} for a missing product, a value of the wrong type,
+        a negative cost or a currency that is not three capital letters.
+    """
+    if not isinstance(item, dict):
+        fail(400, error="invalid_body")
+    values: dict[str, Any] = {}
+    for key, value in item.items():
+        if key not in SUPPLIER_PRODUCT_FIELDS:
+            fail(400, error="unknown_field", field=key, index=index)
+        column, converter = SUPPLIER_PRODUCT_FIELDS[key]
+        try:
+            values[column] = converter(value)
+        except Invalid:
+            fail(400, error="invalid", field=key, index=index)
+    if values.get("product_id") is None:
+        fail(400, error="required", field="productId", index=index)
+    values["supplier_sku"] = (values.get("supplier_sku") or "").strip() or None
+    cost = values.get("cost_price")
+    if cost is not None and (not cost.is_finite() or cost < 0):
+        fail(400, error="invalid", field="costPrice", index=index)
+    currency = values.get("cost_currency") or "ILS"
+    if not CURRENCY_PATTERN.match(currency):
+        fail(400, error="invalid", field="costCurrency", index=index)
+    values["cost_currency"] = currency
+    return values
+
+
+@bp.get("/suppliers/<uuid:supplier_id>/products")
+def supplier_products(supplier_id: uuid.UUID) -> list[dict[str, Any]]:
+    """The products a supplier supplies (the "Products" dialog of the suppliers page).
+
+    Args:
+        supplier_id: The supplier.
+
+    Returns:
+        The lines (see supplier_products_json); 404 for an unknown supplier.
+    """
+    return supplier_products_json(find_supplier(supplier_id))
+
+
+@bp.put("/suppliers/<uuid:supplier_id>/products")
+def replace_supplier_products(supplier_id: uuid.UUID) -> list[dict[str, Any]]:
+    """Replaces the list of products a supplier supplies, in one transaction, so a refused line saves nothing.
+
+    The JSON body is the whole new list: [{productId, supplierSku?, costPrice?, costCurrency?}], each product once.
+    A product already linked keeps its link (the fields change); products left out are unlinked.
+
+    Args:
+        supplier_id: The supplier.
+
+    Returns:
+        The saved lines (see supplier_products_json). Errors: 404 for an unknown supplier; 400 {"error":
+        "invalid_body"} for a body that is not a list of objects; the line errors of supplier_product_line; 400
+        {"error": "invalid", "field": "productId", "index"} for a product that does not exist or appears twice.
+    """
+    supplier = find_supplier(supplier_id)
+    data = request.get_json()
+    if not isinstance(data, list):
+        fail(400, error="invalid_body")
+    lines = [supplier_product_line(index, item) for index, item in enumerate(data)]
+    wanted = [line["product_id"] for line in lines]
+    known = set(db.session.scalars(select(Product.id).where(Product.id.in_(wanted))))
+    seen: set[uuid.UUID] = set()
+    for index, product_id in enumerate(wanted):
+        if product_id not in known or product_id in seen:
+            fail(400, error="invalid", field="productId", index=index)
+        seen.add(product_id)
+    links = {link.product_id: link for link in supplier.product_links}
+    for line in lines:
+        link = links.pop(line["product_id"], None)
+        if link is None:
+            supplier.product_links.append(ProductSupplier(**line))
+        else:
+            for column, value in line.items():
+                setattr(link, column, value)
+    for link in links.values():
+        supplier.product_links.remove(link)
+    commit()
+    return supplier_products_json(supplier)
 
 
 # Uploads (the file storage, app/storage.py: the local stub or S3), each stored as `<folder>/<UTC timestamp>_<uuid>.<ext>`:
