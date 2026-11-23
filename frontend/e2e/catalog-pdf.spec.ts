@@ -10,7 +10,7 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-import { signInStaff } from './utils.ts'
+import { signInStaff, swipe } from './utils.ts'
 import { overflowX } from './audit.ts'
 
 /** The state the browser answers after "Generate now". */
@@ -81,6 +81,27 @@ test.describe('PDF catalog', () => {
     await page.getByRole('button', { name: 'קטלוג PDF' }).click()
     await expect(page.getByRole('dialog', { name: 'קטלוג PDF' }).getByRole('slider', { name: 'מוצרים בעמוד' })).toBeVisible()
     expect(await overflowX(page)).toBe(0)
+  })
+
+  test('on a phone, dragging the sheet down by its header closes it and gives the page back', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'a dialog is a bottom sheet only on a phone (with a touch screen)')
+    await keepBuildsInBrowser(page)
+    await signInStaff(page, '/en/admin/products')
+    const button = page.getByRole('button', { name: 'PDF catalog' })
+    await button.click()
+    const dialog = page.getByRole('dialog', { name: 'PDF catalog' })
+    await expect(dialog.getByRole('slider', { name: 'Products per page' })).toBeVisible()
+    // Let the sheet's slide-in end, then drag its title down past the sheet's middle.
+    await dialog.evaluate((el) => Promise.all(el.getAnimations().map((animation) => animation.finished)))
+    const title = (await dialog.getByRole('heading', { name: 'PDF catalog' }).boundingBox())!
+    const sheet = (await dialog.boundingBox())!
+    await swipe(page, { x: title.x + title.width / 2, y: title.y + title.height / 2 }, { y: sheet.height * 0.7 }, 10, 16)
+    await expect(dialog).toBeHidden()
+    await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(0)
+    await expect(button).toBeFocused()
+    // The page answers again: the button reopens the dialog.
+    await button.click()
+    await expect(dialog).toBeVisible()
   })
 
   test('the download links ask for the catalog in the page language', async ({ page }) => {

@@ -192,7 +192,11 @@ export function useSwipeToClose(
       const ms = Math.round(Math.min(Math.max((remaining / Math.max(velocity, 1)) * 1000, 150), 300))
       panel.style.animationDuration = `${ms}ms`
       if (overlay.current) overlay.current.style.animationDuration = `${ms}ms`
+      // onClose may close by clicking a close button inside the panel (DialogContent does): that click must get
+      // through handleClickCapture, while the browser's own click at the end of the drag is still swallowed.
+      dragged.current = false
       onClose()
+      dragged.current = true
       return
     }
     panel.style.transition = `translate ${SNAP_BACK_MS}ms var(--ease-spring)`

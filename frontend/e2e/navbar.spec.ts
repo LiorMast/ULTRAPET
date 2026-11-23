@@ -5,30 +5,7 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
-
-/**
- * Drags one finger horizontally across the page with real touch events (Chromium DevTools protocol), the
- * way a phone would: press, move in steps, lift. Every event carries an explicit timestamp, so the
- * gesture's speed is exact however busy the test machine is.
- * @param page - The Playwright page.
- * @param from - Start point in CSS px.
- * @param dx - Horizontal distance to travel (negative = leftwards).
- * @param steps - Number of moves.
- * @param stepMs - Time between moves in ms; fewer steps or less time over the same distance = a faster flick.
- */
-async function swipe(page: Page, from: { x: number; y: number }, dx: number, steps: number, stepMs: number) {
-  const cdp = await page.context().newCDPSession(page)
-  const start = Date.now() / 1000
-  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', i: number) =>
-    cdp.send('Input.dispatchTouchEvent', {
-      type,
-      timestamp: start + (i * stepMs) / 1000,
-      touchPoints: type === 'touchEnd' ? [] : [{ x: from.x + (dx * i) / steps, y: from.y }],
-    })
-  await touch('touchStart', 0)
-  for (let i = 1; i <= steps; i++) await touch('touchMove', i)
-  await touch('touchEnd', steps)
-}
+import { swipe } from './utils.ts'
 
 /**
  * Fails the test if the page is wider than the window (which would cause horizontal scrolling).
@@ -265,12 +242,12 @@ test.describe('mobile', () => {
       const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 
       // A slow, short drag towards the edge: the panel moves with the finger, then springs back open.
-      await swipe(page, start, sign * 60, 12, 40)
+      await swipe(page, start, { x: sign * 60 }, 12, 40)
       await expect(drawer).toBeVisible()
       await expect.poll(async () => Math.round((await drawer.boundingBox())!.x)).toBe(Math.round(box.x))
 
       // A quick flick that travels well under half the panel: only its momentum carries it closed.
-      await swipe(page, start, sign * 130, 3, 16)
+      await swipe(page, start, { x: sign * 130 }, 3, 16)
       await expect(drawer).toBeHidden()
     }
   })

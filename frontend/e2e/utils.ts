@@ -16,6 +16,30 @@ export async function scrollIntoViewSettled(section: Locator) {
 }
 
 /**
+ * Drags one finger across the page with real touch events (Chromium DevTools protocol), the way a phone would: press,
+ * move in steps, lift. Every event carries an explicit timestamp, so the gesture's speed is exact however busy the test
+ * machine is.
+ * @param page - The Playwright page.
+ * @param from - Start point in CSS px.
+ * @param delta - Distance to travel: `x` (negative = leftwards) and / or `y` (negative = upwards).
+ * @param steps - Number of moves.
+ * @param stepMs - Time between moves in ms; fewer steps or less time over the same distance = a faster flick.
+ */
+export async function swipe(page: Page, from: { x: number; y: number }, delta: { x?: number; y?: number }, steps: number, stepMs: number) {
+  const cdp = await page.context().newCDPSession(page)
+  const start = Date.now() / 1000
+  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', i: number) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      timestamp: start + (i * stepMs) / 1000,
+      touchPoints: type === 'touchEnd' ? [] : [{ x: from.x + ((delta.x ?? 0) * i) / steps, y: from.y + ((delta.y ?? 0) * i) / steps }],
+    })
+  await touch('touchStart', 0)
+  for (let i = 1; i <= steps; i++) await touch('touchMove', i)
+  await touch('touchEnd', steps)
+}
+
+/**
  * Hides the fixed overlays (the header, the bottom tab bar, a bottom action bar, the floating WhatsApp button, and below
  * md the in-place editor's PropBar, which a phone docks above the tab bar) before a section screenshot. They float over
  * the page wherever the scroll stops, and a section taller than the window is captured in several scroll steps, so they
