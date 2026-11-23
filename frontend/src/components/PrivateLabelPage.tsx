@@ -99,7 +99,7 @@ const usePageSection = (texts: { defaults: Record<string, string>; labels: Recor
  */
 function FeatureCard({ icon: Icon, title, children }: { icon: LucideIcon; title: EditableField; children: ReactNode }) {
   return (
-    <li className="flex flex-col rounded-2xl border border-neutral-150 bg-white p-7 shadow-soft">
+    <li className="flex flex-col rounded-2xl border border-neutral-150 bg-white p-5 shadow-soft sm:p-7">
       <span aria-hidden="true" className="flex size-11 items-center justify-center rounded-lg bg-brand-red-muted text-brand-red">
         <Icon className="size-5" />
       </span>
@@ -120,7 +120,7 @@ export function PrivateLabelIntro(props: SectionProps) {
   const p = t.privateLabelPage
   const section = usePageSection(headingTexts(t, p.eyebrow, p.title, p.intro), props)
   return (
-    <section aria-labelledby="private-label-page-title" className="mx-auto max-w-7xl px-6 pt-16 pb-16 lg:px-10 lg:pt-20 lg:pb-20">
+    <section aria-labelledby="private-label-page-title" className="page-y px-gutter mx-auto max-w-7xl lg:py-20">
       <Breadcrumbs items={[{ label: t.articles.home, link: linkOptions({ to: '/' }) }, { label: t.nav.privateLabel }]} />
       {section.edit && <SectionEditBar edit={section.edit} label={p.eyebrow} className="mt-6 bg-white" />}
       <form {...section.formProps}>
@@ -170,17 +170,17 @@ export function PrivateLabelApproach(props: SectionProps) {
   const section = usePageSection({ defaults, labels }, props)
   const { field } = section
   return (
-    <section aria-labelledby="approach-title" className="bg-white px-6 pb-20 lg:px-10 lg:pb-24">
+    <section aria-labelledby="approach-title" className="bg-white px-gutter pb-12 md:pb-16 lg:pb-24">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={p.approachEyebrow} className="bg-white" />}
-        <form {...section.formProps} className="grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-16">
+        <form {...section.formProps} className="grid gap-8 sm:gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-center lg:gap-16">
           <div>
             <SectionHeading id="approach-title" edit={field} />
             <EditableText multiline {...field('approachText')} className="mt-6 max-w-2xl text-lg text-brand-charcoal-muted" />
             <EditableText multiline {...field('approachText2')} className="mt-4 max-w-2xl text-brand-charcoal-muted" />
             <EditableText wrap {...field('approachQuote')} className="mt-8 border-s-2 border-brand-red ps-5 font-display text-xl font-bold text-brand-charcoal" />
           </div>
-          <div className="rounded-3xl bg-brand-charcoal p-8 text-white lg:p-10">
+          <div className="rounded-3xl bg-brand-charcoal p-6 text-white sm:p-8 lg:p-10">
             <EditableText as="h3" wrap {...field('capabilitiesTitle')} className="font-display text-2xl font-bold" />
             <EditableText multiline {...field('capabilitiesText')} className="mt-3 text-white/75" />
             <dl className="mt-8 grid grid-cols-2 gap-3">
@@ -233,12 +233,12 @@ export function PrivateLabelCategories(props: SectionProps) {
   const section = usePageSection({ defaults, labels }, props)
   const { field } = section
   return (
-    <section aria-labelledby="categories-title" className="bg-white px-6 py-20 lg:px-10 lg:py-24">
+    <section aria-labelledby="categories-title" className="bg-white px-gutter section-y">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={p.categoriesEyebrow} className="bg-white" />}
         <form {...section.formProps}>
           <SectionHeading id="categories-title" edit={field} />
-          <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="section-gap grid gap-4 sm:grid-cols-2 sm:gap-5 lg:mt-12 lg:grid-cols-4">
             {CATEGORIES.map(({ id, icon }) => (
               <FeatureCard key={id} icon={icon} title={field(`category.${id}.name`)}>
                 <EditableText wrap {...field(`category.${id}.tagline`)} className="mt-1 text-sm font-semibold text-brand-red-dark" />
@@ -284,12 +284,12 @@ export function PrivateLabelWhy(props: SectionProps) {
   const section = usePageSection({ defaults, labels }, props)
   const { field } = section
   return (
-    <section aria-labelledby="why-title" className="bg-neutral-50 px-6 py-20 lg:px-10 lg:py-24">
+    <section aria-labelledby="why-title" className="bg-neutral-50 px-gutter section-y">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={p.whyEyebrow} className="bg-neutral-50" />}
         <form {...section.formProps}>
           <SectionHeading id="why-title" edit={field} />
-          <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="section-gap grid gap-4 sm:grid-cols-2 sm:gap-5 lg:mt-12 lg:grid-cols-4">
             {REASONS.map(({ id, icon }) => (
               <FeatureCard key={id} icon={icon} title={field(`reason.${id}.title`)}>
                 <EditableText multiline {...field(`reason.${id}.text`)} className="mt-3 text-sm leading-relaxed text-brand-charcoal-muted" />
@@ -320,10 +320,10 @@ export function PrivateLabelCta(props: SectionProps) {
   )
   const { field } = section
   return (
-    <section aria-labelledby="private-label-cta-title" className="bg-white px-6 pb-20 lg:px-10 lg:pb-24">
+    <section aria-labelledby="private-label-cta-title" className="bg-white px-gutter pb-12 md:pb-16 lg:pb-24">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={p.ctaLabel} className="bg-white" />}
-        <form {...section.formProps} className="rounded-3xl bg-brand-charcoal px-8 py-14 text-center lg:py-20">
+        <form {...section.formProps} className="rounded-3xl bg-brand-charcoal px-5 py-10 text-center sm:px-8 sm:py-14 lg:py-20">
           <EditableText as="h2" id="private-label-cta-title" wrap {...field('ctaTitle')} className="mx-auto max-w-3xl font-display text-3xl font-bold text-balance text-white lg:text-4xl" />
           <EditableText multiline {...field('ctaText')} className="mx-auto mt-5 max-w-2xl text-lg text-white/75" />
           {/* While editing, the button is shown but not followed: the page stays in edit mode. */}

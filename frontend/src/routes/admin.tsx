@@ -9,9 +9,11 @@
  * reload. Signing out is the header's Log out button. Entering the panel drops the manage mode's cached staff rows
  * (manage.ts), since they may be changed here. The panel is not for search engines: robots noindex, robots.txt
  * Disallow and no sitemap entry. The data pages (e.g. admin.brands.tsx) show their table in the <Outlet />.
+ * Mobile-first: on a phone the menu is one row of 44px chips that scrolls sideways (the current page's chip scrolled
+ * into view), so the page starts right under it instead of under three wrapped rows of links.
  */
 import { useEffect, useRef } from 'react'
-import { createFileRoute, Link, Outlet, useRouter } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet, useLocation, useRouter } from '@tanstack/react-router'
 import { fetchSession, type User } from '@/api'
 import { useAuth } from '@/auth'
 import { clearProductAdmin } from '@/manage'
@@ -46,6 +48,13 @@ function AdminLayout() {
   const staff = user?.kind === 'staff' ? user : null
   const sessionKey = user ? `${user.kind}:${user.email}` : ''
   const shownKey = useRef(sessionKey)
+  const menu = useRef<HTMLUListElement>(null)
+  const pathname = useLocation({ select: (location) => location.pathname })
+
+  // A phone's menu row scrolls sideways: keep the current page's chip in view (it may be far along the row).
+  useEffect(() => {
+    menu.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [pathname, loaded])
 
   // The header (or the form below) changed the session: load the pages again for the new user.
   useEffect(() => {
@@ -63,15 +72,18 @@ function AdminLayout() {
   }
   if (!loaded) return null
   return (
-    <div className="mx-auto max-w-screen-2xl px-4 py-10 sm:px-6 lg:px-10">
-      <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-150 pb-4">
-        <nav aria-label={t.admin.navLabel}>
-          <ul className="flex flex-wrap gap-1">
+    <div className="page-y px-gutter mx-auto max-w-screen-2xl lg:py-10">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-neutral-150 pb-3 sm:mb-10 sm:pb-4">
+        <nav
+          aria-label={t.admin.navLabel}
+          className="-mx-4 min-w-0 basis-[calc(100%+2rem)] overflow-x-auto overscroll-x-contain [scrollbar-width:none] sm:mx-0 sm:basis-auto [&::-webkit-scrollbar]:hidden"
+        >
+          <ul ref={menu} className="flex gap-1 px-4 sm:flex-wrap sm:px-0">
             {ADMIN_NAV.map(({ id, link, label }) => (
-              <li key={id}>
+              <li key={id} className="shrink-0">
                 <Link
                   {...link}
-                  className="block rounded-lg px-3.5 py-2 font-heading text-sm font-medium text-neutral-700 outline-none transition-[color,background-color] duration-300 hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red aria-[current=page]:bg-brand-red-muted aria-[current=page]:text-brand-red-dark"
+                  className="flex items-center whitespace-nowrap rounded-lg px-3.5 py-2 font-heading text-sm font-medium text-neutral-700 outline-none transition-[color,background-color] duration-300 hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-red aria-[current=page]:bg-brand-red-muted aria-[current=page]:text-brand-red-dark pointer-coarse:min-h-11"
                 >
                   {label(t)}
                 </Link>

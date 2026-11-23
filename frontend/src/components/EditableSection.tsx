@@ -243,7 +243,7 @@ export function SectionEditBar({ edit, label, tone = 'light', className }: { edi
   const { locale } = useI18n()
   const { bar, propBar } = edit
   return (
-    <div className={cn('mb-6 flex flex-wrap items-start justify-end gap-3', bar.editing && 'sticky top-24 z-20 py-3', className)}>
+    <div className={cn('mb-6 flex flex-wrap items-start justify-end gap-3', bar.editing && 'sticky top-(--header-h) z-20 py-3', className)}>
       <InlineEditBar {...bar} label={label} tone={tone} />
       {propBar && <PropBar {...propBar} locale={locale} />}
     </div>

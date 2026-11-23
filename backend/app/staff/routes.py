@@ -42,6 +42,9 @@ stub or the S3 bucket) and returns its key and URL (a product photo also a thumb
 row stores only the key (converters media_key, and media_srcset for a product photo's srcset) and every response
 turns it back into a URL (storage.url_of, storage.srcset_urls). A picture field takes nothing but our own objects:
 every file the site loads comes from the storage or is bundled with the frontend.
+`resellers` are the stores of the Where to Buy page and its map (/admin/resellers); the edit form finds a store's
+position from its address with
+    GET /geocode?address=&city=  {lat, lng, label, approximate} from the geocoder (app/geocode.py); 404 not found
 The PDF catalog (app/catalog_pdf.py): a successful change to a product, category, brand or contact detail asks for a
 rebuild (rebuild_catalog_after_change), and the "PDF catalog" dialog of the products page uses:
     GET /catalog-pdf             the layout options, the last build's status and the files' URLs
@@ -66,7 +69,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import selectinload
 
-from app import catalog_pdf, inventory, storage
+from app import catalog_pdf, geocode, inventory, storage
 from app.accounts import profile_json
 from app.auth import require_user
 from app.database.db import db
@@ -822,6 +825,31 @@ def rebuild_catalog_after_change(response: Response) -> Response:
     if shown and request.method != "GET" and response.status_code < 300:
         catalog_pdf.request_rebuild()
     return response
+
+
+@bp.get("/geocode")
+def geocode_address() -> dict[str, Any]:
+    """Finds a reseller's map position from its address (the "Find from address" button of the reseller form).
+
+    Query args:
+        address: The street address (optional: without it only the city is looked up).
+        city: The city (required).
+
+    Returns:
+        {lat, lng, label, approximate}; 400 "required" (field "city") without a city, 404 "not_found" when neither
+        the address nor the city is found, 502 "geocoder_unavailable" when the geocoder is off or failed.
+    """
+    address = request.args.get("address", "").strip()
+    city = request.args.get("city", "").strip()
+    if not city:
+        fail(400, error="required", field="city")
+    try:
+        found = geocode.locate(address, city)
+    except geocode.GeocoderUnavailable:
+        fail(502, error="geocoder_unavailable")
+    if found is None:
+        fail(404, error="not_found")
+    return found
 
 
 @bp.get("/catalog-pdf")

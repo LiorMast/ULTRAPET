@@ -79,7 +79,7 @@ function AdminProducts() {
     <section>
       <div className="mb-8 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div>
-          <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.productsTitle}</h1>
+          <h1 className="font-display text-2xl font-bold text-brand-charcoal sm:text-3xl">{t.admin.productsTitle}</h1>
           <p className="mt-2 max-w-2xl text-sm text-brand-charcoal-muted">{t.admin.productsDescription}</p>
         </div>
         <CatalogPdfButton load={fetchCatalogPdf} onGenerate={generateCatalogPdf} />

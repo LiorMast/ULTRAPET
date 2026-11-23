@@ -11,6 +11,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { signInStaff } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /** The state the browser answers after "Generate now". */
 const BUILT = {
@@ -79,7 +80,7 @@ test.describe('PDF catalog', () => {
     await signInStaff(page, '/admin/products')
     await page.getByRole('button', { name: 'קטלוג PDF' }).click()
     await expect(page.getByRole('dialog', { name: 'קטלוג PDF' }).getByRole('slider', { name: 'מוצרים בעמוד' })).toBeVisible()
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    expect(await overflowX(page)).toBe(0)
   })
 
   test('the download links ask for the catalog in the page language', async ({ page }) => {

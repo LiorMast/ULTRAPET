@@ -64,14 +64,14 @@ describe('Add to cart', () => {
     expect(screen.getByText(`Added to cart: ${name}`)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/catalog')
 
-    const cart = screen.getByRole('button', { name: 'Shopping cart, 1 item' })
+    const cart = within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 1 item' })
     expect(within(cart).getByTestId('cart-badge')).toHaveTextContent('1')
     expect(within(cart).getByTestId('cart-badge')).toHaveClass('animate-cart-pop')
 
     // Adding again merges into the same line.
     await user.click(button)
-    expect(screen.getByRole('button', { name: 'Shopping cart, 2 items' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Shopping cart, 2 items' }))
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 2 items' })).toBeInTheDocument()
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 2 items' }))
     const panel = await screen.findByRole('dialog', { name: 'Shopping cart' })
     expect(within(panel).getAllByRole('listitem')).toHaveLength(1)
     expect(within(panel).getByRole('textbox', { name: `Quantity of ${name}` })).toHaveValue('2')
@@ -100,7 +100,7 @@ describe('Add to cart', () => {
     expect(quantity).toHaveValue('3')
     await user.click(add)
     expect(quantity).toHaveValue('1')
-    expect(screen.getByRole('button', { name: 'Shopping cart, 3 items' })).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 3 items' })).toBeInTheDocument()
   })
 
   it('accepts a typed quantity, keeping digits only', async () => {
@@ -111,7 +111,7 @@ describe('Add to cart', () => {
     await user.type(quantity, '1a2')
     expect(quantity).toHaveValue('12')
     await user.click(within(main).getAllByRole('button', { name: 'Add to cart' })[0])
-    expect(screen.getByRole('button', { name: 'Shopping cart, 12 items' })).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 12 items' })).toBeInTheDocument()
   })
 
   it("keeps each customer's cart in browser storage", async () => {
@@ -121,12 +121,12 @@ describe('Add to cart', () => {
 
     // The same customer comes back: the cart is still there.
     const again = await renderPage('/en', { user: TEST_USER })
-    expect(screen.getByRole('button', { name: 'Shopping cart, 1 item' })).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 1 item' })).toBeInTheDocument()
     again.unmount()
 
     // Another customer on the same browser starts with an empty cart.
     await renderPage('/en', { user: { ...TEST_USER, email: 'other@example.com' } })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Shopping cart' })).toBeInTheDocument())
+    await waitFor(() => expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart' })).toBeInTheDocument())
   })
 
   it('flies the card photo to the cart icon, and pops the badge only when it lands', async () => {
@@ -143,7 +143,7 @@ describe('Add to cart', () => {
     const flyer = document.querySelector<HTMLImageElement>('body > div[aria-hidden="true"] > img')
     expect(flyer?.src).toBe(card.querySelector('img')!.src)
     expect(animate).toHaveBeenCalledTimes(2)
-    const cart = screen.getByRole('button', { name: 'Shopping cart, 1 item' })
+    const cart = within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 1 item' })
     expect(within(cart).getByTestId('cart-badge')).not.toHaveClass('animate-cart-pop')
 
     await act(async () => land())
@@ -162,7 +162,7 @@ describe('Add to cart', () => {
 
     await user.click(button)
     expect(animate).not.toHaveBeenCalled()
-    expect(within(screen.getByRole('button', { name: 'Shopping cart, 1 item' })).getByTestId('cart-badge')).toHaveClass('animate-cart-pop')
+    expect(within(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 1 item' })).getByTestId('cart-badge')).toHaveClass('animate-cart-pop')
     delete (HTMLElement.prototype as Partial<HTMLElement>).animate
   })
 })

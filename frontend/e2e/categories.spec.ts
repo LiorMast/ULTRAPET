@@ -1,12 +1,14 @@
 /**
  * categories.spec.ts — End-to-end checks of the home page Categories carousel in real Chromium: the arrows
- * scroll the row and disable at the ends (English and RTL Hebrew), the cards are the database's catalog categories
+ * scroll the row and disable at the ends (English and RTL Hebrew; desktop), a phone swipes the row instead (no
+ * arrows, one card per snap, the next one peeking in), the cards are the database's catalog categories
  * linking to the catalog, the page does not
  * overflow horizontally, axe passes, and screenshots (Hebrew, English) for visual review.
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { scrollIntoViewSettled } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 const HIDE_HEADER = 'header { visibility: hidden !important; }'
 
@@ -14,7 +16,8 @@ for (const [name, path, next, previous] of [
   ['he', '/', 'הבא', 'הקודם'],
   ['en', '/en', 'Next', 'Previous'],
 ] as const) {
-  test(`arrows scroll the row and disable at the ends (${name})`, async ({ page }) => {
+  test(`arrows scroll the row and disable at the ends (${name})`, async ({ page, isMobile }) => {
+    test.skip(isMobile, 'a phone swipes the row (no arrows)')
     await page.goto(path)
     const section = page.locator('#categories')
     await scrollIntoViewSettled(section)
@@ -44,11 +47,26 @@ for (const [name, path, next, previous] of [
   })
 }
 
+test('a phone swipes the row: no arrows, one card per snap with the next one peeking in', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'the phone carousel')
+  await page.goto('/en')
+  const section = page.locator('#categories')
+  await scrollIntoViewSettled(section)
+  await expect(section.getByRole('button', { name: 'Next' })).toHaveCount(0)
+  const track = section.locator('ul').first()
+  const widths = await track.evaluate((el) => ({ row: el.clientWidth, card: (el.firstElementChild as HTMLElement).offsetWidth }))
+  // About 82% of the row: the next card shows at the edge.
+  expect(widths.card / widths.row).toBeGreaterThan(0.7)
+  expect(widths.card / widths.row).toBeLessThan(0.9)
+  await track.evaluate((el) => el.scrollBy({ left: el.clientWidth, behavior: 'instant' }))
+  await expect.poll(() => track.evaluate((el) => Math.abs(el.scrollLeft))).toBeGreaterThan(100)
+})
+
 test('the catalog categories are links to the catalog and the page does not overflow', async ({ page }) => {
   await page.goto('/')
   // The database's active categories (the seed's 15), in their order.
   await expect(page.locator('#categories ul a')).toHaveCount(15)
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
   await page.locator('#categories ul a').first().click()
   await expect(page).toHaveURL(/\/catalog\?category=dry-cat-food$/)
 })
@@ -61,12 +79,14 @@ test('has no accessibility violations', async ({ page }) => {
 })
 
 for (const [name, path] of [['he', '/'], ['en', '/en']] as const) {
-  test(`screenshot (${name})`, async ({ page }) => {
+  test(`screenshot (${name})`, async ({ page, isMobile }) => {
     await page.goto(path)
     await page.addStyleTag({ content: HIDE_HEADER })
     const section = page.locator('#categories')
     await scrollIntoViewSettled(section)
-    await expect(section.getByRole('button', { name: /Next|הבא/ })).toBeVisible()
+    // The carousel has measured itself: its arrows show (a phone swipes instead: its cards are in).
+    if (isMobile) await expect(section.getByRole('link').first()).toBeVisible()
+    else await expect(section.getByRole('button', { name: /Next|הבא/ })).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
     await expect(section).toHaveScreenshot(`categories-${name}.png`)
   })

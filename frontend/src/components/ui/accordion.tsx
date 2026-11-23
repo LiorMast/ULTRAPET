@@ -41,11 +41,11 @@ const itemVariants = cva("", {
 
 const triggerVariants = cva(
   "group/trigger flex flex-1 items-center justify-between gap-6 text-start text-base font-semibold text-brand-charcoal transition-colors duration-300 outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red/40 disabled:pointer-events-none disabled:opacity-50 lg:text-lg",
-  { variants: { variant: { line: "py-6", card: "p-6" } } }
+  { variants: { variant: { line: "py-5 sm:py-6", card: "p-5 sm:p-6" } } }
 )
 
-/* pe-16 keeps the answer clear of the icon column (size-10 icon + gap-6). */
-const panelVariants = cva("text-brand-charcoal-muted", { variants: { variant: { line: "pe-16 pb-6", card: "px-6 pe-16 pb-6" } } })
+/* From sm, pe-16 keeps the answer clear of the icon column (size-10 icon + gap-6); a phone gives the answer the full width. */
+const panelVariants = cva("text-brand-charcoal-muted", { variants: { variant: { line: "pb-5 sm:pe-16 sm:pb-6", card: "px-5 pb-5 sm:px-6 sm:pe-16 sm:pb-6" } } })
 
 /**
  * The accordion root: holds the items and decides which may be open.

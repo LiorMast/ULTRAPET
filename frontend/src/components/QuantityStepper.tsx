@@ -19,7 +19,7 @@ import { useI18n } from '@/i18n'
 const stepperVariants = cva('inline-flex items-stretch overflow-hidden rounded-lg border border-neutral-300 bg-white transition-[border-color] duration-150 focus-within:border-brand-red', {
   variants: {
     size: {
-      sm: 'h-9 [&_button]:w-9 [&_input]:w-10 [&_input]:text-sm',
+      sm: 'h-9 [&_button]:w-9 [&_input]:w-10 [&_input]:text-base pointer-coarse:h-12 pointer-coarse:[&_button]:w-11 pointer-coarse:[&_input]:w-11',
       md: 'h-12 [&_button]:w-12 [&_input]:w-12 [&_input]:text-base',
     },
   },

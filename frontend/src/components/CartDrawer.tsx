@@ -1,10 +1,12 @@
 /**
- * CartDrawer.tsx — The business customer's shopping cart: the header's cart icon button (with a count badge) and
- * the Offcanvas panel it opens. Rendered by the Navbar for signed-in business customers only (the public site and
- * staff have no cart). The lines come from useCart() (src/cart.tsx); AddToCartButton fills them.
+ * CartDrawer.tsx — The business customer's shopping cart: its trigger with a count badge and the Offcanvas panel it
+ * opens. Rendered for signed-in business customers only (the public site and staff have no cart): by the Navbar from
+ * xl (the header's cart icon) and by the TabBar below xl (its Cart tab, through `renderTrigger`; CartBadge is the badge
+ * both draw). The lines come from useCart() (src/cart.tsx); AddToCartButton fills them.
  *
- * Hovering or focusing the icon shows the Offcanvas tooltip with the cart's summary: units and subtotal, or "empty".
- * The icon carries CART_TARGET_ATTR: AddToCartButton's flying product photo lands on it.
+ * Hovering or focusing the header icon shows the Offcanvas tooltip with the cart's summary: units and subtotal, or
+ * "empty" (a tab needs none: its label is visible). The icon carries CART_TARGET_ATTR: AddToCartButton's flying
+ * product photo lands on whichever of the two is on screen.
  *
  * Under the panel's header, a banner (the Offcanvas notice, it doesn't scroll) shows how far the cart is from the
  * minimum order (MIN_ORDER_AMOUNT), with a progress bar, until it is reached. A line's stepper goes down to 0, which
@@ -18,7 +20,7 @@
  * the one-unit price struck out, and the subtotal follows), or an empty state with a link to the catalog; its footer shows
  * the subtotal before VAT and Checkout, which stays disabled until checkout exists (Phase 4).
  */
-import { useState } from 'react'
+import { useState, type ReactElement, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { CircleAlert, CircleCheck, ShoppingCart, Trash2 } from 'lucide-react'
 import { cn } from 'cn'
@@ -35,12 +37,53 @@ import { useI18n } from '@/i18n'
 /** The largest number the badge spells out; more shows as "99+". */
 const BADGE_MAX = 99
 
+/** What a custom cart trigger draws (CartDrawer `renderTrigger`): the parts the cart builds for it. */
+export type CartTriggerParts = {
+  /** The accessible name, with the count ("Shopping cart, 2 items"). */
+  label: string
+  /** The cart icon (it nudges on every add). */
+  icon: ReactNode
+  /** How many units the cart holds. */
+  count: number
+  /** Changes on every add, so the badge's pop replays (undefined before the first add). */
+  popKey?: number
+  /** Spread on the box the flying photo lands on (around the icon). */
+  targetProps: Record<string, string>
+}
+
 /**
- * The cart icon button and the cart panel it opens.
- * @param props.className - Extra classes for the icon button (e.g. responsive visibility).
- * @returns The button together with its panel.
+ * The cart's count badge: a small red dot with the number of units (99+ above BADGE_MAX), popping on every add.
+ * @param props.count - The units in the cart; 0 = no badge.
+ * @param props.popKey - Changes on every add (replays the pop); undefined = no animation.
+ * @param props.className - Where it sits on its trigger (absolute, e.g. "end-0.5 top-0.5").
+ * @returns The badge, or nothing when the cart is empty.
  */
-export function CartDrawer({ className }: { className?: string }) {
+export function CartBadge({ count, popKey, className }: { count: number; popKey?: number; className?: string }) {
+  if (count <= 0) return null
+  return (
+    <span
+      key={`badge-${popKey}`}
+      aria-hidden="true"
+      data-testid="cart-badge"
+      className={cn(
+        'absolute flex min-w-5 items-center justify-center rounded-full bg-brand-red px-1 text-2xs font-semibold leading-5 text-white',
+        popKey && 'animate-cart-pop',
+        className,
+      )}
+    >
+      {count > BADGE_MAX ? `${BADGE_MAX}+` : count}
+    </span>
+  )
+}
+
+/**
+ * The cart's trigger and the cart panel it opens.
+ * @param props.className - Extra classes for the header's icon button (e.g. responsive visibility).
+ * @param props.renderTrigger - Draws another trigger instead of the header's icon button (the TabBar's Cart tab): it
+ *   gets the cart's parts and returns a <button> that spreads the props it is given (the panel's trigger props).
+ * @returns The trigger together with its panel.
+ */
+export function CartDrawer({ className, renderTrigger }: { className?: string; renderTrigger?: (parts: CartTriggerParts) => ReactElement }) {
   const { t, locale } = useI18n()
   const { lines, count, subtotal, addedTick, remove } = useCart()
   const [open, setOpen] = useState(false)
@@ -50,6 +93,8 @@ export function CartDrawer({ className }: { className?: string }) {
   // Each add gets new keys (distinct for the icon and the badge: they are siblings), so the animations replay;
   // nothing animates before the first add.
   const popKey = addedTick > 0 ? addedTick : undefined
+  const icon = <ShoppingCart key={`icon-${popKey}`} size={24} aria-hidden="true" className={cn('block', popKey && 'animate-cart-nudge')} />
+  const targetProps = { [CART_TARGET_ATTR]: '' }
 
   /**
    * Removes a line and moves the focus to the next line's name (else the previous one's, else the empty state's
@@ -72,7 +117,7 @@ export function CartDrawer({ className }: { className?: string }) {
       onOpenChange={setOpen}
       title={t.cart.title}
       tooltip={
-        <>
+        !renderTrigger && <>
           <span className="block font-semibold">{t.cart.title}</span>
           <span className="block text-white/80">
             {count > 0 ? t.cart.tooltipSummary.replace('{items}', items).replace('{amount}', formatPrice(locale, subtotal)) : t.cart.empty}
@@ -82,30 +127,22 @@ export function CartDrawer({ className }: { className?: string }) {
       description={t.cart.minimumOrder.replace('{amount}', minimum)}
       notice={lines.length > 0 && <MinimumOrderBanner subtotal={subtotal} />}
       trigger={
-        <button
-          type="button"
-          {...{ [CART_TARGET_ATTR]: '' }}
-          aria-label={label}
-          className={cn(
-            'relative rounded-lg p-2 text-brand-charcoal sm:p-3 transition-[color,scale] outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.97] active:duration-100',
-            className,
-          )}
-        >
-          <ShoppingCart key={`icon-${popKey}`} size={24} aria-hidden="true" className={cn('block', popKey && 'animate-cart-nudge')} />
-          {count > 0 && (
-            <span
-              key={`badge-${popKey}`}
-              aria-hidden="true"
-              data-testid="cart-badge"
-              className={cn(
-                'absolute end-0.5 top-0.5 flex min-w-5 items-center justify-center rounded-full bg-brand-red px-1 text-2xs font-semibold leading-5 text-white sm:end-1 sm:top-1',
-                popKey && 'animate-cart-pop',
-              )}
-            >
-              {count > BADGE_MAX ? `${BADGE_MAX}+` : count}
-            </span>
-          )}
-        </button>
+        renderTrigger ? (
+          renderTrigger({ label, icon, count, popKey, targetProps })
+        ) : (
+          <button
+            type="button"
+            {...targetProps}
+            aria-label={label}
+            className={cn(
+              'relative rounded-lg p-3 text-brand-charcoal transition-[color,scale] outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.97] active:duration-100',
+              className,
+            )}
+          >
+            {icon}
+            <CartBadge count={count} popKey={popKey} className="end-1 top-1" />
+          </button>
+        )
       }
       footer={
         <>
@@ -239,7 +276,7 @@ function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNaviga
             to="/products/$slug"
             params={{ slug: line.slug }}
             onClick={onNavigate}
-            className="line-clamp-2 text-sm font-semibold leading-snug text-brand-charcoal hover:text-brand-red-dark focus-visible:ring-2 focus-visible:ring-brand-red/60"
+            className="line-clamp-2 text-sm font-semibold leading-snug text-brand-charcoal hover:text-brand-red-dark focus-visible:ring-2 focus-visible:ring-brand-red/60 pointer-coarse:min-h-11"
           >
             {name}
           </Link>
@@ -247,7 +284,7 @@ function CartLineItem({ line, onNavigate, onRemove }: { line: CartLine; onNaviga
             type="button"
             aria-label={t.cart.remove.replace('{name}', name)}
             onClick={onRemove}
-            className="-me-1.5 -mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-brand-red-muted hover:text-brand-red-dark focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
+            className="-me-1.5 -mt-1 flex size-8 shrink-0 items-center pointer-coarse:-me-3 pointer-coarse:-mt-2.5 pointer-coarse:size-11 justify-center rounded-lg text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-brand-red-muted hover:text-brand-red-dark focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
           >
             <Trash2 aria-hidden="true" className="size-4" />
           </button>

@@ -6,6 +6,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { hideFixedOverlays, scrollIntoViewSettled } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 test('shows four figures and does not overflow', async ({ page }) => {
   await page.goto('/')
@@ -14,7 +15,7 @@ test('shows four figures and does not overflow', async ({ page }) => {
   await expect(page.locator('#stats li [aria-hidden]').nth(2)).toHaveText('1,000+')
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    expect(await overflowX(page)).toBe(0)
   }
 })
 

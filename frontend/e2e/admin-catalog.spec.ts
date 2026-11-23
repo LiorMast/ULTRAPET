@@ -28,6 +28,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import categories from '../src/stubs/product-categories.json' with { type: 'json' }
 import products from '../src/stubs/products.json' with { type: 'json' }
 import { hideFixedOverlays, scrollIntoViewSettled, signInStaff } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /** The product the discount test changes: the last one, on the table's last page. */
 const PRODUCT = products[products.length - 1].name.en
@@ -221,13 +222,13 @@ test('adds a discount on the Discounts page, then deletes it', async ({ page }, 
 test('the catalog pages do not scroll sideways on a phone', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'phone layout')
   await signInStaff(page, '/en/admin/products')
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
   await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('link', { name: 'Categories' }).click()
   await page.getByRole('table', { name: 'Categories' }).waitFor()
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
   await page.getByRole('navigation', { name: 'Admin', exact: true }).getByRole('link', { name: 'Discounts' }).click()
   await page.getByRole('table', { name: 'Discounts' }).waitFor()
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
 })
 
 for (const [name, path] of [['he', '/admin/categories'], ['en', '/en/admin/categories']] as const) {

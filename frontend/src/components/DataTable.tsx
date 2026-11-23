@@ -9,7 +9,9 @@
  * the caller's own (e.g. "Discounts") that open the caller's dialog for the row. `onReorder` adds "Change order",
  * which opens ReorderDialog (drag the rows into order) for a table whose rows have a display order. A page whose
  * form is not one field per column (e.g. the Discounts page) passes `formDialog`, its own dialog for Add and Edit,
- * in place of RecordDialog; `canEdit` hides Edit on rows that form cannot edit. Used by the
+ * in place of RecordDialog; `canEdit` hides Edit on rows that form cannot edit; `formExtra` adds content of its own
+ * after RecordDialog's fields (e.g. the resellers page's map picker). `editRequest` opens a row's Edit from outside
+ * the table (e.g. a click on the row's pin on a map). Used by the
  * /admin pages (e.g. routes/admin.brands.tsx), one column config per resource.
  *
  * How it talks to DataTables: the options, columns and cell renderers are read once, when the table mounts
@@ -17,17 +19,24 @@
  * keeping its search, sort and page. Cells are React (slots rendered through portals) for display, and plain
  * text for DataTables' sorting and search; only the rows of the page shown get their cells built (deferRender),
  * so a table of hundreds of rows stays fast. Changing `columns` after mount needs a remount (a new `key`).
+ *
+ * Mobile-first: on a phone (below md) the rows are cards instead of a table that scrolls sideways (index.css,
+ * `.data-table`): the first column is the card's title, every other value sits beside its column's name (the cells'
+ * data-label), and the row's actions fill the card's bottom as labelled 44px buttons, two to a row. The column titles
+ * are then for screen readers only, so a "Sort by" menu above the cards sorts them (DataTables' order through its API);
+ * the search spans the width and "rows per page" steps aside. On touch screens the paging and sort controls are 44px.
  */
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import DataTableLib, { type DataTableSlots } from 'datatables.net-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import DataTableLib, { type DataTableRef, type DataTableSlots } from 'datatables.net-react'
 import DT, { type ColumnOptions, type Options } from 'datatables.net-dt'
 import 'datatables.net-dt/css/dataTables.dataTables.css'
 import { ArrowUpDown, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import type { StaffProductImage, UploadFolder } from '@/api'
 import { localized, type Localized } from '@/config'
-import { DeleteDialog, RecordDialog } from '@/components/RecordDialog'
+import { DeleteDialog, RecordDialog, type FormExtraProps } from '@/components/RecordDialog'
 import { ReorderDialog } from '@/components/ReorderDialog'
 import { Button } from '@/components/ui/button'
+import { inputVariants } from '@/components/ui/input'
 import { useToast } from '@/toast'
 import { useI18n, type Locale } from '@/i18n'
 
@@ -115,8 +124,17 @@ export type DataTableProps<Row> = {
   onReorder?: (keys: string[]) => Promise<unknown>
   rowActions?: RowAction<Row>[]
   formDialog?: (row: Row | undefined, props: FormDialogProps) => ReactNode
+  formExtra?: (form: FormExtraProps) => ReactNode
   canEdit?: (row: Row) => boolean
+  editRequest?: EditRequest | null
 }
+
+/**
+ * Asks the table to open a row's Edit form from outside it (each new object opens it once): `key` = the row's key
+ * (rowKey); `restoreFocus` puts the focus back where the request came from when the form closes (default: the row's
+ * Edit button, else the table).
+ */
+export type EditRequest = { key: string; restoreFocus?: () => void }
 
 /**
  * What DataTable hands a `formDialog`: `onSave` creates the row (Add) or saves its changes (Edit) through
@@ -132,7 +150,7 @@ export type FormDialogProps = { onSave: (values: RowValues) => Promise<void>; on
 type OpenDialog<Row> =
   | { mode: 'create' }
   | { mode: 'reorder' }
-  | { mode: 'edit'; row: Row }
+  | { mode: 'edit'; row: Row; restoreFocus?: () => void }
   | { mode: 'delete'; row: Row }
   | { mode: 'action'; name: string; row: Row }
   | null
@@ -290,7 +308,10 @@ function RowActions<Row>({ row, table, onOpen }: { row: Row; table: { current: D
  * @param props.rowActions - Buttons of the caller's own on every row, each opening its dialog (see RowAction).
  * @param props.formDialog - The caller's own Add/Edit dialog in place of RecordDialog: gets the edited row (undefined
  *   for Add) and FormDialogProps; omit to use the column-driven form.
+ * @param props.formExtra - Content of the caller's own after the column-driven form's fields (see RecordDialog
+ *   `extra`); ignored with formDialog.
  * @param props.canEdit - Whether a row shows Edit (with onUpdate); default every row.
+ * @param props.editRequest - Opens a row's Edit form from outside the table (see EditRequest); needs onUpdate.
  * @returns The table section.
  */
 export function DataTable<Row>(props: DataTableProps<Row>) {
@@ -299,6 +320,9 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   const [open, setOpen] = useState<OpenDialog<Row>>(null)
   const toast = useToast()
   const wrapper = useRef<HTMLDivElement>(null)
+  const table = useRef<DataTableRef>(null)
+  // The phone's sort menu: "<column index>:asc|desc", or "" for the rows' own order.
+  const [sortChoice, setSortChoice] = useState('')
   /** The props of the latest render, for the cell renderers DataTables keeps from the first one. */
   const latest = useRef(props)
   useLayoutEffect(() => {
@@ -306,7 +330,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
   })
 
   // Built once: DataTables reads its options, columns and renderers only when it mounts.
-  const [{ columns, slots, options }] = useState(() => {
+  const [{ shown, columns, slots, options }] = useState(() => {
     const shown = props.columns.filter((column) => column.inTable !== false && column.type !== 'password')
     const hasActions = Boolean(props.onUpdate || props.onDelete || props.rowActions?.length)
     const columns: ColumnOptions[] = shown.map((column) => ({
@@ -315,6 +339,8 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
       title: column.label,
       defaultContent: '',
       type: ['integer', 'number', 'money', 'boolean', 'images'].includes(column.type ?? 'text') ? 'num' : 'string',
+      // A phone's card shows each value under its column's name (index.css, `.data-table`).
+      createdCell: (cell: Node) => (cell as HTMLElement).setAttribute('data-label', column.label),
     }))
     if (hasActions) columns.push({ data: null, name: 'actions', title: t.admin.actions, orderable: false, searchable: false, className: 'dt-actions' })
     const slots: DataTableSlots = {}
@@ -358,8 +384,18 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
         },
       },
     }
-    return { columns, slots, options }
+    return { shown, columns, slots, options }
   })
+
+  /**
+   * The phone's sort menu changed: sorts the cards by a column (or back to the rows' own order) through DataTables.
+   * @param choice - "<column index>:asc|desc", or "" for the rows' own order.
+   */
+  const handleSort = (choice: string) => {
+    setSortChoice(choice)
+    const [index, direction] = choice.split(':')
+    table.current?.dt()?.order(choice ? [[Number(index), direction as 'asc' | 'desc']] : []).draw()
+  }
 
   /**
    * Puts the keyboard focus back after a dialog closes: on the row's button again (the table redraws its
@@ -368,6 +404,10 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
    */
   const handleCloseFocus = (event: Event) => {
     event.preventDefault()
+    if (open?.mode === 'edit' && open.restoreFocus) {
+      open.restoreFocus()
+      return
+    }
     const action = open?.mode === 'action' ? open.name : open?.mode
     const target = open && open.mode !== 'create' && open.mode !== 'reorder' ? `[data-row="${CSS.escape(props.rowKey(open.row))}"][data-action="${action}"]` : `[data-action="${action}"]`
     focusSettled(wrapper.current, target)
@@ -389,13 +429,21 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
     setOpen(null)
   }
 
+  // An edit asked for from outside the table (e.g. a pin on a map) opens that row's form, once per request.
+  const { editRequest } = props
+  useEffect(() => {
+    if (!editRequest || !latest.current.onUpdate) return
+    const row = latest.current.rows.find((candidate) => latest.current.rowKey(candidate) === editRequest.key)
+    if (row !== undefined) setOpen({ mode: 'edit', row, restoreFocus: editRequest.restoreFocus })
+  }, [editRequest])
+
   // A custom action's dialog shows the row as it is now: a save inside it reloads the rows.
   const action = open?.mode === 'action' ? props.rowActions?.find((candidate) => candidate.name === open.name) : undefined
   const actionRow = open?.mode === 'action' ? (rows.find((row) => props.rowKey(row) === props.rowKey(open.row)) ?? open.row) : undefined
 
   const memoTable = useMemo(
     () => (
-      <DataTableLib data={rows} columns={columns} slots={slots} options={options} className="admin-table">
+      <DataTableLib ref={table} data={rows} columns={columns} slots={slots} options={options} className="admin-table">
         <caption className="sr-only">{caption}</caption>
       </DataTableLib>
     ),
@@ -404,7 +452,22 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
 
   return (
     <div ref={wrapper} tabIndex={-1} dir={dir} className="data-table outline-none">
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-4">
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-x-4 gap-y-3">
+        {/* A phone's cards have no column titles to click: this menu sorts them. */}
+        <label className="min-w-48 flex-1 md:hidden">
+          <span className="sr-only">{t.admin.table.sortBy}</span>
+          <select value={sortChoice} onChange={(event) => handleSort(event.target.value)} className={inputVariants({ size: 'compact' })}>
+            <option value="">{`${t.admin.table.sortBy}: ${t.admin.table.sortDefault}`}</option>
+            {shown.flatMap((column, index) => [
+              <option key={`${column.key}-asc`} value={`${index}:asc`}>
+                {t.admin.table.sortAsc.replace('{label}', column.label)}
+              </option>,
+              <option key={`${column.key}-desc`} value={`${index}:desc`}>
+                {t.admin.table.sortDesc.replace('{label}', column.label)}
+              </option>,
+            ])}
+          </select>
+        </label>
         <div className="flex flex-wrap gap-2">
           {onReorder && rows.length > 1 && (
             <Button size="sm" variant="outline" data-action="reorder" onClick={() => setOpen({ mode: 'reorder' })}>
@@ -440,6 +503,7 @@ export function DataTable<Row>(props: DataTableProps<Row>) {
           onSave={handleSave}
           onClose={() => setOpen(null)}
           onCloseAutoFocus={handleCloseFocus}
+          extra={props.formExtra}
         />
       )}
       {open?.mode === 'reorder' && onReorder && (

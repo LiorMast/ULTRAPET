@@ -8,6 +8,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { signInCustomer } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /**
  * Opens the English catalog signed in as the demo customer, with an empty cart, and waits for the prices.
@@ -48,7 +49,7 @@ test('adds from the cards with the fly animation, and edits the cart in the pane
   const panel = page.getByRole('dialog', { name: 'Shopping cart' })
   await expect(panel.getByRole('progressbar', { name: 'Progress to the minimum order' })).toBeVisible()
   await expect(panel).toContainText(/Add ₪[\d.,]+ more to reach the ₪2,000 minimum order/)
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
 
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).include('[role="dialog"]').analyze()
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
@@ -74,5 +75,5 @@ test('adds a chosen quantity from a product page', async ({ page, isMobile }) =>
   await main.getByRole('button', { name: 'Add to cart' }).first().click()
   await expect(page.getByRole('button', { name: 'Shopping cart, 3 items' })).toBeVisible()
   await expect(main.getByRole('textbox', { name: 'Quantity' })).toHaveValue('1')
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
 })

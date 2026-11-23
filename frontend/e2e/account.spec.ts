@@ -7,6 +7,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { signInCustomer, signInStaff } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /** The WCAG tags axe checks. */
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
@@ -15,7 +16,7 @@ test('the demo customer opens their account', async ({ page, isMobile }) => {
   await page.goto('/en')
   await signInCustomer(page, isMobile)
   if (isMobile) {
-    await page.getByRole('button', { name: 'Open menu' }).click()
+    await page.getByRole('button', { name: 'Menu', exact: true }).click()
     await page.getByRole('dialog').getByRole('link', { name: 'My account' }).click()
   } else {
     await page.getByRole('banner').getByRole('link', { name: 'My account' }).click()
@@ -30,7 +31,7 @@ test('the demo customer opens their account', async ({ page, isMobile }) => {
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
   for (const width of [360, 1280]) {
     await page.setViewportSize({ width, height: 900 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `at ${width}px`).toBe(true)
+    expect(await overflowX(page), `at ${width}px`).toBe(0)
   }
 })
 
@@ -50,5 +51,5 @@ test('the account requests page passes axe and does not overflow', async ({ page
   await expect(page.getByRole('heading', { level: 1, name: 'Account requests' })).toBeVisible()
   const results = await new AxeBuilder({ page }).withTags(WCAG).include('main').analyze()
   expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
 })

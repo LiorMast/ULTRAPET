@@ -15,7 +15,7 @@
  * DeleteDialog, the confirmation before deleting a record (with the server's reason when it refuses), lives here
  * too: the same two callers delete records.
  */
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { ApiError, type StaffProductImage } from '@/api'
 import type { DataColumn, RowValues } from '@/components/DataTable'
 import { GeneratedPasswordInput, MIN_PASSWORD_LENGTH } from '@/components/GeneratedPasswordInput'
@@ -23,7 +23,7 @@ import { ImageListField } from '@/components/ImageListField'
 import { ImageUploadField } from '@/components/ImageUploadField'
 import { SearchableField } from '@/components/SearchableField'
 import { Button } from '@/components/ui/button'
-import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
+import { CHECKBOX_CLASS, CHECKBOX_LABEL_CLASS, INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { Dictionary } from '@/i18n/he'
 import { useI18n } from '@/i18n'
@@ -32,7 +32,13 @@ import { useI18n } from '@/i18n'
  * A field's value while it is edited: text for most inputs, a pair for localized text, a flag for a checkbox, the
  * list of pictures for an "images" column.
  */
-type FormValue = string | boolean | { he: string; en: string } | StaffProductImage[]
+export type FormValue = string | boolean | { he: string; en: string } | StaffProductImage[]
+
+/**
+ * What a form's extra content (`extra`, e.g. the resellers page's map picker) gets: the fields' current values by
+ * column key (as the inputs edit them: text for numbers, a flag for a boolean) and `setValues`, which changes some.
+ */
+export type FormExtraProps = { values: Record<string, FormValue>; setValues: (changes: Record<string, FormValue>) => void }
 
 
 /**
@@ -158,6 +164,8 @@ function errorField<Row>(error: ApiError, columns: DataColumn<Row>[]): string | 
  *   ApiError to show the server's error.
  * @param props.onClose - Closes without saving.
  * @param props.onCloseAutoFocus - Where the focus goes after closing (see DataTable).
+ * @param props.extra - Content of the caller's own after the fields (e.g. a map that sets two of them), given the
+ *   form's values and a way to change them (FormExtraProps); optional.
  * @returns The dialog.
  */
 export function RecordDialog<Row>({
@@ -168,6 +176,7 @@ export function RecordDialog<Row>({
   onSave,
   onClose,
   onCloseAutoFocus,
+  extra,
 }: {
   columns: DataColumn<Row>[]
   row?: RowValues
@@ -176,6 +185,7 @@ export function RecordDialog<Row>({
   onSave: (values: RowValues) => Promise<void>
   onClose: () => void
   onCloseAutoFocus: (event: Event) => void
+  extra?: (form: FormExtraProps) => ReactNode
 }) {
   const { t } = useI18n()
   const id = useId()
@@ -245,6 +255,7 @@ export function RecordDialog<Row>({
                 onBusyChange={(busy) => setUploads((count) => count + (busy ? 1 : -1))}
               />
             ))}
+            {extra?.({ values, setValues: (changes) => setValues((current) => ({ ...current, ...changes })) })}
           </div>
           {formError && (
             <p role="alert" className="px-6 pb-4 text-sm font-medium text-brand-red-dark">
@@ -315,8 +326,8 @@ function Field<Row>({
   if (column.type === 'boolean') {
     return (
       <div>
-        <label htmlFor={id} className="flex cursor-pointer items-center gap-3 text-sm text-brand-charcoal">
-          <input id={id} type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} className="size-4 accent-brand-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red" {...common} />
+        <label htmlFor={id} className={CHECKBOX_LABEL_CLASS}>
+          <input id={id} type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} className={CHECKBOX_CLASS} {...common} />
           {column.label}
         </label>
         {footer}

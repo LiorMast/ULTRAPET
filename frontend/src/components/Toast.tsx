@@ -1,5 +1,5 @@
 /**
- * Toast.tsx — A short notification at the top center of the screen, just under the fixed header: a compact squircle box
+ * Toast.tsx — A short notification at the top center of the screen: a compact squircle box
  * on a brand color with the kind's icon, the message in bold and a close button (X) at the end. It drops in 8px, stays
  * for `duration` (TOAST_SHOW_MS, 2 seconds, by default; the timer pauses while the pointer is on it or its close button
  * has the focus), fades away while rising back in TOAST_FADE_MS, then tells its caller through `onDone` so the caller
@@ -7,7 +7,9 @@
  * (polite; an error interrupts), which holds only the icon and the words (the close button sits beside it). Pages show
  * toasts through useToast() (src/toast.tsx), which also sets how long each kind stays and names the close button. It
  * is portalled to <body>, above everything on the page (z-[100], over the header and every dialog), and never moves the
- * focus.
+ * focus. Where it sits: below xl (phones and tablets, the slim 56px header) inside the header's band, like a phone's own
+ * notifications, so it never covers the page or a bottom sheet; from xl just under the 88px header. The close button's
+ * taps reach 44px (touch-target).
  *
  * Three ready kinds (TOAST_KINDS): `kind="success"` (green, check), `kind="error"` (brand red, cross, announced at
  * once as an alert) and `kind="warning"` (amber, triangle); or any icon + color of your own.
@@ -28,7 +30,7 @@ export const TOAST_SHOW_MS = 2000
 export const TOAST_FADE_MS = 300
 
 const toastVariants = cva(
-  'fixed inset-x-0 top-20 z-[100] mx-auto flex w-fit min-w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg py-2 ps-4 pe-2 text-sm font-semibold shadow-premium-sm transition-[opacity,translate] duration-300 animate-in fade-in slide-in-from-top-2 sm:top-[6.5rem]',
+  'fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.25rem)] z-[100] mx-auto flex min-h-12 w-fit min-w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg py-1 ps-4 pe-2 text-sm font-semibold shadow-premium-sm transition-[opacity,translate] duration-300 animate-in fade-in slide-in-from-top-2 xl:top-[calc(var(--header-h)+1rem)] xl:py-2',
   {
     variants: {
       color: {
@@ -141,6 +143,7 @@ export function Toast({
   return createPortal(
     <div
       data-slot="toast-box"
+      data-toast=""
       data-kind={kind}
       data-leaving={leaving || undefined}
       onPointerEnter={() => pause(true)}
@@ -158,7 +161,7 @@ export function Toast({
           type="button"
           aria-label={closeLabel}
           onClick={close}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md opacity-80 outline-none transition-[opacity,background-color] duration-150 hover:bg-current/15 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-current"
+          className="relative flex size-8 shrink-0 items-center justify-center rounded-md opacity-80 outline-none touch-target transition-[opacity,background-color] duration-150 hover:bg-current/15 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-current"
         >
           <X aria-hidden="true" className="size-4" />
         </button>

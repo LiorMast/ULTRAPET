@@ -5,16 +5,17 @@
  *
  * - Fixed to the top of the window: a white, translucent material (material-bar in index.css; content
  *   scrolling underneath shows through blurred) with a hairline and a soft shadow (both drawn as
- *   box-shadows, so they add no height). It is exactly 88px tall so the logo reads clearly; pages
- *   offset their content by the same amount.
+ *   box-shadows, so they add no height). Mobile-first: below xl it is a slim 56px app bar (the logo and the
+ *   language toggle; the bottom tab bar, TabBar.tsx, navigates); from xl it is 88px with the full menu, so the logo
+ *   reads clearly. Pages offset their content by --header-h (index.css), which holds the same heights.
  * - The menu is built by mainNav() in src/config.ts (the Products dropdown lists the categories passed in); an item with `children` opens a dropdown (Products), on hover on desktop, and its label links to the full catalog.
- * - From the xl breakpoint the full menu is shown; below it, <MobileMenu> (a drawer) takes over.
+ * - From the xl breakpoint the full menu is shown; below it, the tab bar's Menu tab opens <MobileMenu> (a drawer).
  * - Staff get an Admin panel button (in LoginPopover) that slides the admin drawer (<SubNavDrawer>, the
  *   pages of ADMIN_NAV) down out of the header and back up; the header grows with it, over the page.
  * - The header spans the full window: the logo sits at the start edge, the language switcher and login/logout
  *   at the end edge, and the menu in the middle.
- * - Signed-in business customers get a cart icon (<CartDrawer>) at the end edge, beside the language button (at
- *   every width).
+ * - Signed-in business customers get a cart icon (<CartDrawer>) at the end edge, beside the language button (from
+ *   xl; below it the cart is a tab of the tab bar).
  * - On the home page the menu is a scrollspy (useScrollSpy): the URL hash follows the section in view
  *   (history replace, no extra Back entries), so TanStack marks the matching #section link active, and an entry
  *   that stands for the section but links elsewhere (NavItem `sections`: Products ← #categories, Private Label ←
@@ -28,7 +29,6 @@ import { CartDrawer } from '@/components/CartDrawer'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { LoginPopover } from '@/components/LoginPopover'
 import { Logo } from '@/components/Logo'
-import { MobileMenu } from '@/components/MobileMenu'
 import { inViewProps, NAV_TEXT, Underline, useInViewSection } from '@/components/NavText'
 import { SubNavDrawer, useSubNavDrawer } from '@/components/SubNavDrawer'
 import {
@@ -43,11 +43,18 @@ import type { ProductCategory } from '@/api'
 import { useAuth } from '@/auth'
 import { useI18n } from '@/i18n'
 
-/** The fixed header bar: the translucent white material, 88px tall (py-4 + the 56px logo); shared with HeaderSkeleton. */
-export const HEADER_BAR_CLASS = 'material-bar fixed inset-x-0 top-0 z-50 py-4 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)]'
+/**
+ * The fixed header bar: the translucent white material, 56px tall below xl (the 44px row + py-1.5) and 88px from xl
+ * (py-4 + the 56px logo), plus the phone's top safe area; shared with HeaderSkeleton. --header-h holds these heights.
+ */
+export const HEADER_BAR_CLASS =
+  'material-bar safe-x fixed inset-x-0 top-0 z-50 pt-[calc(0.375rem+env(safe-area-inset-top))] pb-1.5 shadow-[0_1px_0_var(--color-neutral-150),var(--shadow-premium-sm)] xl:pt-[calc(1rem+env(safe-area-inset-top))] xl:pb-4'
 
 /** The header's row: logo at the start edge, the menu centered, the buttons at the end edge; shared with HeaderSkeleton. */
-export const HEADER_ROW_CLASS = 'flex w-full items-center justify-between gap-1 px-4 sm:px-6 lg:px-10 xl:gap-6 xl:px-6 2xl:px-10'
+export const HEADER_ROW_CLASS = 'flex min-h-11 w-full items-center justify-between gap-1 px-gutter xl:gap-6 xl:px-6 2xl:px-10'
+
+/** The header's logo: 32px tall in the slim bar (36px from sm), 56px from xl; shared with HeaderSkeleton. */
+export const HEADER_LOGO_CLASS = 'h-8 sm:h-9 xl:h-14'
 
 /**
  * The site header.
@@ -72,9 +79,9 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
           to="/"
           aria-label={t.header.home}
           onClick={() => window.scrollTo({ top: 0 })}
-          className="shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-4"
+          className="relative shrink-0 outline-none touch-target focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-4"
         >
-          <Logo className="h-8 sm:h-14" />
+          <Logo className={HEADER_LOGO_CLASS} />
         </Link>
 
         <nav ref={mainNavRef} aria-label={t.header.mainMenu} className="hidden flex-1 items-center justify-center gap-4 xl:flex rtl:gap-7 2xl:gap-7">
@@ -83,18 +90,18 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
           ))}
         </nav>
 
-        {/* The end edge: the cart icon beside the language button, then login/logout (desktop) or the menu. */}
+        {/* The end edge: from xl the cart icon, the language menu and login/logout; below xl the language toggle (the
+            tab bar has the cart, the account and the menu). */}
         <div className="flex shrink-0 items-center gap-1 xl:gap-2">
-          {user?.kind === 'business' && <CartDrawer />}
+          {user?.kind === 'business' && <CartDrawer className="hidden xl:block" />}
 
           <div className="hidden items-center gap-2 xl:flex">
             <LanguageSwitcher variant="dropdown" />
             <LoginPopover adminToggle={adminDrawer.trigger} />
           </div>
 
-          <div className="flex items-center gap-1 xl:hidden">
+          <div className="xl:hidden">
             <LanguageSwitcher variant="toggle" />
-            <MobileMenu items={items} />
           </div>
         </div>
       </div>
@@ -104,8 +111,11 @@ export function Navbar({ categories = [], items }: { categories?: ProductCategor
   )
 }
 
-/** Height of the fixed header in px (py-4 + the 56px logo); a section counts as reached below it. */
-const HEADER_HEIGHT = 88
+/**
+ * The fixed header's current height in px (56 below xl, 88 from xl); a section counts as reached below it.
+ * @returns The height of the page's <header>, or 88 before it renders.
+ */
+const headerHeight = () => document.querySelector('header')?.getBoundingClientRect().height ?? 88
 
 /**
  * Makes the menu a scrollspy on the home page: while the visitor scrolls, the URL hash is replaced with
@@ -125,7 +135,7 @@ function useScrollSpy() {
     /** Finds the section in view and, when it changed, replaces the URL hash with its id. */
     const update = () => {
       frame = 0
-      const line = HEADER_HEIGHT + window.innerHeight / 3
+      const line = headerHeight() + window.innerHeight / 3
       const atBottom =
         window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
       let current = ''

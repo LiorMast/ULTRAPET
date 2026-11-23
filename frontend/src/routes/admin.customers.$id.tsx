@@ -36,7 +36,7 @@ function AdminCustomerProfile() {
     <section aria-labelledby="customer-title">
       <Breadcrumbs items={[{ label: t.admin.customersTitle, link: { to: '/admin/customers' } }, { label: customer.companyName }]} className="mb-6" />
       <p className="font-heading text-sm font-semibold text-brand-red-dark">{t.admin.profileTitle}</p>
-      <h1 id="customer-title" className="mb-8 mt-1 font-display text-3xl font-bold text-brand-charcoal">
+      <h1 id="customer-title" className="mb-8 mt-1 font-display text-2xl font-bold text-brand-charcoal sm:text-3xl">
         {customer.companyName}
       </h1>
       <CustomerProfile profile={profile} view="staff" />

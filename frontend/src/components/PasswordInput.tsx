@@ -57,9 +57,13 @@ export function PasswordInput({ inputClassName, className, visible: visibleProp,
         autoCapitalize="off"
         // The buttons sit at the page's end, but the input is always LTR, so its own "end" is the right even on a
         // Hebrew page: the room for the buttons goes on the input's start side there.
-        className={cn(inputClassName, 'mt-0', dir === 'rtl' ? (extra ? 'ps-20' : 'ps-12') : extra ? 'pe-20' : 'pe-12')}
+        className={cn(
+          inputClassName,
+          'mt-0',
+          dir === 'rtl' ? (extra ? 'ps-20 pointer-coarse:ps-26' : 'ps-12 pointer-coarse:ps-14') : extra ? 'pe-20 pointer-coarse:pe-26' : 'pe-12 pointer-coarse:pe-14',
+        )}
       />
-      <span className="absolute inset-y-0 end-0 flex items-center gap-0.5 pe-1.5">
+      <span className="absolute inset-y-0 end-0 flex items-center gap-0.5 pe-1.5 pointer-coarse:gap-1 pointer-coarse:pe-0.5">
         {extra}
         <Button
           type="button"

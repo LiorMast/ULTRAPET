@@ -10,6 +10,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { hideFixedOverlays, scrollIntoViewSettled } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /** The WCAG tags axe checks. */
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
@@ -19,7 +20,7 @@ test('the section does not overflow horizontally', async ({ page }) => {
   await scrollIntoViewSettled(page.locator('#business'))
   for (const width of [360, 1280]) {
     await page.setViewportSize({ width, height: 900 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `at ${width}px`).toBe(true)
+    expect(await overflowX(page), `at ${width}px`).toBe(0)
   }
 })
 

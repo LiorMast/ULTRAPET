@@ -12,7 +12,9 @@
  *    list price, SKU, stock (StockCell), active discounts, an "Active" switch (shown to customers or hidden), and
  *    Edit (RecordDialog: every field of the admin form, photos included), Stock (StockDialog), Discounts
  *    (DiscountsDialog) and Delete (DeleteDialog). On a card the actions are icon buttons with tooltips; on the page
- *    they carry their labels.
+ *    they carry their labels. On a phone's card (below md, where there is no hover for a tooltip and no room for four
+ *    buttons) one labelled "Manage" button opens them as a bottom action sheet (Offcanvas): an icon and a label each,
+ *    48px rows.
  *
  * Everything here is what /admin/products does, with the same parts: the columns and every save come from
  * productColumns.tsx (useProductHandlers: the staff API, then a reload of the page and of the staff rows, manage.ts),
@@ -20,7 +22,7 @@
  * This module is loaded lazily (ManageBar / ManageStrip in manage.ts), so customers never download it.
  */
 import { useId, useRef, useState, type ReactNode } from 'react'
-import { ArrowUpDown, Boxes, Pencil, Percent, Plus, Trash2 } from 'lucide-react'
+import { ArrowUpDown, Boxes, Pencil, Percent, Plus, Settings2, Trash2 } from 'lucide-react'
 import { cva } from 'class-variance-authority'
 import { cn } from 'cn'
 import { ApiError, fetchCatalogPdf, generateCatalogPdf } from '@/api'
@@ -29,6 +31,8 @@ import { formatPrice } from '@/components/CatalogCard'
 import { CatalogPdfButton } from '@/components/CatalogPdfDialog'
 import type { RowValues } from '@/components/DataTable'
 import { israelNow } from '@/components/DiscountDialog'
+import { Offcanvas } from '@/components/Offcanvas'
+import { PHONE_QUERY, useMediaQuery } from '@/components/useMediaQuery'
 import { DiscountsDialog, ruleState } from '@/components/DiscountsDialog'
 import { newProductRow, productColumns, useProductHandlers, type ProductRow } from '@/components/productColumns'
 import { DeleteDialog, RecordDialog, errorMessage } from '@/components/RecordDialog'
@@ -236,6 +240,11 @@ export function ProductManageStrip({
   const buttons = useRef<Partial<Record<NonNullable<OpenDialog>, HTMLButtonElement | null>>>({})
   const name = localized(row.name, locale)
   const compact = size === 'card'
+  // A phone's card: one Manage button opening the actions in a bottom sheet.
+  const phone = useMediaQuery(PHONE_QUERY)
+  const sheet = compact && phone
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const manageButton = useRef<HTMLButtonElement>(null)
   const now = israelNow()
   const activeDiscounts = row.discounts.filter((rule) => ruleState(rule, now) === 'active').length
 
@@ -243,7 +252,7 @@ export function ProductManageStrip({
    * Puts the focus back on the button of the dialog that closes.
    * @param event - Radix's close-autofocus event.
    */
-  const closeFocus = (event: Event) => focusBack(event, open ? buttons.current[open] : null)
+  const closeFocus = (event: Event) => focusBack(event, sheet ? manageButton.current : open ? buttons.current[open] : null)
 
   /**
    * Shows the product to customers or hides it (its `isActive`), and confirms it in a toast.
@@ -289,6 +298,14 @@ export function ProductManageStrip({
     buttons.current[dialog] = button
   }
 
+  // The product's actions: Edit, Stock, Discounts, Delete (each opens its dialog).
+  const actions: { dialog: NonNullable<OpenDialog>; icon: ReactNode; label: string; name: string; danger?: boolean }[] = [
+    { dialog: 'edit', icon: <Pencil aria-hidden />, label: t.admin.edit, name: t.admin.editRow.replace('{name}', name) },
+    { dialog: 'stock', icon: <Boxes aria-hidden />, label: t.admin.stock.button, name: t.admin.stock.buttonRow.replace('{name}', name) },
+    { dialog: 'discounts', icon: <Percent aria-hidden />, label: t.admin.discounts.button, name: t.admin.discounts.buttonRow.replace('{name}', name) },
+    { dialog: 'delete', icon: <Trash2 aria-hidden />, label: t.admin.delete, name: t.admin.deleteRow.replace('{name}', name), danger: true },
+  ]
+
   const details = [
     { label: f.listPrice, value: row.listPrice !== null ? <span className="font-semibold tabular-nums">{formatPrice(locale, row.listPrice)}</span> : <span className="text-brand-charcoal-muted">{m.noListPrice}</span> },
     row.sku && { label: f.sku, value: <span dir="ltr" className="font-semibold">{row.sku}</span> },
@@ -324,12 +341,57 @@ export function ProductManageStrip({
           {f.isActive}
         </label>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        <ActionButton icon={<Pencil aria-hidden />} label={t.admin.edit} name={t.admin.editRow.replace('{name}', name)} compact={compact} buttonRef={buttonRef('edit')} onClick={() => setOpen('edit')} />
-        <ActionButton icon={<Boxes aria-hidden />} label={t.admin.stock.button} name={t.admin.stock.buttonRow.replace('{name}', name)} compact={compact} buttonRef={buttonRef('stock')} onClick={() => setOpen('stock')} />
-        <ActionButton icon={<Percent aria-hidden />} label={t.admin.discounts.button} name={t.admin.discounts.buttonRow.replace('{name}', name)} compact={compact} buttonRef={buttonRef('discounts')} onClick={() => setOpen('discounts')} />
-        <ActionButton icon={<Trash2 aria-hidden />} label={t.admin.delete} name={t.admin.deleteRow.replace('{name}', name)} compact={compact} danger buttonRef={buttonRef('delete')} onClick={() => setOpen('delete')} />
-      </div>
+      {sheet ? (
+        <Offcanvas
+          side="bottom"
+          title={name}
+          description={m.label}
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          trigger={
+            <Button ref={manageButton} variant="action" size="action" aria-label={m.actionsFor.replace('{name}', name)} className="w-full">
+              <Settings2 aria-hidden />
+              {m.actions}
+            </Button>
+          }
+        >
+          <ul className="-mx-2">
+            {actions.map((action) => (
+              <li key={action.dialog}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSheetOpen(false)
+                    setOpen(action.dialog)
+                  }}
+                  className={cn(
+                    'flex min-h-12 w-full items-center gap-3 rounded-lg px-2 text-start text-base font-medium outline-none transition-colors duration-150 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-brand-red active:bg-neutral-100 [&_svg]:size-5',
+                    action.danger ? 'text-brand-red-dark' : 'text-brand-charcoal',
+                  )}
+                >
+                  {action.icon}
+                  {action.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Offcanvas>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {actions.map((action) => (
+            <ActionButton
+              key={action.dialog}
+              icon={action.icon}
+              label={action.label}
+              name={action.name}
+              compact={compact}
+              danger={action.danger}
+              buttonRef={buttonRef(action.dialog)}
+              onClick={() => setOpen(action.dialog)}
+            />
+          ))}
+        </div>
+      )}
 
       {open === 'edit' && (
         <RecordDialog

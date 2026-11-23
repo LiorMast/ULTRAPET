@@ -330,26 +330,26 @@ export function DiscountsDialog({
                         <span id={`${id}-confirm`} className="text-sm font-semibold text-brand-charcoal">
                           {d.confirm}
                         </span>
-                        <Button size="xs" autoFocus loading={pending} aria-describedby={`${id}-confirm`} onClick={() => handleDelete(rule)}>
+                        <Button size="action" variant="actionDanger" autoFocus loading={pending} aria-describedby={`${id}-confirm`} onClick={() => handleDelete(rule)}>
                           {t.admin.delete}
                         </Button>
-                        <Button size="xs" variant="outline" onClick={() => cancelDelete(rule)}>
+                        <Button size="action" variant="action" onClick={() => cancelDelete(rule)}>
                           {t.admin.cancel}
                         </Button>
                       </span>
                     ) : (
-                      <span className="flex gap-1">
+                      <span className="flex gap-2">
                         {/* A fixed price is not a discount DiscountDialog edits: it can only be deleted here. */}
                         {rule.kind !== 'fixed_price' && (
-                          <Button id={`${id}-edit-${rule.id}`} variant="ghost" size="xs" aria-label={d.editRule.replace('{discount}', text)} onClick={() => openEditor(rule)}>
+                          <Button id={`${id}-edit-${rule.id}`} variant="action" size="action" aria-label={d.editRule.replace('{discount}', text)} onClick={() => openEditor(rule)}>
                             <Pencil aria-hidden />
                             {t.admin.edit}
                           </Button>
                         )}
                         <Button
                           id={`${id}-delete-${rule.id}`}
-                          variant="ghost"
-                          size="xs"
+                          variant="actionDanger"
+                          size="action"
                           aria-label={d.deleteRule.replace('{discount}', text)}
                           onClick={() => {
                             setError('')

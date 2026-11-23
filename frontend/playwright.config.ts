@@ -5,7 +5,8 @@
  * `docker compose up`. The repo's .env is loaded so the sign-in tests can use the demo customer that the seed
  * creates (SEED_CUSTOMER_EMAIL / SEED_CUSTOMER_PASSWORD, see .env.example), and the backend's host port
  * (BACKEND_PORT, default 5000).
- * Two projects: a desktop window (1440×900) and a phone (Pixel 7). Run with `npm run test:e2e`;
+ * Three projects: a desktop window (1440×900), a phone (Pixel 7), and "audit" (mobile-audit.spec.ts only: every page
+ * on several touch devices, see audit.ts; its devices are set per describe block). Run with `npm run test:e2e`;
  * after an intended visual change, refresh the screenshots with `npm run test:e2e -- --update-snapshots`.
  */
 import { existsSync } from 'node:fs'
@@ -18,6 +19,8 @@ if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE)
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  // One dev server and one Flask dev server answer every worker: more than six at once slows pages past the timeouts.
+  workers: 6,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:5173',
@@ -27,8 +30,9 @@ export default defineConfig({
     toHaveScreenshot: { maxDiffPixelRatio: 0.01 },
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] } },
+    { name: 'desktop', testIgnore: /mobile-audit/, use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'mobile', testIgnore: /mobile-audit/, use: { ...devices['Pixel 7'] } },
+    { name: 'audit', testMatch: /mobile-audit\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: [
     {

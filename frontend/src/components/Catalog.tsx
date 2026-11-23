@@ -59,7 +59,7 @@ function CategoryChip({ label, count, category, active }: { label: string; count
 function PricesHiddenBanner() {
   const { t } = useI18n()
   return (
-    <div className="mt-10 flex flex-col gap-4 rounded-2xl bg-neutral-100 p-6 md:flex-row md:items-center md:justify-between md:px-8">
+    <div className="mt-6 flex flex-col gap-4 rounded-2xl bg-neutral-100 p-5 sm:mt-10 sm:p-6 md:flex-row md:items-center md:justify-between md:px-8">
       <div>
         <p className="font-heading text-base font-semibold text-brand-charcoal">{t.catalog.pricesHiddenTitle}</p>
         <p className="mt-1 text-sm text-brand-charcoal-muted">{t.catalog.pricesHiddenText}</p>
@@ -132,7 +132,7 @@ export function Catalog({
   }
 
   return (
-    <section aria-labelledby="catalog-title" className="mx-auto max-w-screen-2xl px-6 py-16 lg:px-10 lg:py-20">
+    <section aria-labelledby="catalog-title" className="page-y px-gutter mx-auto max-w-screen-2xl lg:py-20">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <SectionHeading as="h1" id="catalog-title" eyebrow={t.catalog.eyebrow} title={t.catalog.title} intro={t.catalog.description} />
         <TextLink href={catalogPdfUrl(locale)} external icon={Download} className="shrink-0">
@@ -148,7 +148,7 @@ export function Catalog({
 
       {!prices && !manage.available && <PricesHiddenBanner />}
 
-      <div className={cn('flex flex-col gap-5', prices ? 'mt-12' : 'mt-8')}>
+      <div className={cn('flex flex-col gap-5', prices ? 'mt-8 sm:mt-12' : 'mt-6 sm:mt-8')}>
         <form role="search" aria-label={t.catalog.searchLabel} onSubmit={(e) => e.preventDefault()} className="relative max-w-xl">
           <label htmlFor="catalog-search" className="sr-only">
             {t.catalog.searchLabel}
@@ -165,8 +165,12 @@ export function Catalog({
           />
         </form>
 
-        <nav aria-label={t.catalog.categoriesLabel} className="-mx-6 overflow-x-auto px-6 pb-1 md:mx-0 md:overflow-visible md:px-0">
-          <ul className="flex gap-2 md:flex-wrap">
+        {/* On a phone the chips are one row that scrolls sideways, bleeding into the page's side margins (px-gutter). */}
+        <nav
+          aria-label={t.catalog.categoriesLabel}
+          className="-mx-4 snap-x scroll-px-4 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 md:mx-0 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden"
+        >
+          <ul className="flex gap-2 md:flex-wrap [&>li]:snap-start">
             <li>
               <CategoryChip label={t.catalog.all} count={allCount} active={!activeCategory} />
             </li>
@@ -195,7 +199,7 @@ export function Catalog({
       </p>
 
       {items.length === 0 ? (
-        <div className="py-24 text-center">
+        <div className="py-16 text-center sm:py-24">
           <p className="text-lg text-brand-charcoal-muted">{t.catalog.empty}</p>
           <TextLink link={linkOptions({ to: '.', search: {} })} className="mx-auto mt-4 block">
             {t.catalog.clearFilters}
@@ -226,7 +230,7 @@ export function Catalog({
         page={page}
         pageCount={pageCount}
         linkFor={(n) => linkOptions({ to: '.', search: (prev: CatalogSearch) => ({ ...prev, page: n > 1 ? n : undefined }) })}
-        className="mt-14"
+        className="mt-10 sm:mt-14"
       />
     </section>
   )

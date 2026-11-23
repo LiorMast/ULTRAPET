@@ -48,8 +48,8 @@ const optionVariants = cva(
         dark: 'text-white has-checked:text-brand-charcoal',
       },
       size: {
-        default: 'py-3 text-sm',
-        sm: 'py-2 text-xs',
+        default: 'py-3 text-sm max-sm:leading-tight pointer-coarse:min-h-11',
+        sm: 'py-2 text-xs max-sm:leading-tight pointer-coarse:min-h-11',
       },
     },
     defaultVariants: { tone: 'light', size: 'default' },

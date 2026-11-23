@@ -10,9 +10,14 @@
  * classes are physical (rounded-l / rounded-r) on purpose: `side` names a physical screen edge.
  *
  * Motion (Apple's fluid-interface rules): the panel slides in from its own edge and leaves the same way, on
- * the site's spring curve. A left or right panel given `onSwipeClose` can also be swiped away: it follows the
- * finger 1:1, resists when pulled inwards (rubber band), and on release a flick's momentum decides whether
- * it closes or springs back. It can be grabbed again while springing back.
+ * the site's spring curve. A panel given `onSwipeClose` can also be swiped away (useSwipeToClose): a left or right
+ * drawer sideways, a bottom sheet down by its grabber (the bar drawn at its top) or its header, so its body still
+ * scrolls. It follows the finger 1:1, resists when pulled inwards (rubber band), and on release a flick's momentum
+ * decides whether it closes or springs back. It can be grabbed again while springing back.
+ *
+ * Mobile-first: a bottom sheet (the catalog's filters, a card's actions) is the phone's menu: full width, at most the
+ * screen below the header tall, padded for the phone's home bar (safe area); side drawers pad for the safe areas too.
+ * The close button is 44px on touch screens (ui/button's icon-sm).
  */
 import * as React from "react"
 import { cn } from "cn"
@@ -30,15 +35,18 @@ const VELOCITY_WINDOW_MS = 100
 /** Duration of the spring back to the open position. */
 const SNAP_BACK_MS = 400
 
-/** A swipe in progress: where it started, which axis it locked to, and recent samples for the velocity. */
+/** A swipe in progress: where it started, which way it locked, and recent samples for the velocity. */
 type Swipe = {
   pointerId: number
-  originX: number
-  originY: number
-  axis: "pending" | "x" | "y"
-  width: number
+  /** Where the finger started along the closing axis, shifted by the panel's offset at that moment. */
+  origin: number
+  /** Where it started along the other axis (a move mostly that way is a scroll, not a swipe). */
+  cross: number
+  axis: "pending" | "drag" | "scroll"
+  /** The panel's size along the closing axis. */
+  size: number
   offset: number
-  samples: { x: number; t: number }[]
+  samples: { p: number; t: number }[]
 }
 
 /**
@@ -53,7 +61,7 @@ function project(velocity: number) {
 /**
  * Soft boundary: the further the panel is pulled past its open position, the less it follows.
  * @param overshoot - How far past the boundary the finger is, in px (>= 0).
- * @param dimension - The panel's width in px.
+ * @param dimension - The panel's size along the closing axis in px.
  * @returns How far the panel moves past the boundary, in px.
  */
 function rubberband(overshoot: number, dimension: number) {
@@ -62,31 +70,54 @@ function rubberband(overshoot: number, dimension: number) {
 }
 
 /**
- * Swipe-to-close for a left or right panel. The panel moves with the CSS `translate` property, which adds to
- * the `transform` of the open/close animations, so a swipe that ends in closing hands over to the exit
- * animation from where the finger let go.
- * @param side - The edge the panel is attached to; only "left" and "right" can be swiped.
- * @param onClose - Called when a swipe ends in closing (the caller closes the sheet); undefined disables swiping.
+ * Swipe-to-close for a panel attached to a screen edge: a left or right drawer is swiped sideways, a bottom sheet (and a
+ * dialog shown as one on a phone) down. The panel moves with the CSS `translate` property, which adds to the `transform`
+ * of the open/close animations, so a swipe that ends in closing hands over to the exit animation from where the finger
+ * let go. Used by SheetContent and DialogContent.
+ * @param side - The edge the panel is attached to (the direction it closes towards).
+ * @param onClose - Called when a swipe ends in closing (the caller closes the panel); undefined disables swiping.
+ * @param options.handle - A selector: a swipe may only start on an element inside a match (e.g. a bottom sheet's grabber
+ *   and header, so its scrolling body still scrolls). Default: anywhere on the panel.
+ * @param options.enabled - Checked when a finger touches down; false = no swipe this time (e.g. only on phones).
  * @returns `overlay`, the ref to put on the backdrop (it fades along with the swipe), and `handlers`, the
  *   pointer handlers for the panel (empty when swiping is disabled).
  */
-function useSwipeToClose(side: "top" | "right" | "bottom" | "left", onClose: (() => void) | undefined) {
+export function useSwipeToClose(
+  side: "top" | "right" | "bottom" | "left",
+  onClose: (() => void) | undefined,
+  { handle, enabled }: { handle?: string; enabled?: () => boolean } = {}
+) {
   const overlay = React.useRef<HTMLDivElement>(null)
   const swipe = React.useRef<Swipe | null>(null)
   const dragged = React.useRef(false)
-  if (!onClose || (side !== "left" && side !== "right")) return { overlay, handlers: {} }
-  /** +1 when closing moves the panel towards larger x (a right panel), -1 for a left panel. */
-  const closeSign = side === "right" ? 1 : -1
+  if (!onClose) return { overlay, handlers: {} }
+  const vertical = side === "top" || side === "bottom"
+  /** +1 when closing moves the panel towards larger x or y (a right drawer, a bottom sheet), -1 otherwise. */
+  const closeSign = side === "right" || side === "bottom" ? 1 : -1
+  /** A pointer's position along the closing axis. */
+  const along = (event: { clientX: number; clientY: number }) => (vertical ? event.clientY : event.clientX)
+  /** A pointer's position along the other axis. */
+  const across = (event: { clientX: number; clientY: number }) => (vertical ? event.clientX : event.clientY)
 
   /**
    * Puts the panel `offset` px towards its closing edge and dims the backdrop to match.
    * @param panel - The panel element.
    * @param offset - Distance towards the edge; negative while rubber-banding inwards.
-   * @param width - The panel's width.
+   * @param size - The panel's size along the closing axis.
    */
-  const place = (panel: HTMLElement, offset: number, width: number) => {
-    panel.style.translate = `${offset * closeSign}px 0`
-    if (overlay.current) overlay.current.style.opacity = String(1 - Math.min(Math.max(offset / width, 0), 1))
+  const place = (panel: HTMLElement, offset: number, size: number) => {
+    panel.style.translate = vertical ? `0 ${offset * closeSign}px` : `${offset * closeSign}px 0`
+    if (overlay.current) overlay.current.style.opacity = String(1 - Math.min(Math.max(offset / size, 0), 1))
+  }
+
+  /**
+   * The panel's current offset towards its closing edge (it may still be springing back).
+   * @param panel - The panel element.
+   * @returns The offset in px.
+   */
+  const liveOffset = (panel: HTMLElement) => {
+    const [x = "0", y = "0"] = getComputedStyle(panel).translate.split(" ")
+    return (parseFloat(vertical ? y : x) || 0) * closeSign
   }
 
   /**
@@ -95,46 +126,49 @@ function useSwipeToClose(side: "top" | "right" | "bottom" | "left", onClose: (()
    */
   const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
     if (event.pointerType === "mouse" || !event.isPrimary) return
+    if (handle && !(event.target as Element).closest(handle)) return
+    if (enabled && !enabled()) return
     const panel = event.currentTarget
-    const live = (parseFloat(getComputedStyle(panel).translate) || 0) * closeSign
+    const live = liveOffset(panel)
     panel.style.transition = "none"
     if (overlay.current) overlay.current.style.transition = "none"
-    const width = panel.getBoundingClientRect().width
-    place(panel, live, width)
+    const rect = panel.getBoundingClientRect()
+    const size = vertical ? rect.height : rect.width
+    place(panel, live, size)
     dragged.current = false
     swipe.current = {
       pointerId: event.pointerId,
-      originX: event.clientX - live * closeSign,
-      originY: event.clientY,
-      axis: Math.abs(live) > 1 ? "x" : "pending",
-      width,
+      origin: along(event) - live * closeSign,
+      cross: across(event),
+      axis: Math.abs(live) > 1 ? "drag" : "pending",
+      size,
       offset: live,
-      samples: [{ x: event.clientX, t: event.timeStamp }],
+      samples: [{ p: along(event), t: event.timeStamp }],
     }
     if (Math.abs(live) > 1) panel.setPointerCapture(event.pointerId)
   }
 
   /**
-   * Follows the finger 1:1 once the swipe is clearly horizontal; a vertical swipe is left to scrolling.
+   * Follows the finger 1:1 once the move clearly goes along the closing axis; a move the other way is left to scrolling.
    * @param event - A pointermove on the panel.
    */
   const handlePointerMove = (event: React.PointerEvent<HTMLElement>) => {
     const s = swipe.current
-    if (!s || event.pointerId !== s.pointerId || s.axis === "y") return
-    const dx = event.clientX - s.originX
-    const dy = event.clientY - s.originY
+    if (!s || event.pointerId !== s.pointerId || s.axis === "scroll") return
+    const d = along(event) - s.origin
+    const c = across(event) - s.cross
     if (s.axis === "pending") {
-      if (Math.abs(dy) > SWIPE_SLOP && Math.abs(dy) >= Math.abs(dx)) s.axis = "y"
-      if (Math.abs(dx) <= SWIPE_SLOP || s.axis === "y") return
-      s.axis = "x"
-      s.originX += Math.sign(dx) * SWIPE_SLOP // track 1:1 from the end of the slop, without a jump
+      if (Math.abs(c) > SWIPE_SLOP && Math.abs(c) >= Math.abs(d)) s.axis = "scroll"
+      if (Math.abs(d) <= SWIPE_SLOP || s.axis === "scroll") return
+      s.axis = "drag"
+      s.origin += Math.sign(d) * SWIPE_SLOP // track 1:1 from the end of the slop, without a jump
       event.currentTarget.setPointerCapture(event.pointerId)
     }
-    const raw = (event.clientX - s.originX) * closeSign
-    s.offset = raw >= 0 ? raw : -rubberband(-raw, s.width)
+    const raw = (along(event) - s.origin) * closeSign
+    s.offset = raw >= 0 ? raw : -rubberband(-raw, s.size)
     dragged.current = true
-    place(event.currentTarget, s.offset, s.width)
-    s.samples.push({ x: event.clientX, t: event.timeStamp })
+    place(event.currentTarget, s.offset, s.size)
+    s.samples.push({ p: along(event), t: event.timeStamp })
     while (s.samples.length > 2 && event.timeStamp - s.samples[0].t > VELOCITY_WINDOW_MS) s.samples.shift()
   }
 
@@ -151,10 +185,10 @@ function useSwipeToClose(side: "top" | "right" | "bottom" | "left", onClose: (()
     const first = s.samples[0]
     const last = s.samples[s.samples.length - 1]
     const elapsed = last.t - first.t
-    const velocity = elapsed > 0 ? (((last.x - first.x) * closeSign) / elapsed) * 1000 : 0
-    if (event.type === "pointerup" && s.axis === "x" && s.offset + project(velocity) > s.width / 2) {
+    const velocity = elapsed > 0 ? (((last.p - first.p) * closeSign) / elapsed) * 1000 : 0
+    if (event.type === "pointerup" && s.axis === "drag" && s.offset + project(velocity) > s.size / 2) {
       // Leave at the finger's pace: faster flicks get a shorter exit, within 150-300ms.
-      const remaining = Math.max(s.width - s.offset, 0)
+      const remaining = Math.max(s.size - s.offset, 0)
       const ms = Math.round(Math.min(Math.max((remaining / Math.max(velocity, 1)) * 1000, 150), 300))
       panel.style.animationDuration = `${ms}ms`
       if (overlay.current) overlay.current.style.animationDuration = `${ms}ms`
@@ -163,7 +197,7 @@ function useSwipeToClose(side: "top" | "right" | "bottom" | "left", onClose: (()
     }
     panel.style.transition = `translate ${SNAP_BACK_MS}ms var(--ease-spring)`
     if (overlay.current) overlay.current.style.transition = `opacity ${SNAP_BACK_MS}ms var(--ease-spring)`
-    place(panel, 0, s.width)
+    place(panel, 0, s.size)
   }
 
   /**
@@ -257,8 +291,9 @@ function SheetOverlay({
  * The sliding panel, with its backdrop.
  * @param props.side - The screen edge it slides in from: "top", "right" (default), "bottom" or "left". Choose it from the text direction (e.g. "left" for Hebrew).
  * @param props.showCloseButton - Show the built-in X button in the corner (default true).
- * @param props.onSwipeClose - For a "left" or "right" panel: enables swipe-to-close and is called when a
- *   swipe ends in closing (close the sheet in it). Without it the panel can't be swiped.
+ * @param props.onSwipeClose - Enables swipe-to-close and is called when a swipe ends in closing (close the sheet in it):
+ *   a "left" or "right" panel anywhere on it, a "bottom" one by its grabber or a SheetHeader (it then shows the
+ *   grabber). Without it the panel can't be swiped.
  * @param props.className - Extra classes (width, padding ...), merged over the defaults.
  * @param props.children - The panel's content.
  * @param props - Other Radix Dialog.Content props (aria-describedby, onOpenAutoFocus, ...).
@@ -276,7 +311,8 @@ function SheetContent({
   showCloseButton?: boolean
   onSwipeClose?: () => void
 }) {
-  const { overlay, handlers: swipeHandlers } = useSwipeToClose(side, onSwipeClose)
+  const vertical = side === "top" || side === "bottom"
+  const { overlay, handlers: swipeHandlers } = useSwipeToClose(side, onSwipeClose, vertical ? { handle: SHEET_HANDLE } : {})
   return (
     <SheetPortal>
       <SheetOverlay ref={overlay} />
@@ -284,19 +320,22 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed z-50 flex flex-col gap-4 overflow-hidden bg-popover bg-clip-padding text-sm text-popover-foreground shadow-premium ease-spring data-[side=right]:rounded-l-3xl data-[side=left]:rounded-r-3xl data-[side=top]:rounded-b-3xl data-[side=bottom]:rounded-t-3xl data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-e data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-s data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-open:animate-in data-open:duration-450 data-[side=bottom]:data-open:slide-in-from-bottom data-[side=left]:data-open:slide-in-from-left data-[side=right]:data-open:slide-in-from-right data-[side=top]:data-open:slide-in-from-top data-closed:animate-out data-closed:duration-300 data-[side=bottom]:data-closed:slide-out-to-bottom data-[side=left]:data-closed:slide-out-to-left data-[side=right]:data-closed:slide-out-to-right data-[side=top]:data-closed:slide-out-to-top motion-reduce:data-open:fade-in-0 motion-reduce:data-closed:fade-out-0",
-          onSwipeClose && "touch-pan-y",
+          // A side drawer's width is a plain class (w-3/4, sm:max-w-sm), so a caller's own width class replaces it.
+          "fixed z-50 flex flex-col gap-4 overflow-hidden overscroll-contain bg-popover bg-clip-padding text-sm text-popover-foreground shadow-premium ease-spring w-3/4 sm:max-w-sm data-[side=right]:rounded-l-3xl data-[side=left]:rounded-r-3xl data-[side=top]:rounded-b-3xl data-[side=bottom]:rounded-t-3xl data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:max-h-[calc(100dvh-var(--header-h))] data-[side=bottom]:w-auto data-[side=bottom]:max-w-none data-[side=bottom]:border-t data-[side=bottom]:pb-[env(safe-area-inset-bottom)] data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:border-e data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:border-s data-[side=left]:pt-[env(safe-area-inset-top)] data-[side=left]:pb-[env(safe-area-inset-bottom)] data-[side=right]:pt-[env(safe-area-inset-top)] data-[side=right]:pb-[env(safe-area-inset-bottom)] data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:w-auto data-[side=top]:max-w-none data-[side=top]:border-b data-open:animate-in data-open:duration-450 data-[side=bottom]:data-open:slide-in-from-bottom data-[side=left]:data-open:slide-in-from-left data-[side=right]:data-open:slide-in-from-right data-[side=top]:data-open:slide-in-from-top data-closed:animate-out data-closed:duration-300 data-[side=bottom]:data-closed:slide-out-to-bottom data-[side=left]:data-closed:slide-out-to-left data-[side=right]:data-closed:slide-out-to-right data-[side=top]:data-closed:slide-out-to-top motion-reduce:data-open:fade-in-0 motion-reduce:data-closed:fade-out-0",
+          onSwipeClose && !vertical && "touch-pan-y",
+          onSwipeClose && vertical && "[&_[data-slot=sheet-header]]:touch-none",
           className
         )}
         {...swipeHandlers}
         {...props}
       >
+        {onSwipeClose && side === "bottom" && <SheetGrabber />}
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-4 end-4"
+              className="absolute top-3 end-3"
               size="icon-sm"
             >
               <XIcon
@@ -307,6 +346,22 @@ function SheetContent({
         )}
       </SheetPrimitive.Content>
     </SheetPortal>
+  )
+}
+
+/** Where a bottom sheet's swipe may start: its grabber or its header (its body scrolls instead). */
+const SHEET_HANDLE = '[data-slot="sheet-grabber"], [data-slot="sheet-header"]'
+
+/**
+ * The grabber of a bottom sheet that can be swiped down: a short bar at the top centre that shows the sheet can be
+ * dragged (decorative: the close button and Escape close it too).
+ * @returns The grabber.
+ */
+function SheetGrabber() {
+  return (
+    <div data-slot="sheet-grabber" aria-hidden="true" className="-mb-4 flex h-6 shrink-0 touch-none justify-center pt-2">
+      <span className="h-1.5 w-10 rounded-full bg-neutral-300 [corner-shape:round]" />
+    </div>
   )
 }
 

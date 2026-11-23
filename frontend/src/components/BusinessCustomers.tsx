@@ -132,7 +132,7 @@ function RequestForm() {
 
   if (sent) {
     return (
-      <div role="status" className="flex flex-col items-center gap-4 p-8 text-center lg:p-12">
+      <div role="status" className="flex flex-col items-center gap-4 p-6 text-center sm:p-8 lg:p-12">
         <CheckCircle2 aria-hidden="true" className="size-12 text-success" />
         <h3 className="font-display text-2xl font-bold text-brand-charcoal">{b.successTitle}</h3>
         <p className="text-brand-charcoal-muted">{b.successText}</p>
@@ -161,7 +161,7 @@ function RequestForm() {
   ]
 
   return (
-    <div className="p-6 sm:p-8 lg:p-10">
+    <div className="p-5 sm:p-8 lg:p-10">
       <h3 id="business-form-title" className="font-display text-2xl font-bold text-brand-charcoal">
         {b.formTitle}
       </h3>
@@ -277,20 +277,20 @@ export function BusinessCustomers({
   const section = useEditableSection<string>({ content, ...businessTexts(t, { audiences, trust }), styled: HEADING_KEYS, onSave: onSave && ((next) => onSave(next)) })
   const { field } = section
   return (
-    <section id="business" aria-labelledby="business-title" className="bg-white px-6 py-20 lg:px-10 lg:py-24">
+    <section id="business" aria-labelledby="business-title" className="bg-white px-gutter section-y">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.business.eyebrow} className="bg-white" />}
-        <div className="grid gap-x-16 gap-y-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
+        <div className="grid gap-x-16 gap-y-10 sm:gap-y-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
           <form {...section.formProps} className="contents">
             <div className="lg:col-start-1">
               <SectionHeading id="business-title" edit={field} />
-              <EditableText as="h3" wrap {...field('audienceTitle')} className="mt-12 font-display text-2xl font-bold text-brand-charcoal" />
+              <EditableText as="h3" wrap {...field('audienceTitle')} className="mt-8 font-display text-xl font-bold text-brand-charcoal sm:mt-12 sm:text-2xl" />
               <ul className="mt-6 grid gap-4 sm:grid-cols-2">
                 {audiences.map((item) => (
                   <AudienceCard key={item.id} title={field(`audience.${item.id}.title`)} text={field(`audience.${item.id}.text`)} />
                 ))}
               </ul>
-              <div className="mt-8 rounded-2xl bg-neutral-50 p-6 lg:p-8">
+              <div className="mt-6 rounded-2xl bg-neutral-50 p-5 sm:mt-8 sm:p-6 lg:p-8">
                 <EditableText as="h3" wrap {...field('trustTitle')} className="font-display text-xl font-bold text-brand-charcoal" />
                 <ul className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2">
                   {trust.map((item) => (

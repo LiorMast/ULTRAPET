@@ -10,7 +10,7 @@
  * Variants:
  *  - "dropdown": globe button + menu, for the desktop header (its text turns brand red on hover).
  *  - "buttons":  a row of squircle language buttons, for the mobile drawer.
- *  - "toggle":   one compact link to the other language, for the mobile header bar.
+ *  - "toggle":   one compact link to the other language (44px tall), for the slim header of phones and tablets.
  */
 import { useId } from 'react'
 import { useLocation } from '@tanstack/react-router'
@@ -55,7 +55,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
         hrefLang={other}
         lang={other}
         aria-label={`${LOCALES[other].shortName} – ${LOCALES[other].nativeName}`}
-        className="flex items-center gap-1.5 rounded-lg p-3 font-heading text-nav-button font-semibold text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red"
+        className="flex h-11 items-center gap-1.5 rounded-lg px-3 font-heading text-nav-button font-semibold text-neutral-600 transition-colors duration-200 outline-none hover:text-brand-red focus-visible:ring-2 focus-visible:ring-brand-red"
       >
         <Globe size={22} aria-hidden="true" />
         {LOCALES[other].shortName}
@@ -82,7 +82,7 @@ export function LanguageSwitcher({ variant }: { variant: 'dropdown' | 'buttons' 
               dir={LOCALES[l].dir}
               aria-current={l === locale ? 'true' : undefined}
               className={cn(
-                'flex-1 rounded-lg border py-2.5 text-center font-heading text-sm font-semibold transition-[color,background-color,border-color] duration-300',
+                'flex min-h-11 flex-1 items-center justify-center rounded-lg border py-2.5 font-heading text-sm font-semibold transition-[color,background-color,border-color] duration-300',
                 l === locale
                   ? 'border-brand-red bg-brand-red text-white'
                   : 'border-neutral-200 text-neutral-600 hover:border-brand-red hover:text-brand-red',

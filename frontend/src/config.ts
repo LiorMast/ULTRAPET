@@ -12,7 +12,7 @@
  * doesn't exist is a type error.
  */
 import { linkOptions, type LinkOptions, type RegisteredRouter } from '@tanstack/react-router'
-import { Award, ClipboardList, Factory, FlaskConical, Globe, Handshake, Lightbulb, Package, Palette, Ship, ShieldCheck, Truck, type LucideIcon } from 'lucide-react'
+import { Award, ClipboardList, Factory, FlaskConical, Globe, Handshake, House, LayoutGrid, Lightbulb, MapPin, Package, Palette, Ship, ShieldCheck, Truck, UserRound, type LucideIcon } from 'lucide-react'
 import type { ContactDetails, DiscountType, FontKey, ProductCategory, RibbonColors, SizeStep } from '@/api'
 import type { Locale } from '@/i18n'
 import type { Dictionary } from '@/i18n/he'
@@ -314,6 +314,7 @@ export const ADMIN_NAV: NavLink[] = [
   { id: 'customers', label: (t: Dictionary) => t.admin.navCustomers, link: linkOptions({ to: '/admin/customers' }) },
   { id: 'brands', label: (t: Dictionary) => t.admin.navBrands, link: linkOptions({ to: '/admin/brands' }) },
   { id: 'suppliers', label: (t: Dictionary) => t.admin.navSuppliers, link: linkOptions({ to: '/admin/suppliers' }) },
+  { id: 'resellers', label: (t: Dictionary) => t.admin.navResellers, link: linkOptions({ to: '/admin/resellers' }) },
 ]
 
 /** The smallest order a business customer can place, in shekels (shown in the cart; checked at checkout). */
@@ -330,6 +331,40 @@ export const DISCOUNT_RIBBON_DEFAULTS: RibbonColors = { general: '#BE1E24', cust
 
 /** The setting that stores the ribbon colors chosen by staff ({ general, customer }: "#rrggbb" each). */
 export const RIBBON_COLORS_SETTING = 'discount_ribbon_colors'
+
+/**
+ * A page of the bottom tab bar (TabBar.tsx): its label, icon, link, and when it lights up (`active`, given the page's
+ * path without the language prefix, e.g. "/products/some-slug").
+ */
+export type TabItem = { id: string; label: Label; icon: LucideIcon; link: AppLink; active: (pathname: string) => boolean }
+
+/**
+ * The bottom tab bar's page tabs (phones and tablets, below xl), in order. The bar adds two more after them: the
+ * account tab (Log in for visitors, the cart for business customers, Admin for staff) and Menu (the full menu drawer).
+ */
+export const TAB_BAR: TabItem[] = [
+  { id: 'home', label: (t) => t.tabBar.home, icon: House, link: linkOptions({ to: '/' }), active: (path) => path === '/' },
+  {
+    id: 'products',
+    label: (t) => t.tabBar.products,
+    icon: LayoutGrid,
+    link: linkOptions({ to: '/catalog' }),
+    active: (path) => path === '/catalog' || path.startsWith('/products/'),
+  },
+  { id: 'stores', label: (t) => t.tabBar.stores, icon: MapPin, link: linkOptions({ to: '/where-to-buy' }), active: (path) => path === '/where-to-buy' },
+]
+
+/** The tab bar's Admin tab for staff (the staff panel; lit on every /admin page). */
+export const TAB_ADMIN: TabItem = {
+  id: 'admin',
+  label: (t) => t.tabBar.admin,
+  icon: ShieldCheck,
+  link: linkOptions({ to: '/admin' }),
+  active: (path) => path === '/admin' || path.startsWith('/admin/'),
+}
+
+/** The tab bar's Log in tab for visitors (the sign-in page). */
+export const TAB_LOGIN: TabItem = { id: 'login', label: (t) => t.tabBar.login, icon: UserRound, link: linkOptions({ to: '/login' }), active: (path) => path === '/login' }
 
 /** The header's login link (the B2B customer portal). */
 export const HEADER_LOGIN = {

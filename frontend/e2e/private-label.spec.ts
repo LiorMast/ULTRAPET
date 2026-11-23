@@ -12,6 +12,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { hideFixedOverlays, scrollIntoViewSettled, signInStaff } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /** The WCAG tags axe checks. */
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
@@ -49,7 +50,7 @@ async function fakeSections(page: Page) {
 test('the menu leads to the Private Label page', async ({ page, isMobile }) => {
   await page.goto('/')
   if (isMobile) {
-    await page.getByRole('button', { name: 'פתיחת תפריט' }).click()
+    await page.getByRole('button', { name: 'תפריט', exact: true }).click()
     await page.getByRole('dialog').getByRole('link', { name: 'תווית פרטית' }).click()
   } else {
     await page.getByRole('navigation', { name: 'תפריט ראשי' }).getByRole('link', { name: 'תווית פרטית' }).click()
@@ -75,7 +76,7 @@ test('the page and the home section do not overflow horizontally', async ({ page
     await scrollIntoViewSettled(page.locator('#private-label'))
     for (const width of [360, 1280]) {
       await page.setViewportSize({ width, height: 900 })
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${path} at ${width}px`).toBe(true)
+      expect(await overflowX(page), `${path} at ${width}px`).toBe(0)
     }
   }
 })

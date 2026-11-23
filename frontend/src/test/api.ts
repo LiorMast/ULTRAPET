@@ -34,6 +34,11 @@
  * lowercased); GET/PUT /api/staff/suppliers/<id>/products read and replace the products each supplies (none at first),
  * with the server's checks (each product once and existing; a cost of 0 or more; a three-letter currency, default ILS;
  * `field` + `index` name the refused line) and its cascade (a deleted supplier or product takes its lines).
+ * Resellers (the Where to Buy stores): the staff table "resellers" starts with stubs/branches.json (name, address and
+ * city required; latitude -90..90 and longitude -180..180 as JSON numbers, like the server's `number` converter and its
+ * checks); GET /api/resellers answers its active rows, so staff edits show on the public page. GET
+ * /api/staff/geocode answers FAKE_GEOCODE for any city named in its `city` (approximate when the address is empty or
+ * unknown), 404 not_found for any other city, 400 required without a city.
  * The generated PDF catalog: GET/POST /api/staff/catalog-pdf keep its options and answer a build as finished at once
  * (setFakeCatalogPdf sets another state, e.g. "building").
  * POST /api/staff/uploads fakes the upload (staff only; folder "categories", "brands", "private-label" or "products";
@@ -672,6 +677,31 @@ const STAFF_TABLES: Record<string, FakeTable> = {
     },
     order: (a, b) => String(a.name).localeCompare(String(b.name)),
   },
+  resellers: {
+    fields: ['name', 'address', 'city', 'phone', 'website', 'latitude', 'longitude', 'approximateLocation', 'isActive'],
+    required: ['name', 'address', 'city', 'latitude', 'longitude', 'approximateLocation', 'isActive'],
+    defaults: { phone: null, website: null, approximateLocation: false, isActive: true },
+    convert: (values) => {
+      const field = ['latitude', 'longitude'].find((key) => key in values && values[key] !== null && typeof values[key] !== 'number')
+      return field ? json({ error: 'invalid', field }, 400) : null
+    },
+    seed: () =>
+      branches.map(({ id, name, address, city, phone, website, lat, lng, ...rest }) => ({
+        id, name, address, city, phone, website,
+        latitude: lat,
+        longitude: lng,
+        approximateLocation: 'approximate' in rest && rest.approximate === true,
+        isActive: true,
+        createdAt: SEEDED,
+        updatedAt: SEEDED,
+      })),
+    check: (reseller) => {
+      if (Math.abs(Number(reseller.latitude)) > 90) return invalid('resellers_latitude_check')
+      if (Math.abs(Number(reseller.longitude)) > 180) return invalid('resellers_longitude_check')
+      return null
+    },
+    order: (a, b) => String(a.city).localeCompare(String(b.city)) || String(a.name).localeCompare(String(b.name)),
+  },
   leads: {
     creatable: false,
     fields: ['status', 'notes'],
@@ -1107,6 +1137,27 @@ async function catalogPdfAnswer(method: string, body: BodyInit | null | undefine
   return json(catalogPdf, 202)
 }
 
+/** Where the fake geocoder places any address in a known city (the server asks Nominatim). */
+export const FAKE_GEOCODE = { lat: 32.0853, lng: 34.7818, label: 'דיזנגוף 50, תל אביב-יפו' }
+
+/** The cities the fake geocoder knows (any other city is not found). */
+const GEOCODE_CITIES = ['תל אביב', 'Tel Aviv']
+
+/**
+ * Answers GET /api/staff/geocode like the server's geocode_address (staff only).
+ * @param params - The query: address (optional) and city.
+ * @returns FAKE_GEOCODE (approximate when the address is empty or contains "nowhere"), 404 not_found for an unknown
+ *   city, 400 required without a city.
+ */
+function geocodeAnswer(params: URLSearchParams): Response {
+  if (session?.kind !== 'staff') return json({ error: session ? 'forbidden' : 'unauthorized' }, session ? 403 : 401)
+  const address = (params.get('address') ?? '').trim()
+  const city = (params.get('city') ?? '').trim()
+  if (!city) return json({ error: 'required', field: 'city' }, 400)
+  if (!GEOCODE_CITIES.includes(city)) return json({ error: 'not_found' }, 404)
+  return json({ ...FAKE_GEOCODE, approximate: !address || address.includes('nowhere') })
+}
+
 /**
  * Answers /api/staff/<resource>[/<id>] like the server's generic staff CRUD.
  * @param resource - The table's URL name, e.g. "price-rules".
@@ -1446,6 +1497,7 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
   if (supplierProductsPath) return supplierProductsAnswer(decodeURIComponent(supplierProductsPath[1]), method, init.body)
   const stockPath = /^\/api\/staff\/products\/([^/]+)\/stock$/.exec(path)
   if (stockPath) return stockAnswer(decodeURIComponent(stockPath[1]), method, init.body)
+  if (path === '/api/staff/geocode' && method === 'GET') return geocodeAnswer(url.searchParams)
   const staff = /^\/api\/staff\/([a-z-]+)(?:\/(.+))?$/.exec(path)
   if (staff) return staffAnswer(staff[1], method, staff[2] ? decodeURIComponent(staff[2]) : null, init.body)
 
@@ -1482,7 +1534,22 @@ export async function fakeFetch(input: RequestInfo | URL, init: RequestInit = {}
     }
     const section = (await tableRows('page-sections')).find((row) => row.key === slug('/api/sections/'))
     if (section) return json({ key: section.key, content: sectionJson(String(section.key), section.content), updatedAt: section.updatedAt })
-    if (path === '/api/resellers') return json(branches.map((b) => ({ approximate: false, ...b })) satisfies Branch[])
+    if (path === '/api/resellers') {
+      const rows = [...(await tableRows('resellers'))].filter((row) => row.isActive).sort(STAFF_TABLES.resellers.order)
+      return json(
+        rows.map((row) => ({
+          id: row.id,
+          name: String(row.name),
+          address: String(row.address),
+          city: String(row.city),
+          phone: (row.phone as string | null) ?? null,
+          website: (row.website as string | null) ?? null,
+          lat: Number(row.latitude),
+          lng: Number(row.longitude),
+          approximate: Boolean(row.approximateLocation),
+        })) satisfies Branch[],
+      )
+    }
     if (path === '/api/prices') return pricesAnswer()
     if (path === '/api/account') return accountAnswer()
     if (path === '/api/auth/me') return session ? json({ user: session }) : json({ error: 'unauthorized' }, 401)

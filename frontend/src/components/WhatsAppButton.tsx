@@ -1,5 +1,7 @@
 /**
- * WhatsAppButton.tsx — The floating WhatsApp squircle fixed to the bottom corner of every page.
+ * WhatsAppButton.tsx — The floating WhatsApp squircle fixed to the bottom corner of every page: 56px above the tab bar
+ * (and a page's bottom bar) below xl, 64px in the window's corner from xl. It carries data-fab, so pages keep its
+ * height free at their end (--page-end in index.css).
  * Rendered once by routes/__root.tsx; it opens a chat with the customer-service number (the setting contact_whatsapp,
  * which the root route loads with fetchContact).
  */
@@ -9,7 +11,7 @@ import { whatsappUrl } from '@/config'
 import { useI18n } from '@/i18n'
 
 /**
- * A 72px squircle link (a superellipse: CSS `corner-shape: squircle`; browsers without it get a rounded square) that opens a WhatsApp chat in a new tab and shows a Popover label on hover/focus. Sits at the end corner (right in LTR, left in RTL).
+ * A squircle link (a superellipse: CSS `corner-shape: squircle`; browsers without it get a rounded square) that opens a WhatsApp chat in a new tab and shows a Popover label on hover/focus. Sits at the end corner (right in LTR, left in RTL).
  * @param props.phone - The WhatsApp number, international (e.g. "+972 52-214-2410"; only its digits are used).
  * @returns The fixed squircle link, or nothing when no number is set.
  */
@@ -18,14 +20,15 @@ export function WhatsAppButton({ phone }: { phone: string }) {
   if (!phone.replace(/\D/g, '')) return null
   return (
     <a
+      data-fab=""
       href={whatsappUrl(phone)}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`${t.header.whatsappLabel} – WhatsApp`}
-      className="group fixed bottom-5 end-5 z-40 flex size-16 items-center justify-center rounded-[30%] bg-[#21c063] supports-[corner-shape:squircle]:rounded-full supports-[corner-shape:squircle]:[corner-shape:squircle] text-white shadow-premium transition-[background-color,box-shadow,scale] hover:bg-[#1aa854] active:scale-[0.97] active:duration-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#21c063]/40 lg:bottom-8 lg:end-8"
+      className="group fixed end-4 bottom-[calc(var(--tabbar-h)+var(--bottom-bar-h)+var(--fab-gap))] z-40 flex size-14 items-center justify-center rounded-[30%] bg-[#21c063] supports-[corner-shape:squircle]:rounded-full supports-[corner-shape:squircle]:[corner-shape:squircle] text-white shadow-premium transition-[background-color,box-shadow,scale] hover:bg-[#1aa854] active:scale-[0.97] active:duration-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#21c063]/40 xl:end-8 xl:bottom-8 xl:size-16"
     >
-      {/* 52px: the bubble's tail tip (the logo's farthest point from its center) stays inside the squircle. */}
-      <img src={whatsappLogo} alt="" width={52} height={52} className="size-13" />
+      {/* 44px / 52px: the bubble's tail tip (the logo's farthest point from its center) stays inside the squircle. */}
+      <img src={whatsappLogo} alt="" width={52} height={52} className="size-11 xl:size-13" />
       <Popover
         message={t.header.whatsappLabel}
         color="#1A1A1A"

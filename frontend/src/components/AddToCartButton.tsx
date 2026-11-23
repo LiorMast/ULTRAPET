@@ -93,7 +93,7 @@ export function flyToCart(image: HTMLImageElement, target: Element, launcher?: E
 const addVariants = cva('relative', {
   variants: {
     size: {
-      sm: 'w-full px-3 py-2.5 text-sm',
+      sm: 'w-full px-2 py-2.5 text-sm pointer-coarse:min-h-11 sm:px-3',
       lg: 'px-8 py-3.5 text-sm',
     },
   },
@@ -142,7 +142,8 @@ export function AddToCartButton({
    */
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     const image = event.currentTarget.closest(`[${CART_FLY_SOURCE_ATTR}]`)?.querySelector('img')
-    const target = document.querySelector(`[${CART_TARGET_ATTR}]`)
+    // The cart icon on screen: the header's from xl, the tab bar's below it (the other one is hidden).
+    const target = [...document.querySelectorAll(`[${CART_TARGET_ATTR}]`)].find((el) => el.getBoundingClientRect().width > 0)
     add(product, quantity, { pop: false })
     if (image && target) void flyToCart(image, target, event.currentTarget).then(() => pop())
     else pop()

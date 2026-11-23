@@ -1,7 +1,9 @@
 /**
  * Carousel.test.tsx — Tests for the generic Carousel: slides as list items under a labelled region,
  * arrows hidden when everything fits, scroll direction in LTR vs RTL, disabled arrows at the ends and
- * non-smooth scrolling for reduced motion, and paged mode (grouping, dots, one-page arrows). jsdom has no layout, so the scroll metrics are mocked.
+ * non-smooth scrolling for reduced motion, paged mode (grouping, dots, one-page arrows), and the phone's swipe row (no
+ * arrows, no pages, 82% slides, a decorative position bar). jsdom has no layout, so the scroll metrics are mocked, and
+ * the media queries (matchMedia) where a test needs one to match.
  */
 import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -37,6 +39,16 @@ afterEach(() => {
   vi.restoreAllMocks()
   scrollBy.mockClear()
 })
+
+/**
+ * Makes matchMedia report the queries that contain a word as matching (and every other as not).
+ * @param word - A part of the query, e.g. "reduced-motion" or "48rem" (PHONE_QUERY).
+ */
+function matchQueries(word: string) {
+  vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query) => ({ matches: query.includes(word), media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+  )
+}
 
 describe('Carousel', () => {
   it('wraps every child in a list item inside a labelled carousel region', async () => {
@@ -81,7 +93,7 @@ describe('Carousel', () => {
 
   it('does not animate for visitors who prefer reduced motion', async () => {
     mockMetrics(900, 300)
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList)
+    matchQueries('reduced-motion')
     const { user } = renderComponent(slides, 'en')
     await user.click(await screen.findByRole('button', { name: 'Next' }))
     expect(scrollBy).toHaveBeenCalledWith({ left: 270, behavior: 'auto' })
@@ -132,5 +144,31 @@ describe('Carousel in paged mode', () => {
     renderComponent(paged, 'en')
     await screen.findByRole('region')
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+  })
+})
+
+describe('Carousel on a phone', () => {
+  it('is a swipe row: no arrows, no pages, 82% slides and a decorative position bar', async () => {
+    mockMetrics(900, 300)
+    matchQueries('48rem')
+    const { container } = renderComponent(
+      <Carousel label="Demo" pageSize={2}>
+        <span>one</span>
+        <span>two</span>
+        <span>three</span>
+      </Carousel>,
+      'en',
+    )
+    await screen.findByRole('region')
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('ul > li > ul')).toHaveLength(0)
+    const slidesShown = screen.getAllByRole('listitem')
+    expect(slidesShown).toHaveLength(3)
+    expect(slidesShown[0]).toHaveClass('basis-[82%]', 'snap-start')
+    // A third of the row is in view: the bar's thumb is a third wide, at the start.
+    const thumb = container.querySelector<HTMLElement>('[aria-hidden="true"] > span')!
+    expect(thumb.style.width).toBe(`${(300 / 900) * 100}%`)
+    expect(thumb.style.insetInlineStart).toBe('0%')
   })
 })

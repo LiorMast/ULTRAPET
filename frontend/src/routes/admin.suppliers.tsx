@@ -106,8 +106,8 @@ function AdminSuppliers() {
 
   return (
     <section>
-      <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.suppliersTitle}</h1>
-      <p className="mb-8 mt-2 max-w-2xl text-sm text-brand-charcoal-muted">{t.admin.suppliersDescription}</p>
+      <h1 className="font-display text-2xl font-bold text-brand-charcoal sm:text-3xl">{t.admin.suppliersTitle}</h1>
+      <p className="mb-6 mt-2 max-w-2xl sm:mb-8 text-sm text-brand-charcoal-muted">{t.admin.suppliersDescription}</p>
       <DataTable
         rows={suppliers}
         columns={columns}

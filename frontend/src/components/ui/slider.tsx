@@ -63,7 +63,7 @@ function Slider({
   return (
     <SliderPrimitive.Root
       data-slot="slider"
-      className={cn("relative flex h-6 w-full touch-none items-center select-none data-[disabled]:opacity-50", marks?.length && "mb-7", className)}
+      className={cn("relative flex h-6 w-full touch-none items-center select-none data-[disabled]:opacity-50 pointer-coarse:h-11", marks?.length && "mb-7", className)}
       {...props}
       onValueChange={handleValueChange}
       onKeyDown={(event) => {
@@ -85,7 +85,7 @@ function Slider({
           aria-label={thumbLabels?.[index] ?? ariaLabel}
           aria-labelledby={thumbLabels ? undefined : ariaLabelledBy}
           aria-valuetext={thumbValueText && values?.[index] !== undefined ? thumbValueText(values[index], index) : ariaValueText}
-          className="block size-5 cursor-grab rounded-full [corner-shape:round] border-2 border-brand-red bg-white shadow-premium-sm transition-[scale,box-shadow] duration-300 outline-none hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red active:scale-[0.97] active:cursor-grabbing active:duration-100 data-[disabled]:cursor-not-allowed"
+          className="relative block size-5 cursor-grab rounded-full [corner-shape:round] border-2 touch-target pointer-coarse:size-7 border-brand-red bg-white shadow-premium-sm transition-[scale,box-shadow] duration-300 outline-none hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red active:scale-[0.97] active:cursor-grabbing active:duration-100 data-[disabled]:cursor-not-allowed"
         />
       ))}
       {marks?.map((mark) => {

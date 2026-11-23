@@ -7,7 +7,8 @@
  * An internal page takes `link` (TanStack linkOptions, so a wrong route is a type error); another site or a file
  * takes `href` (a plain <a>; `external` opens it in a new tab). A <button> that should look the same uses
  * `textLinkVariants()`. Used by the catalog (the PDF catalog, "show all products", "clear filters"), the product,
- * brand and article pages and the 404 page.
+ * brand and article pages and the 404 page. Its taps reach 44px around it (touch-target), so a short link is still easy
+ * to hit with a finger.
  */
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
@@ -18,7 +19,7 @@ import type { AppLink } from '@/config'
 
 /** The link's look: dark brand red (default) or muted grey that darkens on hover. */
 export const textLinkVariants = cva(
-  'link-underline inline-flex w-fit items-center gap-1.5 rounded-sm pb-0.5 font-heading text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-red/60',
+  'link-underline relative inline-flex w-fit items-center gap-1.5 rounded-sm pb-0.5 touch-target font-heading text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-red/60',
   {
     variants: {
       tone: {

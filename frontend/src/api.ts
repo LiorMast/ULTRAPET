@@ -627,6 +627,27 @@ export type StaffSupplier = StaffRowBase & {
 }
 
 /**
+ * A reseller (a store of the Where to Buy page, משווקים) as the staff API returns it, active or not. `latitude` /
+ * `longitude`: the map pin (WGS 84 degrees); `approximateLocation` = the pin sits at the city centre (the public map
+ * says so); `isActive` false hides the store from the public site.
+ */
+export type StaffReseller = StaffRowBase & {
+  id: string
+  name: string
+  address: string
+  city: string
+  phone: string | null
+  website: string | null
+  latitude: number
+  longitude: number
+  approximateLocation: boolean
+  isActive: boolean
+}
+
+/** Where the geocoder found an address: the point, its name, and whether only the city (an area) was matched. */
+export type GeocodeResult = { lat: number; lng: number; label: string; approximate: boolean }
+
+/**
  * One product a supplier supplies: the supplier's own item code (null = none), the cost price (null = unknown) and
  * its currency (ISO 4217, e.g. "ILS", "EUR").
  */
@@ -997,6 +1018,17 @@ export const fetchCatalogPdf = (signal?: AbortSignal) => apiFetch<CatalogPdfStat
  */
 export const generateCatalogPdf = (options: Partial<CatalogPdfOptions>) =>
   apiFetch<CatalogPdfState>('/api/staff/catalog-pdf', { method: 'POST', body: { options } })
+
+/**
+ * Finds a street address on the map (staff only; the server asks OpenStreetMap's Nominatim, app/geocode.py).
+ * @param address - The street address, e.g. "הרצל 12" (may be empty: then only the city is looked up).
+ * @param city - The city.
+ * @param signal - Aborts the request (the dialog closed).
+ * @returns The point found (approximate when only the city matched); throws ApiError 404 "not_found", 400 "required"
+ *   (no city) or 502 "geocoder_unavailable".
+ */
+export const geocodeAddress = (address: string, city: string, signal?: AbortSignal) =>
+  apiFetch<GeocodeResult>(`/api/staff/geocode?${new URLSearchParams({ address, city })}`, { signal })
 
 /**
  * The products a supplier supplies, in the catalog's order (staff only).

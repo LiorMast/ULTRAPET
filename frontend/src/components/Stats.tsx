@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cn } from 'cn'
 import { fieldLabel, SectionEditBar, useEditableSection, type EditableField } from '@/components/EditableSection'
 import { EditableText, InlineEditError } from '@/components/InlineEditor'
-import { useReducedMotion } from '@/components/useReducedMotion'
+import { useReducedMotion } from '@/components/useMediaQuery'
 import type { SectionContent, Stat } from '@/api'
 import { STAT_LABELS, type Label } from '@/config'
 import { useI18n } from '@/i18n'
@@ -84,7 +84,7 @@ function StatFigure({ stat, label, edit, className }: { stat: Stat; label: Edita
   const shown = useCountUp(stat.value, visible, canObserve && !reducedMotion)
   const format = (n: number) => `${n.toLocaleString(locale)}${stat.suffix}`
   return (
-    <li ref={ref} className={cn('px-6 py-10 lg:px-10 lg:py-14', className)}>
+    <li ref={ref} className={cn('px-4 py-6 sm:px-6 sm:py-10 lg:px-10 lg:py-14', className)}>
       {edit ? (
         <div dir="ltr" className={cn(NUMBER_CLASS, 'flex items-baseline gap-2 rtl:justify-end')}>
           <EditableText as="span" {...edit.value} dir="ltr" inputMode="numeric" />

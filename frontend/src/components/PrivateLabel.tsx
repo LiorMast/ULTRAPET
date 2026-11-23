@@ -320,7 +320,7 @@ export function PrivateLabel({
   const hint = (texts: Texts | undefined, prompt: string) => Object.entries(texts ?? {}).find(([language, text]) => language !== locale && text?.trim())?.[1] ?? prompt
 
   return (
-    <section id="private-label" aria-labelledby="private-label-title" className="bg-neutral-50 px-6 py-20 lg:px-10 lg:py-24">
+    <section id="private-label" aria-labelledby="private-label-title" className="bg-neutral-50 px-gutter section-y">
       <div className="mx-auto max-w-7xl">
         {onSave && (
           <SectionEditBar edit={{ bar: { ...inline.bar, onEdit: startEditing }, propBar }} label={t.privateLabel.eyebrow} className="bg-neutral-50" />
@@ -329,7 +329,7 @@ export function PrivateLabel({
           <SectionHeading id="private-label-title" edit={field} className="mx-auto text-center" />
 
           {draft ? (
-            <div className="mx-auto mt-14 max-w-3xl">
+            <div className="section-gap mx-auto max-w-3xl">
               {entries.length > 0 && (
                 <FlowchartList orientation="vertical" label={t.privateLabel.processLabel}>
                   {entries.map((entry, i) => {
@@ -434,7 +434,7 @@ export function PrivateLabel({
               </Button>
             </div>
           ) : shown.length ? (
-            <FlowchartList label={t.privateLabel.processLabel} className="mt-16">
+            <FlowchartList label={t.privateLabel.processLabel} className="section-gap lg:mt-16">
               {shown.map((step) => (
                 <FlowchartCard key={step.id} media={<StepMedia icon={step.icon} imageUrl={step.imageUrl} />} title={step.title} description={step.text} />
               ))}
@@ -446,7 +446,7 @@ export function PrivateLabel({
 
         {variant === 'home' && (
           // While editing, the links are shown but not followed: the page stays in edit mode.
-          <div className={cn('mt-14 flex flex-wrap items-center justify-center gap-x-8 gap-y-4', inline.editing && 'pointer-events-none')}>
+          <div className={cn('section-gap flex flex-wrap items-center justify-center gap-x-8 gap-y-4', inline.editing && 'pointer-events-none')}>
             <Button asChild>
               <Link to="/" hash="contact">{t.privateLabel.cta}</Link>
             </Button>

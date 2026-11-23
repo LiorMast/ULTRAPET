@@ -16,7 +16,7 @@ import { ApiError } from '@/api'
 import { useAuth, type Credentials } from '@/auth'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Button } from '@/components/ui/button'
-import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
+import { CHECKBOX_CLASS, CHECKBOX_LABEL_CLASS, INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
 import { useToast } from '@/toast'
 
@@ -33,7 +33,7 @@ export type LoginValues = Credentials
  */
 export function LoginCard({ title, subtitle, children }: { title: ReactNode; subtitle: ReactNode; children: ReactNode }) {
   return (
-    <section className="mx-auto max-w-md px-4 py-16 sm:px-6 lg:py-24">
+    <section className="page-y mx-auto max-w-md px-4 sm:px-6 lg:py-24">
       <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-soft sm:p-10">
         <h1 className="font-display text-3xl font-bold text-brand-charcoal">{title}</h1>
         <p className="mb-8 mt-2 text-sm text-brand-charcoal-muted">{subtitle}</p>
@@ -129,13 +129,13 @@ export function LoginForm({
         />
         {errors.password && <p id={`${idPrefix}-password-error`} className="mt-1 text-xs font-medium text-brand-red-dark">{errors.password}</p>}
       </div>
-      <label htmlFor={`${idPrefix}-remember`} className="flex cursor-pointer items-center gap-3 text-sm text-brand-charcoal">
+      <label htmlFor={`${idPrefix}-remember`} className={CHECKBOX_LABEL_CLASS}>
         <input
           id={`${idPrefix}-remember`}
           type="checkbox"
           checked={values.remember}
           onChange={(e) => setValues((v) => ({ ...v, remember: e.target.checked }))}
-          className="size-4 accent-brand-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red"
+          className={CHECKBOX_CLASS}
         />
         {t.login.remember}
       </label>

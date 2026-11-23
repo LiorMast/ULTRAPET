@@ -452,6 +452,17 @@ export const he = {
     skipToContent: 'דילוג לתוכן',
     whatsappLabel: 'שירות לקוחות',
   },
+  // The bottom tab bar of phones and tablets (TabBar.tsx): short labels under the icons.
+  tabBar: {
+    label: 'ניווט מהיר',
+    home: 'בית',
+    products: 'מוצרים',
+    stores: 'משווקים',
+    login: 'התחברות',
+    cart: 'סל',
+    admin: 'ניהול',
+    menu: 'תפריט',
+  },
   offcanvas: {
     close: 'סגירה',
   },
@@ -509,6 +520,9 @@ export const he = {
     hiddenSaved: 'המוצר הוסתר מהלקוחות.',
     addProduct: 'הוספת מוצר',
     addTitle: 'מוצר חדש',
+    // A phone's card: one button opening the product's actions in a bottom sheet.
+    actions: 'ניהול',
+    actionsFor: 'ניהול {name}',
     loading: 'טוען את נתוני הניהול…',
   },
   hero: {
@@ -618,6 +632,12 @@ export const he = {
     approximate: 'מיקום משוער',
     fullscreen: 'מסך מלא',
     exitFullscreen: 'יציאה ממסך מלא',
+    // On a touch screen one finger scrolls the page; the hint shows when one finger drags on a map.
+    twoFingers: 'הזיזו את המפה בשתי אצבעות',
+    // The phone's switch between the store list and the map.
+    view: 'תצוגה',
+    list: 'רשימה',
+    map: 'מפה',
   },
   catalog: {
     eyebrow: 'קטלוג מוצרים',
@@ -660,6 +680,10 @@ export const he = {
     },
     brandLabel: 'מותג',
     brandsSelected: 'מותג ({n})',
+    // The phone's toolbar: one button for the brand and price filters, opening a bottom sheet.
+    filters: 'סינון',
+    filtersSelected: 'סינון ({n})',
+    showResults: 'הצגת {n} מוצרים',
     priceFilterLabel: 'מחיר',
     priceRangeTitle: 'טווח מחירים (לפני מע"מ)',
     priceMin: 'מחיר מינימלי',
@@ -701,6 +725,8 @@ export const he = {
     previous: 'לעמוד הקודם',
     next: 'לעמוד הבא',
     page: 'עמוד {n}',
+    // A phone's compact pagination, between the arrows.
+    status: 'עמוד {n} מתוך {total}',
   },
   articles: {
     eyebrow: 'מאמרים',
@@ -747,6 +773,7 @@ export const he = {
     navCustomers: 'לקוחות',
     navRequests: 'בקשות פתיחת חשבון',
     navSuppliers: 'ספקים',
+    navResellers: 'משווקים',
     brandsTitle: 'מותגים',
     brandsDescription: 'המותגים שמוצגים באתר: שם, תגית, תיאור, צבע, לוגו וסדר. מותג לא פעיל מוסתר מהאתר.',
     categoriesTitle: 'קטגוריות',
@@ -762,6 +789,10 @@ export const he = {
     suppliersTitle: 'ספקים',
     suppliersDescription:
       'היצרנים והיצואנים שאולטרה פט קונה מהם: פרטי קשר, ארץ והערות, והמוצרים שכל ספק מספק עם הקוד שלו ומחיר העלות (בכפתור "מוצרים"). הספקים לא מוצגים באתר. ספק שכבר לא קונים ממנו מסמנים כלא פעיל.',
+    resellersTitle: 'משווקים',
+    resellersDescription:
+      'החנויות שמוכרות את מוצרי אולטרה פט, כפי שהן מוצגות בעמוד "איפה לקנות" ובמפה שלו: שם, כתובת, טלפון, אתר ומיקום על המפה. לחצו על סיכה במפה כדי לערוך את החנות. משווק לא פעיל (סיכה אפורה) מוסתר מהאתר.',
+    resellersMapLabel: 'מפת המשווקים',
     requestsTitle: 'בקשות לפתיחת חשבון',
     requestsDescription:
       'עסקים ששלחו בקשה לפתיחת חשבון מטופס האתר. כל בקשה חדשה נשלחת גם במייל. פתחו את החשבון בכפתור "פתיחת חשבון" (הבקשה מסומנת כ"הומרה" ומקושרת ללקוח), או עדכנו את הסטטוס וההערות.',
@@ -832,6 +863,11 @@ export const he = {
       cancelled: 'ההזזה בוטלה. {name} חזרה למקום {position} מתוך {total}.',
     },
     table: {
+      // A phone's table is a stack of cards: this menu sorts them (the column titles are not shown there).
+      sortBy: 'מיון לפי',
+      sortDefault: 'סדר ברירת המחדל',
+      sortAsc: '{label} (בסדר עולה)',
+      sortDesc: '{label} (בסדר יורד)',
       search: 'חיפוש',
       info: 'מציג _START_–_END_ מתוך _TOTAL_',
       infoEmpty: 'אין רשומות להצגה',
@@ -879,7 +915,8 @@ export const he = {
       moveEarlierOf: 'הזזת תמונה {n} מוקדם יותר',
       moveLaterOf: 'הזזת תמונה {n} מאוחר יותר',
       remove: 'הסרה',
-      removeOf: 'הסרת תמונה {n}',
+      // Holds the visible label ("הסרה"), as WCAG 2.5.3 asks.
+      removeOf: 'הסרה: תמונה {n}',
       uploading: 'מעלה תמונה {n} מתוך {total}…',
       uploaded: 'התמונות הועלו. שמרו כדי לשמור אותן.',
       removed: 'התמונה הוסרה. שמרו כדי לשמור את השינוי.',
@@ -1096,6 +1133,30 @@ export const he = {
       notes: 'הערות',
       notesHint: 'פנימי: תנאי תשלום, זמני אספקה וכו׳.',
       isActive: 'פעיל',
+    },
+    resellerFields: {
+      name: 'שם החנות',
+      address: 'כתובת',
+      city: 'עיר',
+      phone: 'טלפון',
+      website: 'אתר',
+      latitude: 'קו רוחב',
+      longitude: 'קו אורך',
+      location: 'מיקום על המפה',
+      locationHint: 'לחצו על המפה כדי להציב את הסיכה, גררו אותה, הקלידו את הקואורדינטות או מצאו אותן לפי הכתובת.',
+      pickerLabel: 'מפה לבחירת המיקום של החנות',
+      pin: 'המיקום של החנות',
+      approximateLocation: 'מיקום משוער',
+      approximateHint: 'הסיכה במרכז העיר ולא בכתובת עצמה; המפה באתר מציינת זאת.',
+      isActive: 'פעיל',
+    },
+    geocode: {
+      button: 'מציאה לפי הכתובת',
+      needCity: 'הקלידו קודם את העיר.',
+      found: 'נמצא: {label}',
+      foundCity: 'הכתובת לא נמצאה; הסיכה הוצבה במרכז העיר: {label}',
+      notFound: 'לא מצאנו את הכתובת או את העיר. הציבו את הסיכה על המפה.',
+      unavailable: 'שירות המפות לא זמין כרגע. הציבו את הסיכה על המפה או הקלידו את הקואורדינטות.',
     },
     supplierProducts: {
       button: 'מוצרים',

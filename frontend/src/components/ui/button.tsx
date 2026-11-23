@@ -4,8 +4,14 @@
  * Every button is a squircle (rounded-lg, see the corner system in index.css) with a sentence-case semibold label. The
  * default variant is the brand-red primary action, darkening on hover (no lift, no glow: calm and corporate). An action
  * button leads with its lucide icon (Edit = Pencil, Delete = Trash2, Add = Plus ...). Every variant reacts the instant it is pressed (scales to
- * 97% in 100ms) and springs back on release, so a press never feels dead. Sizes: "default" (48px tall) and "sm" (40px,
- * dialogs and the header). The "ghostWhite" variant is the white-outline button for dark photo backgrounds (hero). The
+ * 97% in 100ms) and springs back on release, so a press never feels dead. Sizes: "default" (48px tall) and "sm" (dialogs
+ * and the header).
+ *
+ * Touch sizes: a control's size follows the input, not the window. On a touch screen (`pointer-coarse:`) every size is
+ * at least 44px tall, and the icon sizes 44px square (min-height / min-width, so a caller's own width or height still
+ * applies); with a mouse the compact sizes keep their desktop look ("sm" 42px, "action" 36px, "icon" 36px, "icon-sm"
+ * 32px). The two tiny sizes ("xs", "icon-xs") keep their look everywhere and take their taps through an invisible 44px
+ * `touch-target` around them. The "ghostWhite" variant is the white-outline button for dark photo backgrounds (hero). The
  * "action" variant with size "action" is a record's action (the admin tables' Edit / Discounts / Delete): outlined,
  * filled charcoal on hover; "actionDanger" is the same for a destructive one (red outline and fill). The other shadcn
  * variants and icon sizes are kept for shadcn components that use them. Use `asChild` to style a <Link> or <a> as a
@@ -49,14 +55,14 @@ const buttonVariants = cva(
       },
       size: {
         default: "gap-2 px-7 py-3.5 text-sm",
-        sm: "gap-2 px-5 py-2.5 text-sm",
-        xs: "h-6 gap-1 px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
-        action: "h-9 gap-1.5 px-4 text-xs [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-10 gap-1.5 px-2.5",
-        icon: "size-9",
-        "icon-xs": "size-6 [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
+        sm: "gap-2 px-5 py-2.5 text-sm pointer-coarse:min-h-11",
+        xs: "relative h-6 gap-1 px-2 text-xs touch-target [&_svg:not([class*='size-'])]:size-3",
+        action: "h-9 gap-1.5 px-4 text-xs pointer-coarse:min-h-11 pointer-coarse:text-sm [&_svg:not([class*='size-'])]:size-3.5",
+        lg: "h-10 gap-1.5 px-2.5 pointer-coarse:min-h-11",
+        icon: "size-9 pointer-coarse:min-h-11 pointer-coarse:min-w-11",
+        "icon-xs": "relative size-6 touch-target [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm": "size-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11",
+        "icon-lg": "size-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11",
       },
     },
     defaultVariants: {
@@ -70,7 +76,8 @@ const buttonVariants = cva(
  * A button, or — with `asChild` — any single child element (such as a router <Link>) styled as one.
  * @param props.variant - Visual style; "default" is the brand-red primary button, "ghostWhite" a white outline for dark
  *   backgrounds, "action" / "actionDanger" a record's action in a table row.
- * @param props.size - "default", "sm" (header), "action" (with the action variants), or one of the shadcn icon/compact sizes.
+ * @param props.size - "default", "sm" (header, dialogs), "action" (with the action variants), or one of the shadcn
+ *   icon/compact sizes; all at least 44px on touch screens (see the header).
  * @param props.asChild - Render the child element instead of a <button>, merging the button styles into it.
  * @param props.loading - The server is working on this button's action: shows the spinner and ignores clicks (see the
  *   header). Undefined = a button that never waits (its children render unwrapped). Ignored with `asChild`.

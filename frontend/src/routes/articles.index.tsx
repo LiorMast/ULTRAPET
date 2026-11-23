@@ -59,11 +59,11 @@ function ArticlesPage() {
   const { t } = useI18n()
   const [latest, ...others] = Route.useLoaderData()
   return (
-    <section aria-labelledby="articles-title" className="mx-auto max-w-7xl px-6 py-16 lg:px-10 lg:py-20">
+    <section aria-labelledby="articles-title" className="page-y px-gutter mx-auto max-w-7xl lg:py-20">
       <Breadcrumbs items={[{ label: t.articles.home, link: linkOptions({ to: '/' }) }, { label: t.nav.articles }]} />
-      <SectionHeading as="h1" id="articles-title" eyebrow={t.articles.eyebrow} title={t.articles.title} intro={t.articles.description} className="mt-10" />
+      <SectionHeading as="h1" id="articles-title" eyebrow={t.articles.eyebrow} title={t.articles.title} intro={t.articles.description} className="mt-6 sm:mt-10" />
 
-      {latest && <ArticleCard article={latest} variant="featured" headingLevel="h2" priority className="mt-12" />}
+      {latest && <ArticleCard article={latest} variant="featured" headingLevel="h2" priority className="mt-8 sm:mt-12" />}
       {others.length > 0 && (
         <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {others.map((article) => (

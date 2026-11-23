@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { signInCustomer } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /** Stand-in for every product photo. */
 const PHOTO = readFileSync(new URL('../src/assets/brands/ultra-pet.png', import.meta.url))
@@ -31,15 +32,19 @@ async function open(page: Page, path: string) {
   await page.waitForFunction(() => [...document.querySelectorAll('main img')].every((img) => (img as HTMLImageElement).naturalWidth > 0))
 }
 
-test('pages through the catalog and filters by category', async ({ page }) => {
+test('pages through the catalog and filters by category', async ({ page, isMobile }) => {
   await open(page, '/catalog')
   const cards = page.getByRole('list', { name: 'מוצרים' }).getByRole('article')
   await expect(cards).toHaveCount(24)
   const first = await cards.first().getByRole('heading').innerText()
 
-  await page.getByRole('navigation', { name: 'עמודים' }).getByRole('link', { name: 'עמוד 2' }).click()
+  const pages = page.getByRole('navigation', { name: 'עמודים' })
+  // A phone's pagination is compact: the arrows around "Page n of N", no numbers.
+  if (isMobile) await pages.getByRole('link', { name: 'לעמוד הבא' }).click()
+  else await pages.getByRole('link', { name: 'עמוד 2' }).click()
   await expect(page).toHaveURL(/\/catalog\?page=2$/)
   await expect(cards.first().getByRole('heading')).not.toHaveText(first)
+  if (isMobile) await expect(pages).toContainText(/עמוד 2 מתוך \d+/)
   // The new page starts at the top (smooth scrolling, so wait for it to settle).
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(200)
 
@@ -70,6 +75,8 @@ test('hides prices from visitors and shows them after signing in', async ({ page
 
   await page.goto('/en/login')
   await page.getByRole('main').getByRole('button', { name: 'Sign out' }).click()
+  // The server has cleared the sign-in (leaving earlier could cut the request off).
+  await expect(page.getByText('You are signed out.')).toBeVisible()
   await open(page, '/en/catalog')
   await expect(page.getByRole('main')).not.toContainText('₪')
 })
@@ -78,7 +85,7 @@ test('does not overflow horizontally', async ({ page }) => {
   await open(page, '/catalog')
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    expect(await overflowX(page)).toBe(0)
   }
 })
 

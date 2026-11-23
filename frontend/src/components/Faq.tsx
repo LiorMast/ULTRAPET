@@ -238,13 +238,13 @@ export function Faq({
   const hint = (texts: Texts | undefined, prompt: string) => Object.entries(texts ?? {}).find(([language, text]) => language !== locale && text?.trim())?.[1] ?? prompt
 
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="bg-white px-6 py-20 lg:px-10 lg:py-24">
+    <section id={id} aria-labelledby={`${id}-title`} className="bg-white px-gutter section-y">
       {/* One form for the whole section: the questions and the section's texts are saved together. */}
-      <form {...inline.formProps} className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
+      <form {...inline.formProps} className="mx-auto grid max-w-7xl gap-8 sm:gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-20">
         <div className="lg:sticky lg:top-32 lg:self-start">
           <SectionHeading id={`${id}-title`} edit={field} />
           {contactBox && (
-            <div className="mt-10 rounded-2xl bg-neutral-100 p-6 lg:p-8">
+            <div className="mt-6 rounded-2xl bg-neutral-100 p-5 sm:mt-10 sm:p-6 lg:p-8">
               <EditableText as="h3" wrap {...field('moreTitle')} className="font-display text-xl font-bold text-brand-charcoal" />
               <EditableText multiline {...field('moreText')} className="mt-2 text-brand-charcoal-muted" />
               <Button asChild className="mt-6">

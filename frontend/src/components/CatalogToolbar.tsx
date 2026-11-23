@@ -5,17 +5,23 @@
  * removable, plus "Clear all". Every control writes the URL state (CatalogSearch: brand, min, max, sort) and goes
  * back to page 1; the route reloads the results from the server. Used by Catalog; reusable for any list whose page
  * answers a ProductPage.
+ *
+ * Mobile-first: on a phone (below md) the menus become bottom sheets (Offcanvas side="bottom"), like a phone app's:
+ * "Filters (n)" opens the brands as 48px checkbox rows and, for customers, the price range, with "Show N products" to
+ * go back to the results; Sort opens its choices as radio rows (a choice applies and closes the sheet).
  */
 import { useRef, useState, type ComponentProps, type FormEvent, type ReactNode, type Ref } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { cva } from 'class-variance-authority'
-import { ArrowUpDown, ChevronDown, X } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, SlidersHorizontal, X } from 'lucide-react'
 import { cn } from 'cn'
 import { CATALOG_SORTS, type Brand, type CatalogSearch, type CatalogSort, type ProductPage } from '@/api'
 import { formatPrice } from '@/components/CatalogCard'
+import { Offcanvas } from '@/components/Offcanvas'
+import { PHONE_QUERY, useMediaQuery } from '@/components/useMediaQuery'
 import { textLinkVariants } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
-import { inputVariants } from '@/components/ui/input'
+import { CHECKBOX_CLASS, inputVariants, LABEL_CLASS } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import {
   DropdownMenu,
@@ -41,7 +47,7 @@ export const chipVariants = cva(
         true: 'border-brand-charcoal bg-brand-charcoal text-white',
         false: 'border-neutral-200 bg-white text-brand-charcoal hover:border-brand-red hover:text-brand-red-dark',
       },
-      size: { md: 'h-11', sm: 'h-10' },
+      size: { md: 'h-11', sm: 'h-10 pointer-coarse:h-11' },
     },
     defaultVariants: { active: false, size: 'md' },
   },
@@ -50,6 +56,9 @@ export const chipVariants = cva(
 /** The look of the menu panels and their entries (square, roomy, like the language menu). */
 const MENU = 'w-auto min-w-60'
 const MENU_ITEM = 'py-2.5 ps-3.5 pe-10 font-medium text-brand-charcoal'
+
+/** A row of a phone's filter or sort sheet: a 48px choice (a checkbox or a radio and its label). */
+const SHEET_ROW = 'flex min-h-12 cursor-pointer items-center gap-3 rounded-lg px-2 text-base text-brand-charcoal has-checked:font-semibold has-disabled:cursor-not-allowed has-disabled:opacity-50'
 
 /** The look of the price inputs (the shared field, compact). */
 const INPUT = inputVariants({ size: 'compact' })
@@ -98,7 +107,7 @@ function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }
         type="button"
         onClick={onRemove}
         aria-label={t.catalog.removeFilter.replace('{name}', label)}
-        className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 ps-3.5 pe-3 text-sm text-brand-charcoal outline-none transition-[color,border-color,scale] duration-300 hover:border-brand-red hover:text-brand-red-dark active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 starting:scale-95 starting:opacity-0"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg border pointer-coarse:min-h-11 border-neutral-200 bg-neutral-50 ps-3.5 pe-3 text-sm text-brand-charcoal outline-none transition-[color,border-color,scale] duration-300 hover:border-brand-red hover:text-brand-red-dark active:scale-[0.97] active:duration-100 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 starting:scale-95 starting:opacity-0"
       >
         {label}
         <X aria-hidden="true" className="size-3.5" />
@@ -234,6 +243,9 @@ export function CatalogToolbar({ results, brands, canUsePrices, className }: { r
   const { t, locale } = useI18n()
   const navigate = useNavigate()
   const [priceOpen, setPriceOpen] = useState(false)
+  const phone = useMediaQuery(PHONE_QUERY)
+  // The phone's open bottom sheet, if any.
+  const [sheet, setSheet] = useState<'filters' | 'sort' | null>(null)
   const brandTrigger = useRef<HTMLButtonElement>(null)
   const { brands: applied, sort, priceRange, priceBounds, brandCounts } = results
   const sorts = CATALOG_SORTS.filter((s) => canUsePrices || !s.startsWith('price'))
@@ -284,70 +296,157 @@ export function CatalogToolbar({ results, brands, canUsePrices, className }: { r
         ? t.catalog.priceFrom.replace('{price}', formatPrice(locale, priceRange.min))
         : t.catalog.priceUpTo.replace('{price}', formatPrice(locale, priceRange.max ?? 0)))
 
+  const sortLabel = `${t.catalog.sortLabel}: ${t.catalog.sorts[sort ?? 'default']}`
+  const filterCount = applied.length + (priceRange ? 1 : 0)
+
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       <div role="group" aria-label={t.catalog.toolbarLabel} className="flex flex-wrap items-center gap-2">
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <ToolbarTrigger
-              ref={brandTrigger}
-              label={applied.length ? t.catalog.brandsSelected.replace('{n}', String(applied.length)) : t.catalog.brandLabel}
-              active={applied.length > 0}
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className={MENU}>
-            {brands.map((brand) => {
-              const checked = applied.includes(brand.slug)
-              const count = brandCounts[brand.slug] ?? 0
-              return (
-                <DropdownMenuCheckboxItem
-                  key={brand.slug}
-                  checked={checked}
-                  disabled={!checked && count === 0}
-                  // Stay open, so several brands can be picked in a row.
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(on) => toggleBrand(brand.slug, on === true)}
-                  className={MENU_ITEM}
-                >
-                  <span className="flex-1">{brand.name}</span>
-                  <span aria-hidden="true" className="text-xs text-brand-charcoal-muted">
-                    {count}
-                  </span>
-                </DropdownMenuCheckboxItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {phone ? (
+          <>
+            <Offcanvas
+              side="bottom"
+              title={t.catalog.filters}
+              open={sheet === 'filters'}
+              onOpenChange={(open) => setSheet(open ? 'filters' : null)}
+              trigger={
+                <ToolbarTrigger
+                  ref={brandTrigger}
+                  label={filterCount ? t.catalog.filtersSelected.replace('{n}', String(filterCount)) : t.catalog.filters}
+                  icon={<SlidersHorizontal aria-hidden="true" className="size-4" />}
+                  active={filterCount > 0}
+                />
+              }
+              footer={
+                <Button className="w-full" onClick={() => setSheet(null)}>
+                  {t.catalog.showResults.replace('{n}', String(results.total))}
+                </Button>
+              }
+            >
+              <fieldset>
+                <legend className={LABEL_CLASS}>{t.catalog.brandLabel}</legend>
+                <ul className="-mx-2 mt-2">
+                  {brands.map((brand) => {
+                    const checked = applied.includes(brand.slug)
+                    const count = brandCounts[brand.slug] ?? 0
+                    return (
+                      <li key={brand.slug}>
+                        <label className={SHEET_ROW}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!checked && count === 0}
+                            onChange={(e) => toggleBrand(brand.slug, e.target.checked)}
+                            className={CHECKBOX_CLASS}
+                          />
+                          <span className="flex-1">{brand.name}</span>
+                          <span aria-hidden="true" className="text-sm font-normal text-brand-charcoal-muted">
+                            {count}
+                          </span>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </fieldset>
+              {canUsePrices && (
+                <div className="mt-6 border-t border-neutral-150 pt-6">
+                  <PriceRangeForm range={priceRange} bounds={priceBounds} onApply={(min, max) => update({ min, max })} />
+                </div>
+              )}
+            </Offcanvas>
+            <Offcanvas
+              side="bottom"
+              title={t.catalog.sortLabel}
+              open={sheet === 'sort'}
+              onOpenChange={(open) => setSheet(open ? 'sort' : null)}
+              trigger={<ToolbarTrigger label={sortLabel} icon={<ArrowUpDown aria-hidden="true" className="size-4" />} className="ms-auto" />}
+            >
+              <fieldset>
+                <legend className="sr-only">{t.catalog.sortLabel}</legend>
+                <ul className="-mx-2">
+                  {(['default', ...sorts] as const).map((value) => (
+                    <li key={value}>
+                      <label className={SHEET_ROW}>
+                        <input
+                          type="radio"
+                          name="catalog-sort"
+                          checked={(sort ?? 'default') === value}
+                          onChange={() => {
+                            update({ sort: value === 'default' ? undefined : (value as CatalogSort) })
+                            setSheet(null)
+                          }}
+                          className={CHECKBOX_CLASS}
+                        />
+                        {t.catalog.sorts[value]}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </fieldset>
+            </Offcanvas>
+          </>
+        ) : (
+          <>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <ToolbarTrigger
+                  ref={brandTrigger}
+                  label={applied.length ? t.catalog.brandsSelected.replace('{n}', String(applied.length)) : t.catalog.brandLabel}
+                  active={applied.length > 0}
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className={MENU}>
+                {brands.map((brand) => {
+                  const checked = applied.includes(brand.slug)
+                  const count = brandCounts[brand.slug] ?? 0
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={brand.slug}
+                      checked={checked}
+                      disabled={!checked && count === 0}
+                      // Stay open, so several brands can be picked in a row.
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={(on) => toggleBrand(brand.slug, on === true)}
+                      className={MENU_ITEM}
+                    >
+                      <span className="flex-1">{brand.name}</span>
+                      <span aria-hidden="true" className="text-xs text-brand-charcoal-muted">
+                        {count}
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-        {canUsePrices && (
-          <Popover open={priceOpen} onOpenChange={setPriceOpen}>
-            <PopoverTrigger asChild>
-              <ToolbarTrigger label={priceText ?? t.catalog.priceFilterLabel} active={!!priceRange} />
-            </PopoverTrigger>
-            <PopoverContent align="start" sideOffset={4}>
-              <PriceRangeForm range={priceRange} bounds={priceBounds} onApply={applyPrice} />
-            </PopoverContent>
-          </Popover>
+            {canUsePrices && (
+              <Popover open={priceOpen} onOpenChange={setPriceOpen}>
+                <PopoverTrigger asChild>
+                  <ToolbarTrigger label={priceText ?? t.catalog.priceFilterLabel} active={!!priceRange} />
+                </PopoverTrigger>
+                <PopoverContent align="start" sideOffset={4}>
+                  <PriceRangeForm range={priceRange} bounds={priceBounds} onApply={applyPrice} />
+                </PopoverContent>
+              </Popover>
+            )}
+
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <ToolbarTrigger label={sortLabel} icon={<ArrowUpDown aria-hidden="true" className="size-4" />} className="ms-auto" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className={MENU}>
+                <DropdownMenuRadioGroup value={sort ?? 'default'} onValueChange={(value) => update({ sort: value === 'default' ? undefined : (value as CatalogSort) })}>
+                  {(['default', ...sorts] as const).map((value) => (
+                    <DropdownMenuRadioItem key={value} value={value} className={MENU_ITEM}>
+                      {t.catalog.sorts[value]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         )}
-
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <ToolbarTrigger
-              label={`${t.catalog.sortLabel}: ${t.catalog.sorts[sort ?? 'default']}`}
-              icon={<ArrowUpDown aria-hidden="true" className="size-4" />}
-              className="ms-auto"
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className={MENU}>
-            <DropdownMenuRadioGroup value={sort ?? 'default'} onValueChange={(value) => update({ sort: value === 'default' ? undefined : (value as CatalogSort) })}>
-              {(['default', ...sorts] as const).map((value) => (
-                <DropdownMenuRadioItem key={value} value={value} className={MENU_ITEM}>
-                  {t.catalog.sorts[value]}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {(applied.length > 0 || priceText) && (

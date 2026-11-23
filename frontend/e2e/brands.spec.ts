@@ -6,8 +6,10 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { hideFixedOverlays, scrollIntoViewSettled } from './utils.ts'
+import { overflowX } from './audit.ts'
 
-test('the carousel pages through the brands with the arrows and the dots', async ({ page }) => {
+test('the carousel pages through the brands with the arrows and the dots', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'a phone swipes the brands (no arrows or dots; categories.spec.ts checks the swipe row)')
   await page.goto('/en')
   const section = page.locator('#brands')
   await section.scrollIntoViewIfNeeded()
@@ -25,7 +27,7 @@ test('the six cards are links and the section does not overflow', async ({ page 
   await page.goto('/')
   const cards = page.locator('#brands a')
   await expect(cards).toHaveCount(6)
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
   await cards.first().focus()
   await expect(cards.first()).toBeFocused()
   await cards.first().click()

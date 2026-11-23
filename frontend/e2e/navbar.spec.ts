@@ -7,10 +7,6 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Fails the test if the page is wider than the window (which would cause horizontal scrolling).
- * @param page - The Playwright page to check.
- */
-/**
  * Drags one finger horizontally across the page with real touch events (Chromium DevTools protocol), the
  * way a phone would: press, move in steps, lift. Every event carries an explicit timestamp, so the
  * gesture's speed is exact however busy the test machine is.
@@ -34,6 +30,10 @@ async function swipe(page: Page, from: { x: number; y: number }, dx: number, ste
   await touch('touchEnd', steps)
 }
 
+/**
+ * Fails the test if the page is wider than the window (which would cause horizontal scrolling).
+ * @param page - The Playwright page to check.
+ */
 async function expectNoHorizontalOverflow(page: Page) {
   const { scrollWidth, clientWidth } = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
@@ -228,7 +228,7 @@ test.describe('mobile', () => {
       ['/en', 'right'],
     ] as const) {
       await page.goto(path)
-      await page.getByRole('button', { name: path === '/' ? 'פתיחת תפריט' : 'Open menu' }).click()
+      await page.getByRole('button', { name: path === '/' ? 'תפריט' : 'Menu', exact: true }).click()
       const drawer = page.getByRole('dialog')
       await expect(drawer).toBeVisible()
 
@@ -253,11 +253,11 @@ test.describe('mobile', () => {
 
   test('the drawer follows a swipe: a short drag springs back, a flick towards the edge closes it', async ({ page }) => {
     for (const [path, open, sign] of [
-      ['/en', 'Open menu', 1],
-      ['/', 'פתיחת תפריט', -1],
+      ['/en', 'Menu', 1],
+      ['/', 'תפריט', -1],
     ] as const) {
       await page.goto(path)
-      await page.getByRole('button', { name: open }).click()
+      await page.getByRole('button', { name: open, exact: true }).click()
       const drawer = page.getByRole('dialog')
       await expect(drawer).toBeVisible()
       await page.waitForTimeout(600) // let the slide-in finish
@@ -277,7 +277,7 @@ test.describe('mobile', () => {
 
   test('a vertical swipe in the drawer does not move it sideways', async ({ page }) => {
     await page.goto('/en')
-    await page.getByRole('button', { name: 'Open menu' }).click()
+    await page.getByRole('button', { name: 'Menu', exact: true }).click()
     const drawer = page.getByRole('dialog')
     await page.waitForTimeout(600)
     const box = (await drawer.boundingBox())!
@@ -294,13 +294,33 @@ test.describe('mobile', () => {
 
   test('choosing a section in the drawer closes it and scrolls there', async ({ page }) => {
     await page.goto('/en')
-    await page.getByRole('button', { name: 'Open menu' }).click()
+    await page.getByRole('button', { name: 'Menu', exact: true }).click()
     const drawer = page.getByRole('dialog')
     await drawer.getByRole('link', { name: 'About' }).click()
 
     await expect(drawer).toBeHidden()
     await expect(page).toHaveURL(/\/en#about$/)
     await expectSectionBelowHeader(page, 'about')
+  })
+
+  test('is a slim 56px app bar over a 64px bottom tab bar that navigates and marks the current page', async ({ page }) => {
+    await page.goto('/en')
+    const header = page.getByRole('banner')
+    expect(Math.round((await header.boundingBox())!.height)).toBe(56)
+    const bar = page.getByRole('navigation', { name: 'Quick navigation' })
+    const box = (await bar.boundingBox())!
+    expect(Math.round(box.height)).toBe(64)
+    expect(Math.round(box.y + box.height)).toBe(page.viewportSize()!.height)
+    await expect(bar.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+
+    await bar.getByRole('link', { name: 'Products' }).click()
+    await expect(page).toHaveURL(/\/en\/catalog$/)
+    await expect(bar.getByRole('link', { name: 'Products' })).toHaveAttribute('aria-current', 'page')
+    await expect(bar.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+    // The page's end clears the tab bar: scrolled to the bottom, the last section ends above it.
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
+    const mainBottom = await page.locator('main > *').last().evaluate((el) => el.getBoundingClientRect().bottom)
+    expect(mainBottom).toBeLessThanOrEqual(box.y + 1)
   })
 
   test('fits the phone screen in both languages', async ({ page }) => {
@@ -313,7 +333,7 @@ test.describe('mobile', () => {
 
   test('has no accessibility violations with the drawer open', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'פתיחת תפריט' }).click()
+    await page.getByRole('button', { name: 'תפריט', exact: true }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await expectNoA11yViolations(page)
   })

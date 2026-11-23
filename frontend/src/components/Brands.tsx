@@ -32,13 +32,13 @@ export function Brands({ brands, content, onSave }: { brands: Brand[]; content?:
     onSave: onSave && ((next) => onSave(next)),
   })
   return (
-    <section id="brands" aria-labelledby="brands-title" className="bg-black px-6 py-20 lg:px-10 lg:py-24">
+    <section id="brands" aria-labelledby="brands-title" className="bg-black px-gutter section-y">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.brands.eyebrow} tone="dark" className="bg-black" />}
         <form {...section.formProps}>
           <SectionHeading id="brands-title" tone="dark" edit={section.field} className="max-w-2xl" />
         </form>
-        <Carousel label={t.brands.carouselLabel} pageSize={BRANDS_PER_PAGE} tone="dark" className="mt-14">
+        <Carousel label={t.brands.carouselLabel} pageSize={BRANDS_PER_PAGE} tone="dark" className="section-gap">
           {brands.map((brand) => (
             <BrandCard key={brand.slug} brand={brand} className="w-full" />
           ))}

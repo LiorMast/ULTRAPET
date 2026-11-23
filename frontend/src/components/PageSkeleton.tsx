@@ -21,29 +21,40 @@ import { ArticleCardSkeleton } from '@/components/ArticleCard'
 import { BrandCardSkeleton } from '@/components/BrandCard'
 import { CatalogCardSkeleton } from '@/components/CatalogCard'
 import { Logo } from '@/components/Logo'
-import { HEADER_BAR_CLASS, HEADER_ROW_CLASS } from '@/components/Navbar'
+import { HEADER_BAR_CLASS, HEADER_LOGO_CLASS, HEADER_ROW_CLASS } from '@/components/Navbar'
 import { SectionHeadingSkeleton } from '@/components/SectionHeading'
+import { TabBar } from '@/components/TabBar'
 import { Skeleton, SkeletonGroup, SkeletonText } from '@/components/ui/skeleton'
 import { ADMIN_NAV, mainNav } from '@/config'
 import { useI18n } from '@/i18n'
 import type { ComponentType } from 'react'
 import type { FileRoutesById } from '@/routeTree.gen'
 
-/** The home hero's frame: full-bleed under the header, filling the rest of the first screen (Hero.tsx). */
+/**
+ * The home hero's frame: full-bleed under the header, filling the rest of the first screen (Hero.tsx). Below xl it is
+ * the screen between the header and the tab bar, and grows when its text needs more (a short or landscape phone: a
+ * grid, so its content row stretches to the frame); from xl the first screen under the header, 600-960px tall.
+ */
 export const HERO_FRAME_CLASS =
-  'relative isolate h-[calc(100svh-5.5rem)] max-h-[960px] min-h-[600px] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3'
+  'relative isolate grid min-h-[max(28rem,calc(100svh-var(--header-h)-var(--tabbar-h)))] overflow-hidden bg-linear-to-br from-black via-brand-charcoal to-brand-charcoal-3 xl:h-[calc(100svh-var(--header-h))] xl:max-h-[960px] xl:min-h-[600px]'
 
-/** The hero's side padding: the navbar's, so the hero text lines up with the logo (Hero.tsx). */
-export const HERO_GUTTER_CLASS = 'px-6 lg:px-10 xl:px-6 2xl:px-10'
+/**
+ * The hero's text column: the header's side padding (so the text lines up with the logo), and below xl room at the
+ * bottom for the slideshow controls and the scroll-down arrow (from xl the text is centred on the photo).
+ */
+export const HERO_GUTTER_CLASS = 'px-gutter xl:px-6 2xl:px-10'
+
+/** The hero's content box: centred, with room below xl for the controls at its bottom (Hero.tsx). */
+export const HERO_CONTENT_CLASS = 'relative z-10 mx-auto flex w-full max-w-screen-2xl flex-col justify-center pt-10 pb-32 xl:py-0'
 
 /** A page's ordinary width and padding (the catalog, product and brand pages are wider: WIDE_PAGE). */
-const PAGE = 'mx-auto max-w-7xl px-6 py-16 lg:px-10 lg:py-20'
-const WIDE_PAGE = 'mx-auto max-w-screen-2xl px-6 py-12 lg:px-10 lg:py-16'
+const PAGE = 'page-y px-gutter mx-auto max-w-7xl lg:py-20'
+const WIDE_PAGE = 'page-y px-gutter mx-auto max-w-screen-2xl lg:py-16'
 
 /** The catalog's grid of product cards (Catalog.tsx). */
 const CATALOG_GRID = 'grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4'
 
-/** The Where to Buy page's list and map height (WhereToBuy.tsx). */
+/** The Where to Buy page's list height (WhereToBuy.tsx; below lg the list flows, here a screenful of rows). */
 const PANE_HEIGHT = 'h-[34rem] lg:h-[40rem]'
 
 /**
@@ -71,9 +82,11 @@ export function PageSkeleton() {
   return (
     <div className="animate-fade-in">
       <HeaderSkeleton />
-      <main aria-busy="true" className="pt-22">
+      <main aria-busy="true" className="pt-(--header-h) pb-(--page-end)">
         {body}
       </main>
+      {/* The real tab bar (it needs no data), so phones can navigate while the first page loads. */}
+      <TabBar />
     </div>
   )
 }
@@ -115,8 +128,8 @@ export function skeletonFor(routeId: keyof FileRoutesById | undefined, user: Use
 }
 
 /**
- * The header's skeleton: the real logo (bundled, so it shows at once), a placeholder per menu entry (desktop) and the
- * end buttons, in the header's own bar.
+ * The header's skeleton: the real logo (bundled, so it shows at once), in the header's own bar; below xl the language
+ * toggle's placeholder (the slim bar), from xl a placeholder per menu entry and the end buttons.
  * @returns The decorative header.
  */
 function HeaderSkeleton() {
@@ -124,16 +137,16 @@ function HeaderSkeleton() {
   return (
     <div aria-hidden="true" className={HEADER_BAR_CLASS}>
       <div className={HEADER_ROW_CLASS}>
-        <Logo className="h-8 sm:h-14" />
+        <Logo className={HEADER_LOGO_CLASS} />
         <div className="hidden flex-1 items-center justify-center gap-7 xl:flex">
           {mainNav([], locale).map((item) => (
             <Skeleton key={item.id} className="h-4 w-20" />
           ))}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Skeleton className="size-10 rounded-lg" />
+          <Skeleton className="h-9 w-16 rounded-lg xl:hidden" />
+          <Skeleton className="hidden size-10 rounded-lg xl:block" />
           <Skeleton className="hidden h-10 w-28 rounded-lg xl:block" />
-          <Skeleton className="size-10 rounded-lg xl:hidden" />
         </div>
       </div>
     </div>
@@ -141,11 +154,19 @@ function HeaderSkeleton() {
 }
 
 /**
- * The breadcrumb trail's skeleton (Breadcrumbs.tsx).
+ * The breadcrumb trail's skeleton (Breadcrumbs.tsx): the trail's line, or on a phone the back link's.
  * @returns One short line of the trail's size.
  */
 function BreadcrumbsSkeleton() {
-  return <SkeletonText className="font-heading text-sm" width="w-64 max-w-full" />
+  // A phone shows a back link (Breadcrumbs.tsx), 44px tall: a short line in that box.
+  return (
+    <>
+      <div className="flex h-11 items-center sm:hidden">
+        <SkeletonText className="font-heading text-sm" width="w-28" />
+      </div>
+      <SkeletonText className="hidden font-heading text-sm sm:block" width="w-64 max-w-full" />
+    </>
+  )
 }
 
 /**
@@ -173,7 +194,7 @@ function HomeSkeleton() {
   return (
     <>
       <div className={HERO_FRAME_CLASS}>
-        <div className={cn('mx-auto flex h-full max-w-screen-2xl flex-col justify-center', HERO_GUTTER_CLASS)}>
+        <div className={cn(HERO_CONTENT_CLASS, HERO_GUTTER_CLASS)}>
           <div className="max-w-3xl">
             <SkeletonText tone="dark" className="mb-5 font-heading text-sm" width="w-40" />
             <SkeletonText tone="dark" lines={2} className="mb-5 text-[clamp(3.2rem,7.5vw,6.5rem)] leading-[1.05]" width="w-2/3" />
@@ -186,19 +207,19 @@ function HomeSkeleton() {
         </div>
       </div>
       <div className="border-b border-neutral-150">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-6 py-14 lg:grid-cols-4 lg:px-10">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-4 py-6 sm:px-6 sm:py-10 lg:grid-cols-4 lg:px-10 lg:py-14">
           {Array.from({ length: 4 }, (_, index) => (
             <div key={index}>
-              <SkeletonText className="font-display text-5xl" width="w-28" />
+              <SkeletonText className="font-display text-4xl sm:text-5xl" width="w-28" />
               <SkeletonText className="mt-2 text-sm" width="w-36" />
             </div>
           ))}
         </div>
       </div>
-      <div className="bg-black px-6 py-20 lg:px-10 lg:py-24">
+      <div className="bg-black px-gutter section-y">
         <div className="mx-auto max-w-7xl">
           <SectionHeadingSkeleton tone="dark" className="max-w-2xl" />
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
+          <div className="section-gap grid gap-6 md:grid-cols-3">
             {Array.from({ length: 3 }, (_, index) => (
               <BrandCardSkeleton key={index} className={cn(index > 0 && 'hidden md:flex')} />
             ))}
@@ -215,9 +236,9 @@ function HomeSkeleton() {
  */
 function CatalogSkeleton() {
   return (
-    <div className="mx-auto max-w-screen-2xl px-6 py-16 lg:px-10 lg:py-20">
+    <div className="page-y px-gutter mx-auto max-w-screen-2xl lg:py-20">
       <SectionHeadingSkeleton />
-      <div className="mt-8 flex flex-col gap-5">
+      <div className="mt-6 flex flex-col gap-4 sm:mt-8 sm:gap-5">
         <Skeleton className="h-12 w-full max-w-xl rounded-lg" />
         <div className="flex gap-2 overflow-hidden">
           {Array.from({ length: 8 }, (_, index) => (
@@ -229,10 +250,10 @@ function CatalogSkeleton() {
           <Skeleton className="h-10 w-32 rounded-lg" />
         </div>
       </div>
-      <div className="mt-8 border-b border-neutral-150 pb-4">
+      <div className="mt-6 border-b border-neutral-150 pb-4 sm:mt-8">
         <SkeletonText className="text-sm" width="w-48" />
       </div>
-      <CardGridSkeleton count={8} className="mt-8" />
+      <CardGridSkeleton count={8} className="mt-4 sm:mt-8" />
     </div>
   )
 }
@@ -245,10 +266,11 @@ function ProductSkeleton() {
   return (
     <div className={WIDE_PAGE}>
       <BreadcrumbsSkeleton />
-      <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
+      <div className="mt-4 grid gap-6 sm:mt-10 sm:gap-10 lg:grid-cols-2 lg:gap-16">
         <div className="flex flex-col gap-3">
           <Skeleton className="aspect-square w-full rounded-3xl" />
-          <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+          {/* Thumbnails from md (a phone's gallery is a swipe strip). */}
+          <div className="hidden grid-cols-4 gap-3 sm:grid-cols-5 md:grid">
             {Array.from({ length: 4 }, (_, index) => (
               <Skeleton key={index} className="aspect-square w-full rounded-xl" />
             ))}
@@ -288,7 +310,7 @@ function BrandSkeleton() {
   return (
     <div className={WIDE_PAGE}>
       <BreadcrumbsSkeleton />
-      <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
+      <div className="mt-4 grid gap-6 sm:mt-10 sm:gap-10 lg:grid-cols-2 lg:gap-16">
         <Skeleton className="aspect-[4/3] w-full rounded-3xl" />
         <div className="flex flex-col">
           <SkeletonText className="font-heading text-sm" width="w-40" />
@@ -301,7 +323,7 @@ function BrandSkeleton() {
           <Skeleton className="mt-8 h-12 w-48 rounded-lg" />
         </div>
       </div>
-      <CardGridSkeleton count={4} className="mt-16 lg:mt-20" />
+      <CardGridSkeleton count={4} className="mt-12 sm:mt-16 lg:mt-20" />
     </div>
   )
 }
@@ -314,8 +336,8 @@ function ArticlesSkeleton() {
   return (
     <div className={PAGE}>
       <BreadcrumbsSkeleton />
-      <SectionHeadingSkeleton className="mt-10" />
-      <ArticleCardSkeleton variant="featured" className="mt-12" />
+      <SectionHeadingSkeleton className="mt-6 sm:mt-10" />
+      <ArticleCardSkeleton variant="featured" className="mt-8 sm:mt-12" />
       <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }, (_, index) => (
           <ArticleCardSkeleton key={index} />
@@ -331,16 +353,16 @@ function ArticlesSkeleton() {
  */
 function ArticleSkeleton() {
   return (
-    <div className="px-6 py-16 lg:px-10 lg:py-20">
+    <div className="page-y px-gutter lg:py-20">
       <div className="mx-auto max-w-3xl">
         <BreadcrumbsSkeleton />
-        <SkeletonText className="mt-10 font-heading text-xs" width="w-56" />
-        <SkeletonText lines={2} className="mt-5 font-display text-4xl leading-tight lg:text-5xl" width="w-2/3" />
+        <SkeletonText className="mt-6 font-heading text-xs sm:mt-10" width="w-56" />
+        <SkeletonText lines={2} className="mt-4 font-display text-3xl leading-tight sm:mt-5 sm:text-4xl lg:text-5xl" width="w-2/3" />
       </div>
-      <Skeleton className="mx-auto mt-12 aspect-[16/9] w-full max-w-5xl rounded-3xl" />
-      <div className="mx-auto mt-12 max-w-3xl space-y-6">
-        <SkeletonText lines={4} className="text-lg leading-relaxed" />
-        <SkeletonText lines={3} className="text-lg leading-relaxed" />
+      <Skeleton className="mx-auto mt-8 aspect-[16/9] w-full max-w-5xl rounded-3xl sm:mt-12" />
+      <div className="mx-auto mt-8 max-w-3xl space-y-5 sm:mt-12 sm:space-y-6">
+        <SkeletonText lines={4} className="text-base leading-relaxed sm:text-lg" />
+        <SkeletonText lines={3} className="text-base leading-relaxed sm:text-lg" />
       </div>
     </div>
   )
@@ -354,11 +376,13 @@ function WhereToBuySkeleton() {
   return (
     <div className={PAGE}>
       <SectionHeadingSkeleton />
-      <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-6 flex flex-col gap-3 sm:mt-10 sm:flex-row">
         <Skeleton className="h-12 flex-1 rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg sm:w-56" />
       </div>
       <SkeletonText className="mt-3 text-sm" width="w-24" />
+      {/* Below lg: the List | Map switch. */}
+      <Skeleton className="mt-3 h-12 w-full rounded-lg lg:hidden" />
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div className={cn(PANE_HEIGHT, 'overflow-hidden rounded-2xl border border-neutral-200')}>
           {Array.from({ length: 5 }, (_, index) => (
@@ -386,7 +410,7 @@ function ProfileSkeleton({ className }: { className?: string }) {
       <SectionHeadingSkeleton intro={1} className="mb-10" />
       <div className="grid gap-8">
         {[4, 2].map((rows, index) => (
-          <div key={index} className="rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8">
+          <div key={index} className="rounded-2xl border border-neutral-200 bg-white p-5 sm:p-8">
             <SkeletonText className="font-display text-xl" width="w-40" />
             <div className="mt-6 space-y-4">
               {Array.from({ length: rows }, (_, row) => (
@@ -411,11 +435,12 @@ function AdminSkeleton({ profile, nested }: { profile: boolean; nested: boolean 
   const page = profile ? <ProfileSkeleton /> : <AdminTableSkeleton />
   if (nested) return page
   return (
-    <div className="mx-auto max-w-screen-2xl px-4 py-10 sm:px-6 lg:px-10">
-      <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border-b border-neutral-150 pb-4">
-        <div className="flex flex-wrap gap-1">
+    <div className="page-y px-gutter mx-auto max-w-screen-2xl lg:py-10">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-neutral-150 pb-3 sm:mb-10 sm:pb-4">
+        {/* A phone's menu is one row (it scrolls sideways): the chips past the edge are cut off. */}
+        <div className="flex gap-1 overflow-hidden sm:flex-wrap">
           {ADMIN_NAV.map(({ id }) => (
-            <Skeleton key={id} className="h-9 w-24 rounded-lg" />
+            <Skeleton key={id} className="h-9 w-24 shrink-0 rounded-lg" />
           ))}
         </div>
         <SkeletonText className="text-sm" width="w-48" />
@@ -433,19 +458,23 @@ function AdminTableSkeleton() {
   return (
     <>
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <SkeletonText className="font-display text-3xl" width="w-48" />
+            <SkeletonText className="font-display text-2xl sm:text-3xl" width="w-48" />
             <Skeleton className="h-10 w-32 rounded-lg" />
           </div>
-          <div className="mt-8 flex justify-end">
-            <Skeleton className="h-11 w-64 rounded-lg" />
+          <div className="mt-6 flex justify-end sm:mt-8">
+            <Skeleton className="h-11 w-full rounded-lg md:w-64" />
           </div>
-          <div className="mt-4 overflow-hidden rounded-2xl border border-neutral-200">
+          {/* A phone's table is a stack of cards (DataTable.tsx), from md a framed table. */}
+          <div className="mt-4 space-y-3 md:space-y-0 md:overflow-hidden md:rounded-2xl md:border md:border-neutral-200">
             {Array.from({ length: 8 }, (_, index) => (
-              <div key={index} className="flex items-center gap-6 border-b border-neutral-150 px-4 py-4 last:border-b-0">
-                <Skeleton className="h-4 w-1/4" />
-                <Skeleton className="h-4 w-1/5" />
-                <Skeleton className="hidden h-4 w-1/6 sm:block" />
-                <Skeleton className="ms-auto h-8 w-20 rounded-lg" />
+              <div
+                key={index}
+                className="flex flex-col gap-2 rounded-2xl border border-neutral-200 p-4 md:flex-row md:items-center md:gap-6 md:rounded-none md:border-0 md:border-b md:border-neutral-150 md:last:border-b-0"
+              >
+                <Skeleton className="h-4 w-1/2 md:w-1/4" />
+                <Skeleton className="h-4 w-2/3 md:w-1/5" />
+                <Skeleton className="h-4 w-1/3 md:hidden lg:block lg:w-1/6" />
+                <Skeleton className="mt-2 h-11 w-full rounded-lg md:ms-auto md:mt-0 md:h-8 md:w-20" />
               </div>
             ))}
           </div>
@@ -459,7 +488,7 @@ function AdminTableSkeleton() {
  */
 function SignInSkeleton() {
   return (
-    <div className="mx-auto max-w-md px-4 py-16 sm:px-6 lg:py-24">
+    <div className="page-y mx-auto max-w-md px-4 sm:px-6 lg:py-24">
       <div className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-soft sm:p-10">
         <SkeletonText className="font-display text-3xl" width="w-1/2" />
         <SkeletonText className="mb-8 mt-2 text-sm" width="w-3/4" />

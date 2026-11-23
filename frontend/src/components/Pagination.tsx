@@ -2,7 +2,8 @@
  * Pagination.tsx — Page links for any paged list: previous, the page numbers (with "…" gaps on long lists)
  * and next. Every entry is a real link (crawlable, works without JavaScript state), the router
  * marks the current page's link with aria-current (exact URL match), and the arrows flip in right-to-left pages. Used by the catalog; reusable for any list
- * whose page lives in the URL.
+ * whose page lives in the URL. Mobile-first: on a phone (below sm) the numbers give way to "Page 3 of 17" between the
+ * arrows, so the bar fits one line; every entry is a 44px target.
  */
 import { Link } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -61,8 +62,11 @@ export function Pagination({ page, pageCount, linkFor, className }: { page: numb
             </span>
           )}
         </li>
+        <li className="px-3 font-heading text-sm font-semibold text-brand-charcoal sm:hidden">
+          {t.pagination.status.replace('{n}', String(page)).replace('{total}', String(pageCount))}
+        </li>
         {pageWindow(page, pageCount).map((n, index) => (
-          <li key={n ?? `gap-${index}`}>
+          <li key={n ?? `gap-${index}`} className="max-sm:hidden">
             {n === null ? (
               <span aria-hidden="true" className="flex size-11 items-end justify-center pb-3 text-brand-charcoal-muted">
                 …

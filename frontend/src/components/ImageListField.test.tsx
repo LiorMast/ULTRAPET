@@ -169,6 +169,6 @@ describe('ImageListField on /admin/products', () => {
     const photos = within(dialog).getByRole('group', { name: 'תמונות' })
     expect(within(photos).getByRole('button', { name: 'הוספת תמונות' })).toBeInTheDocument()
     expect(within(photos).getByText('תמונה ראשית')).toBeInTheDocument()
-    expect(within(photos).getByRole('button', { name: 'הסרת תמונה 1' })).toBeInTheDocument()
+    expect(within(photos).getByRole('button', { name: 'הסרה: תמונה 1' })).toBeInTheDocument()
   })
 })

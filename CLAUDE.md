@@ -36,13 +36,19 @@ requirements/           original prompts
 frontend/
   index.html  vite.config.ts  playwright.config.ts  components.json  .oxlintrc.json
   public/favicon.svg
-  e2e/                  Playwright specs (+ *-snapshots/ screenshot baselines); utils.ts = shared helpers
+  e2e/                  Playwright specs (+ *-snapshots/ screenshot baselines); utils.ts = shared helpers;
+                        audit.ts = the phone audit's measurements (overflowX, small targets, overlaps, bottom clearance,
+                        zooming fields, axeScan with WCAG 2.2), mobile-audit.spec.ts = every page and state on six touch
+                        devices (Playwright project `audit`)
   src/
     main.tsx            entry: locale from the URL -> <html lang/dir>, providers, router
     router.ts           createAppRouter(): /en prefix rewrite, route staticData types
-    index.css           Tailwind + brand tokens + base styles
+    index.css           Tailwind + brand tokens + base styles; the app shell's variables (--header-h, --tabbar-h,
+                        --bottom-bar-h, --page-end) and the mobile utilities (touch-target, safe-x, section-y,
+                        section-gap, page-y, px-gutter)
     api.ts              the one API layer: every backend call (typed), CSRF header, refresh-and-retry on token_expired
-    config.ts           menu (mainNav: Products dropdown = the API categories), the article pages' marketing categories, stat labels, header buttons, external links,
+    config.ts           menu (mainNav: Products dropdown = the API categories), the bottom tab bar's tabs (TAB_BAR, TAB_LOGIN,
+                        TAB_ADMIN), the article pages' marketing categories, stat labels, header buttons, external links,
                         bundled photos (brandLogo, articleImage), the fonts and size steps of editable texts (FONTS, SIZE_STEPS)
     motion.ts           imgFade: the handlers of a photo that fades in once loaded (with the `img-fade` class)
     seo.ts              pageHead(): per-route title, description, canonical, hreflang, Open Graph, JSON-LD
@@ -56,16 +62,23 @@ frontend/
     toast.tsx           ToastProvider/useToast: one Toast at a time (`success` / `error` / `warning`); useSignOut (auth.tsx)
                         confirms signing out with it
     i18n/               index.tsx (locales, URL helpers, LocaleProvider, useI18n), he.ts, en.ts
-    routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>) + 404;
+    routes/             one file per page; __root.tsx = layout (skip link, Navbar, <main>, TabBar, WhatsApp button) + 404;
                         admin.tsx = staff panel layout (shows the shared login form to non-staff), admin.<resource>.tsx = one table each
                         (admin.products / admin.categories also manage their discounts through DiscountsDialog;
                         admin.discounts = every price rule in one table, general or for one customer;
                         admin.customers.index = the business customers' accounts + each one's own discounts;
                         admin.customers.$id = one customer's profile (staff view); admin.requests = the requests for
                         an account ("Open account" converts one); admin.suppliers = the suppliers (vendors) + each one's
-                        products (SupplierProductsDialog); account.tsx = "My account" (the customer's profile);
+                        products (SupplierProductsDialog); admin.resellers = the resellers (משווקים, the Where to Buy
+                        stores): the map of every one (a pin opens its form) + the table, the form's map position
+                        (LocationField); account.tsx = "My account" (the customer's profile);
                         private-label.tsx = the Private Label page (every section editable in place, components/PrivateLabelPage.tsx); route pages are tested in components/<Name>Page.test.tsx)
-    components/         site components (PageSkeleton (the first load's skeleton of each page: skeletonFor picks it), Navbar, MobileMenu, LanguageSwitcher, LoginPopover, LoginForm (+ LoginCard, the sign-in pages' card), Logo,
+    components/         site components (PageSkeleton (the first load's skeleton of each page: skeletonFor picks it), Navbar,
+                        TabBar (the bottom tab bar below xl: Home, Products, Where to buy, Log in / Cart / Admin, Menu),
+                        BottomBar (a page's action bar fixed above the tab bar below xl: the product page's Add to cart),
+                        useMediaQuery (useMediaQuery, PHONE_QUERY, useReducedMotion: a component whose structure
+                        changes on a phone), MobileMenu (the menu drawer the Menu tab opens), LanguageSwitcher,
+                        LoginPopover, LoginForm (+ LoginCard, the sign-in pages' card), Logo,
                         Brands, Stats, Categories, PrivateLabel, BusinessCustomers (#business: the request for an
                         account + RequestForm), About, Faq, Contact, Hero, SectionHeading, FormField (a public form's
                         labelled input/textarea + inline role="alert" error: Contact, BusinessCustomers),
@@ -81,9 +94,10 @@ frontend/
                         ImageUploadField (picture upload of the admin forms), ImageListField (an ordered list of uploaded
                         pictures: a product's photos), ReorderDialog (drag a list into order),
                         Offcanvas (the reusable side panel on ui/sheet: title, close, `notice` strip, scrolling body, footer;
-                        logical side; optional trigger `tooltip`),
-                        CartDrawer (the business customers' header cart icon + badge and its Offcanvas: lines, subtotal,
-                        minimum order, each line's bulk progress), ProgressBar (role="progressbar", the cart's bars), AddToCartButton (adds to the cart, "✓ Added" morph; `available={false}` = a
+                        logical side, or `side="bottom"`: a phone's bottom sheet (the catalog's filter / sort sheets,
+                        manage mode's action sheet); optional trigger `tooltip`),
+                        CartDrawer (the business customers' cart: the header's icon from xl or the tab bar's Cart tab
+                        (`renderTrigger`, CartBadge), and its Offcanvas: lines, subtotal, minimum order, each line's bulk progress), ProgressBar (role="progressbar", the cart's bars), AddToCartButton (adds to the cart, "✓ Added" morph; `available={false}` = a
                         disabled "Out of stock"), QuantityStepper (− n +),
                         StockDialog (a product's stock in the admin: record a movement, the history; stockAction,
                         StockCell, StockSummary, stockStatus), DiscountRibbon (a small squircle badge: short message on a color; kinds
@@ -91,19 +105,25 @@ frontend/
                         staff-chosen color with readableTextColor text; DiscountRibbons = a product's ribbons per kind of discount),
                         RibbonColorsDialog (the "Ribbon colors" button + dialog of /admin/discounts: each discount kind's ribbon color),
                         SegmentedSwitch (the multi-choice switch: a radio group drawn as one bar with a sliding thumb),
-                        Toast (a compact squircle notification at the top center: icon, bold message, close X; `kind` success / error / warning
+                        Toast (a compact squircle notification at the top center (below xl in the header's band): icon, bold message, close X; `kind` success / error / warning
                         presets them (TOAST_KINDS; tokens `success`, `warning`); shows 2 s, fades, then onDone; above everything, z-[100]),
                         PasswordInput (eye toggle), GeneratedPasswordInput (+ Generate button),
                         productColumns (the product's DataColumns + useProductHandlers: shared by /admin/products and
                         manage mode), ProductManager (manage mode: ProductManageBar, ProductManageStrip),
                         SupplierProductsDialog (the "Products" row action of /admin/suppliers: the products a supplier
                         supplies, its item code, cost price + currency; saved whole; supplierProductsAction),
+                        BranchMap (lazy Leaflet: BranchMap = the stores' pins (Where to Buy; the admin map: `mutedIds` grey
+                        pins, `popups={false}`), LocationPicker = one pin to place by click or drag), LocationField (a
+                        form's map position: LocationPicker + "Find from address" through `geocodeAddress`; RecordDialog
+                        `extra` of /admin/resellers),
                         CatalogPdfDialog (the "PDF catalog" button + dialog of /admin/products: the generated PDF
                         catalog's layout, status, files and "Generate now"; catalogPdfGrid), ...)
                         + their tests
-    components/ui/      shadcn primitives (accordion, button (+ `loading`), dialog, dropdown-menu, popover, sheet, skeleton, slider, spinner,
+    components/ui/      shadcn primitives (accordion, button (+ `loading`), dialog (a bottom sheet on phones), dropdown-menu, popover,
+                        sheet (useSwipeToClose: side drawers and bottom sheets), skeleton, slider, spinner,
                         switch, tooltip), restyled for the brand; input.tsx = the one form-field look (inputVariants,
-                        INPUT_CLASS, LABEL_CLASS) for inputs, selects, textareas, PasswordInput and SearchableField
+                        INPUT_CLASS, LABEL_CLASS, CHECKBOX_CLASS / CHECKBOX_LABEL_CLASS) for inputs, selects, textareas,
+                        PasswordInput and SearchableField
     stubs/              the backend's seed data (`flask seed`) and the fixtures of the tests' fake API; app code never
                         imports them (oxlint no-restricted-imports); legacy-media.json = object key -> WordPress URL
                         of every file `flask import-media` copies into the storage
@@ -135,7 +155,8 @@ backend/
                         leads (the requests for an account: status + notes editable, the rest `read_only`,
                         `creatable=False`: POST is 405), suppliers (the vendors; never public)); GET/PUT
                         /suppliers/<id>/products reads / replaces a supplier's products (product_suppliers: item code,
-                        cost price, currency) in one transaction; POST /leads/<id>/convert opens the account from a request
+                        cost price, currency) in one transaction; GET /geocode?address=&city= finds a reseller's
+                        position (geocode.py; 404 not_found, 502 geocoder_unavailable); POST /leads/<id>/convert opens the account from a request
                         (customer + request converted, one transaction; 409 "converted"); GET /customers/<id>/profile
                         (accounts.py, staff view); PUT /<resource> replaces a whole ordered list in one transaction (only
                         `replaceable` resources: faq-items); PUT /<resource>/order sets the order from every row's id
@@ -151,6 +172,8 @@ backend/
                         it), bulk_tiers, resolve_price, customer_price_details, customer_prices) and ribbon_colors (setting discount_ribbon_colors)
     accounts.py         a customer's profile (profile_json: details, orders, own price rules; staff view adds notes,
                         Rivhit id, paused rules), shared by GET /api/account and the staff profile route
+    geocode.py          locate(address, city): the map position of an address in Israel from GEOCODER_URL (default
+                        OpenStreetMap's Nominatim; empty = off), falling back to the city centre (approximate)
     mailer.py           send_mail (MAIL_BACKEND smtp / log / memory (tests) / off; SMTP in a background thread, never
                         fails the request) and staff_recipients (LEADS_NOTIFY_TO, else the contact_email setting)
     inventory.py        the stock ledger: stock_status, apply_movement / record_movement (a movement + the product's
@@ -194,7 +217,11 @@ backend/
 - `npm run check` — lint + typecheck + unit tests.
 - `npm run test:e2e` — Playwright against the seeded backend (reuses or starts `docker compose up` and the dev server;
   reads `../.env` for the demo customer `SEED_CUSTOMER_EMAIL`/`PASSWORD`). After an intended visual change:
-  `npm run test:e2e -- --update-snapshots`, then look at the changed PNGs.
+  `npm run test:e2e -- --update-snapshots`, then look at the changed PNGs. Three projects: `desktop` (1440×900),
+  `mobile` (Pixel 7) and `audit` (mobile-audit.spec.ts only).
+- `npx playwright test --project=audit` — the phone audit (working rule 7): every page and state on six touch devices
+  (320 to 768 px, one landscape phone), Hebrew and English; one failure lists all of a page's problems, and a
+  full-page screenshot of each state lands in `test-results/` for review (not a baseline). `-g "360 he catalog"` runs one.
 - `npm run build` — typecheck + production build.
 - From the repo root: `codegraph sync` after changing files.
 
@@ -328,6 +355,35 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   page benefits, rather than styling a single page differently.
 - When reviewing a change, check both: could this be reused, and does it match the rest of the site?
 
+### 7. Mobile-first: design for a phone, then add to it
+The site is a phone app first and a desktop site second. Every page, section and component is designed and built for a
+360px phone first; `sm` / `md` / `lg` / `xl` add to that layout, never the other way round.
+- **The app shell** (index.css variables, never hard-coded heights): below xl a slim 56px header (`--header-h`: logo +
+  language) and the bottom tab bar (`TabBar`, `--tabbar-h` 64px plus the home-bar safe area; 48px in a short landscape
+  window, the `short:` variant); from xl the 88px header with the full menu and no tab bar. `<main>` pads by
+  `pt-(--header-h) pb-(--page-end)`, `scroll-padding` keeps anchors and the focused control clear of both. A page's
+  own action bar is a `BottomBar` (fixed above the tab bar below xl, `--bottom-bar-h`). Fixed things never hide the start
+  or the end of a page.
+- **Layers** (z-index scale in index.css): cards 10, a sticky edit bar 20, the PropBar 30, the tab bar / a bottom bar /
+  the WhatsApp button 40, the header and every overlay 50, the skip link and the flying photo 60, the progress bar 70,
+  toasts 100. A Leaflet map stays inside its box (`isolate`).
+- **Touch targets**: every control is at least 44×44px on a touch screen. Control size follows the input, layout follows
+  the width: `pointer-coarse:` adds the touch size (the button sizes, dropdown items, switches, sliders, steppers do it
+  already); a control that must look small gets `relative touch-target` (an invisible 44px hit area); neighbours keep
+  their hit areas apart. No information or action behind hover or a tooltip only.
+- **Form fields** have text of at least 16px (`text-base`; iOS zooms into smaller fields).
+- **Vertical space**: the rhythm utilities (`section-y`, `section-gap`, `page-y`, `px-gutter`), smaller on phones;
+  never a fixed `py-20` / `mt-16` that costs a phone screen. Headings step down a size on phones (`SectionHeading`).
+- **Phone patterns**: a dialog is a bottom sheet below sm (`ui/dialog`, drag its header down to close); a choice menu
+  with many entries or a filter panel is a bottom sheet (`Offcanvas side="bottom"`); a row of cards swipes (`Carousel`,
+  `ProductGallery`: scroll-snap, the next item peeking in) instead of stacking; a data table turns into cards
+  (`DataTable`); a breadcrumb trail turns into a back link; a map lets one finger scroll the page (two move it); a list
+  and its map take turns (a `SegmentedSwitch`); safe areas pad the fixed bars (`safe-x`, `env(safe-area-inset-*)`).
+- **Proven by the audit**: every new page, state (an open menu, sheet or dialog) or component goes into
+  `e2e/mobile-audit.spec.ts`, and the audit must pass on all its devices before a commit: no sideways overflow, no
+  target under 44px, nothing covering a control, no overlapping text, nothing hidden under the chrome at a page's end,
+  no field under 16px, axe with WCAG 2.2 AA. Review its screenshots at 360, 412 and 768 in both languages.
+
 ## Frontend conventions
 
 - **Data-driven components**: components take data through props, with defaults from `src/config.ts`; changing the
@@ -362,7 +418,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   omit `onCreate`/`onUpdate`/`onDelete` for read-only; `rowActions` add the page's own row buttons (each with its `icon`, like Edit / Delete; `available(row)` hides one on some rows) that open its dialog
   (e.g. "Discounts"); `formDialog` replaces the column-driven form for Add and Edit with the page's own dialog (it
   gets the row and `FormDialogProps`: `onSave` goes through `onCreate`/`onUpdate`), and `canEdit(row)` hides Edit on
-  rows that form cannot edit (the Discounts page: DiscountDialog with `scope`, Edit hidden on fixed prices); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
+  rows that form cannot edit (the Discounts page: DiscountDialog with `scope`, Edit hidden on fixed prices); `formExtra`
+  adds content of the page's own after the column-driven form's fields, given the form's values and `setValues`
+  (`FormExtraProps`: the resellers' `LocationField` writes latitude / longitude / approximateLocation); `editRequest`
+  (`{ key, restoreFocus? }`, each new object once) opens a row's Edit from outside the table (a pin on the resellers map); `onReorder` adds "Change order" (`ReorderDialog`: @dnd-kit drag by pointer, touch or keyboard,
   plus up/down buttons; Save sends every row key in order, e.g. `reorderStaffRows`). A `type: 'password'` column is
   write-only: never a cell, a `GeneratedPasswordInput` in the form that starts empty, at least 8 characters,
   `required` only when adding, and left out of an edit when empty (the password is kept). Technical fields staff need not
@@ -370,6 +429,10 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   order comes from `onReorder` (the categories, brands and products tables). Columns and options are read once at mount (DataTables' rule); `deferRender` builds only the
   shown page's cells.
   DataTables' CSS loads with the admin chunk; the brand overrides live in `index.css` under `.data-table`.
+  **On a phone** (below md) the rows are cards: the first column is the card's title, every other cell shows its value
+  after its column's name (`data-label`, set by each column's `createdCell`), the row actions fill the card's bottom two
+  to a row; the column titles are for screen readers only, so a "Sort by" select above the cards drives DataTables'
+  `order()` (through the `DataTableRef`); "rows per page" hides. A column's `render` must read well as a card value.
 - **Every resource comes from our storage or is bundled**: pictures, PDFs and other files the site loads are objects
   in the file storage (S3 / the stub, served at `/api/media/<key>`) or files under `src/assets/` / `public/`. Never
   hot-link another site (the old WordPress files were moved by `flask import-media`; the manifest is
@@ -546,7 +609,8 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
 - **Toasts** (`src/toast.tsx`, `Toast`): a confirmation with no place of its own on the page is a toast:
   `useToast().success(t...)` (the admin tables' add/save/delete/reorder, the discount dialogs, in-place and hero saves,
   signing in and out), `.warning` (signing out dropped an in-place draft), `.error` (a failure with no form to show it
-  in). One at a time, top center just under the header (`top-20`, `sm:top-[6.5rem]`); every toast stays 2 s (`TOAST_SHOW_MS`; errors and warnings use `TOAST_ALERT_MS`, also 2 s), above everything (z-[100]). Look:
+  in). One at a time, top center: below xl inside the slim header's band (like a phone's own notifications, never over
+  the page or a bottom sheet), from xl just under the header; every toast stays 2 s (`TOAST_SHOW_MS`; errors and warnings use `TOAST_ALERT_MS`, also 2 s), above everything (z-[100]). Look:
   a compact `rounded-lg` squircle on the kind's color (success `#26744D`), its icon, the message in bold, and a close X
   (`t.common.closeNotification`) at the end that dismisses it at once; hovering pauses its timer; the live region holds
   only the icon and the words. Form and
@@ -576,15 +640,21 @@ def create_order(customer_id: int, lines: list[OrderLine]) -> Order:
   radios (arrow keys, one tab stop), never copied radio markup.
   An on/off setting is a `ui/switch` (`Switch`, `role="switch"`, named by a `<label htmlFor>`; brand red when on).
 - **Header dropdowns are non-modal** (`<DropdownMenu modal={false}>`): no scroll lock, the page stays accessible.
-- **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel): landmarks, a skip link, labelled
-  controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1, `prefers-reduced-motion`
-  (global rule in `index.css`). An accessible name must contain the visible label (WCAG 2.5.3); avoid building
-  names from several spans that rely on whitespace.
+- **Accessibility** (IS 5568 / WCAG 2.1 AA — legally required in Israel; the phone audit adds WCAG 2.2 AA): landmarks,
+  a skip link, labelled controls, `aria-current`, visible focus rings, full keyboard support, contrast >= 4.5:1,
+  `prefers-reduced-motion` (global rule in `index.css`), 44px touch targets and nothing fixed hiding the focused control
+  (working rule 7). An accessible name must contain the visible label (WCAG 2.5.3); avoid building
+  names from several spans that rely on whitespace. A box that scrolls with no focusable content inside (a phone's photo
+  strip) takes `tabIndex={0}` and a label.
 - **Icons**: lucide-react only; logos are SVG assets. An **action button** leads with its icon (aria-hidden, before
   the label): Edit `Pencil`, Delete / Remove `Trash2`, Add `Plus`, Change order `ArrowUpDown`, Discounts `Percent`,
   Stock `Boxes`, a supplier's Products `Package`, End discount now `CalendarX2`, PDF catalog `FileText`, Ribbon colors `Palette`, Upload `Upload`, Edit on page `Pencil`, Add
-  to cart `ShoppingCart`, Out of stock `PackageX`, Find the nearest store `LocateFixed`, Login `UserRound`, My account
-  `UserRound`, Open account `UserPlus`, Admin panel `ShieldCheck`, Log out `LogOut`, To the catalog `LayoutGrid`; a download link too (`TextLink icon={Download}`).
+  to cart `ShoppingCart`, Out of stock `PackageX`, Find the nearest store `LocateFixed`, Find from address `MapPin`, Login `UserRound`, My account
+  `UserRound`, Open account `UserPlus`, Admin panel `ShieldCheck`, Log out `LogOut`, To the catalog `LayoutGrid`,
+  Filters `SlidersHorizontal`, Sort `ArrowUpDown`, a card's Manage (phone action sheet) `Settings2`, a store's Call
+  `Phone` / Waze `Navigation` / Website `Globe`, List `List` / Map `Map`; a download link too (`TextLink icon={Download}`).
+  The tab bar's tabs are an icon over a label: Home `House`, Products `LayoutGrid`, Stores `MapPin`, Log in
+  `UserRound`, Cart `ShoppingCart`, Admin `ShieldCheck`, Menu `Menu`.
   Controls that are icons stay (close, menu, chevrons, carousel arrows, cart, play/pause, password eye, drag grip,
   stepper −/+, the search magnifier), and state signals (a toast's kind, a sent form's check). Labels, cards,
   headings, navigation CTAs ("Our brands", "Get a quote") and plain text links have no icon, and no arrow appended.
@@ -640,8 +710,10 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   rounded-lg, light grey fill, white with a red border and a faint red halo when focused; never copy field classes.
 - **Logo**: `<Logo className="h-14" />` — horizontal lockup traced from `legacy/public/UltraPet_Logo.pdf`.
 - **Header**: a translucent white material (`material-bar` in `index.css`: 85% white + backdrop blur; solid white
-  for reduced transparency / more contrast), 88px tall (`py-4` + 56px logo; below `sm` the logo shrinks to h-8 so the cart, language and menu buttons fit at 360px); pages use `pt-22` to clear it. No
-  transparent or scroll-driven states. On the home page the menu is a scrollspy (`useScrollSpy` in `Navbar.tsx`): the URL
+  for reduced transparency / more contrast). Below xl a slim 56px app bar: the logo (h-8, h-9 from sm) and the language
+  toggle; the bottom tab bar (`TabBar`, same material) carries Home, Products, Where to buy, Log in / the cart / Admin and
+  Menu (the `MobileMenu` drawer). From xl 88px tall (`py-4` + 56px logo) with the full menu. Pages clear it with
+  `pt-(--header-h)` (never a fixed `pt-22`). No transparent or scroll-driven states. On the home page the menu is a scrollspy (`useScrollSpy` in `Navbar.tsx`): the URL
   hash follows the `<section id>` being read (history replace; none on the hero), so `includeHash` links light up, and an entry whose
   `sections` (NavItem, config.ts) hold that id gets `data-in-view` (`inViewProps` in NavText.tsx: Products ← `#categories`,
   Private Label ← `#private-label`, About ← `#faq`; red + underline, purely visual).
@@ -650,7 +722,8 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   active:duration-100`); clickable cards never move: on hover their border darkens and they gain a soft shadow
   (`transition-[box-shadow,border-color]`), and photos don't zoom (calm, corporate). Tailwind v4 moves with
   `translate`/`scale`, so `transition-[transform]` would not animate those. The mobile drawer
-  can be swiped closed (`onSwipeClose` on `SheetContent`). Reduced motion keeps fades and drops movement (see the
+  can be swiped closed (`onSwipeClose` on `SheetContent`), a bottom sheet and a phone's dialog dragged down by their
+  grabber or header (`useSwipeToClose` in `ui/sheet.tsx`); swipe rows snap (`snap-x`). Reduced motion keeps fades and drops movement (see the
   `prefers-reduced-motion` block in `index.css`). Subtle motion wherever it answers an action, in three durations
   (150ms press / color, 300ms hover / menus, 500ms panels / photos), never more than ~8px of travel, never looping (except a Spinner, the progress bar or a skeleton's shine while something loads): shared utilities `img-fade`
   (a photo fades in once loaded), `img-frame` (its frame shimmers until then), `skeleton` (the shine; reduced motion pulses), `link-underline` (an underline that sweeps in), `animate-spinner`,
@@ -659,15 +732,16 @@ Tokens live in `src/index.css` (ported from legacy `tailwind.config.js` and `src
   and to axe.
 - **Type**: Inter with optical sizing (`opsz`); sizes from `text-xl` up carry size-specific negative tracking
   (`--text-*--letter-spacing`, milder in Hebrew); `tracking-display` for the hero headline; headings balance.
-- **Home hero**: full-bleed (edge to edge under the header, square corners); its slideshow controls sit at the inline
-  start (the inline end is the WhatsApp button's), raised above the
-  scroll-down arrow on phones.
+- **Home hero**: full-bleed (edge to edge under the header, square corners); below xl it fills the screen between the
+  header and the tab bar and grows when its text needs more (a short phone); its slideshow controls sit at the inline
+  start (the inline end is the WhatsApp button's), raised above the scroll-down arrow on phones; the dashes are 44px
+  targets on touch screens.
 - **Header layout**: the desktop menu shows from `xl` (1280px); between `xl` and `2xl` it is compacted (16px gaps,
   short language label "EN"/"עב"). Menu entries (`NAV_TEXT` + `Underline` in NavText.tsx) are sentence-case grey text
   that turns brand red on hover / focus while a thin red underline grows from the reading start; the active page and an
   open dropdown keep it red and underlined (keyboard focus adds a squircle ring). The language button and the cart turn
   red on hover; the account buttons are outlined squircles with their icon that fill red on hover; the header row spans the full window (logo at the start edge; the business customers' cart icon, language and login at the end edge; the menu centered). Re-run the e2e overflow test
-  after adding menu items.
+  after adding menu items. Below xl the header row is the logo and the language toggle only (see Header).
 - **Look and feel**: like Royal Canin / Purina / Hill's / Hamilton — a large international distributor, **not a pet
   shop**. Clean, minimal and premium; large typography, high-end photography, elegant animations; beautiful and
   production-grade, never cookie-cutter. Mobile-first and fast.
@@ -816,6 +890,11 @@ content exists in each language, and the layout flips direction automatically.
 - [x] Scaffold: Vite, Tailwind tokens, TanStack Router, i18n, shadcn/ui, Vitest + Playwright
 - [x] Navbar (`Navbar`, `MobileMenu`, `LanguageSwitcher`, `Logo`), with the login popover (`LoginPopover`, `LoginForm`:
       email, password, remember me; one form for customers and staff, through the API) — the mobile drawer links to `/login`, which shows the same form; signed in, the login button becomes Log out and staff also get an Admin panel button, a toggle that slides the admin drawer (`SubNavDrawer`: the `ADMIN_NAV` pages from `config.ts`) down out of the header and back up
+- [x] Mobile-first app shell and phone layouts (working rule 7): the slim header and the bottom tab bar (`TabBar`; its
+      Menu tab opens `MobileMenu`), the page's `BottomBar` (the product page's Add to cart), dialogs as bottom sheets,
+      the catalog's filter / sort sheets, swipe carousels and gallery, the timeline flowchart, card tables, the admin's
+      chip menu, the docked PropBar, manage mode's action sheet, two-finger maps, the Where to Buy List | Map switch,
+      44px touch targets and 16px fields everywhere; proven by the phone audit (`e2e/mobile-audit.spec.ts`)
 - [ ] Footer + floating WhatsApp button
 - [x] Hero (`Hero`) — photos come from the folder `frontend/src/assets/hero/` (drop files in; see its README); staff
       edit its title, tagline and description (text, font, size per language) in place ("Edit on page", the page's
@@ -900,6 +979,9 @@ content exists in each language, and the layout flips direction automatically.
 - [x] `/admin/suppliers`: the suppliers (vendors: name, country, contact, email, phone, website, notes, active) and
       each one's products (row action "Products", `SupplierProductsDialog`: the supplier's item code, cost price +
       currency, saved whole with `PUT /api/staff/suppliers/<id>/products`); [ ] the suppliers map (latitude / longitude)
+- [x] `/admin/resellers` (משווקים): the Where to Buy stores (name, address, city, phone, website, map position,
+      approximate, active) on a map of every one (a pin opens its form; inactive = grey) and in a table; the form places
+      the pin on a map (`LocationField`) or finds it from the address (`GET /api/staff/geocode`, Nominatim)
 - [x] Inventory on `/admin/products`: the stock ledger (`stock_movements`, `app/inventory.py`, `StockDialog`), stock
       column + alerts, low-stock threshold; customers see In stock / Low / Out and cannot add an out-of-stock product
 - [x] `DiscountDialog`; amount/dated discounts in `price_rules` + staff API

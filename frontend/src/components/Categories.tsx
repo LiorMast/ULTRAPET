@@ -43,13 +43,13 @@ export function Categories({
     onSave: onSave && ((next) => onSave(next)),
   })
   return (
-    <section id="categories" aria-labelledby="categories-title" className="bg-neutral-50 px-6 py-20 lg:px-10 lg:py-24">
+    <section id="categories" aria-labelledby="categories-title" className="bg-neutral-50 px-gutter section-y">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.categories.eyebrow} className="bg-neutral-50" />}
         <form {...section.formProps}>
           <SectionHeading id="categories-title" edit={section.field} className="max-w-2xl" />
         </form>
-        <Carousel label={t.categories.carouselLabel} pageSize={3} className="mt-14">
+        <Carousel label={t.categories.carouselLabel} pageSize={3} className="section-gap">
           {categories.map((category) => (
             <CategoryCard
               key={category.slug}

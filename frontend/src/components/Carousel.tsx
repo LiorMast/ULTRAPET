@@ -8,16 +8,24 @@
  * Paged mode (`pageSize`): the children are grouped into pages of that many items, each page is one full-width
  * snap slide holding a grid of its items, the arrows move exactly one page, and a row of dots below (the current one stretched into a short bar) shows the
  * current page and jumps to any page. Used by the home page Brands section.
+ *
+ * Mobile-first: on a phone (below md, PHONE_QUERY) it is a swipe row like a phone app's: one card per snap (82% of the
+ * width, the next one peeking in), the row bleeding into the page's side margins (px-gutter) so cards slide in from the
+ * screen's edge, no arrow columns (a finger swipes), and a thin decorative bar under it showing where the row is (paged
+ * mode drops its pages there). On touch screens from md the dots are 44px targets.
  */
 import { Children, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from 'cn'
 import { Button } from '@/components/ui/button'
-import { useReducedMotion } from '@/components/useReducedMotion'
+import { PHONE_QUERY, useMediaQuery, useReducedMotion } from '@/components/useMediaQuery'
 import { useI18n } from '@/i18n'
 
-/** Which parts of the row can still be scrolled to. */
-type ScrollState = { overflow: boolean; atStart: boolean; atEnd: boolean; page: number }
+/**
+ * Which parts of the row can still be scrolled to, the current page, and (for the phone's position bar) the share of
+ * the row in view and where that view starts, both as fractions of the row's whole width.
+ */
+type ScrollState = { overflow: boolean; atStart: boolean; atEnd: boolean; page: number; shown: number; start: number }
 
 /** Both arrows per tone: a narrow squircle button beside the row, as tall as the row; dims when disabled. */
 const ARROW_CLASSES = {
@@ -76,9 +84,10 @@ export function Carousel({
   const { t, isRtl } = useI18n()
   const reducedMotion = useReducedMotion()
   const track = useRef<HTMLUListElement>(null)
-  const [state, setState] = useState<ScrollState>({ overflow: false, atStart: true, atEnd: true, page: 0 })
+  const phone = useMediaQuery(PHONE_QUERY)
+  const [state, setState] = useState<ScrollState>({ overflow: false, atStart: true, atEnd: true, page: 0, shown: 1, start: 0 })
   const items = Children.toArray(children)
-  const pages = pageSize ? chunk(items, Math.max(1, pageSize)) : null
+  const pages = pageSize && !phone ? chunk(items, Math.max(1, pageSize)) : null
 
   /** Reads the row's scroll position and stores which arrows are usable (scrollLeft is negative in RTL). */
   const update = useCallback(() => {
@@ -86,7 +95,14 @@ export function Carousel({
     if (!el) return
     const offset = Math.abs(el.scrollLeft)
     const max = el.scrollWidth - el.clientWidth
-    setState({ overflow: max > 1, atStart: offset <= 1, atEnd: offset >= max - 1, page: el.clientWidth ? Math.round(offset / el.clientWidth) : 0 })
+    setState({
+      overflow: max > 1,
+      atStart: offset <= 1,
+      atEnd: offset >= max - 1,
+      page: el.clientWidth ? Math.round(offset / el.clientWidth) : 0,
+      shown: el.scrollWidth ? el.clientWidth / el.scrollWidth : 1,
+      start: el.scrollWidth ? offset / el.scrollWidth : 0,
+    })
   }, [])
 
   useEffect(() => {
@@ -96,7 +112,7 @@ export function Carousel({
     const observer = new ResizeObserver(update)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [update])
+  }, [update, phone])
 
   /**
    * Scrolls the row one page towards the end ("next") or the start ("previous").
@@ -124,7 +140,7 @@ export function Carousel({
   return (
     <div role="region" aria-roledescription="carousel" aria-label={label} className={className}>
       <div className="flex items-stretch gap-3 sm:gap-4">
-        {state.overflow && (
+        {state.overflow && !phone && (
           <Button variant="outline" size="icon-lg" aria-label={t.carousel.previous} disabled={state.atStart} onClick={() => scrollPage(-1)} className={ARROW_CLASSES[tone]}>
             <ChevronLeft aria-hidden="true" strokeWidth={2.25} className="size-7 rtl:rotate-180" />
           </Button>
@@ -133,8 +149,10 @@ export function Carousel({
           ref={track}
           onScroll={update}
           className={cn(
-            'flex min-w-0 flex-1 snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+            'flex min-w-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
             !pages && 'gap-6',
+            // A phone's row bleeds into the page's side margins (px-gutter), its cards snapping in line with the text.
+            phone && '-mx-4 scroll-px-4 gap-4 px-4 sm:-mx-6 sm:scroll-px-6 sm:px-6',
           )}
         >
           {pages
@@ -150,19 +168,28 @@ export function Carousel({
                 </li>
               ))
             : items.map((child, i) => (
-                <li key={i} className={cn('flex shrink-0 snap-start', slideClassName)}>
+                <li key={i} className={cn('flex shrink-0 snap-start', phone ? 'basis-[82%]' : slideClassName)}>
                   {child}
                 </li>
               ))}
         </ul>
-        {state.overflow && (
+        {state.overflow && !phone && (
           <Button variant="outline" size="icon-lg" aria-label={t.carousel.next} disabled={state.atEnd} onClick={() => scrollPage(1)} className={ARROW_CLASSES[tone]}>
             <ChevronRight aria-hidden="true" strokeWidth={2.25} className="size-7 rtl:rotate-180" />
           </Button>
         )}
       </div>
+      {phone && state.overflow && (
+        // Where the row is (decorative: a finger swipes, and the cards themselves take the focus).
+        <div aria-hidden="true" className={cn('relative mx-auto mt-6 h-1 w-24 overflow-hidden rounded-full', tone === 'dark' ? 'bg-white/20' : 'bg-neutral-200')}>
+          <span
+            className={cn('absolute inset-y-0 rounded-full', tone === 'dark' ? 'bg-white' : 'bg-brand-red')}
+            style={{ width: `${state.shown * 100}%`, insetInlineStart: `${state.start * 100}%` }}
+          />
+        </div>
+      )}
       {pages && state.overflow && (
-        <nav aria-label={t.carousel.pages} className="mt-8 flex justify-center gap-2">
+        <nav aria-label={t.carousel.pages} className="mt-8 flex justify-center gap-2 pointer-coarse:gap-9">
           {pages.map((_, p) => (
             <button
               key={p}
@@ -171,7 +198,7 @@ export function Carousel({
               aria-current={p === state.page ? 'true' : undefined}
               onClick={() => goToPage(p)}
               className={cn(
-                'h-2 w-2 rounded-full outline-none transition-[width,background-color] duration-500 aria-[current=true]:w-8 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
+                'relative h-2 w-2 rounded-full outline-none touch-target transition-[width,background-color] duration-500 aria-[current=true]:w-8 focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2',
                 tone === 'dark' ? 'bg-white/30 aria-[current=true]:bg-white' : 'bg-neutral-300 aria-[current=true]:bg-brand-red',
               )}
             />

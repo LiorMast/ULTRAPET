@@ -5,6 +5,7 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { overflowX } from './audit.ts'
 
 /** The article opened by the article-page tests. */
 const SLUG = 'living-with-a-cat'
@@ -24,7 +25,7 @@ async function open(page: Page, path: string) {
 test('the menu leads to the articles, and a card opens its article', async ({ page, isMobile }) => {
   await page.goto('/')
   if (isMobile) {
-    await page.getByRole('button', { name: 'פתיחת תפריט' }).click()
+    await page.getByRole('button', { name: 'תפריט', exact: true }).click()
     await page.getByRole('dialog').getByRole('link', { name: 'מאמרים' }).click()
   } else {
     await page.getByRole('navigation', { name: 'תפריט ראשי' }).getByRole('link', { name: 'מאמרים' }).click()
@@ -64,7 +65,7 @@ for (const path of ['/articles', `/articles/${SLUG}`]) {
     await open(page, path)
     for (const width of [375, 1440]) {
       await page.setViewportSize({ width, height: 900 })
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      expect(await overflowX(page)).toBe(0)
     }
   })
 

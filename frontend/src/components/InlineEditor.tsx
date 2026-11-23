@@ -346,7 +346,7 @@ export function InlineEditBar({ editing, formId, pending, error, editButton, onE
 
 /** The look of the PropBar's selectors, on its dark chip (readable on any section). */
 const SELECT_CLASS =
-  'rounded-md border border-white/30 bg-brand-charcoal px-2 py-1 text-xs text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white'
+  'rounded-md border border-white/30 bg-brand-charcoal px-2 py-1 text-xs text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white pointer-coarse:min-h-11 pointer-coarse:text-base max-md:min-w-0 max-md:flex-1'
 
 /** How far one arrow-key press moves the PropBar, in pixels (with Shift: KEY_STEP * 5). */
 const KEY_STEP = 10
@@ -390,7 +390,10 @@ function clampOffset(bar: HTMLElement, current: Offset, next: Offset): Offset {
 
 /**
  * The section's one font and size bar; it controls the selected text (see useInlineDraft's `propBar`). It can be
- * dragged by its grip (or moved with the arrow keys on the grip) and keeps its spot until edit mode ends.
+ * dragged by its grip (or moved with the arrow keys on the grip) and keeps its spot until edit mode ends. On a phone
+ * (below md) it docks instead as a full-width toolbar just above the tab bar, where the thumb reaches it (no grip),
+ * with 44px selectors in 16px text; while it shows, the page keeps room for it at its end and the WhatsApp button
+ * steps aside (index.css, data-prop-bar).
  * @param props.label - The selected text's name, e.g. "Tagline" (shown, and in the selectors' names).
  * @param props.value - The selected text's values.
  * @param props.onChange - Called with the new font or size of the selected text.
@@ -476,9 +479,15 @@ export function PropBar({
       ref={bar}
       role="toolbar"
       aria-label={t.inlineEdit.toolbar}
+      data-prop-bar=""
       onKeyDown={onKeyDown}
       style={{ translate: `${offset.x}px ${offset.y}px` }}
-      className={cn('relative z-30 flex flex-wrap items-center gap-3 rounded-2xl bg-brand-charcoal py-2 ps-1.5 pe-3 font-sans text-xs text-white shadow-premium', className)}
+      className={cn(
+        'relative z-30 flex flex-wrap items-center gap-3 rounded-2xl bg-brand-charcoal py-2 ps-1.5 pe-3 font-sans text-xs text-white shadow-premium',
+        // A phone: docked above the tab bar, full width.
+        'max-md:fixed max-md:inset-x-2 max-md:bottom-[calc(var(--tabbar-h)+0.5rem)] max-md:z-40 max-md:gap-2 max-md:p-3 max-md:text-sm',
+        className,
+      )}
     >
       <button
         type="button"
@@ -490,14 +499,14 @@ export function PropBar({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onKeyDown={handleGripKeyDown}
-        className="flex h-7 w-6 cursor-grab touch-none items-center justify-center text-white/70 hover:text-white focus-visible:outline-2 focus-visible:outline-white active:cursor-grabbing"
+        className="flex h-7 w-6 cursor-grab touch-none items-center justify-center text-white/70 hover:text-white focus-visible:outline-2 focus-visible:outline-white active:cursor-grabbing max-md:hidden pointer-coarse:size-11"
       >
         <GripVertical size={16} aria-hidden="true" />
       </button>
-      <p aria-live="polite" className="font-semibold">
+      <p aria-live="polite" className="font-semibold max-md:basis-full">
         {t.inlineEdit.editing.replace('{label}', label)}
       </p>
-      <label className="flex items-center gap-1.5">
+      <label className="flex items-center gap-1.5 max-md:min-w-0 max-md:flex-1">
         <span aria-hidden="true">{t.inlineEdit.font}</span>
         <select aria-label={t.inlineEdit.fontOf.replace('{label}', label)} value={value.font} onChange={(event) => onChange({ font: event.target.value as FontKey })} className={SELECT_CLASS}>
           {fontsFor(locale).map((font) => (
@@ -507,7 +516,7 @@ export function PropBar({
           ))}
         </select>
       </label>
-      <label className="flex items-center gap-1.5">
+      <label className="flex items-center gap-1.5 max-md:min-w-0 max-md:flex-1">
         <span aria-hidden="true">{t.inlineEdit.size}</span>
         <select aria-label={t.inlineEdit.sizeOf.replace('{label}', label)} value={value.size} onChange={(event) => onChange({ size: event.target.value as SizeStep })} className={SELECT_CLASS}>
           {SIZE_STEPS.map((size) => (
@@ -523,7 +532,7 @@ export function PropBar({
 
 /** The look of a text box: the text's own typography, a dashed frame, a solid one when selected or focused. */
 const BOX_CLASS =
-  'block w-full bg-transparent p-0 text-inherit outline-1 outline-offset-4 outline-current/50 outline-dashed [font:inherit] [letter-spacing:inherit] placeholder:text-current/50 focus:outline-2 focus:outline-solid focus:outline-current data-[selected=true]:outline-solid data-[selected=true]:outline-current'
+  'block w-full bg-transparent p-0 text-inherit outline-1 outline-offset-4 outline-current/50 outline-dashed [font:inherit] [letter-spacing:inherit] placeholder:text-current/50 focus:outline-2 focus:outline-solid focus:outline-current data-[selected=true]:outline-solid data-[selected=true]:outline-current pointer-coarse:min-h-11 pointer-coarse:text-[max(1rem,1em)]'
 
 /**
  * One text of an editable section.
@@ -749,7 +758,8 @@ function WidthHandle({ width, label, selected, onFocus, onChange }: { width: num
       onPointerCancel={handlePointerUp}
       onKeyDown={handleKeyDown}
       className={cn(
-        'absolute inset-y-0 -end-4 flex w-6 cursor-ew-resize touch-none items-center justify-center outline-none transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-current',
+        // Not on a phone: there the texts use the full width, and the handle would hang over the screen's edge.
+        'absolute inset-y-0 -end-4 flex w-6 cursor-ew-resize touch-none items-center justify-center outline-none transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-current max-md:hidden pointer-coarse:-end-[1.375rem] pointer-coarse:w-11',
         selected ? 'opacity-100' : 'opacity-0 group-hover/box:opacity-100',
       )}
     >

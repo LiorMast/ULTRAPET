@@ -30,7 +30,7 @@ import { cn } from 'cn'
 import { ApiError, type StaffCategory, type StaffProduct } from '@/api'
 import { localized } from '@/config'
 import { errorMessage } from '@/components/RecordDialog'
-import { INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
+import { CHECKBOX_CLASS, CHECKBOX_LABEL_CLASS, INPUT_CLASS, LABEL_CLASS } from '@/components/ui/input'
 import { SearchableField, type SearchOption } from '@/components/SearchableField'
 import { SegmentedSwitch } from '@/components/SegmentedSwitch'
 import { Switch } from '@/components/ui/switch'
@@ -100,12 +100,6 @@ export function scopeFields({ target, customerId }: RuleScope) {
   const [kind, id] = target.split(':')
   return { categoryId: kind === 'category' ? id : null, productId: kind === 'product' ? id : null, businessUserId: customerId }
 }
-
-/** The row of a checkbox and its label ("Bulk discount", "No end date"). */
-const CHECKBOX_LABEL_CLASS = 'flex cursor-pointer items-center gap-3 text-sm text-brand-charcoal'
-
-/** A checkbox in the brand red, with the site's focus ring. */
-const CHECKBOX_CLASS = 'size-4 accent-brand-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red'
 
 /** The field a message belongs to. */
 type FieldName = 'target' | 'customer' | 'value' | 'minQuantity' | 'startsOn' | 'endsOn'

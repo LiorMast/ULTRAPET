@@ -63,7 +63,7 @@ describe('home page sections edited in place', () => {
     await user.type(sectionOf('about').getByRole('textbox', { name: 'Closing paragraph' }), 'Unsaved words')
     expect(screen.getAllByRole('toolbar', { name: 'Text style' }).length).toBeGreaterThan(0)
 
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByRole('button', { name: 'Menu' }))
     await user.click(within(await screen.findByRole('dialog', { name: 'Main menu' })).getByRole('button', { name: 'Sign out' }))
 
     await waitFor(() => expect(screen.queryAllByRole('button', { name: /^Edit on page/ })).toHaveLength(0))
@@ -89,7 +89,8 @@ describe('home page sections edited in place', () => {
     await user.click(brands.getByRole('button', { name: 'Save' }))
 
     const heading = await brands.findByRole('heading', { level: 2, name: 'Our partners' })
-    expect(heading).toHaveClass('text-5xl', 'text-white')
+    // The "Large" step: a step smaller on phones (mobile-first), the design's size from lg.
+    expect(heading).toHaveClass('text-4xl', 'sm:text-5xl', 'lg:text-6xl', 'text-white')
     expect(brands.getByRole('button', { name: 'Edit on page: Our Brands' })).toHaveFocus()
     const posts = sent(fetchSpy, 'POST')
     expect(posts).toHaveLength(1)

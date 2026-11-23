@@ -65,7 +65,7 @@ function AccountPage() {
   }
   if (!profile) return null
   return (
-    <div className="mx-auto max-w-7xl px-6 py-12 lg:px-10 lg:py-16">
+    <div className="page-y px-gutter mx-auto max-w-7xl lg:py-16">
       <SectionHeading id="account-title" as="h1" eyebrow={profile.customer.companyName} title={t.account.title} intro={t.account.subtitle} className="mb-10" />
       <CustomerProfile profile={profile} view="customer" />
     </div>

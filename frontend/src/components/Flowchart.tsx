@@ -6,7 +6,9 @@
  * - FlowchartList renders an ordered list (<ol>): its children are FlowchartCards in flow order. It wraps each in an
  *   <li>, draws a decorative connector between neighbours (double chevrons by default, pointing along the reading
  *   direction, so they flip in RTL) and numbers the cards ("01", "02", ...) unless told not to. `orientation`:
- *   "responsive" = stacked on phones and tablets, one row from `lg`; "vertical" = always stacked (e.g. while editing).
+ *   "responsive" = one row of centred cards from `lg`, and below it (mobile-first) a compact timeline: each step a row
+ *   with its medallion at the start and its card beside it, a thin line joining the medallions; "vertical" = always
+ *   stacked, medallion beside card (e.g. while editing).
  * - FlowchartCard reads its ordinal and the list's orientation from the list (a context), so a card needs no index.
  *   Its title and description are strings (rendered in a heading and a paragraph) or any node styled by the caller,
  *   such as an EditableText with FLOWCHART_TITLE_CLASS / FLOWCHART_TEXT_CLASS; `actions` adds controls under the text.
@@ -35,19 +37,21 @@ export const FLOWCHART_TEXT_CLASS = 'text-sm leading-relaxed text-brand-charcoal
 
 const listVariants = cva('flex flex-col', {
   variants: {
-    orientation: { responsive: 'gap-14 lg:flex-row lg:gap-12', vertical: 'gap-14' },
+    orientation: { responsive: 'gap-6 lg:flex-row lg:gap-12', vertical: 'gap-14' },
   },
   defaultVariants: { orientation: 'responsive' },
 })
 
-// The size-9 (2.25rem) connector sits in the middle of the gap after its step: half the gap plus half its own size
-// beyond the step's edge (stacked: gap-14 → 2.875rem below; in a row: gap-12 → 2.625rem past the inline end, halfway
-// down the cards). Stacked, it is centred across the step, or (vertical) under the size-20 medallion's centre.
-const connectorVariants = cva('pointer-events-none absolute flex size-9 items-center justify-center', {
+// In a row (from lg) the size-9 (2.25rem) connector sits in the middle of the gap after its step: half the gap plus
+// half its own size past the inline end (gap-12 → 2.625rem), halfway down the cards. Below lg (the timeline) it is a
+// line under the size-12 medallion's centre, from just below it into the gap before the next one (gap-6). Vertical: it
+// sits in the middle of the gap-14 below the step (2.875rem), under the size-20 medallion's centre.
+const connectorVariants = cva('pointer-events-none absolute flex items-center justify-center', {
   variants: {
     orientation: {
-      responsive: '-bottom-[2.875rem] inset-x-0 mx-auto lg:inset-x-auto lg:-end-[2.625rem] lg:top-1/2 lg:bottom-auto lg:mx-0 lg:-translate-y-1/2',
-      vertical: '-bottom-[2.875rem] start-[1.375rem]',
+      responsive:
+        'start-[1.4375rem] top-[3.5rem] -bottom-5 w-0.5 lg:start-auto lg:-end-[2.625rem] lg:top-1/2 lg:bottom-auto lg:size-9 lg:-translate-y-1/2',
+      vertical: '-bottom-[2.875rem] start-[1.375rem] size-9',
     },
     kind: {
       chevrons: 'text-brand-red',
@@ -64,17 +68,22 @@ const connectorVariants = cva('pointer-events-none absolute flex size-9 items-ce
  * @returns The connector.
  */
 function Connector({ kind, orientation }: { kind: Exclude<FlowchartConnector, 'none'>; orientation: FlowchartOrientation }) {
-  const row = orientation === 'responsive'
+  if (orientation === 'responsive') {
+    return (
+      <span aria-hidden="true" data-flowchart-connector="" className={connectorVariants({ orientation, kind })}>
+        {/* Below lg: the timeline's line down to the next medallion. */}
+        <span className="h-full w-0.5 rounded-full bg-brand-red/30 lg:hidden" />
+        {kind === 'chevrons' ? (
+          <ChevronsRight strokeWidth={2.75} className="hidden size-9 rtl:-scale-x-100 lg:block" />
+        ) : (
+          <span className="hidden h-px w-full bg-brand-red/40 lg:block" />
+        )}
+      </span>
+    )
+  }
   return (
     <span aria-hidden="true" data-flowchart-connector="" className={connectorVariants({ orientation, kind })}>
-      {kind === 'chevrons' ? (
-        <>
-          <ChevronsDown strokeWidth={2.75} className={cn('size-9', row && 'lg:hidden')} />
-          {row && <ChevronsRight strokeWidth={2.75} className="hidden size-9 rtl:-scale-x-100 lg:block" />}
-        </>
-      ) : (
-        <span className={cn('h-full w-px bg-brand-red/40', row && 'lg:h-px lg:w-full')} />
-      )}
+      {kind === 'chevrons' ? <ChevronsDown strokeWidth={2.75} className="size-9" /> : <span className="h-full w-px bg-brand-red/40" />}
     </span>
   )
 }
@@ -127,14 +136,14 @@ export function FlowchartList({
 
 const cardVariants = cva('flex h-full', {
   variants: {
-    orientation: { responsive: 'flex-col items-center text-center', vertical: 'items-start gap-5 text-start' },
+    orientation: { responsive: 'items-start gap-3 text-start lg:flex-col lg:items-center lg:gap-0 lg:text-center', vertical: 'items-start gap-5 text-start' },
   },
   defaultVariants: { orientation: 'responsive' },
 })
 
 const bodyVariants = cva('relative flex w-full flex-1 flex-col rounded-2xl border border-neutral-150 bg-white shadow-soft', {
   variants: {
-    orientation: { responsive: '-mt-8 items-center px-5 pt-12 pb-9', vertical: 'items-start p-6 pb-7' },
+    orientation: { responsive: 'min-w-0 items-start p-4 pb-5 lg:-mt-8 lg:items-center lg:px-5 lg:pt-12 lg:pb-9', vertical: 'items-start p-6 pb-7' },
   },
   defaultVariants: { orientation: 'responsive' },
 })
@@ -178,14 +187,17 @@ export function FlowchartCard({
     <div data-flowchart-card="" className={cn(cardVariants({ orientation }), className)}>
       <span
         {...(mediaLabel ? { role: 'img', 'aria-label': mediaLabel } : { 'aria-hidden': true })}
-        className="relative z-10 flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-charcoal text-white shadow-premium-sm ring-4 ring-white outline-2 outline-offset-2 outline-brand-red/70 [corner-shape:round] [&>img]:size-full [&>img]:object-cover [&>svg]:size-8"
+        className={cn(
+          'relative z-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-charcoal text-white shadow-premium-sm ring-4 ring-white outline-2 outline-offset-2 outline-brand-red/70 [corner-shape:round] [&>img]:size-full [&>img]:object-cover',
+          orientation === 'responsive' ? 'mt-1 size-12 [&>svg]:size-5 lg:mt-0 lg:size-20 lg:[&>svg]:size-8' : 'size-20 [&>svg]:size-8',
+        )}
       >
         {media}
       </span>
       <div className={bodyVariants({ orientation })}>
         {typeof title === 'string' ? <Heading className={FLOWCHART_TITLE_CLASS}>{title}</Heading> : title}
         {typeof description === 'string' ? <p className={cn('mt-2', FLOWCHART_TEXT_CLASS)}>{description}</p> : description}
-        {actions && <div className={cn('mt-5 flex flex-wrap gap-2', orientation === 'responsive' && 'justify-center')}>{actions}</div>}
+        {actions && <div className={cn('mt-5 flex flex-wrap gap-2', orientation === 'responsive' && 'lg:justify-center')}>{actions}</div>}
         {shownOrdinal !== undefined && (
           // Hidden from screen readers: the <ol> already announces each step's position.
           <span
@@ -194,7 +206,7 @@ export function FlowchartCard({
             data-flowchart-ordinal=""
             className={cn(
               'absolute rounded-md bg-brand-red px-2.5 py-0.5 font-heading text-xs font-bold text-white tabular-nums shadow-soft',
-              orientation === 'responsive' ? 'inset-x-0 -bottom-3 mx-auto w-fit' : '-top-3 end-6',
+              orientation === 'responsive' ? '-top-2.5 end-4 lg:inset-x-0 lg:top-auto lg:-bottom-3 lg:mx-auto lg:w-fit' : '-top-3 end-6',
             )}
           >
             {shownOrdinal}

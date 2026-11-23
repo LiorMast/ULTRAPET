@@ -6,7 +6,8 @@
  * duplicates), Hebrew/RTL and English texts, a caller's own Add/Edit dialog (formDialog) with Edit hidden on some
  * rows (canEdit), a read-only table without action buttons, and the busy Save / Delete buttons (spinner, one request
  * however often they are clicked, back to normal after a refusal), and an "images" column (the main photo's thumbnail,
- * sorted by the number of photos).
+ * sorted by the number of photos), and the phone's card layout: every cell names its column (data-label) and the "Sort
+ * by" menu sorts the rows.
  */
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -53,6 +54,22 @@ describe('DataTable on /admin/brands', () => {
     await waitFor(() => expect(names()).toHaveLength(brands.length))
     await user.click(within(table()).getByRole('columnheader', { name: /Name/ }))
     expect(names()).toEqual(brands.map((brand) => brand.name).sort((a, b) => a.localeCompare(b)))
+  })
+
+  it('names the column of each cell for the phone cards, and sorts from the phone "Sort by" menu', async () => {
+    const { user } = await renderPage('/en/admin/brands', { staff: TEST_STAFF })
+    const firstRow = within(table()).getAllByRole('row')[1]
+    const cells = within(firstRow).getAllByRole('cell')
+    expect(cells[0]).toHaveAttribute('data-label', 'Name')
+    expect(cells[1]).toHaveAttribute('data-label', 'Tagline')
+
+    const sort = screen.getByRole('combobox', { name: 'Sort by' })
+    expect(sort).toHaveValue('')
+    await user.selectOptions(sort, 'Name (descending)')
+    const sorted = brands.map((brand) => brand.name).sort((a, b) => a.localeCompare(b))
+    await waitFor(() => expect(names()).toEqual([...sorted].reverse()))
+    await user.selectOptions(sort, 'Sort by: Default order')
+    await waitFor(() => expect(names()).toEqual(brands.map((brand) => brand.name)))
   })
 
   it('edits a brand and sends only the changed fields', async () => {

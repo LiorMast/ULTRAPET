@@ -275,7 +275,7 @@ function SortableEntry({ item, position, first, last, onMove }: { item: ReorderI
         ref={setActivatorNodeRef}
         type="button"
         aria-label={r.grip.replace('{name}', item.label)}
-        className="flex size-9 shrink-0 cursor-grab touch-none items-center justify-center text-brand-charcoal-muted transition-colors hover:text-brand-charcoal focus-visible:outline-2 focus-visible:outline-brand-red active:cursor-grabbing"
+        className="flex size-9 shrink-0 cursor-grab touch-none items-center justify-center pointer-coarse:size-11 text-brand-charcoal-muted transition-colors hover:text-brand-charcoal focus-visible:outline-2 focus-visible:outline-brand-red active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
@@ -307,7 +307,7 @@ const EntryContent = memo(function EntryContent({ item, first, last, onMove }: {
         <span className="block truncate text-sm font-medium text-brand-charcoal">{item.label}</span>
         {item.detail && <span className="block truncate text-xs text-brand-charcoal-muted">{item.detail}</span>}
       </span>
-      <span className="flex shrink-0 gap-1">
+      <span className="flex shrink-0 gap-1 pointer-coarse:gap-2">
         <Button type="button" variant="ghost" size="icon-sm" data-reorder-id={item.id} data-reorder-action="up" disabled={first} aria-label={r.moveUp.replace('{name}', item.label)} onClick={() => onMove(item.id, 'up')}>
           <ChevronUp aria-hidden />
         </Button>

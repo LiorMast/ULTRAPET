@@ -43,7 +43,7 @@ describe('Cart drawer', () => {
 
   it('slides from the left in Hebrew and closes with the close button, focusing the cart icon', async () => {
     const { user } = await renderPage('/', { user: TEST_USER })
-    const button = screen.getByRole('button', { name: 'סל קניות' })
+    const button = within(screen.getByRole('banner')).getByRole('button', { name: 'סל קניות' })
     await user.click(button)
     const panel = await screen.findByRole('dialog', { name: 'סל קניות' })
     expect(panel).toHaveAttribute('data-side', 'left')
@@ -55,7 +55,7 @@ describe('Cart drawer', () => {
 
   it('closes with Escape', async () => {
     const { user } = await renderPage('/en', { user: TEST_USER })
-    await user.click(screen.getByRole('button', { name: 'Shopping cart' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart' }))
     await screen.findByRole('dialog', { name: 'Shopping cart' })
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -63,7 +63,7 @@ describe('Cart drawer', () => {
 
   it('goes to the catalog and closes from the empty state link', async () => {
     const { user, router } = await renderPage('/en', { user: TEST_USER })
-    await user.click(screen.getByRole('button', { name: 'Shopping cart' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart' }))
     const panel = await screen.findByRole('dialog', { name: 'Shopping cart' })
     await user.click(within(panel).getByRole('link', { name: 'Browse the catalog' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/catalog'))
@@ -72,14 +72,14 @@ describe('Cart drawer', () => {
 
   it("shows the cart's summary in a tooltip on hover", async () => {
     const { user } = await renderPage('/en/catalog', { user: TEST_USER })
-    const cart = screen.getByRole('button', { name: 'Shopping cart' })
+    const cart = within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart' })
     await user.hover(cart)
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Shopping cartYour cart is empty')
     await user.unhover(cart)
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
 
     await user.click((await screen.findAllByRole('button', { name: 'Add to cart' }))[0])
-    await user.hover(screen.getByRole('button', { name: 'Shopping cart, 1 item' }))
+    await user.hover(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 1 item' }))
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/1 item · ₪[\d.,]+ before VAT/)
   })
 
@@ -89,7 +89,7 @@ describe('Cart drawer', () => {
     const name = within(add.closest('article')!).getByRole('heading').textContent!
     const unit = prices.prices[Object.keys(prices.prices).find((id) => products.find((p) => p.id === id)?.name.en === name)! as keyof typeof prices.prices]
     await user.click(add)
-    await user.click(screen.getByRole('button', { name: 'Shopping cart, 1 item' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 1 item' }))
     const panel = await screen.findByRole('dialog', { name: 'Shopping cart' })
 
     const line = within(panel).getByRole('listitem')
@@ -111,7 +111,7 @@ describe('Cart drawer', () => {
     await user.click(within(line).getByRole('button', { name: `Remove ${name}` }))
     expect(within(panel).getByText('Your cart is empty')).toBeInTheDocument()
     // The page behind the open panel is hidden from assistive tech, so the header button is too.
-    expect(screen.getByRole('button', { name: 'Shopping cart', hidden: true })).toBeInTheDocument()
+    expect(within(screen.getByRole('banner', { hidden: true })).getByRole('button', { name: 'Shopping cart', hidden: true })).toBeInTheDocument()
   })
 
   it("shows a line's progress to its next bulk price and prices the line at the bulk price it reaches", async () => {
@@ -123,7 +123,7 @@ describe('Cart drawer', () => {
     const { user } = await renderPage('/en/catalog', { user: TEST_USER })
     const card = screen.getByRole('heading', { name: first.name.en }).closest('article')!
     await user.click(await within(card).findByRole('button', { name: 'Add to cart' }))
-    await user.click(screen.getByRole('button', { name: 'Shopping cart, 1 item' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 1 item' }))
     const panel = await screen.findByRole('dialog', { name: 'Shopping cart' })
     const line = within(panel).getByRole('listitem')
 
@@ -167,7 +167,7 @@ describe('Cart drawer', () => {
   it('shows no bulk progress on a product without bulk prices', async () => {
     const { user } = await renderPage('/en/catalog', { user: TEST_USER })
     await user.click((await screen.findAllByRole('button', { name: 'Add to cart' }))[0])
-    await user.click(screen.getByRole('button', { name: 'Shopping cart, 1 item' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 1 item' }))
     const panel = await screen.findByRole('dialog', { name: 'Shopping cart' })
     expect(panel.querySelector('[data-slot="bulk-progress"]')).toBeNull()
   })
@@ -178,7 +178,7 @@ describe('Cart drawer', () => {
     const names = adds.slice(0, 2).map((add) => within(add.closest('article')!).getByRole('heading').textContent!)
     await user.click(adds[0])
     await user.click(adds[1])
-    await user.click(screen.getByRole('button', { name: 'Shopping cart, 2 items' }))
+    await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Shopping cart, 2 items' }))
     const panel = await screen.findByRole('dialog', { name: 'Shopping cart' })
 
     const first = within(panel).getAllByRole('listitem')[0]

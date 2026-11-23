@@ -448,6 +448,17 @@ export const en: Dictionary = {
     skipToContent: 'Skip to content',
     whatsappLabel: 'Customer service',
   },
+  // The bottom tab bar of phones and tablets (TabBar.tsx): short labels under the icons.
+  tabBar: {
+    label: 'Quick navigation',
+    home: 'Home',
+    products: 'Products',
+    stores: 'Stores',
+    login: 'Log in',
+    cart: 'Cart',
+    admin: 'Admin',
+    menu: 'Menu',
+  },
   offcanvas: {
     close: 'Close',
   },
@@ -505,6 +516,9 @@ export const en: Dictionary = {
     hiddenSaved: 'The product is hidden from customers.',
     addProduct: 'Add product',
     addTitle: 'New product',
+    // A phone's card: one button opening the product's actions in a bottom sheet.
+    actions: 'Manage',
+    actionsFor: 'Manage {name}',
     loading: 'Loading the management data…',
   },
   hero: {
@@ -608,6 +622,12 @@ export const en: Dictionary = {
     approximate: 'Approximate location',
     fullscreen: 'Full screen',
     exitFullscreen: 'Exit full screen',
+    // On a touch screen one finger scrolls the page; the hint shows when one finger drags on a map.
+    twoFingers: 'Use two fingers to move the map',
+    // The phone's switch between the store list and the map.
+    view: 'Show',
+    list: 'List',
+    map: 'Map',
   },
   catalog: {
     eyebrow: 'Product catalog',
@@ -650,6 +670,10 @@ export const en: Dictionary = {
     },
     brandLabel: 'Brand',
     brandsSelected: 'Brand ({n})',
+    // The phone's toolbar: one button for the brand and price filters, opening a bottom sheet.
+    filters: 'Filters',
+    filtersSelected: 'Filters ({n})',
+    showResults: 'Show {n} products',
     priceFilterLabel: 'Price',
     priceRangeTitle: 'Price range (excl. VAT)',
     priceMin: 'Minimum price',
@@ -691,6 +715,8 @@ export const en: Dictionary = {
     previous: 'Previous page',
     next: 'Next page',
     page: 'Page {n}',
+    // A phone's compact pagination, between the arrows.
+    status: 'Page {n} of {total}',
   },
   articles: {
     eyebrow: 'Articles',
@@ -737,6 +763,7 @@ export const en: Dictionary = {
     navCustomers: 'Customers',
     navRequests: 'Account requests',
     navSuppliers: 'Suppliers',
+    navResellers: 'Resellers',
     brandsTitle: 'Brands',
     brandsDescription: 'The brands shown on the site: name, tagline, description, colour, logo and order. Inactive brands are hidden from the site.',
     categoriesTitle: 'Categories',
@@ -752,6 +779,10 @@ export const en: Dictionary = {
     suppliersTitle: 'Suppliers',
     suppliersDescription:
       'The manufacturers and exporters Ultra Pet buys from: contact details, country and notes, and the products each one supplies with its item code and cost price (the "Products" button). Suppliers are never shown on the site. Mark a supplier you no longer buy from inactive.',
+    resellersTitle: 'Resellers',
+    resellersDescription:
+      'The stores that sell Ultra Pet products, as the Where to Buy page and its map show them: name, address, phone, website and map position. Click a pin on the map to edit its store. An inactive reseller (grey pin) is hidden from the site.',
+    resellersMapLabel: 'Map of the resellers',
     requestsTitle: 'Account requests',
     requestsDescription:
       'Businesses that asked for an account with the form on the site. Every new request is also emailed. Open the account with "Open account" (the request is marked converted and linked to the customer), or update its status and notes.',
@@ -822,6 +853,11 @@ export const en: Dictionary = {
       cancelled: 'Move cancelled. {name} is back at position {position} of {total}.',
     },
     table: {
+      // A phone's table is a stack of cards: this menu sorts them (the column titles are not shown there).
+      sortBy: 'Sort by',
+      sortDefault: 'Default order',
+      sortAsc: '{label} (ascending)',
+      sortDesc: '{label} (descending)',
       search: 'Search',
       info: 'Showing _START_–_END_ of _TOTAL_',
       infoEmpty: 'No records to show',
@@ -1085,6 +1121,30 @@ export const en: Dictionary = {
       notes: 'Notes',
       notesHint: 'Internal: payment terms, lead times, etc.',
       isActive: 'Active',
+    },
+    resellerFields: {
+      name: 'Store name',
+      address: 'Address',
+      city: 'City',
+      phone: 'Phone',
+      website: 'Website',
+      latitude: 'Latitude',
+      longitude: 'Longitude',
+      location: 'Map position',
+      locationHint: 'Click the map to place the pin, drag it, type the coordinates or find them from the address.',
+      pickerLabel: "Map for choosing the store's position",
+      pin: "The store's position",
+      approximateLocation: 'Approximate location',
+      approximateHint: 'The pin sits at the city centre, not at the address itself; the map on the site says so.',
+      isActive: 'Active',
+    },
+    geocode: {
+      button: 'Find from address',
+      needCity: 'Type the city first.',
+      found: 'Found: {label}',
+      foundCity: 'The address was not found; the pin is at the city centre: {label}',
+      notFound: 'We could not find the address or the city. Place the pin on the map.',
+      unavailable: 'The map service is not available right now. Place the pin on the map or type the coordinates.',
     },
     supplierProducts: {
       button: 'Products',

@@ -9,6 +9,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { signInStaff } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /** The WCAG tags axe checks. */
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
@@ -47,6 +48,8 @@ test('staff add a supplier, link a product with its cost, and delete the supplie
     const add = dialog.getByRole('combobox', { name: 'Add a product' })
     await add.click()
     await page.getByRole('option').first().click()
+    // The list has closed (it fades out for 200ms; axe would read it mid-fade).
+    await expect(page.getByRole('listbox')).toHaveCount(0)
     await dialog.getByRole('textbox', { name: "Supplier's item code" }).fill('E2E-1')
     await dialog.getByRole('textbox', { name: 'Cost price' }).fill('12.50')
     await dialog.getByRole('combobox', { name: 'Currency' }).selectOption('EUR')
@@ -64,7 +67,7 @@ test('staff add a supplier, link a product with its cost, and delete the supplie
     await page.keyboard.press('Escape')
 
     await page.setViewportSize({ width: 360, height: 800 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    expect(await overflowX(page)).toBe(0)
     await page.setViewportSize({ width: 1280, height: 900 })
   } finally {
     // Leave the dev database as it was (the product links go with the supplier).

@@ -16,13 +16,20 @@ export async function scrollIntoViewSettled(section: Locator) {
 }
 
 /**
- * Hides the fixed overlays (the header and the floating WhatsApp button) before a section screenshot. They float
- * over the page wherever the scroll stops, and a section taller than the window is captured in several scroll
- * steps, so they would land at a different place in every capture. The header has its own screenshots.
+ * Hides the fixed overlays (the header, the bottom tab bar, a bottom action bar, the floating WhatsApp button, and below
+ * md the in-place editor's PropBar, which a phone docks above the tab bar) before a section screenshot. They float over
+ * the page wherever the scroll stops, and a section taller than the window is captured in several scroll steps, so they
+ * would land at a different place in every capture. The header and the tab bar have their own screenshots; the docked
+ * PropBar's place is checked by hero-editor.spec.ts and the phone audit. From md the PropBar floats inside its section
+ * and stays in the screenshots.
  * @param page - The Playwright page.
  */
 export async function hideFixedOverlays(page: Page) {
-  await page.addStyleTag({ content: 'header, a[href^="https://wa.me/"].fixed { visibility: hidden !important; }' })
+  await page.addStyleTag({
+    content:
+      'header, [data-tab-bar], [data-bottom-bar], [data-fab] { visibility: hidden !important; } ' +
+      '@media (width < 48rem) { [data-prop-bar] { visibility: hidden !important; } }',
+  })
 }
 
 /** The staff admin that `flask seed` creates from SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in the repo's .env. */

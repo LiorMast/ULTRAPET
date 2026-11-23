@@ -81,8 +81,8 @@ function AdminCategories() {
 
   return (
     <section>
-      <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.categoriesTitle}</h1>
-      <p className="mb-8 mt-2 max-w-2xl text-sm text-brand-charcoal-muted">{t.admin.categoriesDescription}</p>
+      <h1 className="font-display text-2xl font-bold text-brand-charcoal sm:text-3xl">{t.admin.categoriesTitle}</h1>
+      <p className="mb-6 mt-2 max-w-2xl sm:mb-8 text-sm text-brand-charcoal-muted">{t.admin.categoriesDescription}</p>
       <DataTable
         rows={rows}
         columns={columns}

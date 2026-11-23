@@ -8,6 +8,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import brands from '../src/stubs/brands.json' with { type: 'json' }
 import products from '../src/stubs/products.json' with { type: 'json' }
+import { overflowX } from './audit.ts'
 
 /** A shown brand with more products than the page shows. */
 const BRAND = brands.find((b) => b.slug === 'jr-farm')!
@@ -61,7 +62,7 @@ test('the brand page does not overflow horizontally', async ({ page }) => {
   await open(page, PATH)
   for (const width of [360, 1440]) {
     await page.setViewportSize({ width, height: 900 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    expect(await overflowX(page)).toBe(0)
   }
 })
 

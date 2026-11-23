@@ -1,8 +1,11 @@
 """test_staff_api.py — The staff panel API (app/staff/routes.py): access control and create/read/update/delete of
 every resource (price rules included), with the field checks and the database constraints turned into 400/409 answers.
 """
+import json
 import uuid
 from datetime import datetime
+from urllib.error import URLError
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -601,6 +604,119 @@ def test_resellers_need_a_valid_location(api):
     assert out_of_range.get_json() == {"error": "invalid", "constraint": "resellers_latitude_check"}
     no_city = api("POST", "/resellers", {k: v for k, v in shop.items() if k != "city"})
     assert no_city.get_json() == {"error": "required", "field": "city"}
+
+
+def test_resellers_edit_hides_and_deletes(api, client):
+    shop = {"name": "Pet Shop", "address": "1 Main", "city": "חיפה", "phone": "04-1234567", "latitude": 32.8,
+            "longitude": 35, "approximateLocation": True}
+    created = api("POST", "/resellers", shop).get_json()
+    moved = api("PATCH", f"/resellers/{created['id']}", {"latitude": 32.81, "longitude": 34.99, "approximateLocation": False,
+                                                         "website": "https://pet.example"}).get_json()
+    assert (moved["latitude"], moved["longitude"], moved["approximateLocation"], moved["website"]) == (32.81, 34.99, False, "https://pet.example")
+    public = {r["id"]: r for r in client.get("/api/resellers").get_json()}
+    assert public[created["id"]]["lat"] == 32.81 and public[created["id"]]["approximate"] is False
+    api("PATCH", f"/resellers/{created['id']}", {"isActive": False})
+    assert created["id"] not in {r["id"] for r in client.get("/api/resellers").get_json()}
+    assert created["id"] in {r["id"] for r in api("GET", "/resellers").get_json()}
+    assert api("DELETE", f"/resellers/{created['id']}").status_code == 204
+
+
+class FakeAnswer:
+    """A geocoder answer, as urlopen returns it (a context manager with read())."""
+
+    def __init__(self, body: str):
+        """Keeps the body.
+
+        Args:
+            body: The JSON text answered.
+        """
+        self.body = body.encode()
+
+    def __enter__(self):
+        """Enters the `with` block.
+
+        Returns:
+            Itself.
+        """
+        return self
+
+    def __exit__(self, *args):
+        """Leaves the `with` block (nothing to close)."""
+
+    def read(self) -> bytes:
+        """The body.
+
+        Returns:
+            The JSON bytes.
+        """
+        return self.body
+
+
+@pytest.fixture
+def geocoder(monkeypatch):
+    """Replaces the geocoder's urlopen with canned answers by query text.
+
+    Args:
+        monkeypatch: pytest's patcher.
+
+    Returns:
+        (answers, queries): set answers[query text] to a list of results (missing = no match) or an Exception to
+        raise; queries collects the asked query texts.
+    """
+    from app import geocode
+
+    answers: dict[str, object] = {}
+    queries: list[str] = []
+
+    def fake_urlopen(request, timeout):
+        """Answers one geocoder request.
+
+        Args:
+            request: The urllib Request.
+            timeout: Ignored.
+
+        Returns:
+            A FakeAnswer.
+        """
+        assert "UltraPet" in request.get_header("User-agent")
+        query = parse_qs(urlparse(request.full_url).query)["q"][0]
+        queries.append(query)
+        answer = answers.get(query, [])
+        if isinstance(answer, Exception):
+            raise answer
+        return FakeAnswer(json.dumps(answer))
+
+    monkeypatch.setattr(geocode, "urlopen", fake_urlopen)
+    return answers, queries
+
+
+def test_geocode_finds_the_address(api, geocoder):
+    answers, queries = geocoder
+    answers["הרצל 12, חיפה"] = [{"lat": "32.81", "lon": "34.99", "display_name": "הרצל 12, חיפה", "addresstype": "building"}]
+    response = api("GET", "/geocode?address=הרצל 12&city=חיפה")
+    assert response.get_json() == {"lat": 32.81, "lng": 34.99, "label": "הרצל 12, חיפה", "approximate": False}
+    assert queries == ["הרצל 12, חיפה"]
+
+
+def test_geocode_falls_back_to_the_city(api, geocoder):
+    answers, queries = geocoder
+    answers["חיפה"] = [{"lat": "32.79", "lon": "34.98", "display_name": "חיפה", "addresstype": "city"}]
+    response = api("GET", "/geocode?address=nowhere 1&city=חיפה")
+    assert response.get_json()["approximate"] is True
+    assert queries == ["nowhere 1, חיפה", "חיפה"]
+
+
+def test_geocode_errors(api, geocoder, client):
+    answers, _ = geocoder
+    assert api("GET", "/geocode?address=x").get_json() == {"error": "required", "field": "city"}
+    assert api("GET", "/geocode?address=x&city=Atlantis").status_code == 404
+    answers["Haifa"] = URLError("down")
+    unavailable = api("GET", "/geocode?city=Haifa")
+    assert (unavailable.status_code, unavailable.get_json()) == (502, {"error": "geocoder_unavailable"})
+
+
+def test_geocode_is_staff_only(client, geocoder):
+    assert client.get("/api/staff/geocode?city=Haifa").status_code == 401
 
 
 def test_suppliers_create_read_update_delete(api):

@@ -7,9 +7,10 @@
  * beside the title, the product details (brand, item code, barcode), the price slot (a signed-in customer's price,
  * "log in to see the price" for everyone else; a discounted price shows its discount ribbons above it, the list price
  * struck out and the total percentage, and bulk prices a footnote under it; with a price, the stock status when the product's stock is tracked
- * (In stock / Low stock / Out of stock), a quantity stepper and "Add to cart", or a disabled "Out of stock" button) and
- * the shipping and returns notes; then the full description and
- * "You may also like" (CatalogCards of the same category).
+ * (In stock / Low stock / Out of stock), a quantity stepper and "Add to cart", or a disabled "Out of stock" button;
+ * below xl these two sit in a BottomBar fixed above the tab bar, always within reach) and the shipping and returns
+ * notes; then the full description and "You may also like" (CatalogCards of the same category). On a phone the
+ * breadcrumbs are a back link to the category and the gallery a swipe strip (ProductGallery).
  *
  * Staff: the "Manage mode" switch sits under the breadcrumbs; in manage mode the price block becomes the product's
  * staff panel (ProductManageStrip, size "lg": the information and every action of /admin/products; deleting the
@@ -25,6 +26,7 @@ import { createFileRoute, Link, linkOptions, useNavigate } from '@tanstack/react
 import { fetchProduct, rethrowNotFound, type ProductDetail } from '@/api'
 import { readManageMode, useCustomerPrices, useManage, useManageReload } from '@/auth'
 import { AddToCartButton, CART_FLY_SOURCE_ATTR } from '@/components/AddToCartButton'
+import { BottomBar } from '@/components/BottomBar'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { BulkNote, CatalogCard, PriceSlot, priceFor, stockFor } from '@/components/CatalogCard'
 import { DiscountRibbon, DiscountRibbons, STOCK_RIBBONS } from '@/components/DiscountRibbon'
@@ -171,7 +173,7 @@ function ProductPage() {
 
   return (
     <>
-      <article aria-labelledby="product-title" className="mx-auto max-w-screen-2xl px-6 py-12 lg:px-10 lg:py-16">
+      <article aria-labelledby="product-title" className="page-y px-gutter mx-auto max-w-screen-2xl lg:py-16">
         <Breadcrumbs
           items={[
             { label: t.articles.home, link: linkOptions({ to: '/' }) },
@@ -187,7 +189,7 @@ function ProductPage() {
         )}
 
         {/* The gallery's large photo is the one that flies to the cart. */}
-        <div {...{ [CART_FLY_SOURCE_ATTR]: '' }} className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
+        <div {...{ [CART_FLY_SOURCE_ATTR]: '' }} className="mt-4 grid gap-6 sm:mt-10 sm:gap-10 lg:grid-cols-2 lg:gap-16">
           <ProductGallery images={product.images} name={name} />
 
           <div className="flex flex-col">
@@ -206,7 +208,7 @@ function ProductPage() {
                       <Link
                         to="/brands/$slug"
                         params={{ slug: product.brand.slug }}
-                        className="hover:text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
+                        className="relative touch-target hover:text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
                       >
                         {product.brand.name}
                       </Link>
@@ -240,7 +242,8 @@ function ProductPage() {
                 {price.status === 'shown' && stock && <DiscountRibbon kind={STOCK_RIBBONS[stock]} message={t.stock[stock]} className="mt-3" />}
                 <p className="mt-3 text-sm text-brand-charcoal-muted">{t.product.wholesale}</p>
                 {price.status === 'shown' && (
-                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                  // Below xl a bar fixed above the tab bar, so Add to cart stays within reach while the page scrolls.
+                  <BottomBar className="xl:mt-6 xl:flex xl:flex-wrap xl:items-center xl:gap-3">
                     {stock !== 'out' && <QuantityStepper value={quantity} onChange={setQuantity} />}
                     <AddToCartButton
                       key={product.id}
@@ -249,8 +252,9 @@ function ProductPage() {
                       quantity={quantity}
                       onAdded={() => setQuantity(1)}
                       available={stock !== 'out'}
+                      className="max-xl:flex-1"
                     />
-                  </div>
+                  </BottomBar>
                 )}
               </div>
             )}
@@ -263,7 +267,7 @@ function ProductPage() {
         </div>
 
         {description && (
-          <section aria-labelledby="product-description-title" className="mt-16 max-w-3xl lg:mt-20">
+          <section aria-labelledby="product-description-title" className="mt-10 max-w-3xl sm:mt-16 lg:mt-20">
             <h2 id="product-description-title" className="font-display text-2xl font-bold text-brand-charcoal lg:text-3xl">
               {t.product.descriptionTitle}
             </h2>
@@ -273,7 +277,7 @@ function ProductPage() {
       </article>
 
       {product.related.length > 0 && (
-        <section aria-labelledby="related-title" className="bg-neutral-50 px-6 py-16 lg:px-10 lg:py-20">
+        <section aria-labelledby="related-title" className="bg-neutral-50 px-gutter section-y lg:py-20">
           <div className="mx-auto max-w-screen-2xl">
             <h2 id="related-title" className="font-display text-3xl font-bold text-brand-charcoal">
               {t.product.related}

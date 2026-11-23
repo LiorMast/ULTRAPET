@@ -10,6 +10,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import { hideFixedOverlays, signInStaff as signIn } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 test('signed out, shows the staff sign-in and refuses a wrong password', async ({ page }) => {
   await page.goto('/en/admin')
@@ -78,7 +79,7 @@ test('edits a brand with the keyboard, then reverts it', async ({ page }, testIn
 test('the page does not scroll sideways on a phone', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'phone layout')
   await signIn(page)
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  expect(await overflowX(page)).toBe(0)
 })
 
 for (const [name, path] of [['he', '/admin/brands'], ['en', '/en/admin/brands']] as const) {

@@ -29,18 +29,19 @@ const eyebrowLook = cva('font-heading font-semibold', {
 })
 
 /** The title's look: its size steps and tone. */
-const titleLook = cva('mt-3 font-display font-bold', {
+const titleLook = cva('mt-2 font-display font-bold sm:mt-3', {
   variants: {
-    size: { sm: 'text-3xl lg:text-4xl', md: 'text-4xl lg:text-5xl', lg: 'text-5xl lg:text-6xl', xl: 'text-5xl lg:text-7xl' },
+    // Mobile-first: a step smaller on phones, so a title takes two or three lines, not five.
+    size: { sm: 'text-2xl sm:text-3xl lg:text-4xl', md: 'text-3xl sm:text-4xl lg:text-5xl', lg: 'text-4xl sm:text-5xl lg:text-6xl', xl: 'text-4xl sm:text-5xl lg:text-7xl' },
     tone: { light: 'text-brand-charcoal', dark: 'text-white' },
   },
   defaultVariants: { size: 'md', tone: 'light' },
 })
 
 /** The intro's look: its size steps and tone. */
-const introLook = cva('mt-5', {
+const introLook = cva('mt-3 sm:mt-5', {
   variants: {
-    size: { sm: 'text-base', md: 'text-lg', lg: 'text-xl', xl: 'text-2xl' },
+    size: { sm: 'text-base', md: 'text-base sm:text-lg', lg: 'text-lg sm:text-xl', xl: 'text-xl sm:text-2xl' },
     tone: { light: 'text-brand-charcoal-muted', dark: 'text-white/75' },
   },
   defaultVariants: { size: 'md', tone: 'light' },

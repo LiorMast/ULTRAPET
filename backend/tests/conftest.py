@@ -86,6 +86,8 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> Flask:
             # Emails are kept in app.extensions["outbox"] (the `outbox` fixture), never sent.
             "MAIL_BACKEND": "memory",
             "LEADS_NOTIFY_TO": "",
+            # The geocoder is never called: test_staff_api.py replaces app.geocode.urlopen.
+            "GEOCODER_URL": "http://geocoder.test/search",
         }
     )
     with application.app_context():

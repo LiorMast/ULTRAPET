@@ -110,6 +110,8 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         # How a change to the catalog rebuilds the PDF catalog (app/catalog_pdf.py): "thread" (in the background),
         # "inline" (before the request answers) or "off".
         CATALOG_REBUILD=os.environ.get("CATALOG_REBUILD", "thread"),
+        # The address lookup of the reseller form (app/geocode.py); empty = off.
+        GEOCODER_URL=os.environ.get("GEOCODER_URL", "https://nominatim.openstreetmap.org/search"),
         # Email (app/mailer.py): MAIL_BACKEND "smtp" / "log" / "memory" / "off" (empty = smtp when SMTP_HOST is set,
         # else log); the SMTP server and its sign-in; the sender; who gets the staff notifications (comma separated;
         # empty = the contact_email setting).

@@ -24,6 +24,7 @@ import { BrandCard } from '@/components/BrandCard'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { Carousel } from '@/components/Carousel'
 import { CatalogCard, priceFor, stockFor } from '@/components/CatalogCard'
+import { chipVariants } from '@/components/CatalogToolbar'
 import { TextLink } from '@/components/TextLink'
 import { Button } from '@/components/ui/button'
 import { brandLogo, HERO_LINKS, localized } from '@/config'
@@ -105,7 +106,7 @@ function BrandLogoPanel({ brand }: { brand: Brand }) {
   const logo = logoOf(brand)
   const accent = brand.accent ?? 'var(--color-brand-red)'
   return (
-    <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-3xl bg-neutral-100 p-10">
+    <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-3xl bg-neutral-100 p-6 sm:aspect-[4/3] sm:p-10">
       {logo ? (
         <img src={logo} alt="" width={480} height={360} className="max-h-full w-auto max-w-[70%] object-contain" />
       ) : (
@@ -138,7 +139,7 @@ function BrandPage() {
 
   return (
     <>
-      <article aria-labelledby="brand-title" className="mx-auto max-w-screen-2xl px-6 py-12 lg:px-10 lg:py-16">
+      <article aria-labelledby="brand-title" className="page-y px-gutter mx-auto max-w-screen-2xl lg:py-16">
         <Breadcrumbs
           items={[
             { label: t.articles.home, link: linkOptions({ to: '/' }) },
@@ -152,7 +153,7 @@ function BrandPage() {
           </Suspense>
         )}
 
-        <div className="mt-10 grid gap-10 lg:grid-cols-2 lg:gap-16">
+        <div className="mt-4 grid gap-6 sm:mt-10 sm:gap-10 lg:grid-cols-2 lg:gap-16">
           <BrandLogoPanel brand={brand} />
 
           <div className="flex flex-col">
@@ -174,15 +175,15 @@ function BrandPage() {
                 <dd className="font-semibold text-brand-charcoal">{products.total}</dd>
               </div>
               {brandCategories.length > 0 && (
-                <div className="flex flex-wrap gap-x-2 gap-y-1 py-4">
+                <div className="py-4">
                   <dt className="text-brand-charcoal-muted">{t.brandPage.categories}:</dt>
-                  <dd className="flex flex-wrap gap-x-4 gap-y-1">
+                  <dd className="mt-3 flex flex-wrap gap-2">
                     {brandCategories.map((category) => (
                       <Link
                         key={category.slug}
                         to="/catalog"
                         search={{ brand: brand.slug, category: category.slug }}
-                        className="font-semibold text-brand-charcoal hover:text-brand-red-dark hover:underline focus-visible:ring-2 focus-visible:ring-brand-red/60"
+                        className={chipVariants({ size: 'sm' })}
                       >
                         {localized(category.name, locale)}
                       </Link>
@@ -206,7 +207,7 @@ function BrandPage() {
       </article>
 
       {products.items.length > 0 && (
-        <section aria-labelledby="brand-products-title" className="bg-neutral-50 px-6 py-16 lg:px-10 lg:py-20">
+        <section aria-labelledby="brand-products-title" className="bg-neutral-50 px-gutter section-y lg:py-20">
           <div className="mx-auto max-w-screen-2xl">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <h2 id="brand-products-title" className="font-display text-3xl font-bold text-brand-charcoal">
@@ -235,12 +236,12 @@ function BrandPage() {
       )}
 
       {others.length > 0 && (
-        <section aria-labelledby="other-brands-title" className="bg-black px-6 py-16 lg:px-10 lg:py-20">
+        <section aria-labelledby="other-brands-title" className="bg-black px-gutter section-y lg:py-20">
           <div className="mx-auto max-w-7xl">
             <h2 id="other-brands-title" className="font-display text-3xl font-bold text-white">
               {t.brandPage.otherBrands}
             </h2>
-            <Carousel label={t.brands.carouselLabel} pageSize={BRANDS_PER_PAGE} tone="dark" className="mt-10">
+            <Carousel label={t.brands.carouselLabel} pageSize={BRANDS_PER_PAGE} tone="dark" className="mt-6 sm:mt-10">
               {others.map((other) => (
                 <BrandCard key={other.slug} brand={other} className="w-full" />
               ))}

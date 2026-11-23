@@ -1,13 +1,16 @@
 /**
- * Offcanvas.tsx — A reusable side panel ("offcanvas") that slides in from the start or end edge of the page:
- * a titled header with a close button, an optional notice strip under it (it stays put while the body scrolls),
- * a scrolling body and an optional footer pinned to the bottom.
- * Used by CartDrawer (the business customers' shopping cart); any other side panel (filters, details) should
- * use it too instead of building its own Sheet markup.
+ * Offcanvas.tsx — A reusable panel ("offcanvas") that slides in from the start or end edge of the page, or up from
+ * the bottom (`side="bottom"`, a phone's bottom sheet: full width, as tall as its content up to the screen under the
+ * header, with a grabber): a titled header with a close button, an optional notice strip under it (it stays put while
+ * the body scrolls), a scrolling body and an optional footer pinned to the bottom.
+ * Used by CartDrawer (the business customers' shopping cart) and CatalogToolbar (a phone's filter and sort sheets);
+ * any other side panel or bottom sheet (filters, details, actions) should use it too instead of building its own
+ * Sheet markup.
  *
  * Built on the shared Sheet primitive (ui/sheet.tsx, a Radix Dialog): it traps the focus, closes on Escape or a
  * click on the backdrop, locks the page's scroll, returns the focus to the trigger, and can be swiped closed
- * towards its edge. The side is logical: `end` is the right edge in English and the left edge in Hebrew.
+ * towards its edge (a bottom sheet down, by its grabber or header). The side is logical: `end` is the right edge in
+ * English and the left edge in Hebrew.
  *
  * An optional `tooltip` labels the trigger on hover and keyboard focus (ui/tooltip). It never shows while the panel
  * is open, nor when the focus comes back to the trigger as the panel closes.
@@ -46,7 +49,7 @@ export type OffcanvasProps = VariantProps<typeof panelVariants> & {
   tooltip?: ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
-  side?: 'start' | 'end'
+  side?: 'start' | 'end' | 'bottom'
   notice?: ReactNode
   footer?: ReactNode
   closeLabel?: string
@@ -64,7 +67,8 @@ export type OffcanvasProps = VariantProps<typeof panelVariants> & {
  * @param props.tooltip - Optional tooltip content for the trigger (shown below it on hover or keyboard focus).
  * @param props.open - Controlled open state; omit to let the panel keep its own.
  * @param props.onOpenChange - Called with the new state when the panel opens or closes (including swipes).
- * @param props.side - The logical edge it slides from: 'end' (default; right in English, left in Hebrew) or 'start'.
+ * @param props.side - The edge it slides from: 'end' (default; right in English, left in Hebrew), 'start', or 'bottom'
+ *   (a bottom sheet).
  * @param props.size - The panel's width from `sm` up: 'sm', 'md' (default) or 'lg'; phones always get the full width.
  * @param props.notice - Content of a strip between the header and the body that does not scroll (a status or
  *   a warning the reader must not miss); omitted = none.
@@ -108,7 +112,7 @@ export function Offcanvas({
    * @param next - true when Radix wants to show it (hover or focus).
    */
   const handleTooltip = (next: boolean) => setTooltipOpen(next && !open && Date.now() - closedAt.current > TOOLTIP_QUIET_MS)
-  const physicalSide = (side === 'end') !== isRtl ? 'right' : 'left'
+  const physicalSide = side === 'bottom' ? 'bottom' : (side === 'end') !== isRtl ? 'right' : 'left'
   // The tooltip's trigger wraps the sheet's (both pass their props down to the caller's button).
   const sheetTrigger = trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>
 
@@ -137,7 +141,7 @@ export function Offcanvas({
           </div>
           <SheetClose
             aria-label={closeLabel ?? t.offcanvas.close}
-            className="-me-2 -mt-1 flex size-9 shrink-0 items-center justify-center rounded-lg text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
+            className="-me-2 -mt-1 flex size-9 shrink-0 items-center pointer-coarse:-me-3 pointer-coarse:-mt-2 pointer-coarse:size-11 justify-center rounded-lg text-neutral-500 transition-[color,background-color,scale] duration-150 outline-none hover:bg-neutral-100 hover:text-brand-charcoal focus-visible:ring-2 focus-visible:ring-brand-red active:scale-[0.94] active:duration-100"
           >
             <X size={20} aria-hidden="true" />
           </SheetClose>
@@ -149,9 +153,9 @@ export function Offcanvas({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">{children}</div>
 
-        {footer && <SheetFooter className="mt-0 gap-3 border-t border-neutral-150 px-6 py-5">{footer}</SheetFooter>}
+        {footer && <SheetFooter className="mt-0 gap-3 border-t border-neutral-150 px-6 py-4 sm:py-5">{footer}</SheetFooter>}
       </SheetContent>
     </Sheet>
   )

@@ -137,7 +137,7 @@ describe('Navbar background', () => {
 describe('Products dropdown', () => {
   it('opens on hover and lists the database categories, the product catalog and the PDF catalog', async () => {
     const { user } = await renderPage('/')
-    await user.hover(screen.getByRole('link', { name: 'מוצרים' }))
+    await user.hover(within(screen.getByRole('banner')).getByRole('link', { name: 'מוצרים' }))
     const menu = await screen.findByRole('menu')
 
     const items = within(menu).getAllByRole('menuitem')
@@ -155,7 +155,7 @@ describe('Products dropdown', () => {
 
   it('links the Products label to the full catalog, and the dropdown closes when the pointer leaves', async () => {
     const { user, router } = await renderPage('/en')
-    const products = screen.getByRole('link', { name: 'Products' })
+    const products = within(screen.getByRole('banner')).getByRole('link', { name: 'Products' })
     expect(products).toHaveAttribute('href', '/en/catalog')
     expect(products).toHaveAttribute('aria-expanded', 'false')
 
@@ -172,7 +172,7 @@ describe('Products dropdown', () => {
 
   it('opens the catalog filtered by the chosen category', async () => {
     const { user, router } = await renderPage('/en')
-    await user.hover(screen.getByRole('link', { name: 'Products' }))
+    await user.hover(within(screen.getByRole('banner')).getByRole('link', { name: 'Products' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Cat Litter' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/catalog'))
@@ -208,10 +208,10 @@ describe('Language switcher', () => {
   })
 })
 
-describe('Mobile menu', () => {
+describe('Mobile menu (the tab bar\'s Menu tab)', () => {
   it('opens a drawer with the menu, languages and the business button, and closes on Escape', async () => {
     const { user } = await renderPage('/')
-    const trigger = screen.getByRole('button', { name: 'פתיחת תפריט' })
+    const trigger = screen.getByRole('button', { name: 'תפריט' })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
 
     await user.click(trigger)
@@ -228,20 +228,20 @@ describe('Mobile menu', () => {
 
   it('turns Login into Log out when signed in, with an Admin panel entry for staff, and confirms signing out', async () => {
     const { user } = await renderPage('/en', { staff: TEST_STAFF })
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByRole('button', { name: 'Menu' }))
     const drawer = await screen.findByRole('dialog', { name: 'Main menu' })
     expect(within(drawer).getByRole('link', { name: 'Admin panel' })).toHaveAttribute('href', '/en/admin')
     expect(within(drawer).queryByRole('link', { name: 'Login' })).not.toBeInTheDocument()
     await user.click(within(drawer).getByRole('button', { name: 'Sign out' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByText('You are signed out.')).toHaveAttribute('data-kind', 'success')
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByRole('button', { name: 'Menu' }))
     expect(within(await screen.findByRole('dialog')).getByRole('link', { name: 'Login' })).toBeInTheDocument()
   })
 
   it('expands the Products group to show the categories', async () => {
     const { user } = await renderPage('/')
-    await user.click(screen.getByRole('button', { name: 'פתיחת תפריט' }))
+    await user.click(screen.getByRole('button', { name: 'תפריט' }))
     const drawer = await screen.findByRole('dialog')
 
     await user.click(within(drawer).getByText('מוצרים'))
@@ -251,7 +251,7 @@ describe('Mobile menu', () => {
 
   it('closes after choosing a destination', async () => {
     const { user, router } = await renderPage('/')
-    await user.click(screen.getByRole('button', { name: 'פתיחת תפריט' }))
+    await user.click(screen.getByRole('button', { name: 'תפריט' }))
     const drawer = await screen.findByRole('dialog')
 
     await user.click(within(drawer).getByRole('link', { name: 'משווקים' }))

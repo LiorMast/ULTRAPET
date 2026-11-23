@@ -1,6 +1,7 @@
 /**
  * routes/__root.tsx — The layout shared by every page: the route-managed <head> tags, a "skip to
- * content" link, the Navbar (its Products dropdown lists the categories this route loads), the current page inside <main>, the floating WhatsApp button (not on the staff
+ * content" link, the Navbar (its Products dropdown lists the categories this route loads), the current page inside
+ * <main>, the bottom tab bar of phones and tablets (TabBar, below xl), the floating WhatsApp button (not on the staff
  * panel, /admin/...; the contact details this route loads; the home page's Contact section reads them from here too), the "page not found" screen for
  * unknown URLs, and the "could not load" screen (LoadError, the router's default error component) for pages
  * whose API request failed. Its `head` sets the default title and description; pages override them (see seo.ts).
@@ -14,6 +15,7 @@ import { useState } from 'react'
 import { createRootRouteWithContext, HeadContent, Link, Outlet, useMatchRoute, useRouter, useRouterState } from '@tanstack/react-router'
 import { fetchCategories, fetchContact, type ContactDetails, type ProductCategory } from '@/api'
 import { Navbar } from '@/components/Navbar'
+import { TabBar } from '@/components/TabBar'
 import { Button } from '@/components/ui/button'
 import { WhatsAppButton } from '@/components/WhatsAppButton'
 import { dictionaryFor, useI18n, type Locale } from '@/i18n'
@@ -55,8 +57,10 @@ function RouteProgress({ active }: { active: boolean }) {
 }
 
 /**
- * Renders the site chrome around the current page. The fixed 88px header is always white, so every
- * page gets matching top padding and nothing is hidden under it. The WhatsApp button is left out of the staff panel.
+ * Renders the site chrome around the current page. <main> pads by the fixed chrome's heights (index.css): the header
+ * at the top (--header-h: 56px below xl, 88px from xl), and at the end the tab bar, a page's bottom bar and the
+ * WhatsApp button (--page-end), so nothing fixed ever hides the start or the end of a page. The WhatsApp button is
+ * left out of the staff panel.
  * @returns The page layout.
  */
 function RootLayout() {
@@ -77,9 +81,10 @@ function RootLayout() {
       </a>
       <RouteProgress active={loading} />
       <Navbar categories={categories} />
-      <main id="main" tabIndex={-1} aria-busy={loading || undefined} className="pt-22 outline-none">
+      <main id="main" tabIndex={-1} aria-busy={loading || undefined} className="pt-(--header-h) pb-(--page-end) outline-none">
         <Outlet />
       </main>
+      <TabBar categories={categories} />
       {!isAdmin && <WhatsAppButton phone={contact.whatsapp} />}
     </>
   )
@@ -93,7 +98,7 @@ function RootLayout() {
 function NotFound() {
   const { t } = useI18n()
   return (
-    <section className="mx-auto max-w-3xl px-6 py-32 text-center">
+    <section className="section-y px-gutter mx-auto max-w-3xl text-center lg:py-32">
       <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.page.notFoundTitle}</h1>
       <p className="mt-4 text-brand-charcoal-muted">{t.page.notFoundBody}</p>
       <Button asChild className="mt-8">
@@ -124,7 +129,7 @@ export function LoadError() {
   }
 
   return (
-    <section className="mx-auto max-w-3xl px-6 py-32 text-center">
+    <section className="section-y px-gutter mx-auto max-w-3xl text-center lg:py-32">
       <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.page.loadErrorTitle}</h1>
       <p className="mt-4 text-brand-charcoal-muted">{t.page.loadErrorBody}</p>
       <Button className="mt-8" loading={retrying} onClick={() => void handleRetry()}>

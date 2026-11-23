@@ -7,6 +7,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import products from '../src/stubs/products.json' with { type: 'json' }
+import { overflowX } from './audit.ts'
 
 /** The first catalog product (its card is the first on /catalog). */
 const FIRST = products[0]
@@ -34,7 +35,21 @@ test('a catalog card opens its product page', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/en/products/${encodeURIComponent(FIRST.slug)}$`))
 })
 
-test('the thumbnails switch the large photo', async ({ page }) => {
+test('the photos swipe on a phone: every photo in the strip, the dots follow', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'the phone gallery')
+  await open(page, `/en${PATH}`)
+  const gallery = page.getByRole('group', { name: 'Product photos' })
+  const strip = gallery.getByRole('list', { name: 'Product photos' })
+  await expect(strip.getByRole('img')).toHaveCount(PRODUCT.images.length)
+  const dots = gallery.locator('[aria-hidden="true"] > span')
+  await expect(dots.nth(0)).toHaveClass(/bg-brand-red/)
+  await strip.evaluate((el) => el.scrollTo({ left: (el.firstElementChild as HTMLElement).offsetWidth + 12, behavior: 'instant' }))
+  await expect(dots.nth(1)).toHaveClass(/bg-brand-red/)
+  await expect(dots.nth(0)).not.toHaveClass(/bg-brand-red/)
+})
+
+test('the thumbnails switch the large photo', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'a phone swipes its photos instead')
   await open(page, `/en${PATH}`)
   const gallery = page.getByRole('group', { name: 'Product photos' })
   await gallery.getByRole('button', { name: `Show photo 2 of ${PRODUCT.images.length}` }).click()
@@ -61,7 +76,7 @@ test('the product page does not overflow horizontally', async ({ page }) => {
   await open(page, PATH)
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    expect(await overflowX(page)).toBe(0)
   }
 })
 

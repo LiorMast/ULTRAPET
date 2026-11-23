@@ -130,7 +130,7 @@ function ContactForm({ email }: { email: string }) {
 
   if (sent) {
     return (
-      <div role="status" className="flex flex-col items-center gap-4 p-10 text-center lg:p-14">
+      <div role="status" className="flex flex-col items-center gap-4 p-6 text-center sm:p-10 lg:p-14">
         <CheckCircle2 aria-hidden="true" className="size-12 text-green-700" />
         <h3 className="font-display text-xl font-bold text-brand-charcoal">{t.contact.successTitle}</h3>
         <p className="text-sm text-brand-charcoal-muted">{t.contact.successDesc}</p>
@@ -145,7 +145,7 @@ function ContactForm({ email }: { email: string }) {
   ]
 
   return (
-    <div className="p-8 lg:p-10">
+    <div className="p-5 sm:p-8 lg:p-10">
       <h3 className="font-display text-2xl font-bold text-brand-charcoal">{t.contact.formTitle}</h3>
       <p className="mt-1 text-sm text-brand-charcoal-muted">{t.contact.formSubtitle}</p>
       <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
@@ -246,13 +246,13 @@ export function Contact({
   })
   const { field, editing } = section
   return (
-    <section id="contact" aria-labelledby="contact-title" className="bg-neutral-50 px-6 py-20 lg:px-10 lg:py-24">
+    <section id="contact" aria-labelledby="contact-title" className="bg-neutral-50 px-gutter section-y">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.contact.eyebrow} className="bg-neutral-50" />}
         <div className="grid gap-x-10 lg:grid-cols-2">
           <form {...section.formProps} className="contents">
             <SectionHeading id="contact-title" edit={field} className="lg:col-span-2" />
-            <ul className="mt-14 space-y-3">
+            <ul className="section-gap space-y-3">
               {methods.map((method) => (
                 <ContactCard
                   key={method.id}
@@ -265,7 +265,7 @@ export function Contact({
               ))}
             </ul>
           </form>
-          <div className="mt-10 rounded-3xl bg-white shadow-soft lg:mt-14">
+          <div className="mt-8 rounded-3xl bg-white shadow-soft sm:mt-10 lg:mt-14">
             <ContactForm email={details.email} />
           </div>
         </div>

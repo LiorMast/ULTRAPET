@@ -50,7 +50,7 @@ test('the edit buttons are for staff only', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Edit on page' })).toHaveCount(0)
 })
 
-test('staff edit the texts in place and save them at once', async ({ page }) => {
+test('staff edit the texts in place and save them at once', async ({ page, isMobile }) => {
   const sent = await fakeHeroSection(page)
   await signInStaff(page)
   await page.goto('/en')
@@ -77,20 +77,29 @@ test('staff edit the texts in place and save them at once', async ({ page }) => 
   await expect(bar).toHaveCount(1)
   await expect(bar).toContainText('Editing: Title words')
   await expect(hero.getByRole('textbox', { name: 'Title words' })).toBeFocused()
-  // The bar can be dragged out of the way by its grip and keeps working there.
-  const before = (await bar.boundingBox())!
-  const grip = (await bar.getByRole('button', { name: 'Move the style bar' }).boundingBox())!
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(grip.x + grip.width / 2 - 60, grip.y + grip.height / 2 + 80, { steps: 5 })
-  await page.mouse.up()
-  const after = (await bar.boundingBox())!
-  const heroBox = (await hero.boundingBox())!
-  expect(Math.round(after.y - before.y)).toBe(80)
-  // Sideways it moves the 60px asked for, or stops at the hero's edge (on a phone the bar is nearly as wide).
-  const moved = Math.round(before.x - after.x)
-  expect(moved === 60 || Math.round(after.x) === Math.round(heroBox.x), `moved ${moved}px`).toBe(true)
-  expect(after.x + after.width).toBeLessThanOrEqual(heroBox.x + heroBox.width + 0.5)
+  if (isMobile) {
+    // A phone docks the bar just above the tab bar, full width, with no grip (the thumb reaches it there).
+    const box = (await bar.boundingBox())!
+    const tabBar = (await page.getByRole('navigation', { name: 'Quick navigation' }).boundingBox())!
+    expect(Math.round(tabBar.y - (box.y + box.height))).toBe(8)
+    expect(Math.round(box.x)).toBe(8)
+    await expect(bar.getByRole('button', { name: 'Move the style bar' })).toBeHidden()
+  } else {
+    // The bar can be dragged out of the way by its grip and keeps working there.
+    const before = (await bar.boundingBox())!
+    const grip = (await bar.getByRole('button', { name: 'Move the style bar' }).boundingBox())!
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(grip.x + grip.width / 2 - 60, grip.y + grip.height / 2 + 80, { steps: 5 })
+    await page.mouse.up()
+    const after = (await bar.boundingBox())!
+    const heroBox = (await hero.boundingBox())!
+    expect(Math.round(after.y - before.y)).toBe(80)
+    // Sideways it moves the 60px asked for, or stops at the hero's edge.
+    const moved = Math.round(before.x - after.x)
+    expect(moved === 60 || Math.round(after.x) === Math.round(heroBox.x), `moved ${moved}px`).toBe(true)
+    expect(after.x + after.width).toBeLessThanOrEqual(heroBox.x + heroBox.width + 0.5)
+  }
   await hero.getByRole('textbox', { name: 'Title words' }).focus()
   await bar.getByRole('combobox', { name: 'Title words size' }).selectOption('Small')
   await hero.getByRole('textbox', { name: 'Tagline' }).fill('Wholesale only')

@@ -91,13 +91,13 @@ export function About({
   const section = useEditableSection<string>({ content, ...aboutTexts(t, { pillars, offers, advantages }), styled: HEADING_KEYS, onSave: onSave && ((next) => onSave(next)) })
   const { field } = section
   return (
-    <section id="about" aria-labelledby="about-title" className="bg-white px-6 py-20 lg:px-10 lg:py-24">
+    <section id="about" aria-labelledby="about-title" className="bg-white px-gutter section-y">
       <div className="mx-auto max-w-7xl">
         {section.edit && <SectionEditBar edit={section.edit} label={t.about.eyebrow} className="bg-white" />}
         <form {...section.formProps}>
           <SectionHeading id="about-title" edit={field} />
 
-          <div className="mt-16 grid gap-16 lg:grid-cols-2 lg:gap-20">
+          <div className="section-gap grid gap-10 sm:gap-16 lg:mt-16 lg:grid-cols-2 lg:gap-20">
             <div>
               <EditableText as="h3" wrap {...field('visionTitle')} className="font-display text-2xl font-bold text-brand-charcoal" />
               <ul className="mt-6">
@@ -116,7 +116,7 @@ export function About({
             </div>
           </div>
 
-          <div className="mt-20 grid gap-10 rounded-3xl bg-brand-charcoal p-8 text-white lg:grid-cols-2 lg:gap-16 lg:p-14">
+          <div className="mt-12 grid gap-8 rounded-3xl bg-brand-charcoal p-6 text-white sm:mt-16 sm:gap-10 sm:p-8 lg:mt-20 lg:grid-cols-2 lg:gap-16 lg:p-14">
             <div>
               <EditableText as="h3" wrap {...field('advantagesTitle')} className="font-display text-2xl font-bold" />
               <ul className="mt-6 space-y-4">
@@ -138,7 +138,7 @@ export function About({
             </div>
           </div>
 
-          <EditableText multiline {...field('closing')} className="mt-12 max-w-3xl text-brand-charcoal-muted" />
+          <EditableText multiline {...field('closing')} className="mt-8 max-w-3xl text-brand-charcoal-muted sm:mt-12" />
         </form>
       </div>
     </section>

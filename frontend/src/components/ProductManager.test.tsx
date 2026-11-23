@@ -202,7 +202,7 @@ describe('Manage mode', { timeout: 20_000 }, () => {
   it('is turned off by signing out', async () => {
     setManageMode(true)
     const { user } = await renderPage(CATALOG, { staff: TEST_STAFF })
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(screen.getByRole('button', { name: 'Menu' }))
     const drawer = await screen.findByRole('dialog', { name: 'Main menu' })
     await user.click(within(drawer).getByRole('button', { name: 'Sign out' }))
     expect(readManageMode()).toBe(false)
@@ -214,5 +214,27 @@ describe('Manage mode', { timeout: 20_000 }, () => {
     await renderPage(`/catalog?q=${encodeURIComponent(first.name.he)}`, { staff: TEST_STAFF })
     expect(await screen.findByRole('switch', { name: 'מצב ניהול' }, LAZY)).toBeChecked()
     expect(await screen.findByRole('button', { name: `עריכה: ${first.name.he}` }, LAZY)).toBeInTheDocument()
+  })
+})
+
+describe('Manage mode on a phone', { timeout: 20_000 }, () => {
+  it('puts a card\'s actions behind one Manage button, in a bottom sheet of labelled rows', async () => {
+    // A phone (below md): the media queries that hold "48rem" match.
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query) => ({ matches: query.includes('48rem'), media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+    )
+    setManageMode(true)
+    const { user } = await renderPage(CATALOG, { staff: TEST_STAFF })
+    const manage = await screen.findByRole('button', { name: `Manage ${first.name.en}` }, LAZY)
+    const card = cardOf(first.name.en)
+    expect(within(card).queryByRole('button', { name: `Edit ${first.name.en}` })).not.toBeInTheDocument()
+
+    await user.click(manage)
+    const sheet = await screen.findByRole('dialog', { name: first.name.en })
+    expect(within(sheet).getAllByRole('button').map((button) => button.textContent)).toEqual(expect.arrayContaining(['Edit', 'Stock', 'Discounts', 'Delete']))
+    await user.click(within(sheet).getByRole('button', { name: 'Edit' }))
+    expect(await screen.findByRole('dialog', { name: `Edit ${first.name.en}` })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: first.name.en })).not.toBeInTheDocument())
+    vi.restoreAllMocks()
   })
 })

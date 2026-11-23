@@ -91,7 +91,7 @@ function AdminCustomers() {
                 <Link
                   to="/admin/customers/$id"
                   params={{ id: row.id }}
-                  className="font-semibold text-brand-charcoal underline decoration-brand-red/40 underline-offset-4 transition-colors duration-300 hover:text-brand-red-dark hover:decoration-brand-red-dark"
+                  className="relative font-semibold text-brand-charcoal underline decoration-brand-red/40 underline-offset-4 touch-target transition-colors duration-300 hover:text-brand-red-dark hover:decoration-brand-red-dark"
                 >
                   {row.companyName}
                 </Link>
@@ -121,8 +121,8 @@ function AdminCustomers() {
 
   return (
     <section>
-      <h1 className="font-display text-3xl font-bold text-brand-charcoal">{t.admin.customersTitle}</h1>
-      <p className="mb-8 mt-2 max-w-2xl text-sm text-brand-charcoal-muted">{t.admin.customersDescription}</p>
+      <h1 className="font-display text-2xl font-bold text-brand-charcoal sm:text-3xl">{t.admin.customersTitle}</h1>
+      <p className="mb-6 mt-2 max-w-2xl sm:mb-8 text-sm text-brand-charcoal-muted">{t.admin.customersDescription}</p>
       <DataTable
         rows={rows}
         columns={columns}

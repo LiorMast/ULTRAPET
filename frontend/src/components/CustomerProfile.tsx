@@ -109,7 +109,7 @@ export function PresenceBadge({ lastSeenAt, now: fixedNow, className }: { lastSe
  */
 function ProfileBlock({ id, title, note, children, className }: { id: string; title: string; note?: string; children: ReactNode; className?: string }) {
   return (
-    <section aria-labelledby={id} className={cn('rounded-2xl border border-neutral-200 bg-white p-6 sm:p-8', className)}>
+    <section aria-labelledby={id} className={cn('rounded-2xl border border-neutral-200 bg-white p-5 sm:p-8', className)}>
       <h2 id={id} className="font-display text-xl font-bold text-brand-charcoal">
         {title}
       </h2>
@@ -234,7 +234,9 @@ function DiscountLists({ discounts, view }: { discounts: ProfileDiscount[]; view
 
 /**
  * One past order as an accordion item: the trigger shows its number, date, status and total; the panel its lines,
- * amounts and payment.
+ * amounts and payment. The lines are a table; on a phone (below sm) each line is one row instead ("3 × ₪120.00" under
+ * the product, its total at the end; the column headers stay for screen readers, and explicit roles keep the table's
+ * meaning while its CSS display changes).
  * @param props.order - The order.
  * @param props.view - Who reads it (a product line links to its page only for the customer).
  * @returns The accordion item.
@@ -256,23 +258,23 @@ function OrderItem({ order, view }: { order: ProfileOrder; view: ProfileView }) 
         </span>
       </AccordionTrigger>
       <AccordionContent>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[32rem] text-sm">
+        <div className="sm:overflow-x-auto">
+          <table role="table" className="w-full text-sm max-sm:block sm:min-w-[32rem]">
             <caption className="sr-only">{o.title.replace('{number}', number)}</caption>
-            <thead>
-              <tr className="border-b border-neutral-200 text-start text-brand-charcoal-muted">
-                <th scope="col" className="py-2 pe-4 text-start font-medium">{o.product}</th>
-                <th scope="col" className="py-2 pe-4 text-end font-medium">{o.quantity}</th>
-                <th scope="col" className="py-2 pe-4 text-end font-medium">{o.unitPrice}</th>
-                <th scope="col" className="py-2 text-end font-medium">{o.lineTotal}</th>
+            <thead role="rowgroup" className="max-sm:sr-only">
+              <tr role="row" className="border-b border-neutral-200 text-start text-brand-charcoal-muted">
+                <th role="columnheader" scope="col" className="py-2 pe-4 text-start font-medium">{o.product}</th>
+                <th role="columnheader" scope="col" className="py-2 pe-4 text-end font-medium">{o.quantity}</th>
+                <th role="columnheader" scope="col" className="py-2 pe-4 text-end font-medium">{o.unitPrice}</th>
+                <th role="columnheader" scope="col" className="py-2 text-end font-medium">{o.lineTotal}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-150 text-brand-charcoal">
+            <tbody role="rowgroup" className="divide-y divide-neutral-150 text-brand-charcoal max-sm:block">
               {order.items.map((item, index) => {
                 const name = localized(item.productName, locale)
                 return (
-                  <tr key={index}>
-                    <td className="py-3 pe-4">
+                  <tr role="row" key={index} className="max-sm:flex max-sm:flex-wrap max-sm:items-baseline max-sm:gap-x-1.5 max-sm:py-3">
+                    <td role="cell" className="py-3 pe-4 max-sm:basis-full max-sm:p-0 max-sm:pb-1">
                       {item.productSlug && view === 'customer' ? (
                         <TextLink link={{ to: '/products/$slug', params: { slug: item.productSlug } }}>{name}</TextLink>
                       ) : (
@@ -281,9 +283,11 @@ function OrderItem({ order, view }: { order: ProfileOrder; view: ProfileView }) 
                       {!item.productSlug && <span className="block text-xs text-brand-charcoal-muted">{o.deletedProduct}</span>}
                       {item.sku && <bdi dir="ltr" className="block text-xs text-brand-charcoal-muted">{item.sku}</bdi>}
                     </td>
-                    <td className="py-3 pe-4 text-end tabular-nums">{item.quantity.toLocaleString(locale)}</td>
-                    <td className="py-3 pe-4 text-end tabular-nums">{formatPrice(locale, item.unitPrice)}</td>
-                    <td className="py-3 text-end tabular-nums">{formatPrice(locale, item.lineTotal)}</td>
+                    <td role="cell" className="py-3 pe-4 text-end tabular-nums max-sm:p-0 max-sm:text-brand-charcoal-muted">{item.quantity.toLocaleString(locale)}</td>
+                    <td role="cell" className="py-3 pe-4 text-end tabular-nums max-sm:p-0 max-sm:text-brand-charcoal-muted max-sm:before:content-['×_']">
+                      {formatPrice(locale, item.unitPrice)}
+                    </td>
+                    <td role="cell" className="py-3 text-end tabular-nums max-sm:ms-auto max-sm:p-0 max-sm:font-semibold">{formatPrice(locale, item.lineTotal)}</td>
                   </tr>
                 )
               })}
@@ -322,7 +326,7 @@ export function CustomerProfile({ profile, view }: { profile: Profile; view: Pro
   const a = t.account
   const { customer, orders, discounts } = profile
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-8">
+    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-8">
       <ProfileBlock id="profile-details" title={a.details} note={view === 'customer' ? a.detailsNote : undefined}>
         <div className="mb-6 rounded-xl bg-neutral-50 p-4">
           <p className="font-display text-lg font-bold text-brand-charcoal">{customer.companyName}</p>

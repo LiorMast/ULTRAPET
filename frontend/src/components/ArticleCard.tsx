@@ -83,7 +83,7 @@ const photoClass = (featured: boolean) => cn('relative aspect-[16/10] overflow-h
  * @param featured - The wide card.
  * @returns The column's layout classes.
  */
-const bodyClass = (featured: boolean) => cn('flex flex-1 flex-col p-7', featured && 'lg:justify-center lg:p-12')
+const bodyClass = (featured: boolean) => cn('flex flex-1 flex-col p-5 sm:p-7', featured && 'lg:justify-center lg:p-12')
 
 /**
  * One article card. A real link (crawlable, keyboard-focusable); on hover its border darkens and it gains a soft shadow.

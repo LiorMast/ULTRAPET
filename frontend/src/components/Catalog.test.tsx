@@ -7,7 +7,7 @@
  * (the price ones for customers only), the brand filter with its counts, a customer's price range, the filter pills.
  */
 import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { pageWindow } from '@/components/Pagination'
 import { holdRequests, TEST_USER } from '@/test/api'
 import { renderPage } from '@/test/utils'
@@ -158,8 +158,10 @@ describe('Catalog page', () => {
 
   it('is linked from the Products menu (its label and its first entry)', async () => {
     const { user } = await renderPage('/en')
-    expect(screen.getByRole('link', { name: 'Products' })).toHaveAttribute('href', '/en/catalog')
-    await user.hover(screen.getByRole('link', { name: 'Products' }))
+    // The header's menu entry (the tab bar has a Products tab too, also linking to the catalog).
+    const products = within(screen.getByRole('banner')).getByRole('link', { name: 'Products' })
+    expect(products).toHaveAttribute('href', '/en/catalog')
+    await user.hover(products)
     expect(await screen.findByRole('menuitem', { name: 'All products' })).toHaveAttribute('href', '/en/catalog')
   })
 })
@@ -282,5 +284,34 @@ describe('Catalog sorting and filters', () => {
     await user.keyboard('{ArrowRight}')
     expect(screen.getByRole('spinbutton', { name: 'Minimum price' })).toHaveValue(Number(low.getAttribute('aria-valuenow')))
     expect(screen.getByRole('spinbutton', { name: 'Maximum price' })).toHaveValue(Number(high.getAttribute('aria-valuenow')))
+  })
+})
+
+describe('Catalog filters on a phone', () => {
+  it('opens the brands and the sorts in bottom sheets of 48px rows', async () => {
+    // A phone (below md): the media queries that hold "48rem" match.
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query) => ({ matches: query.includes('48rem'), media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList,
+    )
+    const { user, router } = await renderPage('/en/catalog')
+    const toolbar = screen.getByRole('group', { name: 'Sort and filter' })
+    expect(within(toolbar).queryByRole('button', { name: 'Brand' })).not.toBeInTheDocument()
+
+    await user.click(within(toolbar).getByRole('button', { name: 'Filters' }))
+    const filters = await screen.findByRole('dialog', { name: 'Filters' })
+    await user.click(within(filters).getByRole('checkbox', { name: /^Paw/ }))
+    await waitFor(() => expect(router.state.location.search).toEqual({ brand: 'paw' }))
+    // The sheet stays open for more choices; its button shows the results and closes it.
+    const show = within(filters).getByRole('button', { name: /^Show \d+ products$/ })
+    await user.click(show)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument())
+    expect(within(toolbar).getByRole('button', { name: 'Filters (1)' })).toBeInTheDocument()
+
+    await user.click(within(toolbar).getByRole('button', { name: 'Sort: Recommended' }))
+    const sorts = await screen.findByRole('dialog', { name: 'Sort' })
+    await user.click(within(sorts).getByRole('radio', { name: 'Name: Z to A' }))
+    await waitFor(() => expect(router.state.location.search).toEqual({ brand: 'paw', sort: 'name-desc' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Sort' })).not.toBeInTheDocument())
+    vi.restoreAllMocks()
   })
 })

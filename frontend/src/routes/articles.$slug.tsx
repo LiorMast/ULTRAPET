@@ -118,7 +118,7 @@ function ArticlePage() {
 
   return (
     <>
-      <article aria-labelledby="article-title" className="px-6 py-16 lg:px-10 lg:py-20">
+      <article aria-labelledby="article-title" className="page-y px-gutter lg:py-20">
         <div className="mx-auto max-w-3xl">
           <Breadcrumbs
             items={[
@@ -127,14 +127,14 @@ function ArticlePage() {
               { label: title },
             ]}
           />
-          <ArticleMeta article={article} className="mt-10" />
-          <h1 id="article-title" className="mt-5 font-display text-4xl font-bold leading-tight text-brand-charcoal lg:text-5xl">
+          <ArticleMeta article={article} className="mt-6 sm:mt-10" />
+          <h1 id="article-title" className="mt-4 font-display text-3xl font-bold leading-tight text-brand-charcoal sm:mt-5 sm:text-4xl lg:text-5xl">
             {title}
           </h1>
         </div>
 
         {image && (
-          <figure className="mx-auto mt-12 max-w-5xl">
+          <figure className="mx-auto mt-8 max-w-5xl sm:mt-12">
             <img
               src={image.src}
               srcSet={image.srcSet}
@@ -148,15 +148,15 @@ function ArticlePage() {
           </figure>
         )}
 
-        <div className="mx-auto mt-12 max-w-3xl space-y-6 text-lg leading-relaxed text-brand-charcoal">
+        <div className="mx-auto mt-8 max-w-3xl space-y-5 text-base leading-relaxed text-brand-charcoal sm:mt-12 sm:space-y-6 sm:text-lg">
           {localized(article.body, locale).map((block, index) => (
             <ArticleBlockView key={index} block={block} />
           ))}
         </div>
       </article>
 
-      <aside aria-labelledby="article-cta-title" className="px-3 sm:px-6 lg:px-10">
-        <div className="mx-auto flex max-w-5xl flex-col items-start gap-6 rounded-3xl bg-brand-charcoal px-6 py-12 md:flex-row md:items-center md:justify-between lg:px-12">
+      <aside aria-labelledby="article-cta-title" className="px-gutter">
+        <div className="mx-auto flex max-w-5xl flex-col items-start gap-6 rounded-3xl bg-brand-charcoal px-5 py-8 sm:px-6 sm:py-12 md:flex-row md:items-center md:justify-between lg:px-12">
           <div>
             <h2 id="article-cta-title" className="font-display text-2xl font-bold text-white lg:text-3xl">
               {t.articles.ctaTitle}
@@ -172,7 +172,7 @@ function ArticlePage() {
       </aside>
 
       {categories.length > 0 && (
-        <section aria-labelledby="related-products-title" className="mx-auto max-w-7xl px-6 pt-16 lg:px-10 lg:pt-20">
+        <section aria-labelledby="related-products-title" className="px-gutter mx-auto max-w-7xl pt-12 md:pt-16 lg:pt-20">
           <h2 id="related-products-title" className="font-display text-3xl font-bold text-brand-charcoal">
             {t.articles.relatedProducts}
           </h2>
@@ -190,7 +190,7 @@ function ArticlePage() {
       )}
 
       {more.length > 0 && (
-        <section aria-labelledby="more-articles-title" className="mx-auto max-w-7xl px-6 py-16 lg:px-10 lg:py-20">
+        <section aria-labelledby="more-articles-title" className="px-gutter section-y mx-auto max-w-7xl lg:py-20">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <h2 id="more-articles-title" className="font-display text-3xl font-bold text-brand-charcoal">
               {t.articles.moreArticles}

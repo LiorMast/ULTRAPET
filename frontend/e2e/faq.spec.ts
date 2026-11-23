@@ -6,6 +6,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { hideFixedOverlays, scrollIntoViewSettled } from './utils.ts'
+import { overflowX } from './audit.ts'
 
 /**
  * The CSS animation running on a question's answer panel right now.
@@ -71,7 +72,7 @@ test('does not overflow', async ({ page }) => {
   await page.locator('#faq').scrollIntoViewIfNeeded()
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    expect(await overflowX(page)).toBe(0)
   }
 })
 

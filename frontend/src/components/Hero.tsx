@@ -31,8 +31,8 @@ import { cn } from 'cn'
 import type { HeroContent, SectionText } from '@/api'
 import { putLocale, putWidth, resolveText } from '@/components/EditableSection'
 import { EditableText, InlineEditBar, PropBar, useInlineDraft, type TextValue } from '@/components/InlineEditor'
-import { HERO_FRAME_CLASS, HERO_GUTTER_CLASS } from '@/components/PageSkeleton'
-import { useReducedMotion } from '@/components/useReducedMotion'
+import { HERO_CONTENT_CLASS, HERO_FRAME_CLASS, HERO_GUTTER_CLASS } from '@/components/PageSkeleton'
+import { useReducedMotion } from '@/components/useMediaQuery'
 import { Button } from '@/components/ui/button'
 import logoMarkUrl from '@/assets/logo-mark.svg'
 import { HERO_IMAGES, HERO_LINKS, type HeroImage } from '@/config'
@@ -233,7 +233,7 @@ export function Hero({
       className={cn(
         HERO_FRAME_CLASS,
         // While editing, the boxes' frames and a wrapped bar can add height: the hero grows instead of cutting off.
-        editing && 'h-auto max-h-none py-28',
+        editing && 'py-28 xl:h-auto xl:max-h-none',
       )}
     >
       {images.map((image, i) => (
@@ -256,7 +256,8 @@ export function Hero({
       <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-black/20" />
       <div className="pointer-events-none absolute inset-0 bg-black/30 lg:hidden" />
 
-      <div className={cn('relative z-10 mx-auto flex h-full max-w-screen-2xl flex-col justify-center', HERO_GUTTER_CLASS)}>
+      {/* Staff: below xl the text starts under the edit buttons (one or two rows of them at the top). */}
+      <div className={cn(HERO_CONTENT_CLASS, HERO_GUTTER_CLASS, (onSave || editor) && 'max-xl:pt-40')}>
         <form {...inline.formProps} className="max-w-3xl">
           <div className="mb-5 flex animate-hero-rise items-center gap-3 [animation-delay:200ms]">
             <span aria-hidden="true" className="h-px w-8 bg-brand-red" />
@@ -345,7 +346,7 @@ export function Hero({
 
       {hasControls && (
         // At the text's side (inline start): the inline end belongs to the floating WhatsApp button. On phones the row
-        // sits higher, clear of the centered scroll-down arrow.
+        // sits higher, clear of the centered scroll-down arrow. On touch screens each dash is a 44px target.
         <div className={cn('absolute inset-x-0 bottom-16 z-10 mx-auto flex max-w-screen-2xl justify-start sm:bottom-6', HERO_GUTTER_CLASS)}>
           <div
             role="group"
@@ -359,7 +360,7 @@ export function Hero({
                 aria-label={photoLabel(i)}
                 aria-current={i === current ? 'true' : undefined}
                 onClick={() => setIndex(i)}
-                className="group/dash flex h-6 items-center px-1 outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="group/dash flex h-6 items-center px-1 outline-none focus-visible:ring-2 focus-visible:ring-white pointer-coarse:h-11 pointer-coarse:px-3"
               >
                 <span
                   className={cn(
@@ -387,7 +388,7 @@ export function Hero({
                 type="button"
                 aria-label={userPaused ? t.hero.play : t.hero.pause}
                 onClick={() => setUserPaused(!userPaused)}
-                className="ms-3 flex size-9 items-center justify-center rounded-lg border border-white/40 text-white/80 outline-none transition-[color,border-color,scale] hover:border-white hover:text-white focus-visible:ring-2 focus-visible:ring-white active:scale-90 active:duration-100"
+                className="ms-3 flex size-9 items-center justify-center rounded-lg border pointer-coarse:size-11 border-white/40 text-white/80 outline-none transition-[color,border-color,scale] hover:border-white hover:text-white focus-visible:ring-2 focus-visible:ring-white active:scale-90 active:duration-100"
               >
                 {userPaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}
               </button>
