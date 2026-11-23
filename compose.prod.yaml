@@ -1,5 +1,8 @@
 # compose.prod.yaml — Demo deployment on one server (EC2): Postgres + gunicorn Flask + nginx.
 #
+#   ./deploy.sh [--reset-db | --seed]    update to the newest origin/main: does every step below (see its header)
+#
+# By hand:
 #   cd frontend && npm ci && npm run build      build the static site into frontend/dist
 #   docker compose -f compose.prod.yaml up -d --build
 #   docker compose -f compose.prod.yaml exec backend flask seed

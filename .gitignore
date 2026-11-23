@@ -52,6 +52,8 @@ pgdata/
 postgres-data/
 backend/instance/
 backend/media/
+# Database backups that deploy.sh --reset-db makes before resetting the server's database
+backups/
 
 # Customer personal data: exports of B2B leads and contact-form submissions
 business_leads*

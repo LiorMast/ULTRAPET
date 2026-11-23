@@ -65,6 +65,7 @@ server forwards `/api` (and `/sitemap.xml`) to Flask, so the site calls the API 
 | `docker compose exec backend pytest` | Backend tests, on a separate `content_test` database |
 | `docker compose exec backend flask seed` | Fill an empty database from `frontend/src/stubs/` (plus the demo users from `.env`) |
 | `docker compose exec backend flask reset-db --yes` | Drop and recreate every table (all data is lost) |
+| `./deploy.sh [--reset-db]` | On the demo server (`compose.prod.yaml`): pull the newest `main`, build, restart; `--reset-db` backs up, resets and reseeds the database after a schema change |
 
 The database schema is written by hand in two files, both commented table by table and column by column:
 [backend/app/database/create-tables.sql](backend/app/database/create-tables.sql) creates every table, and
@@ -105,6 +106,8 @@ end-to-end tests need the backend running with seeded data and `SEED_CUSTOMER_*`
 ```
 README.md  CLAUDE.md     this file; the detailed conventions, requirements and roadmap
 compose.yaml             local services: PostgreSQL and the Flask backend (secrets in .env, see .env.example)
+compose.prod.yaml        the demo deployment on one server (Postgres, gunicorn, nginx with nginx.conf)
+deploy.sh                updates the demo server to the newest main (pull, build, restart, optional reset + reseed)
 backend/
   app/                   the Flask app
     auth.py              sign-in with JWTs in HttpOnly cookies, shared by both blueprints

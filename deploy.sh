@@ -88,7 +88,9 @@ main() {
   step "Preflight"
   [ -f .env ] || die "missing .env: run 'cp .env.example .env' and set POSTGRES_PASSWORD and SECRET_KEY."
   [ "$(git rev-parse --abbrev-ref HEAD)" = main ] || die "not on branch main."
-  git diff --quiet && git diff --cached --quiet || die "the working tree has uncommitted changes (git status)."
+  # Edited or deleted tracked files block the update; new files (even staged ones) do not: the fast-forward keeps
+  # them, and git refuses by itself if origin/main adds the same path.
+  git diff --quiet HEAD --diff-filter=a || die "tracked files have uncommitted changes (git status)."
 
   step "Fetching origin/main"
   git fetch origin main

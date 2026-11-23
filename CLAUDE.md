@@ -30,6 +30,8 @@ We are rebuilding two existing sites into one new stack, **step by step, fronten
 README.md  CLAUDE.md
 WORDPRESS.md            audit of the old WordPress site: what it holds, what was imported (and how), what was not
 compose.yaml            dev services: postgres + backend + mailpit (project `ultrapet`)
+compose.prod.yaml       the demo deployment on one server (project `ultrapet-prod`: postgres, gunicorn backend, nginx = nginx.conf)
+deploy.sh               updates the demo server to the newest origin/main (pull, build, restart, health check)
 .env.example            template of the git-ignored .env (database password, secrets)
 legacy/                 reference only (old site; supabase-export/ = seed data and media)
 requirements/           original prompts
@@ -249,6 +251,10 @@ backend/
   (GET only; the container mounts the stubs read-only, so copy /tmp/wp/*.json over; see WORDPRESS.md). It keeps the
   English of unchanged texts and prints the ids whose English must be translated again; then `import-media`.
 - A fresh volume runs `create-tables.sql` by itself; after a schema change run `reset-db` (there are no migrations).
+- `./deploy.sh` — on the demo server: pull origin/main, build the frontend, rebuild/restart `compose.prod.yaml`, check
+  the site. It stops, without pulling, when the schema changed: `./deploy.sh --reset-db` then backs up the database
+  (`backups/`, git-ignored), resets it and reseeds it (seed, import-media, build-catalog). `--seed` = first deploy,
+  `--force` = rebuild when up to date.
 
 ## Working rules (mandatory)
 
